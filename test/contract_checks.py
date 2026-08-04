@@ -16,6 +16,7 @@ EXPECTED_PACKAGES = {
     "cs625_sensor_adapter",
     "cs625_simulation",
     "cs625_bringup",
+    "cs625_target_perception",
 }
 GENERATED_DIRS = {"build", "install", "log", ".colcon"}
 
@@ -61,6 +62,9 @@ def main() -> int:
         ROOT / "scripts" / "test.sh",
         ROOT / "scripts" / "doctor_humble.sh",
         src / "cs625_sensor_adapter" / "tests" / "test_import.py",
+        src / "cs625_target_perception" / "tests" / "test_import.py",
+        src / "cs625_bringup" / "launch" / "sim_ground_truth.launch.py",
+        src / "cs625_bringup" / "launch" / "sim_p2_pipeline.launch.py",
     ]
     for path in required_files:
         if not path.exists():
@@ -75,7 +79,7 @@ def main() -> int:
         export = root.find("export")
         build_type = export.findtext("build_type") if export is not None else None
         expected_build_type = (
-            "ament_python" if package_dir == "cs625_sensor_adapter" else "ament_cmake"
+            "ament_python" if package_dir in ("cs625_sensor_adapter", "cs625_target_perception") else "ament_cmake"
         )
         if build_type != expected_build_type:
             fail(
@@ -359,7 +363,7 @@ def main() -> int:
             continue
         ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
 
-    print("Phase 0–1 static contract checks: PASS")
+    print("Phase 0–2 static contract checks: PASS")
     return 0
 
 

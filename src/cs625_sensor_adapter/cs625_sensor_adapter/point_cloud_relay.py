@@ -28,6 +28,10 @@ class RgbdSensorAdapter(Node):
         self.declare_parameter("status_topic", "")
         self.declare_parameter("freshness_timeout_sec", 1.0)
         self.declare_parameter("drop_invalid_messages", True)
+        self.declare_parameter("validate_camera_info", True)
+        self.declare_parameter("motion_stale_guard", False)
+        self.declare_parameter("motion_complete_time_sec", 0.0)
+        self.declare_parameter("motion_status_topic", "/motion/status")
 
         input_topics = {
             stream: str(self.get_parameter(f"input_{stream}_topic").value)
@@ -125,6 +129,40 @@ class RgbdSensorAdapter(Node):
             )
             self._publish_status(detail=f"invalid {stream} header")
             return
+
+        # CameraInfo validation (P2)
+        if stream == "camera_info" and self.get_parameter("validate_camera_info").value:
+            k = message.k
+            if k[0] <= 0.0 or k[4] <= 0.0:
+                self.get_logger().warning(
+                    "CameraInfo has invalid K matrix (zero focal length)"
+                )
+                if self._drop_invalid_messages:
+                    self._publish_status(detail="invalid camera_info K")
+                    return
+            if message.width == 0 or message.height == 0:
+                self.get_logger().warning("CameraInfo has zero dimensions")
+                if self._drop_invalid_messages:
+                    self._publish_status(detail="invalid camera_info dimensions")
+                    return
+
+        # Stale-frame guard (P2): drop frames older than last motion completion
+        if self.get_parameter("motion_stale_guard").value:
+            motion_cutoff_sec = float(
+                self.get_parameter("motion_complete_time_sec").value
+            )
+            if motion_cutoff_sec > 0.0:
+                msg_sec = (
+                    message.header.stamp.sec
+                    + message.header.stamp.nanosec * 1e-9
+                )
+                if msg_sec < motion_cutoff_sec:
+                    self.get_logger().debug(
+                        f"Dropping stale {stream} frame: "
+                        f"stamp {msg_sec:.3f} < cutoff {motion_cutoff_sec:.3f}"
+                    )
+                    self._publish_status(detail=f"stale_{stream}_dropped")
+                    return
 
         publisher = self._stream_publishers.get(stream)
         if publisher is not None:
