@@ -200,14 +200,14 @@ def generate_launch_description():
         [
             FindPackageShare("cs625_simulation"),
             "worlds",
-            "minimal_occlusion.sdf",
+            "rgbd_fixture.sdf",
         ]
     )
     fixture_world_default = PathJoinSubstitution(
         [
             FindPackageShare("cs625_simulation"),
             "worlds",
-            "rgbd_fixture.sdf",
+            "minimal_occlusion.sdf",
         ]
     )
     common_config_default = PathJoinSubstitution(
@@ -230,7 +230,7 @@ def generate_launch_description():
         DeclareLaunchArgument("launch_rviz", default_value="false", description="Reserved RViz profile switch."),
         DeclareLaunchArgument("use_fake_hardware", default_value="true", description="Use fake hardware when supported."),
         DeclareLaunchArgument("camera_enabled", default_value="true", description="Enable the profile camera path."),
-        DeclareLaunchArgument("launch_sensor_adapter", default_value="false", description="Start the common normalized RGB-D adapter after source topics are verified."),
+        DeclareLaunchArgument("launch_sensor_adapter", default_value="true", description="Start the common normalized RGB-D adapter after source topics are verified."),
         DeclareLaunchArgument("sensor_common_config", default_value=common_config_default, description="Shared normalized sensor configuration."),
         DeclareLaunchArgument("sensor_profile_config", default_value=sim_config_default, description="Simulation sensor profile configuration."),
         DeclareLaunchArgument("sensor_bridge_config", default_value=bridge_config_default, description="Gazebo RGB-D bridge configuration."),
@@ -241,7 +241,7 @@ def generate_launch_description():
         DeclareLaunchArgument("execute", default_value="false", description="Execution gate; false is mandatory outside explicit sim tests."),
         DeclareLaunchArgument("require_confirmation", default_value="true", description="Require an explicit execution confirmation."),
         DeclareLaunchArgument("launch_fixture_world", default_value="true", description="Launch the generic RGB-D fixture world."),
-        DeclareLaunchArgument("launch_official_sim", default_value="false", description="Compose the verified senior/official CS625 control + MoveIt launch."),
+        DeclareLaunchArgument("launch_official_sim", default_value="true", description="Compose the verified senior/official CS625 control + MoveIt launch."),
         DeclareLaunchArgument("official_sim_package", default_value="cs625_bringup", description="Package containing the deterministic CS625 simulation control composition."),
         DeclareLaunchArgument("official_sim_launch_file", default_value="sim_control.launch.py", description="Application simulation control launch; senior CS625 model/configuration remain reused."),
         DeclareLaunchArgument("launch_moveit", default_value="true", description="Launch MoveIt with the application robot description when official simulation is enabled."),
@@ -254,7 +254,7 @@ def generate_launch_description():
         DeclareLaunchArgument("moveit_config_file", default_value="cs625.srdf.xacro", description="Underlay MoveIt SRDF xacro file."),
         DeclareLaunchArgument("moveit_controllers_file", default_value="cs625_moveit_controllers.yaml", description="Reused MoveIt trajectory/controller configuration."),
         DeclareLaunchArgument("moveit_sensors_config", default_value=moveit_sensors_default, description="Normalized point-cloud configuration for MoveIt scene updates."),
-        DeclareLaunchArgument("headless", default_value="true", description="Run Gazebo without GUI when composing the official launch."),
+        DeclareLaunchArgument("headless", default_value="false", description="Run Gazebo without GUI. WSL2/GPU: false; VMware headless: true (Xvfb+ogre1 fallback)."),
         DeclareLaunchArgument("official_sim_launch", default_value="", description="Pinned official CS625 simulation launch path; empty means not connected."),
     ]
     return LaunchDescription(

@@ -1,0 +1,508 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="cs625_static">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size><real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="ignition-gazebo-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="ignition-gazebo-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="ignition-gazebo-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <light type="directional" name="sun">
+      <pose>0 0 5 0 0 0</pose><diffuse>0.8 0.8 0.8 1</diffuse><specular>0.2 0.2 0.2 1</specular><direction>-0.5 0.1 -0.9</direction>
+    </light>
+    <model name="ground_plane"><static>true</static>
+      <link name="link"><collision name="c"><geometry><box><size>10 10 0.1</size></box></geometry></collision><visual name="v"><geometry><box><size>10 10 0.1</size></box></geometry></visual></link>
+    </model>
+    <!-- Fixture camera as render-init trigger; keep at 64x64 1Hz, topic never bridged -->
+    <model name="render_trigger"><static>true</static><pose>-10 10 0.5 0 0 0</pose>
+      <link name="tlink"><sensor name="tcam" type="rgbd_camera"><camera><horizontal_fov>1.0</horizontal_fov><image><width>64</width><height>64</height></image><clip><near>0.1</near><far>10</far></clip></camera><always_on>1</always_on><update_rate>1</update_rate><visualize>0</visualize><topic>/render_trigger</topic><gz_frame_id>tlink</gz_frame_id></sensor></link>
+    </model>
+    <!-- Static occlusion scene -->
+    <model name="occluder"><static>true</static><pose>0.35 0 0.75 0 0 0</pose>
+      <link name="link"><collision name="c"><geometry><box><size>0.35 1.6 1.5</size></box></geometry></collision><visual name="v"><geometry><box><size>0.35 1.6 1.5</size></box></geometry><material><ambient>0.15 0.15 0.65 1</ambient><diffuse>0.15 0.15 0.65 1</diffuse></material></visual></link>
+    </model>
+    <model name="target_object"><static>true</static><pose>0.95 0 0.4 0 0 0</pose>
+      <link name="target_link"><collision name="c"><geometry><cylinder><radius>0.25</radius><length>0.7</length></cylinder></geometry></collision><visual name="v"><geometry><cylinder><radius>0.25</radius><length>0.7</length></cylinder></geometry><material><ambient>0.75 0.1 0.1 1</ambient><diffuse>0.75 0.1 0.1 1</diffuse></material></visual></link>
+    </model>
+    <!-- ROBOT placeholder — inserted by sed below -->
+<sdf version='1.9'>
+  <model name='cs625'>
+    <joint name='base_joint' type='fixed'>
+      <pose relative_to='__model__'>0 0 0 0 0 0</pose>
+      <parent>world</parent>
+      <child>base_link</child>
+    </joint>
+    <link name='base_link'>
+      <pose relative_to='base_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-2.4008693014781e-05 0.00117748953656619 0.07629277704746289 0 0 0</pose>
+        <mass>1.5056196875401799</mass>
+        <inertia>
+          <ixx>0.0067828912063113353</ixx>
+          <ixy>2.67618063769984e-07</ixy>
+          <ixz>-2.5689556417707202e-06</ixz>
+          <iyy>0.0068523032153561536</iyy>
+          <iyz>9.4262879047866778e-05</iyz>
+          <izz>0.0100437671447022</izz>
+        </inertia>
+      </inertial>
+      <collision name='base_link_inertia_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/base.stl</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='base_link_inertia_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/visual/base.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <joint name='shoulder_pan_joint' type='revolute'>
+      <pose relative_to='base_link'>0 0 0.231007 0 0 0</pose>
+      <parent>base_link</parent>
+      <child>shoulder_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-6.2831853071795862</lower>
+          <upper>6.2831853071795862</upper>
+          <effort>730</effort>
+          <velocity>2.0943951023931948</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='shoulder_link'>
+      <pose relative_to='shoulder_pan_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>9.899999999999999e-05 -0.026311 -0.026723 0 0 0</pose>
+        <mass>17.039999999999999</mass>
+        <inertia>
+          <ixx>0.13028999999999999</ixx>
+          <ixy>-8.2709999999999999e-05</ixy>
+          <ixz>0.00010670000000000001</ixz>
+          <iyy>0.085214999999999999</iyy>
+          <iyz>-0.00066335000000000005</iyz>
+          <izz>0.11386</izz>
+        </inertia>
+      </inertial>
+      <collision name='shoulder_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/shoulder.stl</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='shoulder_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/visual/shoulder.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <joint name='shoulder_lift_joint' type='revolute'>
+      <pose relative_to='shoulder_link'>0 0 0 1.5707999 0 0</pose>
+      <parent>shoulder_link</parent>
+      <child>upperarm_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-6.2831853071795862</lower>
+          <upper>6.2831853071795862</upper>
+          <effort>730</effort>
+          <velocity>2.0943951023931948</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='upperarm_link'>
+      <pose relative_to='shoulder_lift_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-0.27762 -1.7e-05 0.20184 0 0 0</pose>
+        <mass>26.542999999999999</mass>
+        <inertia>
+          <ixx>1.1970000000000001</ixx>
+          <ixy>-0.00083272000000000001</ixy>
+          <ixz>-1.5396000000000001</ixz>
+          <iyy>6.1116999999999999</iyy>
+          <iyz>-0.00015495999999999999</iyz>
+          <izz>5.0220000000000002</izz>
+        </inertia>
+      </inertial>
+      <collision name='upperarm_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/upperarm.stl</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='upperarm_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/visual/upperarm.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <joint name='elbow_joint' type='revolute'>
+      <pose relative_to='upperarm_link'>-0.750517 0 0 0 0 0</pose>
+      <parent>upperarm_link</parent>
+      <child>forearm_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-3.1415926535897931</lower>
+          <upper>3.1415926535897931</upper>
+          <effort>430</effort>
+          <velocity>2.617993877991494</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='forearm_link'>
+      <pose relative_to='elbow_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-0.30259 2.1e-05 0.07237 0 0 0</pose>
+        <mass>7.8159999999999998</mass>
+        <inertia>
+          <ixx>0.067796999999999996</ixx>
+          <ixy>4.4997000000000003e-05</ixy>
+          <ixz>-0.12636</ixz>
+          <iyy>1.3409</iyy>
+          <iyz>1.45e-05</iyz>
+          <izz>1.2907999999999999</izz>
+        </inertia>
+      </inertial>
+      <collision name='forearm_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/forearm.stl</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='forearm_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/visual/forearm.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <joint name='wrist_1_joint' type='revolute'>
+      <pose relative_to='forearm_link'>-0.623098 0 0.171144 0 0 0</pose>
+      <parent>forearm_link</parent>
+      <child>wrist_1_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-6.2831853071795862</lower>
+          <upper>6.2831853071795862</upper>
+          <effort>100</effort>
+          <velocity>3.6651914291880918</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='wrist_1_link'>
+      <pose relative_to='wrist_1_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>-3.7e-05 -0.01051 -0.014865 0 0 0</pose>
+        <mass>3.0950000000000002</mass>
+        <inertia>
+          <ixx>0.0079583999999999992</ixx>
+          <ixy>-3.0240000000000002e-06</ixy>
+          <ixz>5.7339999999999996e-06</ixz>
+          <iyy>0.0066863000000000001</iyy>
+          <iyz>1.766e-05</iyz>
+          <izz>0.0048406999999999999</izz>
+        </inertia>
+      </inertial>
+      <collision name='wrist_1_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/wrist1.stl</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='wrist_1_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/visual/wrist1.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <joint name='wrist_2_joint' type='revolute'>
+      <pose relative_to='wrist_1_link'>0 -0.127906 0 1.5707999 0 0</pose>
+      <parent>wrist_1_link</parent>
+      <child>wrist_2_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-6.2831853071795862</lower>
+          <upper>6.2831853071795862</upper>
+          <effort>100</effort>
+          <velocity>3.6651914291880918</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='wrist_2_link'>
+      <pose relative_to='wrist_2_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>3.7e-05 0.01051 -0.014865 0 0 0</pose>
+        <mass>3.0950000000000002</mass>
+        <inertia>
+          <ixx>0.0079584129999999993</ixx>
+          <ixy>-3.0240000000000002e-06</ixy>
+          <ixz>5.7339999999999996e-06</ixz>
+          <iyy>0.0066863479999999999</iyy>
+          <iyz>1.766e-05</iyz>
+          <izz>0.0048406710000000004</izz>
+        </inertia>
+      </inertial>
+      <collision name='wrist_2_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/wrist2.stl</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name='wrist_2_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/visual/wrist2.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+    <joint name='wrist_3_joint' type='revolute'>
+      <pose relative_to='wrist_2_link'>0 0.127478 0 -1.5707999 0 0</pose>
+      <parent>wrist_2_link</parent>
+      <child>wrist_3_link</child>
+      <axis>
+        <xyz>0 0 1</xyz>
+        <limit>
+          <lower>-6.2831853071795862</lower>
+          <upper>6.2831853071795862</upper>
+          <effort>100</effort>
+          <velocity>3.6651914291880918</velocity>
+        </limit>
+        <dynamics>
+          <damping>0</damping>
+          <friction>0</friction>
+          <spring_reference>0</spring_reference>
+          <spring_stiffness>0</spring_stiffness>
+        </dynamics>
+      </axis>
+    </joint>
+    <link name='wrist_3_link'>
+      <pose relative_to='wrist_3_joint'>0 0 0 0 0 0</pose>
+      <inertial>
+        <pose>0.0002842722159730034 -0.001178591676040495 -0.04532164004499438 0 0 0</pose>
+        <mass>0.88900000000000001</mass>
+        <inertia>
+          <ixx>0.0060996539955375916</ixx>
+          <ixy>1.51407085248144e-05</ixy>
+          <ixz>-2.8300927232890902e-05</ixz>
+          <iyy>0.0060943005837749394</iyy>
+          <iyz>3.6808006050663677e-05</iyz>
+          <izz>0.001171545685862902</izz>
+        </inertia>
+      </inertial>
+      <collision name='wrist_3_link_collision'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/wrist3.stl</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name='wrist_3_link_fixed_joint_lump__my_end_effector_link_collision_1'>
+        <pose>-0.046 0 0.353 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/visual/tool0_collision.STL</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <collision name='wrist_3_link_fixed_joint_lump__camera_link_collision_2'>
+        <pose>0.004000000000000004 0 0.403 0 0.785398163397 0</pose>
+        <geometry>
+          <box>
+            <size>0.03 0.05 0.02</size>
+          </box>
+        </geometry>
+        <surface>
+          <contact>
+            <ode/>
+          </contact>
+          <friction>
+            <ode/>
+          </friction>
+        </surface>
+      </collision>
+      <visual name='wrist_3_link_visual'>
+        <pose>0 0 0 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>1 1 1</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/visual/wrist3.dae</uri>
+          </mesh>
+        </geometry>
+      </visual>
+      <visual name='wrist_3_link_fixed_joint_lump__my_end_effector_link_visual_1'>
+        <pose>-0.046 0 0.353 0 0 0</pose>
+        <geometry>
+          <mesh>
+            <scale>0.001 0.001 0.001</scale>
+            <uri>file:///home/oy/cs625_underlay_humble/install/eli_cs_robot_description/share/eli_cs_robot_description/meshes/visual/tool0_vision.STL</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <diffuse>0.9375 0.9375 0.9375 1</diffuse>
+          <ambient>0.9375 0.9375 0.9375 1</ambient>
+        </material>
+      </visual>
+      <visual name='wrist_3_link_fixed_joint_lump__camera_link_visual_2'>
+        <pose>0.004000000000000004 0 0.403 0 0.785398163397 0</pose>
+        <geometry>
+          <box>
+            <size>0.03 0.05 0.02</size>
+          </box>
+        </geometry>
+        <material>
+          <diffuse>0.25 0.25 0.25 1</diffuse>
+          <ambient>0.25 0.25 0.25 1</ambient>
+        </material>
+      </visual>
+      <sensor name='camera_sensor' type='rgbd_camera'>
+        <always_on>true</always_on>
+        <update_rate>15</update_rate>
+        <visualize>false</visualize>
+        <camera>
+          <horizontal_fov>1.0469999999999999</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.050000000000000003</near>
+            <far>5</far>
+          </clip>
+        </camera>
+        <topic>camera</topic>
+        <pose>0.004 0 0.403 0 0.785398 0</pose>
+        <gz_frame_id>camera_link</gz_frame_id>
+      </sensor>
+    </link>
+    <plugin name='gz_ros2_control::GazeboSimROS2ControlPlugin' filename='gz_ros2_control-system'>
+      
+      
+      <parameters>/home/oy/cs625_colcon/install/cs625_bringup/share/cs625_bringup/config/sim_controllers.yaml</parameters>
+      <controller_manager_name>/controller_manager</controller_manager_name>
+    </plugin>
+    <frame name='base_link-base_fixed_joint' attached_to='base_link'>
+      <pose>0 0 0 0 -0 0</pose>
+    </frame>
+    <frame name='base' attached_to='base_link-base_fixed_joint'/>
+    <frame name='base_link-base_link_inertia' attached_to='base_link'>
+      <pose>0 0 0 0 -0 0</pose>
+    </frame>
+    <frame name='base_link_inertia' attached_to='base_link-base_link_inertia'/>
+    <frame name='camera_to_color_optical' attached_to='camera_link'>
+      <pose>0 0 0 -1.5708 -0 -1.5708</pose>
+    </frame>
+    <frame name='camera_color_optical_frame' attached_to='camera_to_color_optical'/>
+    <frame name='camera_to_depth_optical' attached_to='camera_link'>
+      <pose>0 0 0 -1.5708 -0 -1.5708</pose>
+    </frame>
+    <frame name='camera_depth_optical_frame' attached_to='camera_to_depth_optical'/>
+    <frame name='camera_mount_to_camera' attached_to='camera_mount_link'>
+      <pose>0 0 0 0 -0 0</pose>
+    </frame>
+    <frame name='camera_link' attached_to='camera_mount_to_camera'/>
+    <frame name='tool0_to_camera_mount' attached_to='tool0'>
+      <pose>0.05 0 0.05 0 0.785398 0</pose>
+    </frame>
+    <frame name='camera_mount_link' attached_to='tool0_to_camera_mount'/>
+    <frame name='eef_to_tool0' attached_to='my_end_effector_link'>
+      <pose>0 0 0 0 -0 0</pose>
+    </frame>
+    <frame name='tool0' attached_to='eef_to_tool0'/>
+    <frame name='flange_to_eef_joint' attached_to='flange'>
+      <pose>-0.046 0 0.353 0 -0 0</pose>
+    </frame>
+    <frame name='my_end_effector_link' attached_to='flange_to_eef_joint'/>
+    <frame name='wrist_3-flange' attached_to='wrist_3_link'>
+      <pose>0 0 0 0 -0 0</pose>
+    </frame>
+    <frame name='flange' attached_to='wrist_3-flange'/>
+    <frame name='wrist_3_link-ft_frame' attached_to='wrist_3_link'>
+      <pose>0 0 0 0 -0 0</pose>
+    </frame>
+    <frame name='ft_frame' attached_to='wrist_3_link-ft_frame'/>
+  </model>
+</sdf>
+
+  </world>
+</sdf>
