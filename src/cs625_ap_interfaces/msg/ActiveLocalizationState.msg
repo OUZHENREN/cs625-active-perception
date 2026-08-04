@@ -1,0 +1,21 @@
+builtin_interfaces/Time stamp
+
+uint8 UNKNOWN=0
+uint8 IDLE=1
+uint8 INITIALIZE=2
+uint8 OBSERVE=3
+uint8 ESTIMATE_TARGET=4
+uint8 CHECK_TERMINATION=5
+uint8 GENERATE_CANDIDATES=6
+uint8 FILTER_REACHABILITY=7
+uint8 EVALUATE_VIEWS=8
+uint8 PLAN_TO_VIEW=9
+uint8 WAIT_FOR_CONFIRMATION=10
+uint8 EXECUTE_VIEW=11
+uint8 WAIT_FOR_SENSOR_SETTLE=12
+uint8 SUCCESS=13
+uint8 FAILURE=14
+
+uint8 state
+string detail
+bool execute_enabled

@@ -1,0 +1,13 @@
+# MoveIt consumes the normalized application point cloud, never a vendor or
+# Gazebo source topic. Both sim and real profiles pass through the adapter.
+sensors:
+  - point_cloud_sensor
+point_cloud_sensor:
+  sensor_plugin: occupancy_map_monitor/PointCloudOctomapUpdater
+  point_cloud_topic: /sensors/camera/points
+  max_range: 5.0
+  point_subsample: 1
+  padding_offset: 0.01
+  padding_scale: 1.0
+  max_update_rate: 2.0
+  filtered_cloud_topic: /scene/filtered_cloud

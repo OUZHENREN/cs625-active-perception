@@ -1,0 +1,166 @@
+<?xml version="1.0"?>
+<!-- Keep the robot name identical to the reused senior SRDF/MoveIt model. -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="cs625">
+  <!--
+    Application wrapper around the reusable CS robot macro from the senior /
+    official description package. The robot links and dynamics remain in the
+    underlay; this file only composes them with the task-specific tool and
+    camera chain.
+  -->
+  <xacro:include filename="$(find eli_cs_robot_description)/urdf/cs_macro.xacro"/>
+  <xacro:include filename="$(find cs625_ap_description)/urdf/cs625_camera_extension.xacro"/>
+
+  <xacro:arg name="name" default="cs625"/>
+  <xacro:arg name="cs_type" default="cs625"/>
+  <!-- The senior simulation launch passes `prefix`; the official real driver
+       passes `tf_prefix`. Supporting both keeps one application description. -->
+  <xacro:arg name="tf_prefix" default=""/>
+  <xacro:arg name="prefix" default="$(arg tf_prefix)"/>
+  <xacro:arg name="joint_limit_params" default="$(find eli_cs_robot_description)/config/$(arg cs_type)/joint_limits.yaml"/>
+  <xacro:arg name="kinematics_params" default="$(find eli_cs_robot_description)/config/$(arg cs_type)/default_kinematics.yaml"/>
+  <xacro:arg name="physical_params" default="$(find eli_cs_robot_description)/config/$(arg cs_type)/physical_parameters.yaml"/>
+  <xacro:arg name="visual_params" default="$(find eli_cs_robot_description)/config/$(arg cs_type)/visual_parameters.yaml"/>
+  <xacro:arg name="initial_positions_file" default="$(find eli_cs_robot_description)/config/initial_positions.yaml"/>
+
+  <xacro:arg name="safety_limits" default="false"/>
+  <xacro:arg name="safety_pos_margin" default="0.15"/>
+  <xacro:arg name="safety_k_position" default="20"/>
+  <xacro:arg name="use_fake_hardware" default="false"/>
+  <xacro:arg name="fake_sensor_commands" default="false"/>
+  <xacro:arg name="sim_gazebo" default="false"/>
+  <xacro:arg name="sim_ignition" default="false"/>
+  <!-- Keep the senior sensor's Gazebo topic contract as the compatibility
+       default. The ROS-facing name is assigned by the bridge profile. -->
+  <xacro:arg name="camera_sensor_topic" default="/camera"/>
+  <xacro:arg name="simulation_controllers" default=""/>
+  <xacro:arg name="headless_mode" default="false"/>
+
+  <xacro:arg name="robot_ip" default="0.0.0.0"/>
+  <xacro:arg name="script_filename" default=""/>
+  <xacro:arg name="output_recipe_filename" default=""/>
+  <xacro:arg name="input_recipe_filename" default=""/>
+  <xacro:arg name="local_ip" default="0.0.0.0"/>
+  <xacro:arg name="script_command_port" default="50004"/>
+  <xacro:arg name="reverse_port" default="50001"/>
+  <xacro:arg name="script_sender_port" default="50002"/>
+  <xacro:arg name="trajectory_port" default="50003"/>
+  <xacro:arg name="use_tool_communication" default="false"/>
+  <xacro:arg name="tool_voltage" default="0"/>
+  <xacro:arg name="tool_parity" default="0"/>
+  <xacro:arg name="tool_baud_rate" default="115200"/>
+  <xacro:arg name="tool_stop_bits" default="1"/>
+  <xacro:arg name="tool_tcp_port" default="54321"/>
+
+  <xacro:arg name="camera_mount_xyz" default="0.05 0 0.05"/>
+  <xacro:arg name="camera_mount_rpy" default="0 0.785398163397 0"/>
+  <!-- camera_link uses the usual body convention; optical is x-right,
+       y-down, z-forward. The calibration profile may override this. -->
+  <xacro:arg name="camera_optical_rpy" default="-1.570796326795 0 -1.570796326795"/>
+
+  <xacro:property name="initial_positions_file" value="$(arg initial_positions_file)"/>
+
+  <link name="world"/>
+
+  <xacro:cs_robot
+    name="$(arg name)"
+    tf_prefix="$(arg prefix)"
+    parent="world"
+    joint_limits_parameters_file="$(arg joint_limit_params)"
+    kinematics_parameters_file="$(arg kinematics_params)"
+    physical_parameters_file="$(arg physical_params)"
+    visual_parameters_file="$(arg visual_params)"
+    safety_limits="$(arg safety_limits)"
+    safety_pos_margin="$(arg safety_pos_margin)"
+    safety_k_position="$(arg safety_k_position)"
+    use_fake_hardware="$(arg use_fake_hardware)"
+    fake_sensor_commands="$(arg fake_sensor_commands)"
+    sim_gazebo="$(arg sim_gazebo)"
+    sim_ignition="$(arg sim_ignition)"
+    headless_mode="$(arg headless_mode)"
+    initial_positions="${xacro.load_yaml(initial_positions_file)}"
+    robot_ip="$(arg robot_ip)"
+    script_filename="$(arg script_filename)"
+    output_recipe_filename="$(arg output_recipe_filename)"
+    input_recipe_filename="$(arg input_recipe_filename)"
+    local_ip="$(arg local_ip)"
+    script_command_port="$(arg script_command_port)"
+    reverse_port="$(arg reverse_port)"
+    script_sender_port="$(arg script_sender_port)"
+    trajectory_port="$(arg trajectory_port)"
+    use_tool_communication="$(arg use_tool_communication)"
+    tool_voltage="$(arg tool_voltage)"
+    tool_parity="$(arg tool_parity)"
+    tool_baud_rate="$(arg tool_baud_rate)"
+    tool_stop_bits="$(arg tool_stop_bits)"
+    tool_tcp_port="$(arg tool_tcp_port)">
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </xacro:cs_robot>
+
+  <!-- Reused from the senior CS625 description. The control plugin belongs
+       at the top-level robot description, while the reusable cs_robot macro
+       owns the ros2_control tag itself. -->
+  <xacro:if value="$(arg sim_gazebo)">
+    <gazebo>
+      <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+        <parameters>$(arg simulation_controllers)</parameters>
+      </plugin>
+    </gazebo>
+  </xacro:if>
+  <xacro:if value="$(arg sim_ignition)">
+    <!-- Keep the senior top-level Gazebo model pattern, but spell out the
+         Humble gz_ros2_control parameter source so the embedded plugin does
+         not depend on discovery timing. -->
+    <gazebo reference="world"/>
+    <gazebo>
+      <!-- Humble/Fortress expects the plugin's exported logical filename.
+           The installed ELF remains libgz_ros2_control-system.so. -->
+      <plugin filename="gz_ros2_control-system"
+              name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <robot_param>robot_description</robot_param>
+        <robot_param_node>robot_state_publisher</robot_param_node>
+        <parameters>$(arg simulation_controllers)</parameters>
+        <controller_manager_name>$(arg prefix)controller_manager</controller_manager_name>
+      </plugin>
+    </gazebo>
+  </xacro:if>
+
+  <!-- Preserved from the senior CS625 description so the existing MoveIt
+       SRDF group (tip=my_end_effector_link) remains usable. -->
+  <link name="$(arg prefix)my_end_effector_link">
+    <visual>
+      <geometry>
+        <mesh filename="file://$(find eli_cs_robot_description)/meshes/visual/tool0_vision.STL"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="eef_color"><color rgba="0.75 0.75 0.75 1.0"/></material>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="file://$(find eli_cs_robot_description)/meshes/visual/tool0_collision.STL"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+  </link>
+  <joint name="$(arg prefix)flange_to_eef_joint" type="fixed">
+    <parent link="$(arg prefix)flange"/>
+    <child link="$(arg prefix)my_end_effector_link"/>
+    <origin xyz="-0.046 0 0.353" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Stable application frame used by the active-perception contract. -->
+  <link name="$(arg prefix)tool0"/>
+  <joint name="$(arg prefix)eef_to_tool0" type="fixed">
+    <parent link="$(arg prefix)my_end_effector_link"/>
+    <child link="$(arg prefix)tool0"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:cs625_eye_in_hand_camera
+    parent="$(arg prefix)tool0"
+    prefix="$(arg prefix)"
+    xyz="$(arg camera_mount_xyz)"
+    rpy="$(arg camera_mount_rpy)"
+    optical_rpy="$(arg camera_optical_rpy)"
+    sim_ignition="$(arg sim_ignition)"
+    camera_sensor_topic="$(arg camera_sensor_topic)"/>
+</robot>
