@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Copy elite_ros source tree to WSL ext4, build, test, then launch.
-# Usage: bash scripts/wsl_local_build.sh [ros2 launch ...]
 #
 # The /mnt/b symlink-install forces Gazebo/Ogre to load SDF, DAE/STL meshes
 # and textures across the Windows→WSL filesystem boundary.  Fixture worlds
@@ -14,6 +13,21 @@ LOCAL_COPY="${CS625_LOCAL_WS:-$HOME/cs625_local_ws}"
 UNDERLAY_SETUP="${CS625_UNDERLAY_SETUP:-$HOME/cs625_underlay_humble/install/setup.bash}"
 COLCON_ROOT="${CS625_COLCON_ROOT:-$HOME/cs625_colcon}"
 
+# ROS 2 and underlay setup scripts assume variables like AMENT_TRACE_SETUP_FILES
+# may be unset at source time.  Temporarily relax nounset around them so the
+# scripts don't abort before colcon can run.
+source_ros_setup() {
+    local setup_file="$1"
+    if [[ ! -f "${setup_file}" ]]; then
+        echo "ERROR: Setup file not found: ${setup_file}" >&2
+        return 1
+    fi
+    set +u
+    # shellcheck disable=SC1090
+    source "${setup_file}"
+    set -u
+}
+
 echo "=== 清理旧 Gazebo 进程 ==="
 pkill -TERM -f "ign gazebo|gz sim" 2>/dev/null || true
 sleep 2
@@ -25,15 +39,14 @@ rsync -a --delete --exclude '.git' --exclude 'build' --exclude 'install' --exclu
 
 echo "=== 构建 ==="
 cd "$LOCAL_COPY"
-source /opt/ros/humble/setup.bash
+source_ros_setup /opt/ros/humble/setup.bash
 if [[ -n "${UNDERLAY_SETUP}" ]] && [[ -f "${UNDERLAY_SETUP}" ]]; then
-  CS625_UNDERLAY_SETUP="$UNDERLAY_SETUP" bash scripts/build.sh
-else
-  bash scripts/build.sh
+    source_ros_setup "${UNDERLAY_SETUP}"
 fi
+bash scripts/build.sh
 
 echo "=== 测试 ==="
-source "${COLCON_ROOT}/install/setup.bash"
+source_ros_setup "${COLCON_ROOT}/install/setup.bash"
 bash scripts/test.sh --event-handlers console_direct+ || true
 
 echo "=== 静态契约 ==="
