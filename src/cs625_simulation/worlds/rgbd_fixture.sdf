@@ -12,7 +12,10 @@
             name="gz::sim::systems::Physics"/>
     <plugin filename="ignition-gazebo-sensors-system"
             name="gz::sim::systems::Sensors">
-      <render_engine>ogre</render_engine>
+      <!-- Ogre2 with LIBGL_ALWAYS_SOFTWARE=1 is the only reliable path
+           on WSLg (Mesa D3D12): Ogre1 black-screens, Ogre2+hardware
+           crashes at GL3PlusTextureGpu::copyTo. -->
+      <render_engine>ogre2</render_engine>
     </plugin>
     <plugin filename="ignition-gazebo-scene-broadcaster-system"
             name="gz::sim::systems::SceneBroadcaster"/>
