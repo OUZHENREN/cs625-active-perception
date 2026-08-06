@@ -9,6 +9,8 @@ supplying this repository's xacro wrapper. The underlay is never edited here.
 import os
 from pathlib import Path
 
+import time
+
 from ament_index_python.packages import get_package_prefix
 from launch import LaunchDescription
 from launch.actions import (
@@ -176,6 +178,8 @@ def generate_launch_description():
     # IGN variable while newer revisions consult the GZ variable. Prepend the
     # actual ament package lib directory to both before the senior launch
     # starts Gazebo, avoiding a silent model-plugin lookup failure.
+    # Unique IGN_PARTITION prevents stale server connections across runs
+    ign_partition = f"cs625_{int(time.time())}"
     plugin_environment = [
         SetEnvironmentVariable(
             "IGN_GAZEBO_SYSTEM_PLUGIN_PATH",
@@ -193,7 +197,12 @@ def generate_launch_description():
                 EnvironmentVariable("GZ_SIM_SYSTEM_PLUGIN_PATH", default_value=""),
             ],
         ),
+        SetEnvironmentVariable("IGN_PARTITION", ign_partition),
+        SetEnvironmentVariable("GZ_PARTITION", ign_partition),
+        # Prefer NVIDIA adapter on WSLg / Mesa D3D12 path; harmless when absent
+        SetEnvironmentVariable("MESA_D3D12_DEFAULT_ADAPTER_NAME", "NVIDIA"),
         LogInfo(msg=f"gz_ros2_control_plugin={gz_control_library}"),
+        LogInfo(msg=f"ign_partition={ign_partition}"),
     ]
 
     world_default = PathJoinSubstitution(
