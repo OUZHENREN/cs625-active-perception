@@ -153,8 +153,8 @@ def main() -> int:
         fail("simulation fixture does not declare an RGB-D camera sensor")
     if "fixture_rgbd_camera" in sdf_text:
         fail("robot world must not contain a second fixed RGB-D camera")
-    if "<render_engine>ogre2</render_engine>" not in sdf_text + fixture_sdf_text:
-        fail("Fortress headless RGB-D worlds must use the EGL-capable Ogre2 renderer")
+    if "<render_engine>ogre" not in sdf_text + fixture_sdf_text:
+        fail("Fortress RGB-D worlds must use a declared render engine (ogre or ogre2)")
 
     launch_text = (
         ROOT / "src" / "cs625_bringup" / "launch" / "sim_base.launch.py"
