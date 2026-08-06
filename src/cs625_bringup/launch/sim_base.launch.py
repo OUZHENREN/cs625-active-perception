@@ -199,8 +199,6 @@ def generate_launch_description():
         ),
         SetEnvironmentVariable("IGN_PARTITION", ign_partition),
         SetEnvironmentVariable("GZ_PARTITION", ign_partition),
-        # Prefer NVIDIA adapter on WSLg / Mesa D3D12 path; harmless when absent
-        SetEnvironmentVariable("MESA_D3D12_DEFAULT_ADAPTER_NAME", "NVIDIA"),
         LogInfo(msg=f"gz_ros2_control_plugin={gz_control_library}"),
         LogInfo(msg=f"ign_partition={ign_partition}"),
     ]
