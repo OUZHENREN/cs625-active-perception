@@ -1,78 +1,125 @@
 # CS625 Active Perception
 
-面向遮挡目标定位的机械臂可达性规划方法研究。
+面向遮挡目标定位的 CS625 机械臂主动感知与视点规划研究。项目以统一的
+sim/real 应用接口组织候选视点生成、可达性筛选、策略选择、MoveIt 规划和执行
+状态记录；当前已验收范围为 **ROS 2 + Gazebo 仿真**。
 
-本仓库是已确认的新 Git 根目录：
-
-```text
-B:\Recent\Robotic arm\Ubuntu_Share\cs625_active_perception\elite_ros
-```
+> 真机当前未连接。本仓库中的 real-profile、预检和安全配置仅是软件准备，不能
+> 被解释为真实抓取、真实识别或真实轨迹执行已经通过。
 
 ## 当前状态
 
-当前处于 **P0 已完成、P1 基线接入进行中**。当前工作先建立可审查的包边界，并按说明书接入已有底座：
+| 能力层 | 当前状态 | 证据边界 |
+| --- | --- | --- |
+| CS625 URDF、Gazebo、ros2_control、MoveIt | 仿真通过 | 使用 underlay 中复用的 CS625 模型与配置 |
+| 候选视点与硬可达性筛选 | 仿真通过 | IK、关节限位、碰撞与规划服务筛选 |
+| P4 主动感知闭环 | 仿真通过 | 选点、规划、Gazebo 运动、传感器稳定状态、失败码记录 |
+| P5 联合评分基础 | 仿真通过 | 可复现评分与 paired-experiment 工具 |
+| P6 真机准备 | 暂时仅软件验收 | 真机 R1--R4 尚未验收 |
 
-- 已创建五个 Phase 0–1 允许的 ROS 2 包骨架；
-- 已在 Ubuntu 22.04 / ROS 2 Humble VM 中完成五包构建；
-- 已在 VM 中通过 1 个 Python 测试；
-- CS625 官方/师兄模型与参数通过 underlay 和 xacro wrapper 接入；仿真使用应用层单次 topic spawn 编排，避免修改师兄仓库中的启动文件；
-- sim/real 共同复用 `sensor_adapter.launch.py` 与同一套 normalized RGB-D 配置；
-- 尚未迁移 NBV、感知、规划或实验算法；
-- 未启动仿真、fake hardware 或真实机械臂。
+## 最低可展示实验（仿真）
 
-## 主线决策
+已冻结的 P4 矩阵包含 45 个独立 episode：
 
-- 环境：Ubuntu 22.04 VM + ROS 2 Humble + MoveIt 2 Humble + Gazebo Fortress/ros_gz；
-- 架构：主动感知闭环是系统主框架，NBV 是可插拔视点策略；
-- 里程碑：九月前优先完成仿真闭环，真机迁移进入 P6；
-- Phase 0–1：严格只创建五个基础包；
-- 第三方依赖：通过 `.repos`/underlay 管理，不在本仓库直接修改。
+| 因子 | 取值 |
+| --- | --- |
+| 遮挡场景 | `occlusion_light`、`occlusion_medium`、`occlusion_severe` |
+| 随机种子 | 17、18、19、20、21 |
+| 基线 | `fixed_view`、`random_reachable`、`coverage_nbv` |
+| 总量 | 3 × 5 × 3 = 45 |
 
-## 单仓库双 profile 不变量
+每个单元启动独立的 Gazebo + MoveIt 进程，并导出可达率、规划时间、运动代价、
+成功观测率、失败码和终止原因。2026-08-21 的完整仿真运行得到 45/45 个有效
+episode；三种基线各 15 个样本。对应聚合结果为：
 
-本 Git 仓库只维护一套 common 应用接口和核心源码；sim 与 real 只提供各自
-的配置和启动入口，不复制第二套主动感知核心：
+| 基线 | 平均可达率 | 平均规划时间 (s) | 平均运动代价 | 平均成功观测率 |
+| --- | ---: | ---: | ---: | ---: |
+| `coverage_nbv` | 0.7667 | 0.2550 | 40.7146 | 0.7400 |
+| `fixed_view` | 0.7528 | 0.2312 | 37.9201 | 0.6833 |
+| `random_reachable` | 0.7028 | 0.2414 | 38.2754 | 0.6300 |
 
-```text
-elite_ros/
-├── src/                  # 一套 common application packages
-├── src/cs625_bringup/config/common.yaml
-├── src/cs625_bringup/config/sim.yaml
-├── src/cs625_bringup/config/real.yaml
-├── src/cs625_bringup/launch/sim_*.launch.py
-└── src/cs625_bringup/launch/real_*.launch.py
+这是当前 Gazebo 配置下的描述性仿真结果，不是对真实机器人性能的结论。原始
+episode 与运行日志保留在本地实验归档，未混入源码仓库。
+
+## 快速复现
+
+当前验证环境为 Ubuntu 24.04、ROS 2 Jazzy、MoveIt 2 与 Gazebo。需先准备官方
+Elite/CS625、MoveIt 与仿真依赖 underlay，再构建本应用工作区：
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source <underlay>/install/setup.bash
+colcon build --symlink-install
+source install/setup.bash
 ```
 
-`real_base.launch.py` 只组合 underlay 中已有的 `eli_cs_robot_driver` 和显式配置
-的相机源话题。机器人地址默认为空，驱动、相机适配器和机械臂控制器均不会
-自动启用；它不实现厂商驱动，也不改变 common 接口。
+运行完整 45-cell 矩阵时，指定一个新的空输出目录：
+
+```bash
+scripts/run_minimum_showcase_matrix.sh \
+  <application-install>/setup.bash \
+  <new-output-directory>
+```
+
+脚本完成后在 `<new-output-directory>/summary/` 生成：
+
+- `matrix_validation.md`：45-cell 完整性校验；
+- `episode_metrics.csv`：逐 episode 的全部指标、失败码与终止原因；
+- `strategy_summary.csv`：三条基线的 15-cell 聚合指标；
+- `failure_codes.csv`：按基线统计的失败码。
+
+仅运行一个非证据 smoke test：
+
+```bash
+scripts/run_minimum_showcase_matrix.sh \
+  <application-install>/setup.bash <temporary-output-directory> \
+  --scene occlusion_medium --seed 17 --strategy fixed_view
+```
+
+## 验证
+
+在已 source 的 Jazzy、underlay 和本项目 install 环境中运行：
+
+```bash
+python3 test/contract_checks.py
+pytest -q \
+  src/cs625_experiment_tools/tests/test_paired_experiment.py \
+  src/cs625_experiment_tools/tests/test_p4_matrix_summary.py \
+  src/cs625_view_evaluation/tests/test_joint_score.py
+```
+
+## 仓库结构
+
+```text
+src/
+├── cs625_ap_description/       # 应用层 Eye-in-Hand 描述扩展
+├── cs625_ap_interfaces/        # 候选、选择与状态 ROS 接口
+├── cs625_bringup/              # sim/real 启动、配置与矩阵清单
+├── cs625_view_generation/      # 候选视点生成
+├── cs625_motion_adapter/       # 可达性、规划与仿真/真机执行适配器
+├── cs625_view_evaluation/      # 策略、P4 协调器与联合评分
+└── cs625_experiment_tools/     # 矩阵收集与 paired-experiment 工具
+docs/                           # 实验协议、接口、仿真与真机边界说明
+scripts/                        # 可复现矩阵运行脚本
+test/                           # 静态契约检查与固定测试数据
+```
+
+## 复用与边界
+
+- 官方 Elite CS625 模型、驱动、MoveIt 配置与 Gazebo 控制能力通过 underlay 复用；
+  不在本仓库直接修改 vendor 代码。
+- 本仓库只维护主动感知应用层及 sim/real 的共同接口；仿真与真机入口不复制第二套
+  核心逻辑。
+- 真机连接、相机标定、实时点云、抓取与安全停机测试必须按
+  [`docs/p6_on_site_runbook.md`](docs/p6_on_site_runbook.md) 另行完成，并产生新的
+  实物证据。
 
 ## 文档入口
 
-- `docs/architecture.md`：目标分层与 Phase 0–1 边界；
-- `docs/dependencies.md`：依赖 URL、版本状态和修改规则；
-- `docs/frames_and_topics.md`：仿真/实机统一 TF 与话题契约；
-- `docs/simulation.md`：仿真分层、启动和验收命令；
-- `docs/migration_from_legacy.md`：active-vision、师兄库和现有 NBV 的逐项复用矩阵；
-- `docs/decisions/`：环境、包边界和 sim/real 决策记录。
-
-## 后续环境命令
-
-所有 ROS 命令必须在 Ubuntu 22.04 VM 中运行，并先确认：
-
-```bash
-printenv ROS_DISTRO
-```
-
-应为 `humble`。P0/P1 脚本位于 `scripts/`，当前仍需在 VM 中执行。
-
-## 工作日志
-
-本项目工作日志主目录与 Obsidian 镜像目录分别为：
-
-```text
-B:\Recent\Robotic arm\Ubuntu_Share\cs625_active_perception
-B:\Recent\Obsidian\Do be do be do\课题\项目\工作日志
-```
-
-每次输出工作日志时，两处直接写入同名 `WORKLOG_YYYY-MM-DD_<topic>.md` 文件。
+- [最低可展示实验](docs/minimum_showcase_experiment.md)
+- [仿真基线与运行边界](docs/simulation.md)
+- [接口与话题契约](docs/interfaces.md)
+- [P5 实验协议](docs/p5_experiment_protocol.md)
+- [P6 仿真临时验收](docs/p6_simulation_temporary_acceptance.md)
+- [P6 真机现场运行手册](docs/p6_on_site_runbook.md)
+- [依赖、来源与复用规则](docs/dependencies.md)
