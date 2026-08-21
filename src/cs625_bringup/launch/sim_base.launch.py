@@ -19,6 +19,7 @@ from launch.actions import (
     LogInfo,
     OpaqueFunction,
     SetEnvironmentVariable,
+    TimerAction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
@@ -69,6 +70,11 @@ def _compose(context):
                     "world_file": LaunchConfiguration("world"),
                     "launch_rviz": "false",
                     "headless": LaunchConfiguration("headless"),
+                    "camera_image_width": LaunchConfiguration("camera_image_width"),
+                    "camera_image_height": LaunchConfiguration("camera_image_height"),
+                    "camera_update_rate": LaunchConfiguration("camera_update_rate"),
+                    "camera_enabled": LaunchConfiguration("camera_enabled"),
+                    "gazebo_model_file": LaunchConfiguration("gazebo_model_file"),
                 }.items(),
             )
         )
@@ -76,8 +82,14 @@ def _compose(context):
             moveit_launch_path = PathJoinSubstitution(
                 [FindPackageShare("cs625_bringup"), "launch", "sim_moveit.launch.py"]
             )
+            # MoveIt publishes a global robot_description.  Start it after
+            # the spawned Gazebo model has initialized gz_ros2_control; if it
+            # publishes first, controller_manager can load MoveIt's mock
+            # hardware description instead of the model's GazeboSimSystem.
             actions.append(
-                IncludeLaunchDescription(
+                TimerAction(
+                    period=12.0,
+                    actions=[IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(moveit_launch_path),
                     launch_arguments={
                         "cs_type": LaunchConfiguration("cs_type"),
@@ -95,6 +107,7 @@ def _compose(context):
                         "moveit_controllers_file": LaunchConfiguration("moveit_controllers_file"),
                         "sensors_config": LaunchConfiguration("moveit_sensors_config"),
                     }.items(),
+                    )],
                 )
             )
     elif official_launch:
@@ -211,14 +224,14 @@ def generate_launch_description():
         [
             FindPackageShare("cs625_simulation"),
             "worlds",
-            "rgbd_fixture.sdf",
+            "minimal_occlusion.sdf",
         ]
     )
     fixture_world_default = PathJoinSubstitution(
         [
             FindPackageShare("cs625_simulation"),
             "worlds",
-            "minimal_occlusion.sdf",
+            "rgbd_fixture.sdf",
         ]
     )
     common_config_default = PathJoinSubstitution(
@@ -266,6 +279,10 @@ def generate_launch_description():
         DeclareLaunchArgument("moveit_controllers_file", default_value="cs625_moveit_controllers.yaml", description="Reused MoveIt trajectory/controller configuration."),
         DeclareLaunchArgument("moveit_sensors_config", default_value=moveit_sensors_default, description="Normalized point-cloud configuration for MoveIt scene updates."),
         DeclareLaunchArgument("headless", default_value="false", description="Run Gazebo without GUI. WSL2/GPU: false; VMware headless: true (Xvfb+ogre1 fallback)."),
+        DeclareLaunchArgument("camera_image_width", default_value="320", description="Eye-in-hand RGB-D image width for the sim profile."),
+        DeclareLaunchArgument("camera_image_height", default_value="240", description="Eye-in-hand RGB-D image height for the sim profile."),
+        DeclareLaunchArgument("camera_update_rate", default_value="10.0", description="Eye-in-hand RGB-D update rate in Hz for the sim profile."),
+        DeclareLaunchArgument("gazebo_model_file", default_value="/tmp/cs625_active_perception_gazebo_model.urdf", description="Generated visual-mesh-free URDF used only by Gazebo."),
         DeclareLaunchArgument("official_sim_launch", default_value="", description="Pinned official CS625 simulation launch path; empty means not connected."),
     ]
     return LaunchDescription(

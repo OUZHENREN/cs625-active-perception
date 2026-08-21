@@ -1,0 +1,41 @@
+/cs625_candidate_generator:
+  ros__parameters:
+    input_target_pose_topic: /perception/target_pose
+    raw_candidates_topic: /view_planner/raw_candidates
+    planning_frame: base_link
+    candidate_count: 24
+    view_radius_m: 0.70
+    min_elevation_rad: 0.20
+    max_elevation_rad: 1.05
+    regenerate_on_target_update: false
+
+/cs625_reachability_filter:
+  ros__parameters:
+    raw_candidates_topic: /view_planner/raw_candidates
+    reachable_candidates_topic: /view_planner/reachable_candidates
+    motion_status_topic: /motion/status
+    state_topic: /active_localization/state
+    joint_states_topic: /joint_states
+    planning_frame: base_link
+    camera_frame: camera_depth_optical_frame
+    tool_frame: tool0
+    planning_group: cs625_arm
+    # The P3 simulation workspace is profile data, never a code literal.
+    workspace_min: [-1.20, -1.20, 0.05]
+    workspace_max: [1.80, 1.20, 1.80]
+    # Copied as application profile data from the underlay CS625 description;
+    # P5 uses these only to report a normalized configuration margin.
+    joint_limit_names: [shoulder_pan_joint, shoulder_lift_joint, elbow_joint, wrist_1_joint, wrist_2_joint, wrist_3_joint]
+    joint_limit_min: [-6.283185307, -6.283185307, -3.141592654, -6.283185307, -6.283185307, -6.283185307]
+    joint_limit_max: [6.283185307, 6.283185307, 3.141592654, 6.283185307, 6.283185307, 6.283185307]
+    ik_service: /compute_ik
+    state_validity_service: /check_state_validity
+    plan_service: /plan_kinematic_path
+    service_wait_sec: 20.0
+    request_timeout_sec: 5.0
+    planning_time_sec: 2.0
+    goal_tolerance_rad: 0.01
+    # Replays the identical P3 result while DDS endpoints settle; it does not
+    # re-run IK/planning or create extra P4 selections.
+    reachable_publish_replay_count: 5
+    reachable_publish_replay_period_sec: 0.5

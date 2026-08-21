@@ -1,0 +1,16 @@
+/cs625_real_readiness_monitor:
+  ros__parameters:
+    use_sim_time: false
+    profile: real
+    joint_states_topic: /joint_states
+    sensor_status_topic: /sensors/camera/status
+    status_topic: /motion/status
+    planning_frame: base_link
+    camera_frame: camera_depth_optical_frame
+    expected_joint_names: [shoulder_pan_joint, shoulder_lift_joint, elbow_joint, wrist_1_joint, wrist_2_joint, wrist_3_joint]
+    required_moveit_services: [/compute_ik, /check_state_validity, /plan_kinematic_path]
+    # Supply an operator-reviewed JSON manifest outside the repository after R2.
+    hand_eye_manifest: ""
+    freshness_timeout_sec: 1.0
+    assessment_timeout_sec: 15.0
+    exit_after_assessment: false

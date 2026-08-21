@@ -1,0 +1,39 @@
+/cs625_sim_episode_coordinator:
+  ros__parameters:
+    reachable_candidates_topic: /view_planner/reachable_candidates
+    selected_view_topic: /view_planner/selected_view
+    execution_status_topic: /motion/execution_status
+    state_topic: /active_localization/state
+    strategy: predefined_scan
+    random_seed: 17
+    max_views: 3
+    max_failed_attempts: 3
+    fixed_candidate_id: fibonacci_00
+    predefined_candidate_ids: [fibonacci_00, fibonacci_08, fibonacci_16]
+    scene_id: minimal_occlusion
+    episode_log_directory: /tmp/cs625_active_perception/episodes
+    selection_publish_replay_count: 5
+    selection_publish_replay_period_sec: 0.5
+
+/cs625_sim_view_executor:
+  ros__parameters:
+    # Motion completion and PointCloud2 stamps must share Gazebo time.
+    use_sim_time: true
+    profile: sim
+    execute: false
+    require_confirmation: true
+    selected_view_topic: /view_planner/selected_view
+    execution_status_topic: /motion/execution_status
+    points_topic: /sensors/camera/points
+    planning_group: cs625_arm
+    tool_frame: tool0
+    ik_service: /compute_ik
+    plan_service: /plan_kinematic_path
+    controller_action: /joint_trajectory_controller/follow_joint_trajectory
+    planning_time_sec: 2.0
+    goal_tolerance_rad: 0.01
+    request_timeout_sec: 10.0
+    execution_timeout_sec: 90.0
+    sensor_settle_timeout_sec: 15.0
+    execution_status_publish_replay_count: 5
+    execution_status_publish_replay_period_sec: 0.5

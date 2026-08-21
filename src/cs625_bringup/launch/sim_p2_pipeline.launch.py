@@ -47,7 +47,10 @@ def generate_launch_description():
             parameters=[{
                 "input_target_pose_topic": "/sim/target_pose_raw",
                 "output_target_pose_topic": "/perception/target_pose",
-                "target_frame_id": "target_frame",
+                # Preserve the Gazebo/world frame of the source pose.  A
+                # target_frame TF is published only by a real estimator that
+                # owns that coordinate transform.
+                "target_frame_id": "",
             }],
         ),
     ])

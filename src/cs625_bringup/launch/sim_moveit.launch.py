@@ -87,6 +87,10 @@ def _compose(context):
         parameters=[
             moveit_config.to_dict(),
             {
+                # Point clouds and TF are stamped by Gazebo.  Keep the
+                # occupancy-map message filter on the same clock so it can
+                # resolve camera-frame transforms at cloud timestamps.
+                "use_sim_time": True,
                 # Preserve the senior CS625 MoveIt runtime contract. The
                 # normalized point-cloud topic still comes from sensors_file.
                 "octomap_frame": "base_link",

@@ -26,6 +26,21 @@ def _compose(context):
 
     launch_driver = LaunchConfiguration("launch_driver").perform(context).lower()
     robot_ip = LaunchConfiguration("robot_ip").perform(context).strip()
+    execute = LaunchConfiguration("execute").perform(context).lower()
+    require_confirmation = LaunchConfiguration("require_confirmation").perform(context).lower()
+    requested_controller = LaunchConfiguration("activate_joint_controller").perform(context).lower()
+    controller_activation_allowed = (
+        requested_controller == "true" and execute == "true" and require_confirmation == "false"
+    )
+    if requested_controller == "true" and not controller_activation_allowed:
+        actions.append(
+            LogInfo(
+                msg=(
+                    "[WARN] requested real controller activation was blocked; it requires "
+                    "execute=true and require_confirmation=false after external R4 review."
+                )
+            )
+        )
     if launch_driver == "true" and robot_ip:
         driver_launch_path = PathJoinSubstitution(
             [
@@ -59,9 +74,7 @@ def _compose(context):
                     "initial_joint_controller": LaunchConfiguration(
                         "initial_joint_controller"
                     ),
-                    "activate_joint_controller": LaunchConfiguration(
-                        "activate_joint_controller"
-                    ),
+                    "activate_joint_controller": "true" if controller_activation_allowed else "false",
                     "launch_rviz": LaunchConfiguration("launch_rviz"),
                     "headless_mode": LaunchConfiguration("headless_mode"),
                     "safety_limits": LaunchConfiguration("safety_limits"),

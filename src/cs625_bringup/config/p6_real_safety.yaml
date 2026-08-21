@@ -1,0 +1,19 @@
+/cs625_real_preflight:
+  ros__parameters:
+    use_sim_time: false
+    profile: real
+    execute: false
+    require_confirmation: true
+    robot_ip: ""
+    camera_enabled: true
+    status_topic: /motion/status
+    # Interface names preserved from the senior visual grasp worktree. The
+    # handoff remains disabled until R2 calibration and R4 review are accepted.
+    vision_target_topic: /target_pose
+    grasp_task_state_topic: /cs625/grasp_state_event
+    grasp_handoff_enabled: false
+    # Conservative P6 profile values. They are not sent to hardware here.
+    max_velocity_scale: 0.10
+    max_acceleration_scale: 0.10
+    workspace_min: [-1.20, -1.20, 0.05]
+    workspace_max: [1.80, 1.20, 1.80]

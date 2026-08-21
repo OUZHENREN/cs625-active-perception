@@ -1,0 +1,10 @@
+string candidate_id
+geometry_msgs/PoseStamped camera_pose
+geometry_msgs/PoseStamped tool_pose
+
+bool reachable
+string failure_code
+float64 joint_margin
+float64 motion_cost
+float64 planning_time_sec
+float64 coverage_proxy

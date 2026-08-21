@@ -6,7 +6,9 @@
   -->
   <xacro:macro name="cs625_eye_in_hand_camera"
                params="parent prefix xyz rpy optical_rpy
-                       sim_ignition:=false camera_sensor_topic:=/camera">
+                       sim_ignition:=false camera_sensor_topic:=/camera
+                       camera_image_width:=320 camera_image_height:=240
+                       camera_update_rate:=10.0 camera_enabled:=true">
     <link name="${prefix}camera_mount_link">
       <inertial>
         <mass value="0.01"/>
@@ -32,6 +34,11 @@
       <collision>
         <geometry><box size="0.03 0.05 0.02"/></geometry>
       </collision>
+      <inertial>
+        <mass value="0.05"/>
+        <inertia ixx="0.00001" ixy="0" ixz="0"
+                 iyy="0.00001" iyz="0" izz="0.00001"/>
+      </inertial>
     </link>
     <joint name="${prefix}camera_mount_to_camera" type="fixed">
       <parent link="${prefix}camera_mount_link"/>
@@ -60,27 +67,30 @@
          established /camera prefix; the ROS-facing bridge profile assigns
          stable /sim/camera/* names below the vendor boundary. -->
     <xacro:if value="${sim_ignition}">
-      <gazebo reference="${prefix}camera_link">
-        <sensor type="rgbd_camera" name="${prefix}camera_sensor">
+      <xacro:if value="${camera_enabled}">
+        <gazebo reference="${prefix}camera_link">
+          <sensor type="rgbd_camera" name="${prefix}camera_sensor">
+          <pose>0 0 0 0 0 0</pose>
           <always_on>1</always_on>
-          <update_rate>15.0</update_rate>
+          <update_rate>${camera_update_rate}</update_rate>
           <visualize>false</visualize>
           <camera>
             <horizontal_fov>1.047</horizontal_fov>
             <image>
-              <width>640</width>
-              <height>480</height>
+              <width>${camera_image_width}</width>
+              <height>${camera_image_height}</height>
               <format>R8G8B8</format>
             </image>
             <clip>
               <near>0.05</near>
               <far>5.0</far>
             </clip>
+            <optical_frame_id>${prefix}camera_depth_optical_frame</optical_frame_id>
           </camera>
           <topic>${camera_sensor_topic}</topic>
-          <gz_frame_id>${prefix}camera_link</gz_frame_id>
-        </sensor>
-      </gazebo>
+          </sensor>
+        </gazebo>
+      </xacro:if>
     </xacro:if>
   </xacro:macro>
 </robot>

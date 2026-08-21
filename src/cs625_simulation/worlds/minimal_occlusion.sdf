@@ -12,11 +12,18 @@
 
     <plugin filename="ignition-gazebo-physics-system"
             name="gz::sim::systems::Physics"/>
-    <!-- Sensors system intentionally omitted: the eye-in-hand camera is defined
-         in the robot Xacro and registered at spawn time.  Including it here
-         triggers ogre2 render-thread init at world load which stalls on headless
-         GPU-path configurations.  The sensor added by the robot model will
-         register its own rendering context. -->
+    <!-- The eye-in-hand RGB-D sensor is declared in the spawned robot Xacro,
+         but Gazebo requires this world-level system to instantiate and render
+         it.  The verified WSL2/Jazzy fixture uses the same Ogre2 backend. -->
+    <plugin filename="ignition-gazebo-sensors-system"
+            name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <!-- Expose /world/<name>/create before the robot is spawned. Without this
+         system, the eye-in-hand camera cannot be introduced into an otherwise
+         sensor-free world because the create client waits indefinitely. -->
+    <plugin filename="ignition-gazebo-user-commands-system"
+            name="gz::sim::systems::UserCommands"/>
     <plugin filename="ignition-gazebo-scene-broadcaster-system"
             name="gz::sim::systems::SceneBroadcaster"/>
 
@@ -35,10 +42,6 @@
         </collision>
         <visual name="visual">
           <geometry><box><size>10 10 0.1</size></box></geometry>
-          <material>
-            <ambient>0.45 0.45 0.45 1</ambient>
-            <diffuse>0.45 0.45 0.45 1</diffuse>
-          </material>
         </visual>
       </link>
     </model>
@@ -52,10 +55,6 @@
         </collision>
         <visual name="visual">
           <geometry><box><size>0.35 1.6 1.5</size></box></geometry>
-          <material>
-            <ambient>0.15 0.15 0.65 1</ambient>
-            <diffuse>0.15 0.15 0.65 1</diffuse>
-          </material>
         </visual>
       </link>
     </model>
@@ -69,10 +68,6 @@
         </collision>
         <visual name="visual">
           <geometry><cylinder><radius>0.25</radius><length>0.7</length></cylinder></geometry>
-          <material>
-            <ambient>0.75 0.1 0.1 1</ambient>
-            <diffuse>0.75 0.1 0.1 1</diffuse>
-          </material>
         </visual>
       </link>
     </model>

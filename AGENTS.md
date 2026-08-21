@@ -115,6 +115,48 @@ For launch and TF changes, also use the commands documented in `docs/simulation.
 
 Every work log must state changed files, exact commands, pass/fail results, remaining limitations, whether fake hardware/Gazebo/real hardware was used, and whether real motion occurred.
 
+### Capability-gate work-log requirements
+
+Every work log must additionally make the current system maturity and next allowed step explicit. Use this structure, adapting it to the task:
+
+```text
+Capability layer
+- environment and dependencies
+- robot model and simulation
+- kinematics, control and planning
+- vision, hand-eye calibration and TF
+- active perception / NBV
+- real-hardware integration and safety
+
+Acceptance target
+- objective
+- pass criteria
+- runtime evidence: commands, topics, TF, logs and/or screenshots
+
+Critical-chain status
+- URDF -> Gazebo entity
+- ros2_control -> joint_states
+- base_link -> camera optical TF
+- RGB-D -> normalized sensor topics
+- point cloud -> MoveIt planning scene
+- NBV decision -> robot execution
+
+Sim/real alignment
+- reused common core
+- sim entry point
+- real entry point
+- whether real execution is allowed
+- execute and confirmation gate state
+
+Intentionally not done
+- deferred layers/features and the gate that blocks them
+- confirmation that vendor code was not modified, when applicable
+```
+
+For every critical-chain item, record `PASS`, `BLOCKED`, `NOT ACCEPTED`, or `NOT STARTED` and cite the concrete evidence or blocking condition. Do not treat a topic name in the ROS graph as proof of a working publisher, and do not treat a process that exited after a timeout as runtime validation.
+
+Advance to a higher capability layer only after the prerequisite layer has passed its runtime gate. In particular, do not begin NBV, active-vision, reinforcement-learning, imitation-learning, or VLA work while the simulation camera, point-cloud, TF and MoveIt input chain is not accepted. Record infrastructure blockers at their actual layer instead of attributing their downstream symptoms to planning or perception algorithms.
+
 ## Prohibited patterns
 
 - Do not use `pkill ros2` for lifecycle management.
@@ -125,4 +167,3 @@ Every work log must state changed files, exact commands, pass/fail results, rema
 - Do not consume stale point clouds after robot motion.
 - Do not label synthetic smoke tests as real perception validation.
 - Do not modify several architecture layers in one task without explicit scope.
-

@@ -13,7 +13,7 @@ Every dependency must eventually include URL, branch/tag/commit, ROS distributio
 |---|---|---|---|---|---|
 | Elite ROS 2 Driver | https://github.com/Elite-Robots/Elite_Robots_CS_ROS2_Driver | Humble | UNVERIFIED | Official CS625 driver and simulation/ros2_control integration | Do not edit in place |
 | Elite CS SDK | https://github.com/Elite-Robots/Elite_Robots_CS_SDK | Humble integration | UNVERIFIED | Official SDK dependency where required by driver | Do not vendor-edit |
-| Senior CS625 reference snapshot | https://github.com/addission/elite_robot_project_20260129 | Humble reference | REFERENCE_ONLY | CS625 URDF/Xacro, driver launch, controller and simulation lessons | Do not copy-and-edit as vendor code; verify exact revision before underlay use |
+| Senior CS625 reference snapshot | https://github.com/addission/elite_robot_project_20260129 | Humble reference | REFERENCE_ONLY | CS625 URDF/Xacro, MoveIt planning, driver launch, controller, TCP-vision bridge, grasp task manager and simulation lessons | Do not copy-and-edit as vendor code; verify exact revision before underlay use |
 | Local senior remote observed in legacy worktree | https://github.com/addission/elite_robot_project_20260306 | Humble reference | UNVERIFIED | Provenance candidate for the local `eli_*` packages | Keep separate from the specification URL until verified |
 | AIRLab-POLIMI active vision | https://github.com/AIRLab-POLIMI/active-vision | Humble/Fortress reference | REFERENCE_ONLY | Modular bringup/interfaces/pointcloud/octomap/planning boundaries | Architecture reference only; do not import robot-specific code |
 | Existing CS625/NBV project | https://github.com/OUZHENREN/Robot | Humble/Jazzy legacy mix | REFERENCE_ONLY | Existing NBV, IK, trajectory, monitor and experiment assets | Migrate by responsibility; do not copy the legacy workspace wholesale |
@@ -22,7 +22,7 @@ Every dependency must eventually include URL, branch/tag/commit, ROS distributio
 | ros_gz | https://github.com/gazebosim/ros_gz | Humble/Fortress | UNVERIFIED | ROS 2 ↔ Gazebo transport and simulation integration | Use upstream/underlay |
 | gz_ros2_control | https://github.com/ros-controls/gz_ros2_control | Humble/Fortress | UNVERIFIED | Gazebo control plugin | Use upstream/underlay |
 | MoveIt occupancy map monitor | https://github.com/moveit/moveit2/tree/main/moveit_ros/occupancy_map_monitor | Humble | UNVERIFIED | Occupancy-map monitor base used by planning-scene updates | Use upstream binary; do not vendor |
-| MoveIt perception | https://github.com/moveit/moveit2/tree/main/moveit_ros/perception | Humble | UNVERIFIED | Provides the upstream `occupancy_map_monitor/PointCloudOctomapUpdater` plugin | Install/use `moveit_ros_perception`; do not reimplement or vendor |
+| MoveIt perception | https://github.com/moveit/moveit2/tree/main/moveit_ros/perception | Jazzy runtime verified; system install pending | PARTIALLY_PINNED | Provides the upstream `occupancy_map_monitor/PointCloudOctomapUpdater` plugin | Install `ros-jazzy-moveit-ros-perception` system-wide; a temporary extracted deb overlay was used only for the P2 runtime gate; do not vendor |
 | RGB-D camera driver | To be selected | Humble | UNVERIFIED | Real profile sensor input | Keep below `cs625_sensor_adapter` |
 
 ## Provenance rule

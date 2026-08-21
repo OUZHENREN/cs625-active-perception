@@ -1,0 +1,6 @@
+std_msgs/Header header
+string strategy
+uint32 random_seed
+uint32 cycle_index
+cs625_ap_interfaces/ViewCandidate candidate
+string termination_reason

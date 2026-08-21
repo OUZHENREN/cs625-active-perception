@@ -42,8 +42,8 @@ until the PS800E1/Percipio driver is verified.
 | `/perception/target_pose` | estimated target pose | later perception layer |
 | `/perception/localization_quality` | localization quality | later perception layer |
 | `/scene/fused_cloud` | fused scene cloud | later mapping layer |
-| `/view_planner/raw_candidates` | generated camera candidates | later view generation |
-| `/view_planner/reachable_candidates` | hard-filtered candidates | later motion adapter |
+| `/view_planner/raw_candidates` | reproducible camera candidates in `base_link` | `cs625_view_generation` |
+| `/view_planner/reachable_candidates` | candidates that passed TF, IK, collision and planning | `cs625_motion_adapter` |
 | `/view_planner/selected_view` | selected candidate | later view evaluation |
 | `/motion/status` | plan/execute state and failure code | later motion adapter |
 | `/active_localization/state` | task state machine | later orchestrator |

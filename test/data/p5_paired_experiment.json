@@ -1,0 +1,23 @@
+{
+  "experiment": {
+    "data_source": "synthetic_fixture",
+    "validity_label": "interface_only",
+    "strategies": ["fixed_view", "random_reachable", "predefined_scan", "coverage_nbv", "reachability_only", "proposed_joint_score"],
+    "seeds": [17, 18, 19],
+    "fixed_candidate_id": "fibonacci_00",
+    "predefined_candidate_ids": ["fibonacci_00", "fibonacci_02", "fibonacci_04"],
+    "bootstrap_seed": 625,
+    "bootstrap_samples": 1000,
+    "score_config": {
+      "localization_gain_weight": 1.0,
+      "reachability_quality_weight": 1.0,
+      "motion_cost_weight": 0.35,
+      "planning_time_weight": 0.15,
+      "motion_cost_scale": 6.0,
+      "planning_time_scale": 5.0
+    },
+    "candidate_sets": [
+      {"scene_id": "synthetic_fixture_a", "file": "p5_candidate_snapshot.json"}
+    ]
+  }
+}

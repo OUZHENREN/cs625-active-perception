@@ -1,0 +1,3 @@
+std_msgs/Header header
+uint32 source_candidate_count
+cs625_ap_interfaces/ViewCandidate[] candidates

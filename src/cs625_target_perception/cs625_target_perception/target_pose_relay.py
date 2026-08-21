@@ -12,7 +12,7 @@ class TargetPoseRelay(Node):
         super().__init__("target_pose_relay")
         self.declare_parameter("input_target_pose_topic", "")
         self.declare_parameter("output_target_pose_topic", "/perception/target_pose")
-        self.declare_parameter("target_frame_id", "target_frame")
+        self.declare_parameter("target_frame_id", "")
         self.declare_parameter("drop_invalid_messages", True)
 
         in_topic = str(self.get_parameter("input_target_pose_topic").value)
@@ -37,7 +37,12 @@ class TargetPoseRelay(Node):
         ):
             self.get_logger().warning("Dropping target pose with zero timestamp")
             return
-        msg.header.frame_id = self._target_frame_id
+        # A PoseStamped must retain the frame in which its position is
+        # expressed.  ``target_frame`` is an object-attached TF frame, not a
+        # coordinate frame for world/Gazebo pose coordinates.  Profiles may
+        # override this only when they also provide a corresponding transform.
+        if self._target_frame_id:
+            msg.header.frame_id = self._target_frame_id
         self._pub.publish(msg)
         self._received_count += 1
 

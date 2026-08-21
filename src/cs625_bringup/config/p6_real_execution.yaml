@@ -1,0 +1,24 @@
+/cs625_real_view_executor:
+  ros__parameters:
+    use_sim_time: false
+    profile: real
+    execute: false
+    require_confirmation: true
+    r4_authorized: false
+    operator_id: ""
+    approval_id: ""
+    selected_view_topic: /view_planner/selected_view
+    execution_status_topic: /motion/execution_status
+    points_topic: /sensors/camera/points
+    planning_group: cs625_arm
+    tool_frame: tool0
+    ik_service: /compute_ik
+    plan_service: /plan_kinematic_path
+    controller_action: /joint_trajectory_controller/follow_joint_trajectory
+    planning_time_sec: 2.0
+    goal_tolerance_rad: 0.01
+    max_velocity_scale: 0.10
+    max_acceleration_scale: 0.10
+    request_timeout_sec: 10.0
+    execution_timeout_sec: 90.0
+    sensor_settle_timeout_sec: 15.0
