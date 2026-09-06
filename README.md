@@ -110,8 +110,11 @@ src/
 ├── cs625_view_evaluation/      # 策略、P4 协调器与联合评分
 └── cs625_experiment_tools/     # 矩阵收集与 paired-experiment 工具
 docs/                           # 实验协议、接口、仿真与真机边界说明
+├── evidence/                   # 已筛选的 JSON/CSV/PNG/TXT 证据；原始帧本地归档
+├── diagnostics/                # 诊断输出与人工审计辅助材料
+└── worklogs/                   # 仓库内早期工作日志归档
 scripts/                        # 可复现矩阵运行脚本
-test/                           # 静态契约检查与固定测试数据
+test/                           # 仓库级 contract check、P7 运行/采集工具与固定测试数据
 ```
 
 ## 复用与边界
@@ -127,6 +130,7 @@ test/                           # 静态契约检查与固定测试数据
 ## 文档入口
 
 - [最低可展示实验](docs/minimum_showcase_experiment.md)
+- [项目文件层级](docs/project_layout.md)
 - [仿真基线与运行边界](docs/simulation.md)
 - [接口与话题契约](docs/interfaces.md)
 - [P5 实验协议](docs/p5_experiment_protocol.md)
@@ -135,3 +139,4 @@ test/                           # 静态契约检查与固定测试数据
 - [P6 仿真临时验收](docs/p6_simulation_temporary_acceptance.md)
 - [P6 真机现场运行手册](docs/p6_on_site_runbook.md)
 - [依赖、来源与复用规则](docs/dependencies.md)
+- [P7 工具索引](test/README.md)

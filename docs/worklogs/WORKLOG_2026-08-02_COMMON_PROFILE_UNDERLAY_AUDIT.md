@@ -1,14 +1,53 @@
-# 工作日志：common profile 与 underlay/NBV 复用审计
+# 工作日志 | 2026-08-02 | common profile 与 underlay/NBV 复用审计
+
+| 字段 | 内容 |
+| --- | --- |
+| 日期 | `2026-08-02` |
+| 标题 | common profile 与 underlay/NBV 复用审计 |
+| 工作区范围 | 当前主动感知代码仓库 elite_ros |
+| 原始路径 | `cs625_active_perception\elite_ros\docs\worklogs\WORKLOG_2026-08-02_COMMON_PROFILE_UNDERLAY_AUDIT.md` |
+| 当前用途 | 验证证据 / 历史追溯 |
+| 统一格式版本 | WORKLOG_FORMAT_V1_20260906 |
+| 事实边界 | 本次仅统一格式，不新增、不删除、不改写实验数据或工程结论；具体细节以“原始详细记录”为准。 |
+
+## 1. 摘要
+
+- 本日志记录主题：common profile 与 underlay/NBV 复用审计。
+- 本次整理只做格式统一；原有结论、命令、数据路径和风险边界均保留在下方“原始详细记录”。
+
+## 2. 关键结论
+
+- 关键结论以原始记录中的“今日结果 / 已完成 / 验证结果 / 当前结论”等小节为准。
+- 若原记录包含合成数据、仿真数据或真机边界说明，后续引用时必须同时引用对应边界。
+
+## 3. 验证与证据
+
+- 验证命令、PASS/FAIL 结果、导出目录和数据来源均保留在原始详细记录中。
+- 本次格式统一没有新增实验运行，也没有生成新的仿真或真机证据。
+
+## 4. 风险与边界
+
+- 不把合成点云、接口烟雾测试或仿真预检解释为真实相机/真实机械臂结论。
+- 不把历史 Humble/Jazzy 状态反向覆盖当前已经确认的项目主线；引用时需结合最新根目录导航文件。
+
+## 5. 后续事项
+
+- 后续新增或追加日志应遵循 Ubuntu_Share/WORKLOG_FORMAT.md。
+- 需要对外引用时，优先引用已整理后的统一日志；必要时再查阅本次归档的原始备份。
+
+## 6. 原始详细记录
+
+## 工作日志：common profile 与 underlay/NBV 复用审计
 
 日期：2026-08-02
 
-## 范围与边界
+### 范围与边界
 
 本轮继续执行 Phase 0–1，只修改现有五个包内的 description、bringup、sensor
 profile、静态契约和文档。没有创建 P2–P6 包，没有搬运整个 NBV 工作区，也没有
 修改师兄/厂商 underlay。
 
-## 已完成的复用改进
+### 已完成的复用改进
 
 - 新增 `cs625_bringup/launch/sensor_adapter.launch.py`，作为 sim/real 共用的
   normalized RGB-D 入口；两个 profile 不再各自创建适配器节点。
@@ -24,7 +63,7 @@ profile、静态契约和文档。没有创建 P2–P6 包，没有搬运整个 
 - application xacro 同时接受师兄仿真入口使用的 `prefix` 和真实驱动使用的
   `tf_prefix`，维持一份机器人应用描述。
 
-## 本地资产审计结果
+### 本地资产审计结果
 
 - 干净参考工作树：`experiment/real-nbv`，commit
   `ae7327e836419a617e9d446ee35c37b6680c1dc0`。
@@ -38,7 +77,7 @@ profile、静态契约和文档。没有创建 P2–P6 包，没有搬运整个 
 - 师兄 MoveIt `move_group.launch.py` 会从自身配置包重建 `robot_description`；它是否
   与 Gazebo/RSP 的 Eye-in-Hand wrapper 完全一致，仍是 S1 runtime gate。
 
-## VM 验证与失败记录
+### VM 验证与失败记录
 
 用户在 Ubuntu 22.04 / ROS 2 Humble VM 运行：
 
@@ -65,7 +104,7 @@ colcon --log-base <local-log-dir> test ...
 
 并新增静态回归检查，强制全局 `--log-base` 位于子命令之前。
 
-## VM 修复后复验结果
+### VM 修复后复验结果
 
 用户在同一 Ubuntu 22.04 / ROS 2 Humble VM 重新执行 build、test 和静态契约：
 
@@ -77,7 +116,7 @@ colcon --log-base <local-log-dir> test ...
 因此当前可以确认源码构建、现有单元测试和静态架构契约通过。尚未确认 underlay 包发现、
 Xacro 展开、TF 树、Gazebo/MoveIt 组合或真实硬件连接；这些仍属于后续 runtime gate。
 
-## Underlay 发现结果
+### Underlay 发现结果
 
 用户在只 source `/opt/ros/humble` 和当前应用 overlay 的环境中检查四个复用包，结果全部
 `MISSING`。这只能说明当前应用环境没有加载 underlay，不代表共享目录中没有可复用构建。
@@ -93,7 +132,7 @@ Xacro 展开、TF 树、Gazebo/MoveIt 组合或真实硬件连接；这些仍属
 依赖，也不能将其源码整体复制进本仓库。下一步在 VM 中仅 source 它的 install，再做
 包发现、Xacro 展开和 launch 参数检查。
 
-## 关于主动视觉库与既有 NBV 库的实际复用状态
+### 关于主动视觉库与既有 NBV 库的实际复用状态
 
 本轮当前代码尚未源码级迁移 AIRLab-POLIMI active-vision 或既有 `cs625_nbv`。已完成
 的是审计、API 阅读和职责映射，以及师兄 CS625 description/driver 的 underlay 组合；
@@ -114,7 +153,7 @@ Xacro 展开、TF 树、Gazebo/MoveIt 组合或真实硬件连接；这些仍属
 因此当前状态应准确描述为“底座复用已开始，主动视觉/NBV 算法复用待 Phase 1 runtime
 gate 后按职责迁移”，而不是“主动视觉/NBV 已经使用”。
 
-## VM underlay 挂载复验
+### VM underlay 挂载复验
 
 用户尝试 source `/mnt/hgfs/elite_ros_ws/install/setup.bash`，VM 返回
 `No such file or directory`，随后四个 underlay 包仍全部 `MISSING`。这证明当前
@@ -123,9 +162,9 @@ underlay 的源码或 install 不存在。需要先把该目录作为第二个�
 在 VM 的独立 underlay workspace 中重新构建；两种方案都不应把 underlay 源码复制到
 当前 `elite_ros` Git 根目录。
 
-## 运行边界
+### 运行边界
 
-## Underlay 已挂载但 Jazzy 污染
+### Underlay 已挂载但 Jazzy 污染
 
 VM 现在可以访问 `/mnt/hgfs/elite_ros_ws/install/setup.bash`，四个 underlay 包均能被
 `ros2 pkg prefix` 找到；但 source 时出现：
@@ -142,12 +181,12 @@ VM 本地 ext4 目录；当前 Git 仓库仍只保留应用源码，不能 sourc
 本轮没有启动 fake hardware、Gazebo 或真实硬件，没有执行 MoveIt 轨迹，也没有发生
 真实机械臂运动。PS800E1 驱动、topic map、内参和手眼标定仍未得到可验证来源。
 
-## 下一步 runtime gate
+### 下一步 runtime gate
 
 先检查师兄/厂商 underlay 包是否可发现，再展开 application xacro 和核对 launch 参数；
 在这些只读检查通过之前，不启动 Gazebo、MoveIt、控制器或真实驱动。
 
-## 干净参考树与第一批 NBV API 审计
+### 干净参考树与第一批 NBV API 审计
 
 宿主机的干净参考树 `.real_nbv_experiment_20260729` 当前为
 `experiment/real-nbv`，commit `ae7327e836419a617e9d446ee35c37b6680c1dc0`，工作区
@@ -165,7 +204,7 @@ VM 本地 ext4 目录；当前 Git 仓库仍只保留应用源码，不能 sourc
 - 这些算法尚未复制或接入当前仓库，待 underlay runtime gate 通过后按职责进入后续
   `cs625_view_generation` 和 `cs625_view_evaluation` 包。
 
-## Launch 参数门禁复验
+### Launch 参数门禁复验
 
 用户在 Humble 中重建 `cs625_bringup` 后，以下两个只读参数检查均通过：
 
@@ -179,7 +218,7 @@ ros2 launch cs625_bringup real_base.launch.py --show-args
 `activate_joint_controller=false`。本机静态契约和 Python 语法检查也通过。此步骤没有
 启动 Gazebo、控制器、MoveIt 或真实机械臂。
 
-## Xacro 与 Humble launch 验证
+### Xacro 与 Humble launch 验证
 
 用户在 Humble 下重新展开 application xacro：PASS，关键 frame 检查通过，生成 link 数为
 17，包含 `world`、`base_link`、`tool0`、`camera_link` 和
@@ -190,7 +229,7 @@ ros2 launch cs625_bringup real_base.launch.py --show-args
 这些非关键提示改为 Humble 支持的 `LogInfo`，并在消息文本中保留 `[WARN]` 标记；没有
 改变启动条件、安全默认值或 underlay 组合逻辑。宿主机静态契约修复后：PASS。
 
-## Xacro 运行时接口修复
+### Xacro 运行时接口修复
 
 用户在 Humble 下用已构建的 description underlay 展开 application xacro 时，师兄宏报错：
 
@@ -205,7 +244,7 @@ when instantiating macro: cs_robot
 这一无效传参；没有复制或修改师兄宏。顶层 `simulation_controllers` 参数仍保留，供后续
 经过验证的仿真入口使用。宿主机静态契约检查修复后：PASS。
 
-## Humble underlay 构建结果与 SDK 门禁
+### Humble underlay 构建结果与 SDK 门禁
 
 用户在 Humble 中从独立 artifact 根目录构建已有 underlay 源码：
 
@@ -224,7 +263,7 @@ when instantiating macro: cs_robot
 当前应用仓库来绕过该门禁。下一步应安装/构建官方 SDK 到该独立 underlay 前缀，再只
 重建 driver 及其依赖。
 
-## 师兄模型、相机模型与话题链部署
+### 师兄模型、相机模型与话题链部署
 
 用户在 Humble VM 中验证 fixture world 启动成功：Gazebo 进程能够拉起，且安全的
 `launch_official_sim:=false`、`launch_sensor_adapter:=false`、`camera_enabled:=false`
@@ -251,7 +290,7 @@ when instantiating macro: cs_robot
 下一步必须在 VM 重建五包并运行官方仿真 smoke test，检查 `/camera/*`、`/sim/camera/*`、
 `/sensors/camera/*`、`/joint_states` 和 TF。
 
-## 官方仿真首次运行门禁
+### 官方仿真首次运行门禁
 
 用户在 Humble VM 执行官方仿真命令：
 
@@ -274,7 +313,7 @@ package 'controller_manager' not found
 安装 `controller_manager`、`ros2_control`、`ros2_controllers`、`ros2controlcli` 和
 `gz_ros2_control` 后重试。
 
-## MoveIt 模型一致性修正
+### MoveIt 模型一致性修正
 
 审计师兄 `elite_cs625_moveit_config/.setup_assistant` 发现其原始 MoveIt 入口会加载
 `eli_cs_robot_description/urdf/cs625_for_moveit.urdf`，不会包含当前应用新增的相机安装座
@@ -287,7 +326,7 @@ MoveIt/vendor 包；`sim_base.launch.py` 默认改为“师兄控制 launch + �
 宿主机 Python 语法、静态契约和 `git diff --check` 均 PASS。上述应用 MoveIt 组合尚未在
 VM 运行时验证，必须在补齐 ros2_control 依赖后重建并复验。
 
-## 2026-08-03 官方仿真运行证据
+### 2026-08-03 官方仿真运行证据
 
 用户补齐 ros2_control 后再次运行官方仿真。此次日志证明以下链路已经进入运行态：
 
@@ -314,7 +353,7 @@ VM 运行时验证，必须在补齐 ros2_control 依赖后重建并复验。
 和 Gazebo 日志。模型、桥接和 MoveIt 已不再是“完全未启动”，但 ros2_control controller
 active、适配器存活和统一输出话题仍未验收。
 
-## 2026-08-03 00:02 运行门复盘与修正
+### 2026-08-03 00:02 运行门复盘与修正
 
 用户在 Humble VM 的官方仿真命令中进一步验证了模型部署链：
 
@@ -343,7 +382,7 @@ active、适配器存活和统一输出话题仍未验收。
 `qos_profile_sensor_data` 订阅和发布 color/depth/camera_info/points，避免“话题存在但 QoS
 不兼容导致没有数据”的假通过。状态话题仍使用默认可靠 QoS。
 
-## 2026-08-03 Phase 1 入口一致性修正
+### 2026-08-03 Phase 1 入口一致性修正
 
 复核启动任务书后发现 `sim_active_localization.launch.py` 虽已存在，但默认值仍指向师兄
 旧的 `cs_sim_moveit.launch.py` 和 SDK 绑定的 `cs_controllers.yaml`，会绕过当前应用的标准
@@ -357,7 +396,7 @@ Humble 仿真控制器配置。已将该薄入口对齐为：复用师兄 `cs_si
 `/sensors/camera/status`、`/sensors/camera/points` 以及
 `base_link -> camera_depth_optical_frame`。在这些运行时证据出现前，S1 运行门不标记为通过。
 
-## 2026-08-03 Gazebo 实体创建根因与应用层修正
+### 2026-08-03 Gazebo 实体创建根因与应用层修正
 
 完整启动日志证明机械臂 Xacro 已正确生成，包含 `gz_ros2_control/GazeboSimSystem`、
 `libgz_ros2_control-system.so`、应用 `sim_controllers.yaml` 和 eye-in-hand 相机链；真正阻塞点
@@ -370,7 +409,7 @@ Humble 仿真控制器配置。已将该薄入口对齐为：复用师兄 `cs_si
 名固定为 `cs` 且 `allow_renaming=false`；若师兄原始 spawn 已成功，重试不会生成重复机械臂。
 该修正尚待 Humble VM 重建并验证 controller active、`/joint_states` 和相机统一话题。
 
-## 2026-08-03 MoveIt 点云插件依赖校正
+### 2026-08-03 MoveIt 点云插件依赖校正
 
 进一步核对 Humble MoveIt 包职责后确认：`moveit_ros_occupancy_map_monitor` 提供基础监视器，
 配置中使用的 `occupancy_map_monitor/PointCloudOctomapUpdater` 动态插件由上游
@@ -380,7 +419,7 @@ Humble 仿真控制器配置。已将该薄入口对齐为：复用师兄 `cs_si
 VM 下一轮需安装/确认 `ros-humble-moveit-ros-perception`，随后与延迟实体生成重试一起复测。
 S1 仍以 controller active、`/joint_states`、统一相机输出和 camera TF 的运行证据为准。
 
-## 2026-08-03 Humble VM 复测结果
+### 2026-08-03 Humble VM 复测结果
 
 用户已安装 `ros-humble-moveit-ros-perception`，五个应用包重新构建成功，
 `Phase 0–1 static contract checks: PASS`，并确认 `moveit_ros_perception` 位于
@@ -404,7 +443,7 @@ S1 仍以 controller active、`/joint_states`、统一相机输出和 camera TF 
 本轮不修改 URDF、相机话题或 MoveIt 配置；这些部分已有直接运行证据。下一步只针对
 Gazebo 服务端插件日志、controller manager 和 TF 发布做诊断，仍不迁移 NBV/主动视觉算法。
 
-## 2026-08-03 Message Filter 根因收敛与控制插件修正
+### 2026-08-03 Message Filter 根因收敛与控制插件修正
 
 用户再次观察到 MoveIt 对 `camera_depth_optical_frame` 的点云执行 Message Filter 丢帧。
 复核后确认日志中目标帧引号前的空格属于 MoveIt 固有日志格式，并非配置中的尾随空格。
@@ -435,35 +474,35 @@ Gazebo 服务端插件日志、controller manager 和 TF 发布做诊断，仍�
 这表明该次运行尚未使用最新安装的 `cs625_bringup` 启动文件；插件搜索路径修正实际上还未
 进入运行态。下一步先比较源码和 install-space 启动文件，再定向重建 bringup，避免继续用
 旧安装副本重复验证。
-### 2026-08-03：bringup 源码—安装空间一致性已确认
+#### 2026-08-03：bringup 源码—安装空间一致性已确认
 
 - `cs625_bringup` 定向重建成功。
 - `ros2 pkg prefix cs625_bringup` 返回 `${HOME}/cs625_colcon/install/cs625_bringup`。
 - 源码与安装空间的 `sim_base.launch.py` 均在第 264 行包含 `gz_ros2_control_plugin` 启动标记。
 - 安装空间 launch 文件经 `readlink -f` 解析到仓库源码，排除旧安装副本或错误 overlay。
 - 下一门禁：运行时启动头部必须打印 `/opt/ros/humble/lib/libgz_ros2_control-system.so`，随后验证 `/controller_manager/list_controllers` 是否可用。
-### 2026-08-03：定位 Humble/Fortress 模型插件声明错配
+#### 2026-08-03：定位 Humble/Fortress 模型插件声明错配
 
 - 最新双终端运行证明插件库路径已注入，但 Gazebo 在机器人实体创建成功后没有任何 `gz_ros2_control` 初始化输出，`controller_manager` 服务端未创建。
 - `ros2 service list` 中出现 `/controller_manager/list_controllers` 不能证明服务端存在；等待中的 spawner 客户端也会让该名称进入 ROS 图。
 - 对照 Humble 官方 `gz_ros2_control` 文档，模型插件应声明为 `filename="gz_ros2_control-system"`；原包装层使用了磁盘 ELF 名 `libgz_ros2_control-system.so`。
 - 已仅在应用包装层改为 Humble/Fortress 的逻辑插件名，保留硬件插件 `gz_ros2_control/GazeboSimSystem` 和插件类 `gz_ros2_control::GazeboSimROS2ControlPlugin`，未修改师兄库。
 - 契约检查已同步更新；下一步需定向重建 `cs625_ap_description` 后复测插件初始化和 controller manager。
-### 2026-08-03：更正——插件逻辑文件名不是唯一根因
+#### 2026-08-03：更正——插件逻辑文件名不是唯一根因
 
 - 将模型插件名改为 Humble 文档中的 `gz_ros2_control-system` 后，运行时仍未出现 `/controller_manager` 节点和 `/joint_states`。
 - 因此上一条“定位错配根因”的表述过早；该修改保留为 Humble 规范对齐，但已被运行结果证伪为完整修复。
 - 当前已证实的故障边界是：机器人实体创建成功，但 Gazebo 模型插件没有完成实例化；spawner 等待、TF 断链、点云队列满均为后续症状。
 - MoveIt 与 sensor adapter 在 `Ctrl+C` 后的异常退出属于清理路径问题，不作为 controller manager 启动失败的根因。
 - 下一步只运行官方 `gz_ros2_control_demos` 最小示例，隔离 VM 插件安装/ABI 与本项目 URDF→SDF/spawn 链。
-### 2026-08-03：官方 gz_ros2_control demo 通过
+#### 2026-08-03：官方 gz_ros2_control demo 通过
 
 - 安装并运行 Humble 官方 `gz_ros2_control_demos/cart_example_position.launch.py` 成功。
 - `/controller_manager` 节点及完整服务端存在；`joint_state_broadcaster`、`joint_trajectory_controller` 均为 `active`。
 - `/joint_states` 正常发布，硬件 `GazeboSimSystem` 完成 initialize/configure/activate。
 - 由此排除 VM、Gazebo Fortress、`gz_ros2_control` 二进制及 ABI 故障，问题限定在 CS625 的 URDF→SDF/实体创建组合链。
 - 官方 demo 通过 `robot_description` topic 创建实体；CS625 复用的 senior launch 使用 `-string`，但在修改前先验证转换后 SDF 是否保留模型插件。
-### 2026-08-03：改为单次 topic spawn 控制编排
+#### 2026-08-03：改为单次 topic spawn 控制编排
 
 - 本机官方 demo、CS625 展开 URDF 与 Fortress 转换后 SDF 的插件声明完全一致，确认插件未在转换中丢失。
 - 故障差异限定为启动链：senior launch 的 `create -string` 与应用层定时 retry 并存，存在初始请求超时、重复实体和物理场景闪烁风险。
@@ -471,14 +510,14 @@ Gazebo 服务端插件日志、controller manager 和 TF 发布做诊断，仍�
 - `allow_renaming=false`；实体创建退出后依次启动 joint-state broadcaster 与 trajectory controller；删除应用层 TimerAction retry。
 - `sim_base` 与 `sim_active_localization` 默认指向该本地编排；师兄仓库未修改，模型和 MoveIt 配置仍由 underlay 提供。
 - Python launch 语法检查通过；Phase 0–1 静态契约检查通过。运行门禁仍需 VM 定向重建后验证。
-### 2026-08-03：终端 1 证实 Gazebo 卡在 RGB-D 渲染初始化
+#### 2026-08-03：终端 1 证实 Gazebo 卡在 RGB-D 渲染初始化
 
 - 新 `sim_control.launch.py` 已生效：使用 `robot_description` topic，且仅有一个 `cs625_spawn_robot`。
 - Gazebo 停在 `SensorsPrivate::Run`、`Initializing render context`、`Loading ignition-rendering-ogre2`，直到 `Ctrl+C` 后才完成渲染线程初始化并发布固定相机话题。
 - 实体创建因此在 5 秒处超时；`gz_ros2_control` 模型插件尚无执行机会，controller manager 缺失是后果。
 - 纯控制门禁不再使用含固定 RGB-D 相机的 `minimal_occlusion.sdf`，改用 `sim_control.launch.py` 的无相机 `empty.sdf` 默认值。
 - 更正 `ros_gz_sim create` 参数：`-allow_renaming` 是布尔开关，传入字符串 `false` 仍会启用；现已省略该开关，使用默认禁止重命名行为。
-### 2026-08-03：空世界控制链门禁通过
+#### 2026-08-03：空世界控制链门禁通过
 
 - `cs625_spawn_robot` 从 `robot_description` topic 一次创建实体成功，无超时和重复实体。
 - `GazeboSimROS2ControlPlugin` 成功读取 URDF，六个 CS625 关节全部载入。
@@ -486,7 +525,7 @@ Gazebo 服务端插件日志、controller manager 和 TF 发布做诊断，仍�
 - `joint_state_broadcaster` 与 `joint_trajectory_controller` 均完成 configured/activated。
 - 这证明此前 controller manager 缺失的直接阻塞是 RGB-D/Ogre2 世界渲染初始化，而非机械臂 ros2_control 模型。
 - 发现独立资源警告：末端执行器 `package://` 网格在 SDF 中被转换为无法解析的 `model://` URI；包装层已改为解析后的 `file://$(find eli_cs_robot_description)/...`，师兄资产未复制或修改。
-### 2026-08-03：joint state 与眼在手 TF 门禁通过
+#### 2026-08-03：joint state 与眼在手 TF 门禁通过
 
 - `/controller_manager` 节点可见，两个控制器均为 `active`。
 - `/joint_states` 发布完整六关节 position/velocity/effort。
@@ -494,7 +533,7 @@ Gazebo 服务端插件日志、controller manager 和 TF 发布做诊断，仍�
 - 控制与 TF 子门禁通过；相机渲染与 MoveIt 组合仍需单独验证。
 - 为隔离相机源，新增 `rgbd_fixture.sdf` 作为固定相机接口测试世界；`minimal_occlusion.sdf` 删除固定相机，只保留机械臂眼在手相机。
 - 两个 VM 世界的传感器渲染后端改为 Fortress `ogre`，相机 `visualize=false`，避免已观测的 Ogre2 初始化阻塞和画面闪烁。
-### 2026-08-03：更正 headless RGB-D 渲染配置
+#### 2026-08-03：更正 headless RGB-D 渲染配置
 
 - 分离固定相机后，带 Sensors system 的 robot world 仍在渲染线程初始化处阻塞，排除双相机和 Ogre2 本身为唯一原因。
 - Gazebo Fortress 官方约束：普通 `-s` 只是 server-only；无 GUI 的渲染传感器必须额外使用 `--headless-rendering` 选择 EGL，且 EGL 只支持 Ogre2。

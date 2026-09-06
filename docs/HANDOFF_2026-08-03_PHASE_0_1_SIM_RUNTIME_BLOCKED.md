@@ -204,7 +204,7 @@ Message Filter queue full / dropping message
 - `docs/dependencies.md`
 - `docs/frames_and_topics.md`
 - `docs/simulation.md`
-- `WORKLOG_2026-08-02_COMMON_PROFILE_UNDERLAY_AUDIT.md`
+- `docs/worklogs/WORKLOG_2026-08-02_COMMON_PROFILE_UNDERLAY_AUDIT.md`
 
 ## 10. 恢复工作前的第一优先级
 
