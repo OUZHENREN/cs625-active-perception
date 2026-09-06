@@ -1,0 +1,1034 @@
+[INFO] [launch]: All log files can be found below /home/oy/.ros/log/2026-09-06-09-45-34-748107-OY-490
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [launch.user]: gz_ros2_control_plugin=/opt/ros/jazzy/lib/libgz_ros2_control-system.so
+[INFO] [launch.user]: ign_partition=cs625_1788659134
+[INFO] [launch.user]: CS625 sim_base profile: cs625
+[INFO] [launch.user]: execute=false (safe default is false)
+
+[INFO] [parameter_bridge-1]: process started with pid [497]
+[INFO] [gazebo-2]: process started with pid [498]
+[INFO] [python3-3]: process started with pid [499]
+[INFO] [parameter_bridge-4]: process started with pid [500]
+[INFO] [rgbd_sensor_adapter-5]: process started with pid [501]
+[INFO] [candidate_generator-6]: process started with pid [502]
+[INFO] [reachability_filter-7]: process started with pid [504]
+[parameter_bridge-1] [INFO] [1788659135.761902494] [clock_bridge]: Creating GZ->ROS Bridge: [/clock (gz.msgs.Clock) -> /clock (rosgraph_msgs/msg/Clock)] (Lazy 0)
+[python3-3] Prepared Gazebo model at docs/evidence/minimum_showcase_matrix_20260906_r1/models/occlusion_light_fixed_view_seed17.urdf (removed 8 mesh visual elements).
+[INFO] [python3-3]: process has finished cleanly [pid 499]
+[INFO] [create-8]: process started with pid [567]
+[create-8] [INFO] [1788659136.255053509] [cs625_spawn_robot]: Requesting list of world names.
+[gazebo-2] [1;33m[Wrn] [SystemLoader.cc:75] [0m[1;33mTrying to load deprecated plugin [[0m[1;33mignition-gazebo-physics-system[0m[1;33m]. Using [[0m[1;33mgz-sim-physics-system[0m[1;33m] instead.[0m[1;33m[0m
+[rgbd_sensor_adapter-5] [INFO] [1788659136.428880533] [cs625_sensor_adapter]: RGB-D adapter configured for streams: color, depth, camera_info, points
+[gazebo-2] [1;33m[Wrn] [SystemLoader.cc:75] [0m[1;33mTrying to load deprecated plugin [[0m[1;33mignition-gazebo-sensors-system[0m[1;33m]. Using [[0m[1;33mgz-sim-sensors-system[0m[1;33m] instead.[0m[1;33m[0m
+[gazebo-2] [1;33m[Wrn] [SystemLoader.cc:75] [0m[1;33mTrying to load deprecated plugin [[0m[1;33mignition-gazebo-user-commands-system[0m[1;33m]. Using [[0m[1;33mgz-sim-user-commands-system[0m[1;33m] instead.[0m[1;33m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mGazebo Sim Server v[0m[1;32m8.11.0[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mLoading SDF world file[[0m[1;32m/home/oy/cs625_p56_install/share/cs625_simulation/worlds/occlusion_light.sdf[0m[1;32m].[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing entity system service on [[0m[1;32m/[0m[1;32mentity/system/add[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;36m[Dbg] [Physics.cc:906] [0m[1;36mLoaded [[0m[1;36mgz::physics::dartsim::Plugin[0m[1;36m] from library [[0m[1;36m/opt/ros/jazzy/opt/gz_physics_vendor/lib/gz-physics-7/engine-plugins/libgz-physics-dartsim-plugin.so[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SystemManager.cc:80] [0m[1;36mLoaded system [[0m[1;36mgz::sim::systems::Physics[0m[1;36m] for entity [[0m[1;36m1[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:697] [0m[1;36mConfiguring Sensors system[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:557] [0m[1;36mSensorsPrivate::Run[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SystemManager.cc:80] [0m[1;36mLoaded system [[0m[1;36mgz::sim::systems::Sensors[0m[1;36m] for entity [[0m[1;36m1[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:532] [0m[1;36mSensorsPrivate::RenderThread started[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:337] [0m[1;36mWaiting for init[0m[1;36m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mCreate[0m[1;32m service on [[0m[1;32m/world/occlusion_light/create_multiple[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mCreate[0m[1;32m service on [[0m[1;32m/world/occlusion_light/create_multiple/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mRemove[0m[1;32m service on [[0m[1;32m/world/occlusion_light/remove[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mRemove[0m[1;32m service on [[0m[1;32m/world/occlusion_light/remove/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPose[0m[1;32m service on [[0m[1;32m/world/occlusion_light/set_pose[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPose[0m[1;32m service on [[0m[1;32m/world/occlusion_light/set_pose/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPose[0m[1;32m service on [[0m[1;32m/world/occlusion_light/set_pose_vector[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPose[0m[1;32m service on [[0m[1;32m/world/occlusion_light/set_pose_vector/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mLight configuration[0m[1;32m service on [[0m[1;32m/world/occlusion_light/light_config[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mLight configuration[0m[1;32m service on [[0m[1;32m/world/occlusion_light/light_config/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPhysics[0m[1;32m service on [[0m[1;32m/world/occlusion_light/set_physics[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPhysics[0m[1;32m service on [[0m[1;32m/world/occlusion_light/set_physics/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mSphericalCoordinates[0m[1;32m service on [[0m[1;32m/world/occlusion_light/set_spherical_coordinates[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mSphericalCoordinates[0m[1;32m service on [[0m[1;32m/world/occlusion_light/set_spherical_coordinates/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mEnable collision[0m[1;32m service on [[0m[1;32m/world/occlusion_light/enable_collision[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mEnable collision[0m[1;32m service on [[0m[1;32m/world/occlusion_light/enable_collision/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mDisable collision[0m[1;32m service on [[0m[1;32m/world/occlusion_light/disable_collision[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mDisable collision[0m[1;32m service on [[0m[1;32m/world/occlusion_light/disable_collision/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mMaterial[0m[1;32m service on [[0m[1;32m/world/occlusion_light/visual_config[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;33m[Wrn] [SystemLoader.cc:75] [0m[1;33mTrying to load deprecated plugin [[0m[1;33mignition-gazebo-scene-broadcaster-system[0m[1;33m]. Using [[0m[1;33mgz-sim-scene-broadcaster-system[0m[1;33m] instead.[0m[1;33m[0m
+[create-8] [INFO] [1788659136.651630980] [cs625_spawn_robot]: Entity creation successful.
+[INFO] [create-8]: process has finished cleanly [pid 567]
+[parameter_bridge-4] [INFO] [1788659136.767127892] [cs625_sim_sensor_bridge]: Creating GZ->ROS Bridge: [/camera/image (gz.msgs.Image) -> /sim/camera/image (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1788659136.777169689] [cs625_sim_sensor_bridge]: Creating GZ->ROS Bridge: [/camera/depth_image (gz.msgs.Image) -> /sim/camera/depth_image (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1788659136.778675960] [cs625_sim_sensor_bridge]: Creating GZ->ROS Bridge: [/camera/camera_info (gz.msgs.CameraInfo) -> /sim/camera/camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1788659136.780164390] [cs625_sim_sensor_bridge]: Creating GZ->ROS Bridge: [/camera/points (gz.msgs.PointCloudPacked) -> /sim/camera/points (sensor_msgs/msg/PointCloud2)] (Lazy 0)
+[gazebo-2] [INFO] [1788659138.342914739] [gz_ros_control]: [gz_ros2_control] Fixed joint ['base_joint'] (Entity='45') is skipped.
+[gazebo-2] [INFO] [1788659138.346604620] [gz_ros_control]: Loading controller_manager
+[gazebo-2] [INFO] [1788659138.388030220] [controller_manager]: Using ROS clock for triggering controller manager cycles.
+[gazebo-2] [INFO] [1788659138.396844867] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[gazebo-2] [WARN] [1788659138.403666806] [gz_ros_control]: Waiting RM to load and initialize hardware...
+[gazebo-2] [WARN] [1788659139.396132414] [controller_manager]: Waiting for data on 'robot_description' topic to finish initialization
+[gazebo-2] [WARN] [1788659140.396132936] [controller_manager]: Waiting for data on 'robot_description' topic to finish initialization
+[gazebo-2] [WARN] [1788659140.403803287] [gz_ros_control]: Waiting RM to load and initialize hardware...
+[gazebo-2] [WARN] [1788659141.396166393] [controller_manager]: Waiting for data on 'robot_description' topic to finish initialization
+[gazebo-2] [WARN] [1788659142.396068286] [controller_manager]: Waiting for data on 'robot_description' topic to finish initialization
+[gazebo-2] [WARN] [1788659142.404009526] [gz_ros_control]: Waiting RM to load and initialize hardware...
+[gazebo-2] [1;32m[Msg] [0m[1;32mMaterial[0m[1;32m service on [[0m[1;32m/world/occlusion_light/visual_config/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mMaterial[0m[1;32m service on [[0m[1;32m/world/occlusion_light/wheel_slip[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mMaterial[0m[1;32m service on [[0m[1;32m/world/occlusion_light/wheel_slip/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;36m[Dbg] [SystemManager.cc:80] [0m[1;36mLoaded system [[0m[1;36mgz::sim::systems::UserCommands[0m[1;36m] for entity [[0m[1;36m1[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SystemManager.cc:80] [0m[1;36mLoaded system [[0m[1;36mgz::sim::systems::SceneBroadcaster[0m[1;36m] for entity [[0m[1;36m1[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mLoaded level [[0m[1;32mdefault[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing world controls on [[0m[1;32m/world/occlusion_light[0m[1;32m/control], [[0m[1;32m/world/occlusion_light[0m[1;32m/control/state] and [[0m[1;32m/world/occlusion_light[0m[1;32m/playback/control][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing GUI information on [[0m[1;32m/world/occlusion_light[0m[1;32m/[0m[1;32mgui/info[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mWorld [[0m[1;32mocclusion_light[0m[1;32m] initialized with [[0m[1;32m1ms[0m[1;32m] physics profile.[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing world SDF generation service on [[0m[1;32m/world/occlusion_light[0m[1;32m/[0m[1;32mgenerate_world_sdf[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing world names on [[0m[1;32m/gazebo/worlds[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mResource path add service on [[0m[1;32m/gazebo/resource_paths/add[0m[1;32m].[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mResource path get service on [[0m[1;32m/gazebo/resource_paths/get[0m[1;32m].[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mResource path resolve service on [[0m[1;32m/gazebo/resource_paths/resolve[0m[1;32m].[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mResource paths published on [[0m[1;32m/gazebo/resource_paths[0m[1;32m].[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServer control service on [[0m[1;32m/server_control[0m[1;32m].[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mFound no publishers on /stats, adding root stats topic[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mFound no publishers on /clock, adding root clock topic[0m[1;32m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:551] [0m[1;36mCreating PostUpdate worker threads: [0m[1;36m3[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:562] [0m[1;36mCreating postupdate worker thread ([0m[1;36m0[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:562] [0m[1;36mCreating postupdate worker thread ([0m[1;36m1[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [WARN] [1788659143.396067060] [controller_manager]: Waiting for data on 'robot_description' topic to finish initialization
+[INFO] [robot_state_publisher-9]: process started with pid [667]
+[robot_state_publisher-9] [INFO] [1788659143.865789738] [robot_state_publisher]: Robot initialized
+[gazebo-2] [INFO] [1788659144.070684986] [controller_manager]: Received robot description from topic.
+[gazebo-2] [INFO] [1788659144.070763698] [controller_manager]: Enforcing command limits is disabled. Command limits from URDF will be ignored.
+[gazebo-2] [INFO] [1788659144.077096929] [gz_ros_control]: The position_proportional_gain has been set to: 0.5
+[gazebo-2] [INFO] [1788659144.077193301] [gz_ros_control]: Loading joint: shoulder_pan_joint
+[gazebo-2] [INFO] [1788659144.077202414] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788659144.077209115] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077226954] [gz_ros_control]: 			 found initial value: 0.000000
+[gazebo-2] [INFO] [1788659144.077237159] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077245458] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788659144.077249945] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788659144.077254085] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077264101] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077274922] [gz_ros_control]: Loading joint: shoulder_lift_joint
+[gazebo-2] [INFO] [1788659144.077279280] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788659144.077282993] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077286805] [gz_ros_control]: 			 found initial value: 0.000000
+[gazebo-2] [INFO] [1788659144.077291014] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077295679] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788659144.077299581] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788659144.077303214] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077309458] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077317519] [gz_ros_control]: Loading joint: elbow_joint
+[gazebo-2] [INFO] [1788659144.077321877] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788659144.077329233] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077333015] [gz_ros_control]: 			 found initial value: 0.000000
+[gazebo-2] [INFO] [1788659144.077336976] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077340619] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788659144.077345206] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788659144.077348730] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077355133] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077363015] [gz_ros_control]: Loading joint: wrist_1_joint
+[gazebo-2] [INFO] [1788659144.077367234] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788659144.077370867] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077374600] [gz_ros_control]: 			 found initial value: 0.000000
+[gazebo-2] [INFO] [1788659144.077378432] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077382472] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788659144.077386334] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788659144.077389788] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077394702] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077401929] [gz_ros_control]: Loading joint: wrist_2_joint
+[gazebo-2] [INFO] [1788659144.077406168] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788659144.077409752] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077413653] [gz_ros_control]: 			 found initial value: 0.000000
+[gazebo-2] [INFO] [1788659144.077417564] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077421287] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788659144.077424801] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788659144.077428286] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077434073] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077441489] [gz_ros_control]: Loading joint: wrist_3_joint
+[gazebo-2] [INFO] [1788659144.077445281] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788659144.077448785] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077452637] [gz_ros_control]: 			 found initial value: 0.000000
+[gazebo-2] [INFO] [1788659144.077456449] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077461323] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788659144.077465214] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788659144.077468997] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077474198] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077603896] [controller_manager]: Initialize hardware 'cs' 
+[gazebo-2] [WARN] [1788659144.077623035] [controller_manager.hardware_component.system.cs]: Executor is not available during hardware component initialization for 'cs'. Skipping node creation!
+[gazebo-2] [INFO] [1788659144.077722912] [controller_manager]: Successful initialization of hardware 'cs'
+[gazebo-2] [INFO] [1788659144.077856302] [gz_ros_control]: The position_proportional_gain has been set to: 0.5
+[gazebo-2] [INFO] [1788659144.077870994] [gz_ros_control]: Loading joint: gripper_right_finger_joint
+[gazebo-2] [INFO] [1788659144.077875958] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788659144.077879928] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077884197] [gz_ros_control]: 			 found initial value: 0.030000
+[gazebo-2] [INFO] [1788659144.077888922] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077893241] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788659144.077897410] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788659144.077901163] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077911914] [gz_ros_control]: Loading joint: gripper_left_finger_joint
+[gazebo-2] [INFO] [1788659144.077917413] [gz_ros_control]: Joint 'gripper_left_finger_joint'is mimicking joint 'gripper_right_finger_joint' with multiplier: 1 and offset: 0
+[gazebo-2] [INFO] [1788659144.077924015] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788659144.077927648] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788659144.077931391] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788659144.077935600] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788659144.077939431] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788659144.077957310] [controller_manager]: Initialize hardware 'cs625_parallel_gripper' 
+[gazebo-2] [WARN] [1788659144.077978564] [controller_manager.hardware_component.system.cs625_parallel_gripper]: Executor is not available during hardware component initialization for 'cs625_parallel_gripper'. Skipping node creation!
+[gazebo-2] [INFO] [1788659144.078004007] [controller_manager]: Successful initialization of hardware 'cs625_parallel_gripper'
+[gazebo-2] [INFO] [1788659144.078056879] [controller_manager]: Activating component 'cs625_parallel_gripper'.
+[gazebo-2] [INFO] [1788659144.078067719] [resource_manager]: 'configure' hardware 'cs625_parallel_gripper' 
+[gazebo-2] [INFO] [1788659144.078073010] [gz_ros_control]: System Successfully configured!
+[gazebo-2] [INFO] [1788659144.078077656] [resource_manager]: Successful 'configure' of hardware 'cs625_parallel_gripper'
+[gazebo-2] [INFO] [1788659144.078084695] [resource_manager]: 'activate' hardware 'cs625_parallel_gripper' 
+[gazebo-2] [INFO] [1788659144.078100499] [resource_manager]: Successful 'activate' of hardware 'cs625_parallel_gripper'
+[gazebo-2] [INFO] [1788659144.078174237] [controller_manager]: Activating component 'cs'.
+[gazebo-2] [INFO] [1788659144.078179171] [resource_manager]: 'configure' hardware 'cs' 
+[gazebo-2] [INFO] [1788659144.078182486] [gz_ros_control]: System Successfully configured!
+[gazebo-2] [INFO] [1788659144.078186388] [resource_manager]: Successful 'configure' of hardware 'cs'
+[gazebo-2] [INFO] [1788659144.078190756] [resource_manager]: 'activate' hardware 'cs' 
+[gazebo-2] [INFO] [1788659144.078193694] [resource_manager]: Successful 'activate' of hardware 'cs'
+[gazebo-2] [WARN] [1788659144.078212427] [controller_manager]: Component 'cs625_parallel_gripper' does not have read or write statistics initialized, skipping registration.
+[gazebo-2] [WARN] [1788659144.078217658] [controller_manager]: Component 'cs' does not have read or write statistics initialized, skipping registration.
+[gazebo-2] [INFO] [1788659144.078224210] [controller_manager]: Resource Manager has been successfully initialized. Starting Controller Manager services...
+[gazebo-2] [1;31m[Err] [Physics.cc:1808] [0m[1;31mAttempting to create a mimic constraint for joint [[0m[1;31mgripper_left_finger_joint[0m[1;31m] but the chosen physics engine does not support [0m[1;31mmimic constraints, so no constraint will be [0m[1;31mcreated.[0m[1;31m[0m
+[gazebo-2] [1;36m[Dbg] [SystemManager.cc:80] [0m[1;36mLoaded system [[0m[1;36mgz_ros2_control::GazeboSimROS2ControlPlugin[0m[1;36m] for entity [[0m[1;36m18[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [DetachableJoint.cc:137] [0m[1;36mDetach topic is: [0m[1;36m/p7/attachment/detach[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [DetachableJoint.cc:143] [0m[1;36mDetachableJoint subscribing to messages on [0m[1;36m[[0m[1;36m/p7/attachment/detach[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [DetachableJoint.cc:160] [0m[1;36mAttach topic is: [0m[1;36m/p7/attachment/attach[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [DetachableJoint.cc:195] [0m[1;36mOutput topic is: [0m[1;36m/p7/attachment/state[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SystemManager.cc:80] [0m[1;36mLoaded system [[0m[1;36mgz::sim::systems::DetachableJoint[0m[1;36m] for entity [[0m[1;36m18[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [UserCommands.cc:1094] [0m[1;36mCreated entity [[0m[1;36m18[0m[1;36m] named [[0m[1;36mcs[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mbase_link_inertia_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mshoulder_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mupperarm_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mforearm_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mwrist_1_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mwrist_2_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mwrist_3_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mwrist_3_link_fixed_joint_lump__my_end_effector_link_collision_1[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:953] [0m[1;36mInitialization needed[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:349] [0m[1;36mInitializing render context[0m[1;36m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mLoading plugin [[0m[1;32mgz-rendering-ogre2[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [WARN] [1788659144.553824776] [gz_ros_control]:  Desired controller update period (0.01 s) is slower than the gazebo simulation period (0.001 s).
+[INFO] [move_group-10]: process started with pid [777]
+[move_group-10] [WARN] [1788659148.094741383] [rcl.logging_rosout]: Publisher already registered for node name: 'move_group'. If this is due to multiple nodes with the same name then all logs for the logger named 'move_group' will go out over the existing publisher. As soon as any node with that name is destructed it will unregister the publisher, preventing any further logs for that name from being published on the rosout topic.
+[move_group-10] [INFO] [1788659148.109016639] [move_group.move_group.moveit.ros.rdf_loader]: Loaded robot model in 0 seconds
+[move_group-10] [INFO] [1788659148.109205802] [move_group.move_group.moveit.core.robot_model]: Loading robot model 'cs625'...
+[move_group-10] [INFO] [1788659148.184527947] [move_group.move_group.moveit.kinematics.kdl_kinematics_plugin]: Joint weights for group 'cs625_arm': 1 1 1 1 1 1
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing scene information on [[0m[1;32m/world/occlusion_light[0m[1;32m/[0m[1;32mscene/info[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing graph information on [[0m[1;32m/world/occlusion_light[0m[1;32m/[0m[1;32mscene/graph[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing full state on [[0m[1;32m/world/occlusion_light[0m[1;32m/[0m[1;32mstate[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing full state (async) on [[0m[1;32m/world/occlusion_light[0m[1;32m/[0m[1;32mstate_async[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPublishing scene information on [[0m[1;32m/world/occlusion_light/scene/info[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPublishing entity deletions on [[0m[1;32m/world/occlusion_light/scene/deletion[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPublishing state changes on [[0m[1;32m/world/occlusion_light/state[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPublishing pose messages on [[0m[1;32m/world/occlusion_light[0m[1;32m/[0m[1;32mpose/info[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPublishing dynamic pose messages on [[0m[1;32m/world/occlusion_light[0m[1;32m/[0m[1;32mdynamic_pose/info[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:578] [0m[1;36mExiting postupdate worker thread ([0m[1;36m1[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:578] [0m[1;36mExiting postupdate worker thread ([0m[1;36m0[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:551] [0m[1;36mCreating PostUpdate worker threads: [0m[1;36m4[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:562] [0m[1;36mCreating postupdate worker thread ([0m[1;36m0[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:562] [0m[1;36mCreating postupdate worker thread ([0m[1;36m1[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:562] [0m[1;36mCreating postupdate worker thread ([0m[1;36m2[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [DetachableJoint.cc:343] [0m[1;36mAttaching entity: [0m[1;36m54[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Physics.cc:1946] [0m[1;36mCreating detachable joint [[0m[1;36m54[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [RenderUtil.cc:2646] [0m[1;36mCreate scene [[0m[1;36mscene[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:391] [0m[1;36mRendering Thread initialized[0m[1;36mRendering Thread initialized[Dbg] [Sensors.cc:953] [0m[1;36mInitialization needed[0m[1;36m[0m
+[gazebo-2] [1;36m[0m
+[gazebo-2] [1;36m[Dbg] [RgbdCameraSensor.cc:210] [0m[1;36mRGB images for [[0m[1;36mcs::wrist_3_link::camera_sensor[0m[1;36m] advertised on [[0m[1;36m/camera[0m[1;36m/image][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [RgbdCameraSensor.cc:224] [0m[1;36mDepth images for [[0m[1;36mcs::wrist_3_link::camera_sensor[0m[1;36m] advertised on [[0m[1;36m/camera[0m[1;36m/depth_image][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [RgbdCameraSensor.cc:238] [0m[1;36mPoints for [[0m[1;36mcs::wrist_3_link::camera_sensor[0m[1;36m] advertised on [[0m[1;36m/camera[0m[1;36m/points][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [CameraSensor.cc:695] [0m[1;36mCamera info for [[0m[1;36mcs::wrist_3_link::camera_sensor[0m[1;36m] advertised on [[0m[1;36m/camera/camera_info[0m[1;36m][0m[1;36m[0m
+[INFO] [spawner-11]: process started with pid [801]
+[gazebo-2] [INFO] [1788659149.074192476] [controller_manager]: Received robot description from topic.
+[gazebo-2] [WARN] [1788659149.074321217] [controller_manager]: ResourceManager has already loaded a urdf. Ignoring attempt to reload a robot description.
+[move_group-10] [INFO] [1788659149.087172644] [move_group.move_group.moveit.ros.planning_scene_monitor]: Publishing maintained planning scene on 'monitored_planning_scene'
+[move_group-10] [INFO] [1788659149.087571420] [move_group.move_group.moveit.ros.moveit_cpp]: Listening to 'joint_states' for joint states
+[move_group-10] [INFO] [1788659149.089501607] [move_group.move_group.moveit.ros.current_state_monitor]: Listening to joint states on topic 'joint_states'
+[move_group-10] [INFO] [1788659149.090678661] [move_group.move_group.moveit.ros.planning_scene_monitor]: Listening to '/attached_collision_object' for attached collision objects
+[move_group-10] [INFO] [1788659149.090719861] [move_group.move_group.moveit.ros.planning_scene_monitor]: Stopping existing planning scene publisher.
+[move_group-10] [INFO] [1788659149.090996704] [move_group.move_group.moveit.ros.planning_scene_monitor]: Stopped publishing maintained planning scene.
+[move_group-10] [INFO] [1788659149.091664808] [move_group.move_group.moveit.ros.planning_scene_monitor]: Publishing maintained planning scene on 'monitored_planning_scene'
+[move_group-10] [INFO] [1788659149.091808033] [move_group.move_group.moveit.ros.planning_scene_monitor]: Starting planning scene monitor
+[move_group-10] [INFO] [1788659149.092527627] [move_group.move_group.moveit.ros.planning_scene_monitor]: Listening to '/planning_scene'
+[move_group-10] [INFO] [1788659149.092554354] [move_group.move_group.moveit.ros.planning_scene_monitor]: Starting world geometry update monitor for collision objects, attached objects, octomap updates.
+[move_group-10] [INFO] [1788659149.094480931] [move_group.move_group.moveit.ros.planning_scene_monitor]: Listening to 'collision_object'
+[move_group-10] [INFO] [1788659149.095626550] [move_group.move_group.moveit.ros.planning_scene_monitor]: Listening to 'planning_scene_world' for planning scene world geometry
+[move_group-10] [ERROR] [1788659149.096090584] [move_group.move_group.moveit.ros.occupancy_map_monitor]: Exception while loading octomap updater 'occupancy_map_monitor/PointCloudOctomapUpdater': According to the loaded plugin descriptions the class occupancy_map_monitor/PointCloudOctomapUpdater with base class type occupancy_map_monitor::OccupancyMapUpdater does not exist. Declared types are 
+[move_group-10] 
+[move_group-10] [ERROR] [1788659149.096161439] [move_group.move_group.moveit.ros.occupancy_map_monitor]: Failed to load sensor: `point_cloud_sensor` of type: `occupancy_map_monitor/PointCloudOctomapUpdater`
+[move_group-10] [INFO] [1788659149.215803865] [move_group.move_group.moveit.ros.planning_pipeline]: Successfully loaded planner 'STOMP'
+[move_group-10] [INFO] [1788659149.217309158] [move_group]: Try loading adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659149.222015443] [move_group]: Loaded adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659149.222092116] [move_group]: Try loading adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-10] [INFO] [1788659149.222682072] [move_group]: Loaded adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-10] [INFO] [1788659149.222708968] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-10] [INFO] [1788659149.222738135] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-10] [INFO] [1788659149.222742966] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-10] [INFO] [1788659149.222758915] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-10] [INFO] [1788659149.224591181] [move_group]: Try loading adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-10] [INFO] [1788659149.231816543] [move_group]: Loaded adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-10] [INFO] [1788659149.231887548] [move_group]: Try loading adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-10] [INFO] [1788659149.237257788] [move_group]: Loaded adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-10] [INFO] [1788659149.237305195] [move_group]: Try loading adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-10] [INFO] [1788659149.238515659] [move_group]: Loaded adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-10] [INFO] [1788659149.246341695] [move_group.move_group.moveit.planners.pilz.joint_limits_aggregator]: Reading limits from namespace robot_description_planning
+[move_group-10] [INFO] [1788659149.263375495] [move_group.move_group.moveit.planners.pilz.command_planner]: Available plugins: pilz_industrial_motion_planner/PlanningContextLoaderCIRC pilz_industrial_motion_planner/PlanningContextLoaderLIN pilz_industrial_motion_planner/PlanningContextLoaderPTP 
+[move_group-10] [INFO] [1788659149.263439577] [move_group.move_group.moveit.planners.pilz.command_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderCIRC
+[move_group-10] [INFO] [1788659149.267919164] [move_group.move_group.moveit.planners.pilz.command_planner]: Registered Algorithm [CIRC]
+[move_group-10] [INFO] [1788659149.268007931] [move_group.move_group.moveit.planners.pilz.command_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderLIN
+[move_group-10] [INFO] [1788659149.269942566] [move_group.move_group.moveit.planners.pilz.command_planner]: Registered Algorithm [LIN]
+[move_group-10] [INFO] [1788659149.270008132] [move_group.move_group.moveit.planners.pilz.command_planner]: About to load: pilz_industrial_motion_planner/PlanningContextLoaderPTP
+[move_group-10] [INFO] [1788659149.272434723] [move_group.move_group.moveit.planners.pilz.command_planner]: Registered Algorithm [PTP]
+[move_group-10] [INFO] [1788659149.272538750] [move_group.move_group.moveit.ros.planning_pipeline]: Successfully loaded planner 'Pilz Industrial Motion Planner'
+[move_group-10] [INFO] [1788659149.275803690] [move_group]: Try loading adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659149.276217010] [move_group]: Loaded adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659149.276244364] [move_group]: Try loading adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-10] [INFO] [1788659149.277041906] [move_group]: Loaded adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-10] [INFO] [1788659149.277065196] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-10] [INFO] [1788659149.277095788] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-10] [INFO] [1788659149.277103398] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-10] [INFO] [1788659149.277118121] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-10] [INFO] [1788659149.278954641] [move_group]: Try loading adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-10] [INFO] [1788659149.282499582] [move_group]: Loaded adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-10] [INFO] [1788659149.282547875] [move_group]: Try loading adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-10] [INFO] [1788659149.283911994] [move_group]: Loaded adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-10] [INFO] [1788659149.316183158] [move_group.move_group.moveit.ros.planning_pipeline]: Successfully loaded planner 'OMPL'
+[move_group-10] [INFO] [1788659149.318053845] [move_group]: Try loading adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659149.318281255] [move_group]: Loaded adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659149.318295659] [move_group]: Try loading adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-10] [INFO] [1788659149.319029857] [move_group]: Loaded adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-10] [INFO] [1788659149.319057670] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-10] [INFO] [1788659149.319107726] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-10] [INFO] [1788659149.319119929] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-10] [INFO] [1788659149.319143707] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-10] [INFO] [1788659149.321465816] [move_group]: Try loading adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-10] [INFO] [1788659149.323621640] [move_group]: Loaded adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-10] [INFO] [1788659149.323671448] [move_group]: Try loading adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-10] [INFO] [1788659149.324910660] [move_group]: Loaded adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-10] [INFO] [1788659149.324940415] [move_group]: Try loading adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-10] [INFO] [1788659149.325930243] [move_group]: Loaded adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-10] [INFO] [1788659149.339258115] [move_group.move_group.moveit.ros.planning_pipeline]: Successfully loaded planner 'CHOMP'
+[move_group-10] [INFO] [1788659149.340686614] [move_group]: Try loading adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659149.340889728] [move_group]: Loaded adapter 'default_planning_request_adapters/ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659149.340904043] [move_group]: Try loading adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-10] [INFO] [1788659149.342390467] [move_group]: Loaded adapter 'default_planning_request_adapters/ValidateWorkspaceBounds'
+[move_group-10] [INFO] [1788659149.342511618] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-10] [INFO] [1788659149.342587285] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateBounds'
+[move_group-10] [INFO] [1788659149.342598850] [move_group]: Try loading adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-10] [INFO] [1788659149.342619510] [move_group]: Loaded adapter 'default_planning_request_adapters/CheckStartStateCollision'
+[move_group-10] [INFO] [1788659149.344992653] [move_group]: Try loading adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-10] [INFO] [1788659149.346427797] [move_group]: Loaded adapter 'default_planning_response_adapters/AddTimeOptimalParameterization'
+[move_group-10] [INFO] [1788659149.346451993] [move_group]: Try loading adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-10] [INFO] [1788659149.348089833] [move_group]: Loaded adapter 'default_planning_response_adapters/ValidateSolution'
+[move_group-10] [INFO] [1788659149.348187933] [move_group]: Try loading adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-10] [INFO] [1788659149.350468793] [move_group]: Loaded adapter 'default_planning_response_adapters/DisplayMotionPath'
+[move_group-10] [WARN] [1788659149.353890128] [rcl.logging_rosout]: Publisher already registered for node name: 'move_group'. If this is due to multiple nodes with the same name then all logs for the logger named 'move_group' will go out over the existing publisher. As soon as any node with that name is destructed it will unregister the publisher, preventing any further logs for that name from being published on the rosout topic.
+[spawner-11] [INFO] [1788659149.469950880] [spawner_joint_state_broadcaster]: waiting for service /controller_manager/list_controllers to become available...
+[move_group-10] [INFO] [1788659149.486558176] [move_group.move_group.moveit.plugins.simple_controller_manager]: Added FollowJointTrajectory controller for joint_trajectory_controller
+[move_group-10] [INFO] [1788659149.486951284] [move_group.move_group.moveit.plugins.simple_controller_manager]: Returned 1 controllers in list
+[move_group-10] [INFO] [1788659149.487008234] [move_group.move_group.moveit.plugins.simple_controller_manager]: Returned 1 controllers in list
+[move_group-10] [INFO] [1788659149.488415834] [move_group.move_group.moveit.ros.trajectory_execution_manager]: Trajectory execution is managing controllers
+[move_group-10] [INFO] [1788659149.488473153] [move_group]: MoveGroup debug mode is ON
+[move_group-10] [INFO] [1788659149.569873735] [move_group.move_group.moveit.planners.pilz.move_group_sequence_action]: initialize move group sequence action
+[move_group-10] [INFO] [1788659149.580662836] [move_group.move_group.moveit.planners.pilz.joint_limits_aggregator]: Reading limits from namespace robot_description_planning
+[move_group-10] [INFO] [1788659149.581326666] [move_group.move_group.moveit.planners.pilz.joint_limits_aggregator]: Reading limits from namespace robot_description_planning
+[move_group-10] [INFO] [1788659149.584153263] [move_group.move_group.moveit.ros.move_group.executable]: 
+[move_group-10] 
+[move_group-10] ********************************************************
+[move_group-10] * MoveGroup using: 
+[move_group-10] *     - apply_planning_scene_service
+[move_group-10] *     - clear_octomap_service
+[move_group-10] *     - get_group_urdf
+[move_group-10] *     - load_geometry_from_file
+[move_group-10] *     - CartesianPathService
+[move_group-10] *     - execute_trajectory_action
+[move_group-10] *     - get_planning_scene_service
+[move_group-10] *     - kinematics_service
+[move_group-10] *     - move_action
+[move_group-10] *     - motion_plan_service
+[move_group-10] *     - query_planners_service
+[move_group-10] *     - state_validation_service
+[move_group-10] *     - save_geometry_to_file
+[move_group-10] *     - SequenceAction
+[move_group-10] *     - SequenceService
+[move_group-10] ********************************************************
+[move_group-10] 
+[move_group-10] [INFO] [1788659149.584270340] [move_group.move_group.moveit.ros.move_group.context]: MoveGroup context using pipeline ompl
+[move_group-10] [INFO] [1788659149.584293251] [move_group.move_group.moveit.ros.move_group.context]: MoveGroup context initialization complete
+[move_group-10] [96mLoading 'move_group/ApplyPlanningSceneService'...[0m
+[move_group-10] [96mLoading 'move_group/ClearOctomapService'...[0m
+[move_group-10] [96mLoading 'move_group/GetUrdfService'...[0m
+[move_group-10] [96mLoading 'move_group/LoadGeometryFromFileService'...[0m
+[move_group-10] [96mLoading 'move_group/MoveGroupCartesianPathService'...[0m
+[move_group-10] [96mLoading 'move_group/MoveGroupExecuteTrajectoryAction'...[0m
+[move_group-10] [96mLoading 'move_group/MoveGroupGetPlanningSceneService'...[0m
+[move_group-10] [96mLoading 'move_group/MoveGroupKinematicsService'...[0m
+[move_group-10] [96mLoading 'move_group/MoveGroupMoveAction'...[0m
+[move_group-10] [96mLoading 'move_group/MoveGroupPlanService'...[0m
+[move_group-10] [96mLoading 'move_group/MoveGroupQueryPlannersService'...[0m
+[move_group-10] [96mLoading 'move_group/MoveGroupStateValidationService'...[0m
+[move_group-10] [96mLoading 'move_group/SaveGeometryToFileService'...[0m
+[move_group-10] [96mLoading 'pilz_industrial_motion_planner/MoveGroupSequenceAction'...[0m
+[move_group-10] [96mLoading 'pilz_industrial_motion_planner/MoveGroupSequenceService'...[0m
+[move_group-10] 
+[move_group-10] [92mYou can start planning now![0m
+[move_group-10] 
+[gazebo-2] [INFO] [1788659149.723989390] [controller_manager]: Loading controller : 'joint_state_broadcaster' of type 'joint_state_broadcaster/JointStateBroadcaster'
+[gazebo-2] [INFO] [1788659149.724077529] [controller_manager]: Loading controller 'joint_state_broadcaster'
+[gazebo-2] [INFO] [1788659149.731719429] [controller_manager]: Controller 'joint_state_broadcaster' node arguments: --ros-args --params-file /home/oy/cs625_p56_install/share/cs625_bringup/config/sim_controllers.yaml -p use_sim_time:=true --param use_sim_time:=true 
+[spawner-11] [INFO] [1788659149.797664069] [spawner_joint_state_broadcaster]: Loaded joint_state_broadcaster
+[gazebo-2] [INFO] [1788659149.800230219] [controller_manager]: Configuring controller: 'joint_state_broadcaster'
+[gazebo-2] [INFO] [1788659149.800494934] [joint_state_broadcaster]: 'joints' or 'interfaces' parameter is empty. All available state interfaces will be published
+[gazebo-2] [INFO] [1788659149.854554789] [controller_manager]: Activating controllers: [ joint_state_broadcaster ]
+[gazebo-2] [INFO] [1788659149.909282853] [controller_manager]: Successfully switched controllers!
+[spawner-11] [INFO] [1788659149.969781706] [spawner_joint_state_broadcaster]: Configured and activated joint_state_broadcaster
+[INFO] [spawner-11]: process has finished cleanly [pid 801]
+[INFO] [spawner-12]: process started with pid [841]
+[INFO] [spawner-13]: process started with pid [842]
+[spawner-13] [INFO] [1788659151.002076972] [spawner_gripper_controller]: waiting for service /controller_manager/list_controllers to become available...
+[gazebo-2] [INFO] [1788659151.756747532] [controller_manager]: Loading controller : 'gripper_controller' of type 'forward_command_controller/ForwardCommandController'
+[gazebo-2] [INFO] [1788659151.756958726] [controller_manager]: Loading controller 'gripper_controller'
+[gazebo-2] [INFO] [1788659151.763620128] [controller_manager]: Controller 'gripper_controller' node arguments: --ros-args --params-file /home/oy/cs625_p56_install/share/cs625_bringup/config/sim_controllers.yaml -p use_sim_time:=true --param use_sim_time:=true 
+[spawner-13] [INFO] [1788659151.857236067] [spawner_gripper_controller]: Loaded gripper_controller
+[gazebo-2] [INFO] [1788659151.859565087] [controller_manager]: Configuring controller: 'gripper_controller'
+[gazebo-2] [INFO] [1788659151.861953970] [gripper_controller]: configure successful
+[gazebo-2] [INFO] [1788659151.924323201] [controller_manager]: Activating controllers: [ gripper_controller ]
+[gazebo-2] [INFO] [1788659151.984594479] [gripper_controller]: activate successful
+[gazebo-2] [INFO] [1788659151.984696046] [controller_manager]: Successfully switched controllers!
+[spawner-13] [INFO] [1788659152.047870083] [spawner_gripper_controller]: Configured and activated gripper_controller
+[spawner-12] [INFO] [1788659152.234314780] [spawner_joint_trajectory_controller]: waiting for service /controller_manager/list_controllers to become available...
+[INFO] [spawner-13]: process has finished cleanly [pid 842]
+[gazebo-2] [INFO] [1788659154.739696183] [controller_manager]: Loading controller : 'joint_trajectory_controller' of type 'joint_trajectory_controller/JointTrajectoryController'
+[gazebo-2] [INFO] [1788659154.739773803] [controller_manager]: Loading controller 'joint_trajectory_controller'
+[gazebo-2] [INFO] [1788659154.757643408] [controller_manager]: Controller 'joint_trajectory_controller' node arguments: --ros-args --params-file /home/oy/cs625_p56_install/share/cs625_bringup/config/sim_controllers.yaml -p use_sim_time:=true --param use_sim_time:=true 
+[spawner-12] [INFO] [1788659154.863434649] [spawner_joint_trajectory_controller]: Loaded joint_trajectory_controller
+[gazebo-2] [INFO] [1788659154.866740578] [controller_manager]: Configuring controller: 'joint_trajectory_controller'
+[gazebo-2] [INFO] [1788659154.867558798] [joint_trajectory_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[gazebo-2] [INFO] [1788659154.867867526] [joint_trajectory_controller]: Command interfaces are [position] and state interfaces are [position velocity].
+[gazebo-2] [INFO] [1788659154.867956193] [joint_trajectory_controller]: Using 'splines' interpolation method.
+[gazebo-2] [INFO] [1788659154.874941957] [joint_trajectory_controller]: Action status changes will be monitored at 20.00 Hz.
+[gazebo-2] [INFO] [1788659154.899042101] [joint_trajectory_controller]: Setting initial scaling factor to 1.000000
+[gazebo-2] [INFO] [1788659154.899109969] [joint_trajectory_controller]: No scaling interface set. This controller will not read speed scaling from the hardware.
+[gazebo-2] [INFO] [1788659154.928681102] [controller_manager]: Activating controllers: [ joint_trajectory_controller ]
+[gazebo-2] [INFO] [1788659154.980651911] [controller_manager]: Successfully switched controllers!
+[spawner-12] [INFO] [1788659155.029265282] [spawner_joint_trajectory_controller]: Configured and activated joint_trajectory_controller
+[INFO] [spawner-12]: process has finished cleanly [pid 841]
+[candidate_generator-6] [INFO] [1788659160.041628949] [cs625_candidate_generator]: Published 24 reproducible camera candidates in base_link
+[move_group-10] [INFO] [1788659160.124721212] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659160.125308123] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659160.125446610] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659160.125460709] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659160.125481004] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659160.125540176] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659160.125664999] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659160.125685208] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659160.126241502] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659160.126801595] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659160.126998624] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659160.148863540] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659160.148982036] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659160.149007943] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659160.156385490] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659160.158945011] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659160.159159753] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659160.324198451] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659160.324374719] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659160.324399941] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659160.324419608] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659160.324441130] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659160.324477173] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659160.324539145] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659160.324554546] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659160.324839943] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659160.325191924] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659160.325321653] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659160.353884275] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659160.353975648] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659160.354000817] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659160.362180165] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659160.364235726] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659160.364403756] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659160.525639065] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659160.525832415] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659160.525863683] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659160.525872355] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659160.525891272] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659160.525924396] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659160.525982092] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659160.526021945] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659160.526212279] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659160.526498370] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659160.526597178] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659160.593253308] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659160.593354840] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659160.593390471] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659160.605033377] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659160.607367916] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659160.607537780] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659160.773937243] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659160.774155763] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659160.774197276] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659160.774206838] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659160.774229510] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659160.774263666] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659160.774344609] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659160.774363776] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659160.774598749] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659160.774990432] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659160.775128159] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659160.810777311] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659160.810883955] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659160.810968642] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659160.817895585] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659160.819252577] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659160.819398586] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659160.974283101] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659160.974517705] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659160.974562920] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659160.974577202] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659160.974605486] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659160.974646880] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659160.974723179] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659160.974735899] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659160.974925537] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659160.975192668] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659160.975309786] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659161.017664170] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659161.017766050] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659161.017804763] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659161.037452978] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659161.040585531] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659161.040878682] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659161.224198919] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659161.224376945] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659161.224401614] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659161.224407942] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659161.224420846] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659161.224443084] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659161.224512263] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659161.224525482] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659161.224819714] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659161.225265229] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659161.225421277] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659161.261154310] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659161.261261931] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659161.261300156] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659161.269474662] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659161.271146410] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659161.271332185] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659161.424204839] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659161.424440322] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659161.424485124] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659161.424495663] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659161.424516707] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659161.424553250] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659161.424659916] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659161.424684194] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659161.424921164] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659161.425321899] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659161.425464847] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659161.496262038] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659161.496371905] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659161.496407775] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659161.508500885] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [ERROR] [1788659161.512549859] [move_group.move_group.moveit.ros.validate_solution]: Computed path is not valid. Invalid states at index locations: [ 26 27 57 ] out of 67. Explanations follow in command line. Contacts are published on /display_contacts
+[move_group-10] [INFO] [1788659161.512808981] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Found a contact between 'forearm_link' (type 'Robot link') and 'my_end_effector_link' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-10] [INFO] [1788659161.512832391] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-10] [INFO] [1788659161.513241320] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Found a contact between 'forearm_link' (type 'Robot link') and 'my_end_effector_link' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-10] [INFO] [1788659161.513271090] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-10] [INFO] [1788659161.513482447] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Found a contact between 'my_end_effector_link' (type 'Robot link') and 'forearm_link' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-10] [INFO] [1788659161.513503024] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-10] [ERROR] [1788659161.513582264] [move_group.move_group.moveit.ros.validate_solution]: Completed listing of explanations for invalid states.
+[move_group-10] [ERROR] [1788659161.513999354] [move_group]: PlanningResponseAdapter 'ValidateSolution' failed with error code INVALID_MOTION_PLAN
+[move_group-10] [ERROR] [1788659161.514044569] [move_group.move_group.moveit.ros.move_group.plan_service]: Generating a plan with planning pipeline failed.
+[move_group-10] [INFO] [1788659161.675227846] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659161.675398872] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659161.675433569] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659161.675444325] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659161.675467616] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659161.675525051] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659161.675636503] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659161.675658286] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659161.675986206] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659161.676493986] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659161.676607533] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659161.730960414] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659161.731030136] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659161.731050941] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659161.742649511] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659161.746565147] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659161.746743705] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659161.924582817] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659161.924768570] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659161.924804147] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659161.924831475] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659161.924853388] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659161.924886577] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659161.924955648] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659161.924972828] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659161.925149053] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659161.925425724] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659161.925522394] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659161.952320427] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659161.952466762] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659161.952513268] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659161.960023196] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659161.961321435] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659161.961452824] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659162.124545694] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659162.124813368] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659162.124859538] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659162.124871162] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659162.124890708] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659162.124929227] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659162.125021588] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659162.125041308] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659162.125320834] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659162.125782032] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659162.125893647] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659162.174321907] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659162.174395416] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659162.174417188] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659162.181848271] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659162.183897209] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659162.184064132] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659162.374547227] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659162.374929642] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659162.374975117] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659162.374983648] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659162.374998723] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659162.375028330] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659162.375101264] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659162.375119237] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659162.375396820] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659162.375764105] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659162.375852809] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659162.420466405] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659162.420550442] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659162.420585769] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659162.433214254] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [ERROR] [1788659162.435381226] [move_group.move_group.moveit.ros.validate_solution]: Computed path is not valid. Invalid states at index locations: [ 25 ] out of 78. Explanations follow in command line. Contacts are published on /display_contacts
+[move_group-10] [INFO] [1788659162.435581360] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Found a contact between 'my_end_effector_link' (type 'Robot link') and 'forearm_link' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-10] [INFO] [1788659162.435612770] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-10] [ERROR] [1788659162.435714910] [move_group.move_group.moveit.ros.validate_solution]: Completed listing of explanations for invalid states.
+[move_group-10] [ERROR] [1788659162.435828988] [move_group]: PlanningResponseAdapter 'ValidateSolution' failed with error code INVALID_MOTION_PLAN
+[move_group-10] [ERROR] [1788659162.435854070] [move_group.move_group.moveit.ros.move_group.plan_service]: Generating a plan with planning pipeline failed.
+[move_group-10] [INFO] [1788659162.624121799] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659162.624302398] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659162.624357847] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659162.624369232] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659162.624390157] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659162.624428588] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659162.624502130] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659162.624521753] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659162.624745286] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659162.625181707] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659162.625343529] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659162.657593355] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659162.657710006] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659162.657745540] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659162.665127865] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659162.667169894] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659162.667362268] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659162.825141431] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659162.825317721] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659162.825355403] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659162.825363424] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659162.825380897] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659162.825411656] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659162.825492762] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659162.825507924] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659162.825712399] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659162.826047548] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659162.826156580] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659162.844750634] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659162.844872841] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659162.844908212] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659162.849356973] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659162.850229943] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659162.850314838] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659163.023732914] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659163.023859597] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659163.023893729] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659163.023899640] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659163.023933302] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659163.023959199] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659163.024002449] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659163.024011796] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659163.024143408] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659163.024371967] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659163.024480797] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659163.101101332] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659163.101176950] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659163.101204100] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659163.114364886] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [ERROR] [1788659163.116955381] [move_group.move_group.moveit.ros.validate_solution]: Computed path is not valid. Invalid states at index locations: [ 49 50 ] out of 85. Explanations follow in command line. Contacts are published on /display_contacts
+[move_group-10] [INFO] [1788659163.117201403] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Found a contact between 'my_end_effector_link' (type 'Robot link') and 'forearm_link' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-10] [INFO] [1788659163.117220488] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-10] [INFO] [1788659163.117418131] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Found a contact between 'my_end_effector_link' (type 'Robot link') and 'forearm_link' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-10] [INFO] [1788659163.117437636] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-10] [ERROR] [1788659163.117492156] [move_group.move_group.moveit.ros.validate_solution]: Completed listing of explanations for invalid states.
+[move_group-10] [ERROR] [1788659163.117743578] [move_group]: PlanningResponseAdapter 'ValidateSolution' failed with error code INVALID_MOTION_PLAN
+[move_group-10] [ERROR] [1788659163.117778582] [move_group.move_group.moveit.ros.move_group.plan_service]: Generating a plan with planning pipeline failed.
+[move_group-10] [INFO] [1788659163.273597721] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659163.273722069] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659163.273753838] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659163.273759618] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659163.273776850] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659163.273797718] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659163.273835458] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659163.273845276] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659163.273978911] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659163.274197803] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659163.274271047] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659163.318465054] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659163.318543047] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659163.318564286] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659163.329435699] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [ERROR] [1788659163.331430321] [move_group.move_group.moveit.ros.validate_solution]: Computed path is not valid. Invalid states at index locations: [ 15 ] out of 82. Explanations follow in command line. Contacts are published on /display_contacts
+[move_group-10] [INFO] [1788659163.331684958] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Found a contact between 'wrist_2_link' (type 'Robot link') and 'forearm_link' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-10] [INFO] [1788659163.331703993] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-10] [ERROR] [1788659163.331822260] [move_group.move_group.moveit.ros.validate_solution]: Completed listing of explanations for invalid states.
+[move_group-10] [ERROR] [1788659163.332011988] [move_group]: PlanningResponseAdapter 'ValidateSolution' failed with error code INVALID_MOTION_PLAN
+[move_group-10] [ERROR] [1788659163.332070456] [move_group.move_group.moveit.ros.move_group.plan_service]: Generating a plan with planning pipeline failed.
+[move_group-10] [INFO] [1788659163.523425897] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659163.523569831] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659163.523606027] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659163.523612970] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659163.523623700] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659163.523644518] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659163.523712493] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659163.523726679] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659163.523903323] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659163.524157670] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659163.524249980] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659163.568810699] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659163.568877712] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659163.568908268] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659163.574616693] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659163.577325646] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659163.577524381] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659163.773422356] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659163.773526557] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659163.773559698] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659163.773568965] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659163.773581668] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659163.773599972] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659163.773635607] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659163.773645105] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659163.773804257] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659163.774053444] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659163.774123343] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659163.796140567] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659163.796222838] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659163.796250108] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659163.801655466] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659163.802894381] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659163.802987512] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659163.973891207] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659163.974043196] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659163.974073181] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659163.974082959] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659163.974101834] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659163.974140505] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659163.974212888] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659163.974232494] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659163.974430247] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659163.974781762] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659163.974874031] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659164.000172149] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659164.000258718] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659164.000276681] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659164.003345184] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659164.004028478] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659164.004080293] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659164.173497540] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659164.173661351] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659164.173684083] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659164.173701966] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659164.173715270] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659164.173732832] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659164.173778887] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659164.173795477] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659164.173989373] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659164.174294744] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659164.174386012] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659164.189082056] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659164.189159719] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659164.189177471] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659164.191619486] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659164.192062179] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659164.192113683] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659164.373772327] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659164.373892177] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659164.373910431] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659164.373916192] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659164.373927763] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659164.373945666] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659164.373981251] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659164.373991009] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659164.374121248] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659164.374315465] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659164.374369915] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659164.398561384] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659164.398626214] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659164.398641732] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659164.401020079] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659164.401460288] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659164.401520448] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659164.573755198] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659164.573918799] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659164.573945358] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659164.573951038] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659164.573965925] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659164.573991743] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659164.574105251] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659164.574138162] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659164.574319034] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659164.574620337] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659164.574705994] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659164.631142322] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659164.631219153] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659164.631238649] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659164.651783819] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [ERROR] [1788659164.654866814] [move_group.move_group.moveit.ros.validate_solution]: Computed path is not valid. Invalid states at index locations: [ 59 ] out of 122. Explanations follow in command line. Contacts are published on /display_contacts
+[move_group-10] [INFO] [1788659164.655214783] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Found a contact between 'forearm_link' (type 'Robot link') and 'my_end_effector_link' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-10] [INFO] [1788659164.655229089] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-10] [ERROR] [1788659164.655326809] [move_group.move_group.moveit.ros.validate_solution]: Completed listing of explanations for invalid states.
+[move_group-10] [ERROR] [1788659164.655519603] [move_group]: PlanningResponseAdapter 'ValidateSolution' failed with error code INVALID_MOTION_PLAN
+[move_group-10] [ERROR] [1788659164.655546813] [move_group.move_group.moveit.ros.move_group.plan_service]: Generating a plan with planning pipeline failed.
+[move_group-10] [INFO] [1788659164.823893754] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659164.824040956] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659164.824071987] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659164.824079539] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659164.824091559] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659164.824118423] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659164.824157677] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659164.824166862] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659164.824312110] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659164.824551072] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659164.824613204] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659164.866272377] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659164.866397302] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659164.866425017] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659164.873599767] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [ERROR] [1788659164.875187590] [move_group.move_group.moveit.ros.validate_solution]: Computed path is not valid. Invalid states at index locations: [ 17 ] out of 62. Explanations follow in command line. Contacts are published on /display_contacts
+[move_group-10] [INFO] [1788659164.875413840] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Found a contact between 'wrist_2_link' (type 'Robot link') and 'forearm_link' (type 'Robot link'), which constitutes a collision. Contact information is not stored.
+[move_group-10] [INFO] [1788659164.875434494] [move_group.move_group.moveit.core.moveit_collision_detection_fcl]: Collision checking is considered complete (collision was found and 0 contacts are stored)
+[move_group-10] [ERROR] [1788659164.875520756] [move_group.move_group.moveit.ros.validate_solution]: Completed listing of explanations for invalid states.
+[move_group-10] [ERROR] [1788659164.875653163] [move_group]: PlanningResponseAdapter 'ValidateSolution' failed with error code INVALID_MOTION_PLAN
+[move_group-10] [ERROR] [1788659164.875679325] [move_group.move_group.moveit.ros.move_group.plan_service]: Generating a plan with planning pipeline failed.
+[move_group-10] [INFO] [1788659165.073738205] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659165.073885998] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659165.073908475] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659165.073914885] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659165.073927666] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659165.073950884] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659165.074015790] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659165.074028942] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659165.074187302] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659165.074419392] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659165.074487334] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659165.119633388] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659165.119729415] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659165.119747314] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659165.128714324] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659165.131311202] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659165.131433532] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[move_group-10] [INFO] [1788659165.324178730] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659165.324524167] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659165.324574940] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659165.324585207] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659165.324611299] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659165.324642290] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659165.324718225] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659165.324742705] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659165.324990241] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659165.325313350] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659165.325399902] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659165.341271811] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [WARN] [1788659165.341388332] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_velocity_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [WARN] [1788659165.341420265] [move_group.move_group.moveit.core.time_optimal_trajectory_generation]: Invalid max_acceleration_scaling_factor 0.000000 specified, defaulting to 1.000000 instead.
+[move_group-10] [INFO] [1788659165.345034009] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659165.345831086] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659165.345898236] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[reachability_filter-7] [INFO] [1788659165.517051638] [cs625_reachability_filter]: Published reachable candidates for P4: 18 candidates, subscribers=1
+[reachability_filter-7] [INFO] [1788659165.532398517] [cs625_reachability_filter]: P3 reachability complete: 18/24 reachable; failures={'PLANNING_FAILED': 6}
+[move_group-10] [INFO] [1788659165.692356871] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659165.692507688] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659165.692532810] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659165.692539561] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659165.692589042] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659165.692616467] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659165.692669995] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659165.692682195] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659165.692915988] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659165.693131691] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659165.693204341] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659165.698561533] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [INFO] [1788659165.702063419] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659165.702726285] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659165.702793265] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[gazebo-2] [INFO] [1788659165.742444441] [joint_trajectory_controller]: Received new action goal
+[gazebo-2] [INFO] [1788659165.742558298] [joint_trajectory_controller]: Accepted new action goal
+[reachability_filter-7] [INFO] [1788659166.035568242] [cs625_reachability_filter]: Replayed reachable candidates for P4: remaining=3, subscribers=1
+[reachability_filter-7] [INFO] [1788659166.536148537] [cs625_reachability_filter]: Replayed reachable candidates for P4: remaining=2, subscribers=1
+[reachability_filter-7] [INFO] [1788659167.035848660] [cs625_reachability_filter]: Replayed reachable candidates for P4: remaining=1, subscribers=1
+[reachability_filter-7] [INFO] [1788659167.536296261] [cs625_reachability_filter]: Replayed reachable candidates for P4: remaining=0, subscribers=1
+[gazebo-2] [ERROR] [1788659209.079210664] [tolerances]: State tolerances failed for joint 0:
+[gazebo-2] [ERROR] [1788659209.079295761] [tolerances]: Position Error: -3.156206, Position Tolerance: 0.010000
+[gazebo-2] [ERROR] [1788659209.079308888] [tolerances]: State tolerances failed for joint 1:
+[gazebo-2] [ERROR] [1788659209.079314193] [tolerances]: Position Error: 6.249017, Position Tolerance: 0.010000
+[gazebo-2] [ERROR] [1788659209.079320128] [tolerances]: State tolerances failed for joint 2:
+[gazebo-2] [ERROR] [1788659209.079324997] [tolerances]: Position Error: 0.288473, Position Tolerance: 0.010000
+[gazebo-2] [ERROR] [1788659209.079330825] [tolerances]: State tolerances failed for joint 3:
+[gazebo-2] [ERROR] [1788659209.079335772] [tolerances]: Position Error: -0.284454, Position Tolerance: 0.010000
+[gazebo-2] [ERROR] [1788659209.079341513] [tolerances]: State tolerances failed for joint 5:
+[gazebo-2] [ERROR] [1788659209.079346383] [tolerances]: Position Error: 0.211689, Position Tolerance: 0.010000
+[gazebo-2] [WARN] [1788659209.079365280] [joint_trajectory_controller]: Aborted due to goal_time_tolerance exceeding by 5.002734 seconds
+[move_group-10] [INFO] [1788659209.259931439] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659209.260077381] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659209.260118680] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659209.260125515] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659209.260150453] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659209.260171790] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659209.260217436] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659209.260228259] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659209.260391907] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659209.260597871] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659209.260654563] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659209.288148401] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [INFO] [1788659209.293007273] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659209.294422047] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659209.294508527] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[gazebo-2] [INFO] [1788659209.310437048] [joint_trajectory_controller]: Received new action goal
+[gazebo-2] [INFO] [1788659209.310518059] [joint_trajectory_controller]: Accepted new action goal
+[gazebo-2] [ERROR] [1788659252.364523177] [tolerances]: State tolerances failed for joint 0:
+[gazebo-2] [ERROR] [1788659252.364610693] [tolerances]: Position Error: -5.170148, Position Tolerance: 0.010000
+[gazebo-2] [ERROR] [1788659252.364623717] [tolerances]: State tolerances failed for joint 1:
+[gazebo-2] [ERROR] [1788659252.364628592] [tolerances]: Position Error: 2.453942, Position Tolerance: 0.010000
+[gazebo-2] [ERROR] [1788659252.364633929] [tolerances]: State tolerances failed for joint 2:
+[gazebo-2] [ERROR] [1788659252.364638504] [tolerances]: Position Error: 0.669787, Position Tolerance: 0.010000
+[gazebo-2] [ERROR] [1788659252.364643677] [tolerances]: State tolerances failed for joint 3:
+[gazebo-2] [ERROR] [1788659252.364647974] [tolerances]: Position Error: 1.417135, Position Tolerance: 0.010000
+[gazebo-2] [WARN] [1788659252.364660949] [joint_trajectory_controller]: Aborted due to goal_time_tolerance exceeding by 5.007805 seconds
+[move_group-10] [INFO] [1788659252.542318073] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-10] [INFO] [1788659252.542513384] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-10] [INFO] [1788659252.542566097] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-10] [WARN] [1788659252.542578408] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-10] [INFO] [1788659252.542603348] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-10] [ERROR] [1788659252.542637276] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659252.542708224] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-10] [ERROR] [1788659252.542729243] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [ERROR] [1788659252.542959638] [move_group.move_group.moveit.core.conversions]: Found empty JointState message
+[move_group-10] [INFO] [1788659252.543272984] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-10] [INFO] [1788659252.543420958] [move_group]: Calling Planner 'OMPL'
+[move_group-10] [INFO] [1788659252.555096023] [move_group]: Calling PlanningResponseAdapter 'AddTimeOptimalParameterization'
+[move_group-10] [INFO] [1788659252.558823107] [move_group]: Calling PlanningResponseAdapter 'ValidateSolution'
+[move_group-10] [INFO] [1788659252.559765601] [move_group]: Calling PlanningResponseAdapter 'DisplayMotionPath'
+[move_group-10] [WARN] [1788659252.559852530] [move_group.move_group.moveit.ros.planning_pipeline]: The planner plugin did not fill out the 'planner_id' field of the MotionPlanResponse. Setting it to the planner ID name of the MotionPlanRequest assuming that the planner plugin does warn you if it does not use the requested planner.
+[gazebo-2] [INFO] [1788659252.592400168] [joint_trajectory_controller]: Received new action goal
+[gazebo-2] [INFO] [1788659252.592475258] [joint_trajectory_controller]: Accepted new action goal
+[gazebo-2] [ERROR] [1788659294.886909231] [tolerances]: State tolerances failed for joint 0:
+[gazebo-2] [ERROR] [1788659294.886980933] [tolerances]: Position Error: -2.872166, Position Tolerance: 0.010000
+[gazebo-2] [ERROR] [1788659294.886992887] [tolerances]: State tolerances failed for joint 2:
+[gazebo-2] [ERROR] [1788659294.886997804] [tolerances]: Position Error: 0.120034, Position Tolerance: 0.010000
+[gazebo-2] [ERROR] [1788659294.887004094] [tolerances]: State tolerances failed for joint 3:
+[gazebo-2] [ERROR] [1788659294.887008673] [tolerances]: Position Error: 0.221698, Position Tolerance: 0.010000
+[gazebo-2] [WARN] [1788659294.887021174] [joint_trajectory_controller]: Aborted due to goal_time_tolerance exceeding by 5.005666 seconds
+[move_group-10] [INFO] [1788659296.248811012] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[robot_state_publisher-9] [INFO] [1788659296.248813454] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[parameter_bridge-4] [INFO] [1788659296.248838342] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[parameter_bridge-1] [INFO] [1788659296.248910638] [rclcpp]: signal_handler(SIGINT/SIGTERM)
+[move_group-10] Stack trace (most recent call last):
+[move_group-10] #6    Object "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2", at 0xffffffffffffffff, in 
+[move_group-10] #5    Object "/opt/ros/jazzy/lib/moveit_ros_move_group/move_group", at 0x5e78a16a3a44, in _start
+[move_group-10] #4    Object "/usr/lib/x86_64-linux-gnu/libc.so.6", at 0x7b4f7d22a28a, in __libc_start_main
+[move_group-10] #3    Object "/usr/lib/x86_64-linux-gnu/libc.so.6", at 0x7b4f7d22a1c9, in 
+[move_group-10] #2    Object "/opt/ros/jazzy/lib/moveit_ros_move_group/move_group", at 0x5e78a16a2517, in main
+[move_group-10] #1    Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7b4f7db14767, in rclcpp::Executor::~Executor()
+[move_group-10] #0    Object "/opt/ros/jazzy/lib/librclcpp.so", at 0x7b4f7db0f24e, in 
+[move_group-10] Segmentation fault (Address not mapped to object [0x7b4f4c0e3170])
+[rgbd_sensor_adapter-5] Traceback (most recent call last):
+[rgbd_sensor_adapter-5]   File "/home/oy/cs625_p56_install/lib/cs625_sensor_adapter/rgbd_sensor_adapter", line 33, in <module>
+[candidate_generator-6] Traceback (most recent call last):
+[candidate_generator-6]   File "/home/oy/cs625_p56_install/lib/cs625_view_generation/candidate_generator", line 33, in <module>
+[candidate_generator-6]     sys.exit(load_entry_point('cs625-view-generation', 'console_scripts', 'candidate_generator')())
+[rgbd_sensor_adapter-5]     sys.exit(load_entry_point('cs625-sensor-adapter', 'console_scripts', 'rgbd_sensor_adapter')())
+[rgbd_sensor_adapter-5]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rgbd_sensor_adapter-5]   File "/home/oy/cs625_p56_build/cs625_sensor_adapter/cs625_sensor_adapter/point_cloud_relay.py", line 273, in main
+[candidate_generator-6]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[candidate_generator-6]   File "/home/oy/cs625_p56_build/cs625_view_generation/cs625_view_generation/candidate_generator.py", line 199, in main
+[candidate_generator-6]     rclpy.spin(node)
+[candidate_generator-6]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[candidate_generator-6]     executor.spin_once()
+[candidate_generator-6]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[rgbd_sensor_adapter-5]     rclpy.spin(node)
+[rgbd_sensor_adapter-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[rgbd_sensor_adapter-5]     executor.spin_once()
+[rgbd_sensor_adapter-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[rgbd_sensor_adapter-5]     self._spin_once_impl(timeout_sec)
+[rgbd_sensor_adapter-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+[rgbd_sensor_adapter-5]     handler, entity, node = self.wait_for_ready_callbacks(
+[rgbd_sensor_adapter-5]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[rgbd_sensor_adapter-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+[rgbd_sensor_adapter-5]     return next(self._cb_iter)
+[rgbd_sensor_adapter-5]            ^^^^^^^^^^^^^^^^^^^
+[rgbd_sensor_adapter-5]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 757, in _wait_for_ready_callbacks
+[rgbd_sensor_adapter-5]     wait_set = _rclpy.WaitSet(
+[rgbd_sensor_adapter-5]                ^^^^^^^^^^^^^^^
+[rgbd_sensor_adapter-5] rclpy._rclpy_pybind11.RCLError: failed to initialize wait set: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/wait.c:130
+[candidate_generator-6]     self._spin_once_impl(timeout_sec)
+[candidate_generator-6]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+[candidate_generator-6]     handler, entity, node = self.wait_for_ready_callbacks(
+[candidate_generator-6]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[candidate_generator-6]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+[candidate_generator-6]     return next(self._cb_iter)
+[candidate_generator-6]            ^^^^^^^^^^^^^^^^^^^
+[candidate_generator-6]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 785, in _wait_for_ready_callbacks
+[candidate_generator-6]     raise ExternalShutdownException()
+[candidate_generator-6] rclpy.executors.ExternalShutdownException
+[INFO] [parameter_bridge-1]: process has finished cleanly [pid 497]
+[INFO] [parameter_bridge-4]: process has finished cleanly [pid 500]
+[INFO] [robot_state_publisher-9]: process has finished cleanly [pid 667]
+[gazebo-2] [INFO] [1788659296.399204843] [controller_manager.pal_statistics]: Async messages lost 0
+[gazebo-2] [INFO] [1788659296.399354510] [controller_manager.pal_statistics]: publish_async_failures_ 0
+[reachability_filter-7] Traceback (most recent call last):
+[reachability_filter-7]   File "/home/oy/cs625_p56_install/lib/cs625_motion_adapter/reachability_filter", line 33, in <module>
+[reachability_filter-7]     sys.exit(load_entry_point('cs625-motion-adapter', 'console_scripts', 'reachability_filter')())
+[reachability_filter-7]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[reachability_filter-7]   File "/home/oy/cs625_p56_build/cs625_motion_adapter/cs625_motion_adapter/reachability_filter.py", line 491, in main
+[gazebo-2] [INFO] [1788659296.403586007] [controller_manager.pal_statistics]: Async messages lost 0
+[gazebo-2] [INFO] [1788659296.403642934] [controller_manager.pal_statistics]: publish_async_failures_ 0
+[reachability_filter-7]     rclpy.spin(node)
+[reachability_filter-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[reachability_filter-7]     executor.spin_once()
+[reachability_filter-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[reachability_filter-7]     self._spin_once_impl(timeout_sec)
+[reachability_filter-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+[reachability_filter-7]     handler, entity, node = self.wait_for_ready_callbacks(
+[reachability_filter-7]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[reachability_filter-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+[reachability_filter-7]     return next(self._cb_iter)
+[reachability_filter-7]            ^^^^^^^^^^^^^^^^^^^
+[reachability_filter-7]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 785, in _wait_for_ready_callbacks
+[reachability_filter-7]     raise ExternalShutdownException()
+[reachability_filter-7] rclpy.executors.ExternalShutdownException
+[gazebo-2] [1;36m[Dbg] [SignalHandler.cc:142] [0m[1;36mReceived signal[[0m[1;36m2[0m[1;36m].[0m
+[gazebo-2] [1;36m[Dbg] [ServerPrivate.cc:122] [0m[1;36mServer received signal[[0m[1;36m2[0m[1;36m][0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:565] [0m[1;36mSensorsPrivate::Stop[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:551] [0m[1;36mSensorsPrivate::RenderThread stopped[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [gz.cc:434] [0m[1;36mShutting down gz-sim-server[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:578] [Dbg] [SimulationRunner.cc:578] [0m[1;36m[Dbg] [SimulationRunner.cc:578] [0m[1;36mExiting postupdate worker thread ([Dbg] [SimulationRunner.cc:578] [0m[1;36mExiting postupdate worker thread ([0m[1;36m1[0m[1;36m)[0m[1;36mExiting postupdate worker thread ([0m[1;36mExiting postupdate worker thread ([0m[1;36m2[0m[1;36mExiting postupdate worker thread ([0m
+[gazebo-2] [1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m0[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:565] [0m[1;36mSensorsPrivate::Stop[0m[1;36m[0m
+[INFO] [gazebo-2]: process has finished cleanly [pid 498]
+[ERROR] [rgbd_sensor_adapter-5]: process has died [pid 501, exit code 1, cmd '/home/oy/cs625_p56_install/lib/cs625_sensor_adapter/rgbd_sensor_adapter --ros-args -r __node:=cs625_sensor_adapter --params-file /tmp/launch_params_fqz7e9_j --params-file /tmp/launch_params_aazguzws'].
+[ERROR] [candidate_generator-6]: process has died [pid 502, exit code 1, cmd '/home/oy/cs625_p56_install/lib/cs625_view_generation/candidate_generator --ros-args -r __node:=cs625_candidate_generator --params-file /tmp/launch_params_bpxgynl5'].
+[ERROR] [reachability_filter-7]: process has died [pid 504, exit code 1, cmd '/home/oy/cs625_p56_install/lib/cs625_motion_adapter/reachability_filter --ros-args -r __node:=cs625_reachability_filter --params-file /tmp/launch_params__4efep8h'].

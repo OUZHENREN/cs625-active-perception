@@ -1,0 +1,165 @@
+{
+  "schema": "p7_pregrasp_branch_selection_v1",
+  "success": false,
+  "motion_commanded": false,
+  "records": [
+    {
+      "candidate_id": "tomato_historical_r5",
+      "position_m": [
+        0.7113330931460997,
+        0.08309645520327241,
+        0.0509275
+      ],
+      "orientation_xyzw": [
+        0.6131674654867538,
+        0.7802972509927206,
+        -0.07608041669435832,
+        0.09681750646121179
+      ],
+      "ik_success": true,
+      "planning_success": false,
+      "ik_error_code": 1,
+      "joint_bounds_from_active_moveit_urdf": {
+        "shoulder_pan_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "shoulder_lift_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "elbow_joint": [
+          -2.991592653589793,
+          2.991592653589793
+        ],
+        "wrist_1_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_2_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_3_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ]
+      },
+      "raw_ik_joint_positions_rad": {
+        "shoulder_pan_joint": 0.36050281231037123,
+        "shoulder_lift_joint": -1.7183021350409815,
+        "elbow_joint": -2.1706920652485575,
+        "wrist_1_joint": -0.853996191695954,
+        "wrist_2_joint": 1.325764887098982,
+        "wrist_3_joint": 3.2671307717373974,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.02999999999999999
+      },
+      "bounded_ik_joint_positions_rad": {
+        "shoulder_pan_joint": 0.36050281231037123,
+        "shoulder_lift_joint": -1.7183021350409815,
+        "elbow_joint": -2.1706920652485575,
+        "wrist_1_joint": -0.853996191695954,
+        "wrist_2_joint": 1.325764887098982,
+        "wrist_3_joint": 3.2671307717373974,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.02999999999999999
+      },
+      "requested_physical_pose": {
+        "position": {
+          "x": 0.7113330931460997,
+          "y": 0.08309645520327241,
+          "z": 0.0509275
+        },
+        "orientation": {
+          "x": 0.6131674654867538,
+          "y": 0.7802972509927206,
+          "z": -0.07608041669435832,
+          "w": 0.09681750646121179
+        }
+      },
+      "requested_tip_pose": {
+        "position": {
+          "x": 0.7491682629507904,
+          "y": -0.07236224538598895,
+          "z": 0.09125233523771209
+        },
+        "orientation": {
+          "x": 0.6131674654867538,
+          "y": 0.7802972509927206,
+          "z": -0.07608041669435832,
+          "w": 0.09681750646121179
+        }
+      },
+      "physical_to_tip_tf": {
+        "position": {
+          "x": -0.165,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "orientation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        }
+      },
+      "fk_poses": [
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113330282028301,
+              "y": 0.08309646008746625,
+              "z": 0.05092728911750018
+            },
+            "orientation": {
+              "x": 0.6131674658174854,
+              "y": 0.7802972505827172,
+              "z": -0.07608041887335995,
+              "w": 0.09681750595873213
+            }
+          }
+        },
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7491681979057849,
+              "y": -0.07236224044699248,
+              "z": 0.09125212466193938
+            },
+            "orientation": {
+              "x": 0.6131674658174854,
+              "y": 0.7802972505827172,
+              "z": -0.07608041887335995,
+              "w": 0.09681750595873213
+            }
+          }
+        }
+      ],
+      "ik_physical_fk_position_error_m": 2.2071001869947174e-07,
+      "ik_physical_fk_orientation_error_rad": 0.0,
+      "state_valid": false,
+      "state_contacts": [
+        "camera_link<->p7_ground",
+        "gripper_base_link<->p7_occluder",
+        "gripper_base_link<->p7_target_contact_proxy",
+        "gripper_right_finger_link<->p7_occluder"
+      ]
+    }
+  ],
+  "source_candidates": "docs/evidence/p7_5_perception_grasp_20260905_r10/grasp_attempt_04/grasp_candidates.json"
+}

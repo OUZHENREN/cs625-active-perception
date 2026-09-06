@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<!-- DIAGNOSTIC_ONLY: a high-contrast primitive covers the frozen YCB target
+     centre to distinguish camera-axis/self-occlusion faults from mesh-resource
+     faults. This world must never be used as P7.1 acceptance evidence. -->
+<sdf version="1.9">
+  <world name="p7_1_camera_axis_diagnostic">
+    <physics name="p7_physics" type="ignored">
+      <max_step_size>0.001</max_step_size><real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="ignition-gazebo-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="ignition-gazebo-sensors-system" name="gz::sim::systems::Sensors"><render_engine>ogre2</render_engine></plugin>
+    <plugin filename="ignition-gazebo-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="ignition-gazebo-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <light type="directional" name="sun"><pose>0 0 5 0 0 0</pose><diffuse>0.8 0.8 0.8 1</diffuse><specular>0.2 0.2 0.2 1</specular><direction>-0.5 0.1 -0.9</direction></light>
+
+    <model name="ground_plane"><static>true</static><pose>0 0 -0.05 0 0 0</pose><link name="link"><collision name="collision"><geometry><box><size>10 10 0.1</size></box></geometry></collision><visual name="visual"><geometry><box><size>10 10 0.1</size></box></geometry></visual></link></model>
+    <model name="occluder"><static>true</static><pose>0.60 0.30 0.22 0 0 0.18</pose><link name="link"><collision name="collision"><geometry><box><size>0.10 0.18 0.44</size></box></geometry></collision><visual name="visual"><geometry><box><size>0.10 0.18 0.44</size></box></geometry><material><diffuse>0.38 0.38 0.38 1</diffuse></material></visual></link></model>
+
+    <model name="target_object">
+      <pose>0.72 0 0.005 0 0 0</pose><static>false</static>
+      <link name="target_link">
+        <inertial><pose>-0.0091685 0.0840170 0.0510065 0 0 0</pose><mass>0.349</mass><inertia><ixx>0.000435190</ixx><iyy>0.000435853</iyy><izz>0.000267596</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia></inertial>
+        <collision name="ycb_contact_proxy_cylinder"><pose>-0.0091685 0.0840170 0.0510065 0 0 0</pose><geometry><cylinder><radius>0.0340</radius><length>0.101855</length></cylinder></geometry></collision>
+        <visual name="ycb_visual"><geometry><mesh><uri>model://ycb/005_tomato_soup_can/google_16k/textured.obj</uri></mesh></geometry></visual>
+      </link>
+    </model>
+
+    <!-- Frozen settled target centre: model (0.72, 0, -0.000079) plus the
+         versioned local AABB centre (-0.0091685, 0.084017, 0.0510065). -->
+    <model name="p7_1_axis_marker">
+      <static>true</static><pose>0.7108315 0.0840170 0.0509275 0 0 0</pose>
+      <link name="marker_link">
+        <visual name="marker_visual">
+          <geometry><sphere><radius>0.080</radius></sphere></geometry>
+          <material><ambient>1 0 0 1</ambient><diffuse>1 0 0 1</diffuse><emissive>1 0 0 1</emissive></material>
+        </visual>
+      </link>
+    </model>
+  </world>
+</sdf>

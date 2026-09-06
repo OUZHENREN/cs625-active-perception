@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<!-- P7.2 severe-occlusion stratum v4.  A lower, wider occluder blocks the
+     cylinder side silhouette while preserving top-surface yaw texture. -->
+<sdf version="1.9">
+  <world name="p7_ycb_tomato_occlusion_severe_v4">
+    <physics name="p7_physics" type="ignored"><max_step_size>0.001</max_step_size><real_time_factor>1.0</real_time_factor></physics>
+    <plugin filename="ignition-gazebo-physics-system" name="gz::sim::systems::Physics"/><plugin filename="ignition-gazebo-sensors-system" name="gz::sim::systems::Sensors"><render_engine>ogre2</render_engine></plugin><plugin filename="ignition-gazebo-user-commands-system" name="gz::sim::systems::UserCommands"/><plugin filename="ignition-gazebo-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <light type="directional" name="sun"><pose>0 0 5 0 0 0</pose><diffuse>0.8 0.8 0.8 1</diffuse><specular>0.2 0.2 0.2 1</specular><direction>-0.5 0.1 -0.9</direction></light>
+    <model name="ground_plane"><static>true</static><pose>0 0 -0.05 0 0 0</pose><link name="link"><collision name="collision"><geometry><box><size>10 10 0.1</size></box></geometry></collision><visual name="visual"><geometry><box><size>10 10 0.1</size></box></geometry></visual></link></model>
+    <model name="occluder"><static>true</static><pose>0.650 0.055 0.065 0 0 0</pose><link name="link"><collision name="collision"><geometry><box><size>0.055 0.100 0.130</size></box></geometry></collision><visual name="visual"><geometry><box><size>0.055 0.100 0.130</size></box></geometry><material><diffuse>0.38 0.38 0.38 1</diffuse></material></visual></link></model>
+    <model name="target_object"><pose>0.72 0 0.005 0 0 0</pose><static>false</static><link name="target_link"><inertial><pose>-0.0091685 0.0840170 0.0510065 0 0 0</pose><mass>0.349</mass><inertia><ixx>0.000435190</ixx><iyy>0.000435853</iyy><izz>0.000267596</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia></inertial><collision name="ycb_contact_proxy_cylinder"><pose>-0.0091685 0.0840170 0.0510065 0 0 0</pose><geometry><cylinder><radius>0.0340</radius><length>0.101855</length></cylinder></geometry><surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface></collision><visual name="ycb_visual"><geometry><mesh><uri>model://ycb/005_tomato_soup_can/google_16k/textured.obj</uri></mesh></geometry></visual></link></model>
+  </world>
+</sdf>

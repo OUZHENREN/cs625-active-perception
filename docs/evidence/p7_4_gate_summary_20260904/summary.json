@@ -1,0 +1,121 @@
+{
+  "schema": "p7_4_gate_summary_v2",
+  "gate": "P7.4_MOVEIT_EXECUTABILITY",
+  "gate_pass": true,
+  "decision": "PASS_FROZEN_SEVERE_V5_SELECTED_VIEW_EXECUTION",
+  "updated_at": "2026-09-05",
+  "selected_candidate_id": "geometry_nbv_e75_v-110_a22",
+  "selected_candidate": {
+    "fov_pass": true,
+    "workspace_pass": true,
+    "offline_ik_and_joint_limit_pass": true,
+    "moveit_target_state_valid": true,
+    "moveit_plan_success": true,
+    "trajectory_execution_success": true,
+    "planning_time_sec": 0.078895,
+    "planned_joint_path_length_rad": 5.212389,
+    "actual_camera_cartesian_path_length_m": 5.751655,
+    "cartesian_path_definition": "20 Hz sampled TF polyline, not continuous ground truth",
+    "cartesian_sample_count": 206,
+    "cartesian_tf_miss_count": 0,
+    "execution_time_sec": 13.000007,
+    "planning_request_count": 1,
+    "replanning_count": 0,
+    "moveit_raw_error_code": 1,
+    "terminal_joint_max_error_rad": 0.000002,
+    "camera_terminal_position_error_m": 0.000688,
+    "camera_terminal_orientation_error_rad": 0.001398,
+    "controller_result_error_code": 0,
+    "planning_mode": "frozen_joint_goal",
+    "planning_tip_frame": "my_end_effector_link",
+    "physical_target_frame": "camera_depth_optical_frame",
+    "evidence": "../p7_4_moveit_nbv_20260905_r9_integrated/view_trace.json"
+  },
+  "planning_scene": {
+    "profile": "severe_v5",
+    "source_world": "p7_ycb_tomato_occlusion_severe_v5.sdf",
+    "objects": ["p7_ground", "p7_occluder", "p7_target_contact_proxy"],
+    "evidence": "../p7_4_moveit_nbv_20260905_r9_integrated/scene_full.json"
+  },
+  "candidate_filter": {
+    "order": ["fov", "workspace", "ik", "joint_limit", "collision", "planning"],
+    "p7_3_generated_count": 240,
+    "p7_3_strict_static_pass_count": 25,
+    "moveit_batch_count": 25,
+    "single_ik_branch_collision_rejections": 22,
+    "single_ik_branch_planning_successes": 3,
+    "batch_evidence": "../p7_4_batch_moveit_20260904_r4/batch_plan.json",
+    "interpretation": "Every static-pass candidate traversed the ordered MoveIt filters with short-circuit rejection. 22/25 is rejection of one sampled IK branch, not proof of intrinsic view unreachability. Selected a22 passed with the independently checked frozen r13 branch and was executed in r9."
+  },
+  "post_move_observation": {
+    "camera_resolution_px": [640, 480],
+    "sensor_gate_pass": true,
+    "sensor_windows_passed": 3,
+    "sensor_windows_total": 3,
+    "discard_initial_windows": 1,
+    "pose_gate_pass": true,
+    "pose_windows_passed": 3,
+    "translation_error_m": 0.0003767099726741961,
+    "rotation_error_deg": 1.0,
+    "add_m": 0.0005917338976055722,
+    "add_s_m": 0.0005738572560574457,
+    "yaw_standard_deviation_deg": 2.886751,
+    "sensor_evidence": "../p7_4_moveit_nbv_20260905_r9_integrated/post_move_sensor_settled/raw/gate.json",
+    "pose_evidence": "../p7_4_moveit_nbv_20260905_r9_integrated/post_move_pose/evaluation.json",
+    "sampling_unit": "Three consecutive windows in one fixed scene, not three independent random episodes"
+  },
+  "failures_retained": [
+    {
+      "run": "r1_e65_start",
+      "code": "PLANNING_FAILED",
+      "moveit_raw_error_code": 99999,
+      "planning_time_sec": 0.026554,
+      "root_cause": "MoveIt rejected the e65 start state: expected base-ground support plus forearm/end-effector, forearm/wrist-3 and upper-arm/wrist-1 self contacts.",
+      "evidence": "../p7_4_moveit_nbv_20260904_r1/view_motion_trace.json"
+    },
+    {
+      "run": "r3_integrated_attempt_0",
+      "code": "INVALID_MOTION_PLAN",
+      "planning_time_sec": 0.197221,
+      "root_cause": "ValidateSolution rejected an intermediate forearm_link/my_end_effector_link self-collision.",
+      "evidence": "../p7_4_moveit_nbv_20260904_r3_integrated/view_motion_trace.json"
+    },
+    {
+      "run": "r3_integrated_retries_1_2",
+      "code": "PLANNING_FAILED",
+      "planning_times_sec": [4.046059, 4.052718],
+      "root_cause": "No valid pose-goal path returned within the configured planning time; no motion was commanded.",
+      "evidence": [
+        "../p7_4_moveit_nbv_20260904_r3_integrated/view_motion_trace_retry1.json",
+        "../p7_4_moveit_nbv_20260904_r3_integrated/view_motion_trace_retry2.json"
+      ]
+    }
+  ],
+  "moveit_collision_metric": {
+    "definition": "MoveIt planning/state collision rejection only",
+    "status": "measured in r4 batch; failures retained",
+    "rejected_count": 22,
+    "evaluated_count": 25,
+    "single_ik_branch_rejection_rate": 0.88
+  },
+  "gazebo_physical_contact_metric": {
+    "definition": "Gazebo runtime physical contacts during execution",
+    "status": "measured throughout r9 selected-view command through receipt",
+    "mixed_with_moveit_metric": false,
+    "covers_command_through_receipt": true,
+    "unexpected_environment_collision": false,
+    "executed_trajectories_observed": 1,
+    "trajectories_with_unexpected_environment_contacts": 0,
+    "self_contact_observed": null,
+    "scope": "Robot contacts with ground, occluder and target; pedestal-ground support allowed; self-contact outside Gazebo sensor scope",
+    "evidence": "../p7_4_moveit_nbv_20260905_r9_integrated/view_trace_contacts.json"
+  },
+  "additional_failures_retained": [
+    "r5 320x240 post-move pose: rotation error 6 deg exceeds unchanged 5 deg threshold",
+    "r6/r7 execution: target not initially detached; contact diagnostic ended before motion and is not trajectory collision evidence",
+    "r8 interrupted before an executed trajectory; not a success or a completed motion failure",
+    "r9 first post-move sensor capture: initial TF buffer unavailable; original failed gate retained, explicit one-window warmup used for new capture"
+  ],
+  "remaining_for_gate_freeze": [],
+  "claim_boundary": "P7.4 interface/execution gate is accepted for the frozen severe-v5 tomato scene and selected NBV. This is not multi-scene reliability, not a Gazebo self-contact measurement, and not P7.5 grasp acceptance."
+}

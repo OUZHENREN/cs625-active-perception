@@ -1,0 +1,86 @@
+{
+  "artifacts": {
+    "src/cs625_ap_description/urdf/cs625_active_perception.urdf.xacro": {
+      "sha256": "ecb3bc8ab6378f7c717436006c6c9e0f113138b3112183e06ebec4ac002300e0",
+      "size_bytes": 12082
+    },
+    "src/cs625_ap_description/urdf/cs625_parallel_gripper.xacro": {
+      "sha256": "36913a417245bb9e40f2fe10c38bbbecbf1a5697b166e672dafdb66447744c83",
+      "size_bytes": 3377
+    },
+    "src/cs625_bringup/config/cs625_active_perception.srdf": {
+      "sha256": "ce7478b81f92671692c51dfd79a0333caefbbe548ac054d6fbb1ddd8cda0e21a",
+      "size_bytes": 2270
+    },
+    "src/cs625_bringup/config/p7_safe_initial_positions.yaml": {
+      "sha256": "d9a5bb962b6d307f071a69362033aa674930432f4d075af0026929f38b73613e",
+      "size_bytes": 881
+    },
+    "src/cs625_bringup/config/p7_static_grasp_sim.yaml": {
+      "sha256": "0fd92e5a03241edc1c5658a153905efdab9bcc2d4e5ee69eef0410be122899c6",
+      "size_bytes": 3376
+    },
+    "src/cs625_simulation/assets/ycb/MANIFEST.md": {
+      "sha256": "d87238bbf546d758402afb4f8e6e7cc3faf7111bf14f843955be2615b89715f8",
+      "size_bytes": 2594
+    },
+    "src/cs625_simulation/worlds/p7_ycb_tomato_light.sdf": {
+      "sha256": "665a829552315a1f5a87627fa8d5af265e812e79a96a7a6b6a72377eb8c0e602",
+      "size_bytes": 3542
+    }
+  },
+  "captured_at_utc": "2026-08-31T10:43:40.726947+00:00",
+  "git": {
+    "dirty": true,
+    "head": {
+      "command": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "5c623e15464059b580f68db36de05baaf1b2d1cb"
+    },
+    "status": {
+      "command": [
+        "git",
+        "status",
+        "--porcelain=v1"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "M README.md\n M docs/architecture.md\n M docs/minimum_showcase_experiment.md\n M docs/simulation.md\n M scripts/run_minimum_showcase_matrix.sh\n M src/cs625_ap_description/urdf/cs625_active_perception.urdf.xacro\n M src/cs625_bringup/config/p4_sim_loop.yaml\n M src/cs625_bringup/config/sim_controllers.yaml\n M src/cs625_bringup/launch/sim_active_localization.launch.py\n M src/cs625_bringup/launch/sim_base.launch.py\n M src/cs625_bringup/launch/sim_control.launch.py\n M src/cs625_bringup/launch/sim_moveit.launch.py\n M src/cs625_experiment_tools/cs625_experiment_tools/p4_matrix_summary.py\n M src/cs625_experiment_tools/tests/test_p4_matrix_summary.py\n M src/cs625_motion_adapter/cs625_motion_adapter/reachability_filter.py\n M src/cs625_motion_adapter/cs625_motion_adapter/sim_view_executor.py\n M src/cs625_motion_adapter/setup.py\n M src/cs625_simulation/CMakeLists.txt\n M src/cs625_view_evaluation/cs625_view_evaluation/sim_episode_coordinator.py\n M test/contract_checks.py\n?? build_humble_20260828/\n?? docs/evidence/\n?? docs/p7_attachment_assisted_grasp_protocol.md\n?? install_humble_20260828/\n?? log_humble_20260828/\n?? src/cs625_ap_description/urdf/cs625_parallel_gripper.xacro\n?? src/cs625_bringup/config/cs625_active_perception.srdf\n?? src/cs625_bringup/config/p7_safe_initial_positions.yaml\n?? src/cs625_bringup/config/p7_static_grasp_sim.yaml\n?? src/cs625_bringup/pytest.ini\n?? src/cs625_bringup/tests/\n?? src/cs625_experiment_tools/pytest.ini\n?? src/cs625_motion_adapter/cs625_motion_adapter/p7_arm_motion_adapter.py\n?? src/cs625_motion_adapter/pytest.ini\n?? src/cs625_motion_adapter/test/\n?? src/cs625_motion_adapter/tests/\n?? src/cs625_simulation/assets/\n?? src/cs625_simulation/worlds/p7_ycb_tomato_light.sdf\n?? src/cs625_task_orchestrator/\n?? src/cs625_view_evaluation/pytest.ini\n?? test/audit_binary_stl_extents.py\n?? test/data/p7_gripper_close_command.json\n?? test/data/p7_smoke_evidence.json\n?? test/data/p7_smoke_evidence.yaml\n?? test/p7_apply_fixture_scene.py\n?? test/p7_assemble_episode.py\n?? test/p7_attachment_smoke_publisher.py\n?? test/p7_capture_episode_marker.py\n?? test/p7_capture_gazebo_model_pose.py\n?? test/p7_capture_hold_trace.py\n?? test/p7_capture_manifest.py\n?? test/p7_capture_preflight.py\n?? test/p7_capture_tf_pose.py\n?? test/p7_evaluate_geometry_capture.py\n?? test/p7_evaluate_lift_capture.py\n?? test/p7_execute_attachment_capture.py\n?? test/p7_execute_gripper_capture.py\n?? test/p7_execute_pose_capture.py\n?? test/p7_ik_grid_probe.py\n?? test/p7_joint_controller_probe.py\n?? test/p7_pregrasp_path_search.py\n?? test/p7_send_approach.sh\n?? test/p7_send_detach.sh\n?? test/p7_send_gripper_close.sh\n?? test/p7_send_pregrasp.sh\n?? test/run_p7_adapter.sh\n?? test/run_p7_capture.sh\n?? test/run_p7_center_pregrasp_capture.sh\n?? test/run_p7_planning_probe.sh\n?? test/run_p7_static_episode_capture.sh\n?? test/run_p7_tipfix_sim.sh\n?? test/run_p7_wait_topic.sh"
+    }
+  },
+  "manifest_schema": "p7_jazzy_runtime_manifest_v1",
+  "repository_root": "/mnt/b/Recent/Robotic arm/Ubuntu_Share/cs625_active_perception/elite_ros",
+  "runtime": {
+    "gz_partition": "p7_acceptance_20260831_r3",
+    "gz_sim_versions": {
+      "command": [
+        "gz",
+        "sim",
+        "--versions"
+      ],
+      "returncode": 0,
+      "stderr": "",
+      "stdout": "8.11.0"
+    },
+    "ign_partition": "p7_acceptance_20260831_r3",
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "python": "3.12.3",
+    "ros2_doctor": {
+      "command": [
+        "ros2",
+        "doctor",
+        "--report"
+      ],
+      "returncode": null,
+      "stderr": "Command '['ros2', 'doctor', '--report']' timed out after 20.0 seconds",
+      "stdout": ""
+    },
+    "ros_distro": "jazzy",
+    "ros_domain_id": "78"
+  }
+}

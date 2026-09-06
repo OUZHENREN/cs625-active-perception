@@ -30,7 +30,8 @@ def _compose(context):
     description_package = LaunchConfiguration("description_package").perform(context)
     description_file = LaunchConfiguration("description_file").perform(context)
     moveit_package = LaunchConfiguration("moveit_config_package").perform(context)
-    srdf_file = LaunchConfiguration("moveit_config_file").perform(context)
+    semantic_package = LaunchConfiguration("semantic_package").perform(context)
+    semantic_file = LaunchConfiguration("semantic_file").perform(context)
     controllers_file = LaunchConfiguration("moveit_controllers_file").perform(context)
     sensors_file = LaunchConfiguration("sensors_config").perform(context)
 
@@ -38,7 +39,7 @@ def _compose(context):
         description_package, f"urdf/{description_file}"
     )
     moveit_share = Path(get_package_share_directory(moveit_package))
-    srdf_path = _resolve_share_file(moveit_package, f"config/{srdf_file}")
+    srdf_path = _resolve_share_file(semantic_package, semantic_file)
     kinematics_path = str(moveit_share / "config" / "kinematics.yaml")
     joint_limits_path = str(moveit_share / "config" / "joint_limits.yaml")
     trajectory_path = _resolve_share_file(
@@ -55,6 +56,7 @@ def _compose(context):
         "safety_k_position": LaunchConfiguration("safety_k_position").perform(context),
         "use_fake_hardware": LaunchConfiguration("use_fake_hardware").perform(context),
         "fake_sensor_commands": LaunchConfiguration("fake_sensor_commands").perform(context),
+        "initial_positions_file": LaunchConfiguration("initial_positions_file").perform(context),
         "sim_gazebo": "false",
         "sim_ignition": "false",
     }
@@ -127,9 +129,25 @@ def generate_launch_description():
                 "description_file", default_value="cs625_active_perception.urdf.xacro"
             ),
             DeclareLaunchArgument(
+                "initial_positions_file",
+                default_value=str(
+                    Path(get_package_share_directory("eli_cs_robot_description"))
+                    / "config"
+                    / "initial_positions.yaml"
+                ),
+                description="Joint positions shared with the simulated robot description.",
+            ),
+            DeclareLaunchArgument(
                 "moveit_config_package", default_value="elite_cs625_moveit_config"
             ),
-            DeclareLaunchArgument("moveit_config_file", default_value="cs625.srdf.xacro"),
+            DeclareLaunchArgument(
+                "semantic_package", default_value="cs625_bringup",
+                description="Package containing the application semantic overlay.",
+            ),
+            DeclareLaunchArgument(
+                "semantic_file", default_value="config/cs625_active_perception.srdf",
+                description="Application SRDF preserving the senior arm semantics plus gripper pairs.",
+            ),
             DeclareLaunchArgument(
                 "moveit_controllers_file",
                 default_value="cs625_moveit_controllers.yaml",

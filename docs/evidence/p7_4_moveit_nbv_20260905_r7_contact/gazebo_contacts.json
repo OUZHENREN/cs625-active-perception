@@ -1,0 +1,38 @@
+{
+  "captured_at_utc": "2026-09-04T16:52:22.120904+00:00",
+  "claim_boundary": "Gazebo physical-contact observation only; MoveIt state validity and collision rejection are reported separately",
+  "classification_scope": "Gazebo runtime robot contacts with the severe-v5 occluder or target during selected view execution",
+  "collision_pairs": [
+    {
+      "collision_pair": [
+        "occluder::link::collision",
+        "target_object::target_link::ycb_contact_proxy_cylinder"
+      ],
+      "record_count": 30303,
+      "unexpected_robot_contact": false
+    }
+  ],
+  "duration_sec": 35.0,
+  "expected_robot_contact_rule": "no robot contact with the occluder or target during view motion",
+  "monitor_available": true,
+  "parse_failure_count": 0,
+  "schema": "p7_gazebo_contact_capture_v1",
+  "topics": {
+    "/p7/contacts/occluder": {
+      "advertised": true,
+      "contact_record_count": 30222,
+      "message_count": 30222,
+      "process_return_code": 0,
+      "stderr": ""
+    },
+    "/p7/contacts/target": {
+      "advertised": true,
+      "contact_record_count": 81,
+      "message_count": 81,
+      "process_return_code": 0,
+      "stderr": ""
+    }
+  },
+  "unexpected_collision": false,
+  "unexpected_collision_pair_count": 0
+}

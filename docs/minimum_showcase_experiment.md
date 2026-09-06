@@ -24,9 +24,12 @@ exports:
 
 - `episode_metrics.csv`: source/reachable candidate counts and reachability
   rate, total planning time, successful-observation count/rate, successful
-  motion cost, episode termination, and per-episode failure codes.
+  motion cost, episode wall time, executor phase durations, retry-triggered
+  replanning count, P3 candidate-collision rejection count/rate, episode
+  termination, and per-episode failure codes.
 - `strategy_summary.csv`: the mean reachability rate, planning time, motion
-  cost and successful-observation rate over the 15 cells per baseline.
+  cost, successful-observation rate, wall time, phase durations, replan count
+  and candidate-collision rejection rate over the 15 cells per baseline.
 - `failure_codes.csv`: failure-code counts per baseline.
 - `matrix_validation.md`: confirms all 45 cells were present exactly once.
 
@@ -34,6 +37,16 @@ Planning time is the sum of recorded planning-service durations.  Motion cost
 is summed only for successful observed views; it is a candidate trajectory
 cost, not physical energy.  `SENSOR_SETTLED` is the P4 success observation
 code; all other returned codes are retained in `failure_codes.csv`.
+
+`episode_wall_time_sec` is steady-clock elapsed time from receipt of the first
+P3 reachable-candidate result until the episode JSON is committed.  The
+executor phase fields separately report IK, motion-planning, trajectory-action
+and post-motion sensor-settle durations.  A replan is counted only when an
+already selected reachable candidate fails during P4 execution and the
+coordinator selects another remaining candidate.  The collision field is
+strictly a **P3 candidate rejection rate** (`COLLISION` from MoveIt's
+state-validity check divided by the P3 source-candidate count); it is not a
+Gazebo physical-contact rate and must not be reported as one.
 
 Each episode ends after three successful observations (`MAX_VIEWS_REACHED`) or
 three failed execution attempts (`MAX_FAILED_ATTEMPTS`).  This bounded retry

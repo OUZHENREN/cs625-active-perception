@@ -1,0 +1,18 @@
+# P7 simulation-only start pose.
+#
+# The vendor zero pose extends the 1.37 m arm nearly horizontally from a base
+# mounted at floor height.  The distal collision geometry then contacts the
+# ground and Gazebo correctly rejects several positive-direction commands.
+# A -0.35 rad shoulder lift was established with bounded 0.05 rad probes.  An
+# exact zero wrist-1 posture still lets the application collision model report
+# forearm_link <-> wrist_2_link contact at startup.  The smallest tested
+# positive wrist-1 probe (+0.05 rad) both tracks with <= 0.0005 rad terminal
+# error and admits a collision-checked P7 pregrasp path.  Other axes retain the
+# senior/official zero values; this is an application fixture profile, not a
+# replacement robot model.
+shoulder_pan_joint: 0.0
+shoulder_lift_joint: -0.35
+elbow_joint: 0.0
+wrist_1_joint: 0.05
+wrist_2_joint: 0.0
+wrist_3_joint: 0.0

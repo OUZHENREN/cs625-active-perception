@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Dict, Optional
 
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -32,6 +34,7 @@ class RgbdSensorAdapter(Node):
         self.declare_parameter("motion_stale_guard", False)
         self.declare_parameter("motion_complete_time_sec", 0.0)
         self.declare_parameter("motion_status_topic", "/motion/status")
+        self.declare_parameter("point_cloud_axis_convention", "ros_optical")
 
         input_topics = {
             stream: str(self.get_parameter(f"input_{stream}_topic").value)
@@ -54,6 +57,17 @@ class RgbdSensorAdapter(Node):
         self._drop_invalid_messages = bool(
             self.get_parameter("drop_invalid_messages").value
         )
+        self._point_cloud_axis_convention = str(
+            self.get_parameter("point_cloud_axis_convention").value
+        )
+        if self._point_cloud_axis_convention not in (
+            "ros_optical",
+            "gazebo_camera_x_forward",
+        ):
+            raise ValueError(
+                "point_cloud_axis_convention must be ros_optical or "
+                "gazebo_camera_x_forward"
+            )
         # Do not shadow rclpy.node.Node._publishers, which is the internal
         # list used by create_publisher().
         self._stream_publishers = {}
@@ -122,6 +136,47 @@ class RgbdSensorAdapter(Node):
             message.header.stamp.sec != 0 or message.header.stamp.nanosec != 0
         )
 
+    @staticmethod
+    def _gazebo_points_to_ros_optical(message: PointCloud2) -> PointCloud2:
+        """Convert Gazebo camera (X forward) XYZ fields to ROS optical axes.
+
+        The byte layout, organization, RGB field, timestamps and all unknown
+        fields are retained.  Only float32 x/y/z values are rewritten:
+        ``(x_o, y_o, z_o) = (-y_g, -z_g, x_g)``.
+        """
+
+        fields = {field.name: field for field in message.fields}
+        required = ("x", "y", "z")
+        if any(name not in fields for name in required):
+            raise ValueError("PointCloud2 is missing x/y/z fields")
+        if any(fields[name].datatype != 7 or fields[name].count != 1 for name in required):
+            raise ValueError("PointCloud2 x/y/z fields must be scalar FLOAT32")
+        converted = deepcopy(message)
+        mutable = bytearray(converted.data)
+        endian = ">" if converted.is_bigendian else "<"
+        dtype = np.dtype(
+            {
+                "names": list(required),
+                "formats": [f"{endian}f4"] * 3,
+                "offsets": [fields[name].offset for name in required],
+                "itemsize": converted.point_step,
+            }
+        )
+        points = np.ndarray(
+            shape=(converted.height, converted.width),
+            dtype=dtype,
+            buffer=mutable,
+            strides=(converted.row_step, converted.point_step),
+        )
+        x_g = points["x"].copy()
+        y_g = points["y"].copy()
+        z_g = points["z"].copy()
+        points["x"] = -y_g
+        points["y"] = -z_g
+        points["z"] = x_g
+        converted.data = bytes(mutable)
+        return converted
+
     def _relay(self, stream: str, message) -> None:
         if not self._valid_header(message) and self._drop_invalid_messages:
             self.get_logger().warning(
@@ -163,6 +218,17 @@ class RgbdSensorAdapter(Node):
                     )
                     self._publish_status(detail=f"stale_{stream}_dropped")
                     return
+
+        if (
+            stream == "points"
+            and self._point_cloud_axis_convention == "gazebo_camera_x_forward"
+        ):
+            try:
+                message = self._gazebo_points_to_ros_optical(message)
+            except ValueError as error:
+                self.get_logger().warning(f"Dropping invalid point cloud: {error}")
+                self._publish_status(detail="invalid point cloud layout")
+                return
 
         publisher = self._stream_publishers.get(stream)
         if publisher is not None:

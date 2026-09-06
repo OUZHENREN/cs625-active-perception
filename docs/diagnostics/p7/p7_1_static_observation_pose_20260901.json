@@ -1,0 +1,117 @@
+{
+  "capture_schema": "p7_1_static_observation_pose_diagnostic_v2",
+  "evidence_class": "DIAGNOSTIC_ONLY",
+  "acceptance_effect": "none",
+  "failed_runtime_observations": [
+    {
+      "run": "p7_1_sensor_input_20260901_r1",
+      "failure": "capture infrastructure error after the first window; old static pose rendered a uniform background",
+      "old_static_fk_projection_inside_image": false,
+      "old_static_fk_pixel": [146.7852799952434, -6.2665829392549455]
+    },
+    {
+      "run": "p7_1_sensor_input_20260901_r2",
+      "failure": "preflight initial-joint mismatch; the runner incorrectly continued and the exact-time TF lookup did not wait for matching dynamic TF",
+      "maximum_initial_joint_drift_rad": 0.1132835,
+      "record_status": "complete",
+      "gate_pass": false,
+      "immutable_evidence_checksums_verified": true
+    },
+    {
+      "runs": [
+        "p7_1_sensor_input_20260901_r3",
+        "p7_1_sensor_input_20260901_r4",
+        "p7_1_sensor_input_20260901_r5"
+      ],
+      "failure": "all complete five-window records failed target visibility with zero point-cloud support in every window",
+      "shared_passes": [
+        "initial joint preflight",
+        "four normalized RGB-D stream layouts",
+        "synchronization within 0.15 s",
+        "timestamp-exact TF"
+      ],
+      "rgb_center_observation": "uniform background at the projected target centre",
+      "minimum_required_target_points": 12,
+      "observed_target_points_per_window": 0,
+      "immutable_evidence_checksums_verified": true
+    }
+  ],
+  "rejected_candidate": {
+    "seed_source": "p7_jazzy_tomato_attachment_assisted_20260831_r5/e1_pregrasp.json",
+    "joint_positions_rad": {
+      "shoulder_pan_joint": -0.1260777075485177,
+      "shoulder_lift_joint": -2.9025774386161562,
+      "elbow_joint": -1.9847332131596984,
+      "wrist_1_joint": 0.11177521688801555,
+      "wrist_2_joint": -1.1872245937145758,
+      "wrist_3_joint": 0.1673688372408404
+    },
+    "rejection_reason": "Gazebo preflight initial-joint drift exceeded the frozen 0.05 rad tolerance in r2"
+  },
+  "current_candidate": {
+    "seed_source": "src/cs625_bringup/config/p7_safe_initial_positions.yaml",
+    "method": "offline versioned-URDF forward kinematics plus scipy least_squares look-at solve",
+    "moveit_called": false,
+    "gazebo_called_for_solve": false,
+    "trajectory_executed": false,
+    "joint_positions_rad": {
+      "shoulder_pan_joint": 0.37373621453579386,
+      "shoulder_lift_joint": -0.5309418264331002,
+      "elbow_joint": 1.271955164155675,
+      "wrist_1_joint": -1.7637543838414336,
+      "wrist_2_joint": 1.5735778197736918,
+      "wrist_3_joint": 1.566249647513101
+    },
+    "offline_projection": {
+      "camera_position_world_m": [-1.3243141622, -0.7016233111, 0.5786383081],
+      "target_center_camera_m": [0.0, 0.0, 2.24445],
+      "pixel": [159.99998, 119.999998],
+      "inside_320x240_image": true,
+      "camera_near_far_range_m": [0.05, 5.0]
+    },
+    "solver": {
+      "converged": true,
+      "cost": 0.0001251160,
+      "max_seed_delta_rad": 1.8137543838
+    }
+  },
+  "tool_fixes_before_next_runtime": [
+    "NumPy scalar JSON serialization is applied to both atomic record and terminal output",
+    "exact message-time TF lookup waits up to 0.50 s for the matching transform without latest-TF fallback",
+    "capture runner aborts on preflight failure and finalizes checksums through an EXIT trap"
+  ],
+  "latest_diagnosis": {
+    "p7_1_status": "FAILED_IN_PROGRESS",
+    "rejected_hypotheses": [
+      "waiting for exact-time TF was the remaining target-visibility cause",
+      "rotating the Gazebo sensor pose to optical_rpy fixes visibility",
+      "switching the same official YCB asset from DAE to OBJ alone fixes visibility"
+    ],
+    "next_read_only_checks": [
+      "capture Gazebo resource-path resolution while the isolated server is alive",
+      "compare rendered sensor optical axis against versioned TF with a visible calibration primitive",
+      "test whether camera or gripper geometry self-occludes the target ray"
+    ]
+  },
+  "resolution": {
+    "root_cause": "the original eye-in-hand camera centre ray intersected the gripper palm; the 0.03 0 0.15 mount clears the palm and restores rendered target visibility",
+    "diagnostic_confirmation": {
+      "run": "p7_1_axis_marker_diagnostic_20260901_d5",
+      "red_marker_pixel_count": 274,
+      "centre_depth_m": 2.2225828171,
+      "preflight_success": true
+    },
+    "formal_acceptance": {
+      "run": "p7_1_sensor_input_20260901_r7",
+      "gate_pass": true,
+      "windows_passed": 5,
+      "windows_expected": 5,
+      "target_points_per_window": [112, 110, 110, 110, 110],
+      "minimum_target_points": 12,
+      "trajectory_commands_sent": 0,
+      "checksums_verified": true
+    },
+    "next_gate": "P7.2_POSE_ESTIMATION"
+  },
+  "claim_boundary": "diagnostics d1--d5 explain the repair but do not count as acceptance; only formal YCB run r7 freezes P7.1, and it makes no P7.2--P7.5 claim"
+}

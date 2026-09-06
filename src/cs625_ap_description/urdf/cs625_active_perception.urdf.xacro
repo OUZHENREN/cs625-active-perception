@@ -9,6 +9,7 @@
   -->
   <xacro:include filename="$(find eli_cs_robot_description)/urdf/cs_macro.xacro"/>
   <xacro:include filename="$(find cs625_ap_description)/urdf/cs625_camera_extension.xacro"/>
+  <xacro:include filename="$(find cs625_ap_description)/urdf/cs625_parallel_gripper.xacro"/>
 
   <xacro:arg name="name" default="cs625"/>
   <xacro:arg name="cs_type" default="cs625"/>
@@ -37,6 +38,7 @@
   <xacro:arg name="camera_update_rate" default="10.0"/>
   <xacro:arg name="camera_enabled" default="true"/>
   <xacro:arg name="simulation_controllers" default=""/>
+  <xacro:arg name="p7_attachment_enabled" default="true"/>
   <xacro:arg name="headless_mode" default="false"/>
 
   <xacro:arg name="robot_ip" default="0.0.0.0"/>
@@ -55,7 +57,12 @@
   <xacro:arg name="tool_stop_bits" default="1"/>
   <xacro:arg name="tool_tcp_port" default="54321"/>
 
-  <xacro:arg name="camera_mount_xyz" default="0.05 0 0.05"/>
+  <!-- Mount the eye-in-hand camera above and slightly behind the gripper.
+       The old (0.05, 0, 0.05) pose placed the gripper palm about 60 mm along
+       the optical ray; P7.1 d1 proved that even a 160 mm marker at the target
+       was invisible.  At (0.03, 0, 0.15), the 45-degree centre ray clears the
+       palm's z=0.025 m upper face by at least 30 mm over its full x extent. -->
+  <xacro:arg name="camera_mount_xyz" default="0.03 0 0.15"/>
   <xacro:arg name="camera_mount_rpy" default="0 0.785398163397 0"/>
   <!-- camera_link uses the usual body convention; optical is x-right,
        y-down, z-forward. The calibration profile may override this. -->
@@ -100,6 +107,7 @@
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </xacro:cs_robot>
 
+
   <!-- Reused from the senior CS625 description. The control plugin belongs
        at the top-level robot description, while the reusable cs_robot macro
        owns the ros2_control tag itself. -->
@@ -123,9 +131,51 @@
         <robot_param>robot_description</robot_param>
         <robot_param_node>robot_state_publisher</robot_param_node>
         <parameters>$(arg simulation_controllers)</parameters>
+        <!-- gz_ros2_control maps the position interface to a velocity
+             setpoint.  Its default 0.1 gain leaves the heavy CS625 fixture
+             materially behind a retimed P7 trajectory; 0.5 is within the
+             Jazzy documented non-oscillatory range (<= 1) and is simulation
+             only. -->
+        <position_proportional_gain>0.5</position_proportional_gain>
         <controller_manager_name>$(arg prefix)controller_manager</controller_manager_name>
       </plugin>
+      <!-- P7 attachment-assisted grasp mechanism.  Gazebo's official
+           DetachableJoint starts attached, so a P7 episode must explicitly
+           publish /p7/attachment/detach during reset and may only publish
+           /p7/attachment/attach after its geometric pre-grasp gate passes.
+           This is an attachment state, not evidence of frictional contact. -->
+      <xacro:if value="$(arg p7_attachment_enabled)">
+        <plugin filename="gz-sim-detachable-joint-system"
+                name="gz::sim::systems::DetachableJoint">
+        <!-- Gazebo collapses the fixed tool / gripper chain when converting
+             the URDF; wrist_3_link is the terminal non-lumped actuated link
+             that remains addressable in the running CS625 model. -->
+        <parent_link>$(arg prefix)wrist_3_link</parent_link>
+        <child_model>target_object</child_model>
+        <child_link>target_link</child_link>
+        <detach_topic>/p7/attachment/detach</detach_topic>
+        <attach_topic>/p7/attachment/attach</attach_topic>
+          <output_topic>/p7/attachment/state</output_topic>
+        </plugin>
+      </xacro:if>
     </gazebo>
+    <!-- P7 validates task geometry and controller/TF consistency, not
+         force-accurate robot dynamics.  Make the robot's own articulated
+         links gravity-free so a position command is not torque-saturated by
+         the synthetic arm mass.  The YCB target remains dynamic in the world
+         and the attachment mechanism is still explicitly labelled kinematic.
+         This never applies to a real-robot profile. -->
+    <gazebo reference="$(arg prefix)base_link"><gravity>false</gravity></gazebo>
+    <gazebo reference="$(arg prefix)shoulder_link"><gravity>false</gravity></gazebo>
+    <gazebo reference="$(arg prefix)upperarm_link"><gravity>false</gravity></gazebo>
+    <gazebo reference="$(arg prefix)forearm_link"><gravity>false</gravity></gazebo>
+    <gazebo reference="$(arg prefix)wrist_1_link"><gravity>false</gravity></gazebo>
+    <gazebo reference="$(arg prefix)wrist_2_link"><gravity>false</gravity></gazebo>
+    <gazebo reference="$(arg prefix)wrist_3_link"><gravity>false</gravity></gazebo>
+    <gazebo reference="$(arg prefix)my_end_effector_link"><gravity>false</gravity></gazebo>
+    <gazebo reference="$(arg prefix)gripper_base_link"><gravity>false</gravity></gazebo>
+    <gazebo reference="$(arg prefix)gripper_left_finger_link"><gravity>false</gravity></gazebo>
+    <gazebo reference="$(arg prefix)gripper_right_finger_link"><gravity>false</gravity></gazebo>
   </xacro:if>
 
   <!-- Preserved from the senior CS625 description so the existing MoveIt
@@ -157,6 +207,22 @@
     <parent link="$(arg prefix)my_end_effector_link"/>
     <child link="$(arg prefix)tool0"/>
     <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:cs625_parallel_gripper parent="$(arg prefix)tool0" prefix="$(arg prefix)"/>
+
+  <!-- Nominal cylindrical-object grasp centre between the two finger pads.
+       The pad volumes span x=0.005..0.095 m from gripper_base_link, while the
+       palm collision ends at x=0.040 m.  Placing the reference at x=0.080 m
+       leaves 6 mm clearance behind the 34 mm-radius tomato-can proxy; the old
+       pad-volume midpoint at x=0.050 m overlapped the palm and pushed the can.
+       The link is massless and collision-free and remains centred laterally
+       while the two prismatic fingers move symmetrically. -->
+  <link name="$(arg prefix)p7_grasp_center_link"/>
+  <joint name="$(arg prefix)gripper_base_to_p7_grasp_center" type="fixed">
+    <parent link="$(arg prefix)gripper_base_link"/>
+    <child link="$(arg prefix)p7_grasp_center_link"/>
+    <origin xyz="0.080 0 0" rpy="0 0 0"/>
   </joint>
 
   <xacro:cs625_eye_in_hand_camera

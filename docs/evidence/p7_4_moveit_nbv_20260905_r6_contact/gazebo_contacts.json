@@ -1,0 +1,53 @@
+{
+  "captured_at_utc": "2026-09-04T16:44:27.045037+00:00",
+  "claim_boundary": "Gazebo physical-contact observation only; MoveIt state validity and collision rejection are reported separately",
+  "classification_scope": "Gazebo runtime robot/environment contacts during selected view execution",
+  "collision_pairs": [
+    {
+      "collision_pair": [
+        "cs::base_link::base_link_inertia_collision",
+        "ground_plane::link::collision"
+      ],
+      "record_count": 19996,
+      "unexpected_robot_contact": false
+    },
+    {
+      "collision_pair": [
+        "occluder::link::collision",
+        "target_object::target_link::ycb_contact_proxy_cylinder"
+      ],
+      "record_count": 130,
+      "unexpected_robot_contact": false
+    }
+  ],
+  "duration_sec": 30.0,
+  "expected_robot_contact_rule": "ground_plane to cs::base_link pedestal support only",
+  "monitor_available": true,
+  "parse_failure_count": 0,
+  "schema": "p7_gazebo_contact_capture_v1",
+  "topics": {
+    "/p7/contacts/ground": {
+      "advertised": true,
+      "contact_record_count": 19996,
+      "message_count": 19996,
+      "process_return_code": 0,
+      "stderr": ""
+    },
+    "/p7/contacts/occluder": {
+      "advertised": true,
+      "contact_record_count": 65,
+      "message_count": 65,
+      "process_return_code": 0,
+      "stderr": ""
+    },
+    "/p7/contacts/target": {
+      "advertised": true,
+      "contact_record_count": 65,
+      "message_count": 65,
+      "process_return_code": 0,
+      "stderr": ""
+    }
+  },
+  "unexpected_collision": false,
+  "unexpected_collision_pair_count": 0
+}

@@ -1,0 +1,2399 @@
+{
+  "captured_at_utc": "2026-09-04T13:48:55.481452+00:00",
+  "claim_boundary": "collision-checked MoveIt planning only; no trajectory was commanded and no Gazebo physical-contact collision was measured",
+  "configuration": {
+    "camera_frame": "camera_depth_optical_frame",
+    "external_replanning_count": 0,
+    "joint_limit_max_rad": {
+      "elbow_joint": 3.141592654,
+      "shoulder_lift_joint": 6.283185307,
+      "shoulder_pan_joint": 6.283185307,
+      "wrist_1_joint": 6.283185307,
+      "wrist_2_joint": 6.283185307,
+      "wrist_3_joint": 6.283185307
+    },
+    "joint_limit_min_rad": {
+      "elbow_joint": -3.141592654,
+      "shoulder_lift_joint": -6.283185307,
+      "shoulder_pan_joint": -6.283185307,
+      "wrist_1_joint": -6.283185307,
+      "wrist_2_joint": -6.283185307,
+      "wrist_3_joint": -6.283185307
+    },
+    "planning_attempts_per_candidate": 1,
+    "planning_frame": "base_link",
+    "planning_group": "cs625_arm",
+    "planning_time_limit_sec": 2.0,
+    "planning_tip": "my_end_effector_link",
+    "workspace_max_m": [
+      1.8,
+      1.2,
+      1.8
+    ],
+    "workspace_min_m": [
+      -1.2,
+      -1.2,
+      0.05
+    ]
+  },
+  "gate": "P7.4_MOVEIT_PLANNING_ONLY",
+  "gate_order": [
+    "fov",
+    "workspace",
+    "ik",
+    "joint_limit",
+    "collision",
+    "planning"
+  ],
+  "motion_commanded": false,
+  "records": [
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a22",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->gripper_left_finger_link",
+              "forearm_link<->my_end_effector_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.001697
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.0001217907563,
+          "v_px": 65.00013291340994,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": -0.600824254,
+            "shoulder_lift_joint": -2.80160306,
+            "shoulder_pan_joint": -0.03563685,
+            "wrist_1_joint": 2.490248567,
+            "wrist_2_joint": 1.884889573,
+            "wrist_3_joint": -1.95062498
+          },
+          "wall_time_sec": 0.00271
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.8521671070014576,
+            -0.012368950733672252,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.93995208636517
+    },
+    {
+      "candidate_id": "geometry_nbv_e65_v-110_a08",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.000714
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.99998873287208,
+          "v_px": 65.00004457406675,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 1.873312384,
+            "shoulder_lift_joint": 2.274378821,
+            "shoulder_pan_joint": 1.237492507,
+            "wrist_1_joint": 0.942536246,
+            "wrist_2_joint": 1.168221541,
+            "wrist_3_joint": -0.791879478
+          },
+          "wall_time_sec": 0.002201
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.5473500077628036,
+            0.33441642059167687,
+            0.6853429509256549
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.748176868726524
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a23",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 1,
+            "contacts": [
+              "forearm_link<->my_end_effector_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.001322
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.00010593166076,
+          "v_px": 65.0001751353312,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 0.372192434,
+            "shoulder_lift_joint": -0.23941949,
+            "shoulder_pan_joint": 2.947622489,
+            "wrist_1_joint": 0.71968754,
+            "wrist_2_joint": -1.526119763,
+            "wrist_3_joint": -1.621854038
+          },
+          "wall_time_sec": 0.001499
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.8702663993720483,
+            0.03132660637676346,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.743376112785379
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a08",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.000806
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.99999250499854,
+          "v_px": 65.00004630986544,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": -1.870051439,
+            "shoulder_lift_joint": 0.834477359,
+            "shoulder_pan_joint": -2.397406037,
+            "wrist_1_joint": 2.447434693,
+            "wrist_2_joint": -2.185371821,
+            "wrist_3_joint": -0.27112927
+          },
+          "wall_time_sec": 0.00114
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.5755593492080644,
+            0.28555640796042686,
+            0.7087123345501358
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.6411687573678195
+    },
+    {
+      "candidate_id": "geometry_nbv_e65_v-110_a09",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 1,
+            "contacts": [
+              "forearm_link<->my_end_effector_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.001792
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.9999801809456,
+          "v_px": 65.00002954732436,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 2.118265589,
+            "shoulder_lift_joint": -0.758711577,
+            "shoulder_pan_joint": -2.35344123,
+            "wrist_1_joint": 0.209566962,
+            "wrist_2_joint": -2.115738308,
+            "wrist_3_joint": -0.003225997
+          },
+          "wall_time_sec": 0.001614
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.4860810322609645,
+            0.28740308216329397,
+            0.6853429509256549
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.636466688704285
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a07",
+      "failure_reason": null,
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.000566
+          },
+          "passed": true,
+          "reason": null,
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.9999947561634,
+          "v_px": 65.00006154413771,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": -1.631411996,
+            "shoulder_lift_joint": -2.402815775,
+            "shoulder_pan_joint": 1.085161357,
+            "wrist_1_joint": 2.956428352,
+            "wrist_2_joint": 1.157440217,
+            "wrist_3_joint": -0.928773951
+          },
+          "wall_time_sec": 0.001282
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "joint_path_length_rad_l2": 6.019167134,
+          "moveit_reported_planning_time_sec": 0.018609196,
+          "passed": true,
+          "planning_attempts": 1,
+          "raw_error_code": 1,
+          "reason": null,
+          "terminal_joint_positions_rad": {
+            "elbow_joint": -1.634944687,
+            "shoulder_lift_joint": -2.404250846,
+            "shoulder_pan_joint": 1.093929764,
+            "wrist_1_joint": 2.951665635,
+            "wrist_2_joint": 1.15261129,
+            "wrist_3_joint": -0.933220169
+          },
+          "trajectory_duration_sec": 13.261027,
+          "trajectory_point_count": 134,
+          "wall_time_sec": 0.039156
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.6333014705410845,
+            0.3094739777367566,
+            0.7087123345501358
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": 6.019167134,
+      "motion_commanded": false,
+      "moveit_collision_rejected": false,
+      "moveit_error_name": "SUCCESS",
+      "moveit_raw_error_code": 1,
+      "passed": true,
+      "planning_time_sec": 0.018609196,
+      "selection_score": 2.6267098471393915
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a06",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 1,
+            "contacts": [
+              "forearm_link<->my_end_effector_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.001009
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.99999613849693,
+          "v_px": 65.00008052014368,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 1.833494113,
+            "shoulder_lift_joint": -0.6904652,
+            "shoulder_pan_joint": -2.546542251,
+            "wrist_1_joint": 3.179751328,
+            "wrist_2_joint": 2.082154368,
+            "wrist_3_joint": 2.443485335
+          },
+          "wall_time_sec": 0.002115
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.6952663993720484,
+            0.31763181538017826,
+            0.7087123345501358
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.553732698526563
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a09",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.000851
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.99998731999253,
+          "v_px": 65.00003230889253,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 2.150414251,
+            "shoulder_lift_joint": 2.248600133,
+            "shoulder_pan_joint": 1.379231627,
+            "wrist_1_joint": 0.702356858,
+            "wrist_2_joint": 1.058983016,
+            "wrist_3_joint": -0.696816175
+          },
+          "wall_time_sec": 0.001904
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.5259750655184656,
+            0.24750904890579278,
+            0.7087123345501358
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.4953243634075446
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a08",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.000553
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.99999798760805,
+          "v_px": 65.00004707856809,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 1.902780508,
+            "shoulder_lift_joint": 2.4110262,
+            "shoulder_pan_joint": 1.210687555,
+            "wrist_1_joint": 0.905810568,
+            "wrist_2_joint": 1.036240525,
+            "wrist_3_joint": -0.828798377
+          },
+          "wall_time_sec": 0.001406
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.6046797335861661,
+            0.23511842268161942,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.4297769365747763
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a00",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 1,
+            "contacts": [
+              "forearm_link<->my_end_effector_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.001644
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.00008222068428,
+          "v_px": 65.00020338290958,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": -0.122382438,
+            "shoulder_lift_joint": -3.016970774,
+            "shoulder_pan_joint": 0.194906117,
+            "wrist_1_joint": 2.278572421,
+            "wrist_2_joint": 1.698777471,
+            "wrist_3_joint": -1.71819701
+          },
+          "wall_time_sec": 0.01012
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.8764397309438129,
+            0.07821771505221008,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.4263092971883897
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a05",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.001044
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.99999827613942,
+          "v_px": 65.00010483024863,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 1.603567796,
+            "shoulder_lift_joint": 2.320734475,
+            "shoulder_pan_joint": 0.817711902,
+            "wrist_1_joint": -1.780045773,
+            "wrist_2_joint": -1.288280813,
+            "wrist_3_joint": 1.978268738
+          },
+          "wall_time_sec": 0.003754
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.7572313282030122,
+            0.3094739777367566,
+            0.7087123345501358
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.348885737278429
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a06",
+      "failure_reason": null,
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.000465
+          },
+          "passed": true,
+          "reason": null,
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.99999818178364,
+          "v_px": 65.00008263694812,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": -1.830985,
+            "shoulder_lift_joint": -2.420508262,
+            "shoulder_pan_joint": 0.940643096,
+            "wrist_1_joint": 0.15508515,
+            "wrist_2_joint": -1.17198991,
+            "wrist_3_joint": 2.072550222
+          },
+          "wall_time_sec": 0.001575
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "joint_path_length_rad_l2": 3.766063018,
+          "moveit_reported_planning_time_sec": 0.016347043,
+          "passed": true,
+          "planning_attempts": 1,
+          "raw_error_code": 1,
+          "reason": null,
+          "terminal_joint_positions_rad": {
+            "elbow_joint": -1.824803977,
+            "shoulder_lift_joint": -2.419294949,
+            "shoulder_pan_joint": 0.942677202,
+            "wrist_1_joint": 0.147856198,
+            "wrist_2_joint": -1.168239365,
+            "wrist_3_joint": 2.075654151
+          },
+          "trajectory_duration_sec": 6.135078,
+          "trajectory_point_count": 63,
+          "wall_time_sec": 0.029365
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.6952663993720484,
+            0.2593910466239746,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": 3.766063018,
+      "motion_commanded": false,
+      "moveit_collision_rejected": false,
+      "moveit_error_name": "SUCCESS",
+      "moveit_raw_error_code": 1,
+      "passed": true,
+      "planning_time_sec": 0.016347043,
+      "selection_score": 2.302044371136795
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a01",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.00071
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.00005525324406,
+          "v_px": 65.00020867816308,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 1.093565478,
+            "shoulder_lift_joint": 2.589130397,
+            "shoulder_pan_joint": 0.314228516,
+            "wrist_1_joint": -1.393111083,
+            "wrist_2_joint": -1.605340266,
+            "wrist_3_joint": 1.531344576
+          },
+          "wall_time_sec": 0.002454
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.8702663993720483,
+            0.12510882372765653,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.2198955668185314
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a07",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 1,
+            "contacts": [
+              "forearm_link<->my_end_effector_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.001415
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.99999745386805,
+          "v_px": 65.00006359517155,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 1.629239514,
+            "shoulder_lift_joint": -0.77236745,
+            "shoulder_pan_joint": -2.477656494,
+            "wrist_1_joint": 0.383573923,
+            "wrist_2_joint": -2.222349206,
+            "wrist_3_joint": -0.51464578
+          },
+          "wall_time_sec": 0.005081
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.6483752906966019,
+            0.25321771505221,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.2083752831761876
+    },
+    {
+      "candidate_id": "geometry_nbv_e65_v-110_a10",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.000654
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.9999649879107,
+          "v_px": 64.99999650801033,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": -2.386208126,
+            "shoulder_lift_joint": 1.189268218,
+            "shoulder_pan_joint": -2.406130095,
+            "wrist_1_joint": 2.951549049,
+            "wrist_2_joint": -2.086775258,
+            "wrist_3_joint": 0.3603609
+          },
+          "wall_time_sec": 0.011065
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.4390676938325816,
+            0.22613410666145484,
+            0.6853429509256549
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.0966489121062692
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a02",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "p7_occluder<->upperarm_link",
+              "p7_target_contact_proxy<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.00085
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.00003152840307,
+          "v_px": 65.00019208957114,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 0.407544108,
+            "shoulder_lift_joint": -3.255222804,
+            "shoulder_pan_joint": 0.435652984,
+            "wrist_1_joint": 1.994440361,
+            "wrist_2_joint": 1.51288604,
+            "wrist_3_joint": -1.504567838
+          },
+          "wall_time_sec": 0.001268
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.8521671070014577,
+            0.1688043808380923,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.065981968328129
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a03",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.000592
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.0000130134132,
+          "v_px": 65.00016967855059,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": -1.261155226,
+            "shoulder_lift_joint": 0.661533936,
+            "shoulder_pan_joint": -2.86000193,
+            "wrist_1_joint": -1.541538926,
+            "wrist_2_joint": 1.86009559,
+            "wrist_3_joint": 1.989247327
+          },
+          "wall_time_sec": 0.001952
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.8645577332256311,
+            0.24750904890579278,
+            0.7087123345501358
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 2.0118682959109044
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a03",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 4,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link",
+              "p7_occluder<->upperarm_link",
+              "p7_target_contact_proxy<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.000843
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.00001485722825,
+          "v_px": 65.00016350898491,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 0.654672456,
+            "shoulder_lift_joint": -3.364866602,
+            "shoulder_pan_joint": 0.558964725,
+            "wrist_1_joint": 1.846080418,
+            "wrist_2_joint": 1.422308704,
+            "wrist_3_joint": -1.399210482
+          },
+          "wall_time_sec": 0.00138
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.8233752906966019,
+            0.2063266063767636,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 1.983622351273596
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a04",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->my_end_effector_link",
+              "gripper_right_finger_link<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.001252
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.00000310466788,
+          "v_px": 65.00013507200106,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": -0.846857143,
+            "shoulder_lift_joint": -2.734431542,
+            "shoulder_pan_joint": 0.688580876,
+            "wrist_1_joint": 2.611695778,
+            "wrist_2_joint": 1.361879773,
+            "wrist_3_joint": -1.277152272
+          },
+          "wall_time_sec": 0.001754
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.8149734495360325,
+            0.2855564079604268,
+            0.7087123345501358
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 1.970483141799238
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a05",
+      "failure_reason": null,
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.00106
+          },
+          "passed": true,
+          "reason": null,
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.00000026791977,
+          "v_px": 65.00010546482655,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": -1.622928223,
+            "shoulder_lift_joint": -2.497817981,
+            "shoulder_pan_joint": 0.811208443,
+            "wrist_1_joint": 0.064413067,
+            "wrist_2_joint": -1.250704573,
+            "wrist_3_joint": 1.958819005
+          },
+          "wall_time_sec": 0.003694
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "joint_path_length_rad_l2": 3.644677816,
+          "moveit_reported_planning_time_sec": 0.012871186,
+          "passed": true,
+          "planning_attempts": 1,
+          "raw_error_code": 1,
+          "reason": null,
+          "terminal_joint_positions_rad": {
+            "elbow_joint": -1.621476502,
+            "shoulder_lift_joint": -2.490210831,
+            "shoulder_pan_joint": 0.812987264,
+            "wrist_1_joint": 0.056959921,
+            "wrist_2_joint": -1.243484952,
+            "wrist_3_joint": 1.966401887
+          },
+          "trajectory_duration_sec": 6.307229,
+          "trajectory_point_count": 65,
+          "wall_time_sec": 0.028439
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.7421575080474948,
+            0.25321771505221,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": 3.644677816,
+      "motion_commanded": false,
+      "moveit_collision_rejected": false,
+      "moveit_error_name": "SUCCESS",
+      "moveit_raw_error_code": 1,
+      "passed": true,
+      "planning_time_sec": 0.012871186,
+      "selection_score": 1.9683616178780536
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a09",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 1,
+            "contacts": [
+              "forearm_link<->my_end_effector_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.002528
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.0000021884569,
+          "v_px": 65.00003452977414,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 2.141417405,
+            "shoulder_lift_joint": -0.912436006,
+            "shoulder_pan_joint": -2.398218076,
+            "wrist_1_joint": 0.378598141,
+            "wrist_2_joint": -2.289500225,
+            "wrist_3_joint": 0.055838164
+          },
+          "wall_time_sec": 0.003632
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.5671575080474949,
+            0.2063266063767636,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 1.8908370824264
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a04",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.00125
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.00000511847446,
+          "v_px": 65.00013286465062,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 1.435433056,
+            "shoulder_lift_joint": 2.43746111,
+            "shoulder_pan_joint": 0.684108436,
+            "wrist_1_joint": -1.615871901,
+            "wrist_2_joint": -1.334558941,
+            "wrist_3_joint": 1.849145383
+          },
+          "wall_time_sec": 0.00225
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.7858530651579306,
+            0.23511842268161942,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 1.882543806981172
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a10",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.00068
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 160.00001577813927,
+          "v_px": 65.0000443188641,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": 2.803683524,
+            "shoulder_lift_joint": 2.099129688,
+            "shoulder_pan_joint": 1.523235898,
+            "wrist_1_joint": -2.950220923,
+            "wrist_2_joint": -0.945030664,
+            "wrist_3_joint": 2.540677969
+          },
+          "wall_time_sec": 0.002287
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.538365691742639,
+            0.1688043808380923,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 1.680123282423943
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a11",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.000747
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.99941207437908,
+          "v_px": 65.00035182665796,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": -2.722884947,
+            "shoulder_lift_joint": 1.154390281,
+            "shoulder_pan_joint": -2.793101689,
+            "wrist_1_joint": -2.521208004,
+            "wrist_2_joint": -1.958078087,
+            "wrist_3_joint": 1.086548268
+          },
+          "wall_time_sec": 0.005965
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.5202663993720484,
+            0.12510882372765658,
+            0.7270755784023478
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 1.543838110062642
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a10",
+      "failure_reason": "MOVEIT_GOAL_STATE_COLLISION",
+      "gates": {
+        "collision": {
+          "evaluated": true,
+          "goal_state": {
+            "contact_count": 2,
+            "contacts": [
+              "forearm_link<->p7_ground",
+              "p7_ground<->upperarm_link"
+            ],
+            "valid": false,
+            "wall_time_sec": 0.002665
+          },
+          "passed": false,
+          "reason": "MOVEIT_GOAL_STATE_COLLISION",
+          "start_state": {
+            "contact_count": 0,
+            "contacts": [],
+            "valid": true,
+            "wall_time_sec": 0.001281
+          }
+        },
+        "fov": {
+          "evaluated": true,
+          "height": 240,
+          "passed": true,
+          "reason": null,
+          "u_px": 159.9999703367364,
+          "v_px": 65.00001285991084,
+          "width": 320
+        },
+        "ik": {
+          "avoid_collisions": false,
+          "error_name": "SUCCESS",
+          "evaluated": true,
+          "passed": true,
+          "raw_error_code": 1,
+          "reason": null,
+          "solution_joint_positions_rad": {
+            "elbow_joint": -2.403734312,
+            "shoulder_lift_joint": 1.105097088,
+            "shoulder_pan_joint": -2.430772656,
+            "wrist_1_joint": 3.106651318,
+            "wrist_2_joint": -2.162543556,
+            "wrist_3_joint": 0.408991274
+          },
+          "wall_time_sec": 0.004336
+        },
+        "joint_limit": {
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "violations": []
+        },
+        "planning": {
+          "evaluated": false,
+          "passed": false,
+          "reason": "SKIPPED_AFTER_COLLISION"
+        },
+        "workspace": {
+          "camera_position_m": [
+            0.4879277064638316,
+            0.19792476521619412,
+            0.7087123345501358
+          ],
+          "evaluated": true,
+          "passed": true,
+          "reason": null,
+          "workspace_max_m": [
+            1.8,
+            1.2,
+            1.8
+          ],
+          "workspace_min_m": [
+            -1.2,
+            -1.2,
+            0.05
+          ]
+        }
+      },
+      "joint_path_length_rad_l2": null,
+      "motion_commanded": false,
+      "moveit_collision_rejected": true,
+      "moveit_error_name": null,
+      "moveit_raw_error_code": null,
+      "passed": false,
+      "planning_time_sec": null,
+      "selection_score": 1.1926319641639194
+    }
+  ],
+  "scene_profile": "severe_v5",
+  "scene_receipt": "docs/evidence/p7_4_batch_moveit_20260904_r4/scene_full.json",
+  "schema": "p7_4_batch_moveit_planning_v1",
+  "screen_input": "docs/evidence/p7_3_geometry_nbv_20260904_r13_after_chroma/static_screen_all.json",
+  "start_state_joint_limit_gate": {
+    "evaluated": true,
+    "passed": true,
+    "reason": null,
+    "violations": []
+  },
+  "start_state_joint_positions_rad": {
+    "elbow_joint": 0.0,
+    "shoulder_lift_joint": -0.35,
+    "shoulder_pan_joint": 0.0,
+    "wrist_1_joint": 0.05,
+    "wrist_2_joint": 0.0,
+    "wrist_3_joint": 0.0
+  },
+  "start_state_moveit_validity": {
+    "contact_count": 0,
+    "contacts": [],
+    "valid": true,
+    "wall_time_sec": 0.001281
+  },
+  "start_state_source": "src/cs625_bringup/config/p7_safe_initial_positions.yaml",
+  "summary": {
+    "candidate_count": 25,
+    "failure_reason_counts": {
+      "MOVEIT_GOAL_STATE_COLLISION": 22
+    },
+    "first_feasible_candidate_id": "geometry_nbv_e70_v-110_a07",
+    "moveit_collision_evaluated_count": 25,
+    "moveit_collision_rejection_count": 22,
+    "moveit_collision_rejection_rate": 0.88,
+    "planning_success_count": 3,
+    "planning_success_rate": 0.12,
+    "planning_time_sec_total": 0.047827425
+  }
+}

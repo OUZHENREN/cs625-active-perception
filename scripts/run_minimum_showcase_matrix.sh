@@ -4,7 +4,7 @@
 set -eo pipefail
 
 if [[ $# -lt 2 ]]; then
-  echo "Usage: $0 <ros-install-setup.bash> <new-output-directory> [--scene ID] [--seed N] [--strategy ID]" >&2
+  echo "Usage: $0 <ros-install-setup.bash> <new-output-directory> [--resume] [--scene ID] [--seed N] [--strategy ID]" >&2
   exit 2
 fi
 
@@ -14,8 +14,10 @@ shift 2
 scene_filter=""
 seed_filter=""
 strategy_filter=""
+resume="false"
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --resume) resume="true"; shift ;;
     --scene) scene_filter="${2:?--scene requires an ID}"; shift 2 ;;
     --seed) seed_filter="${2:?--seed requires an integer}"; shift 2 ;;
     --strategy) strategy_filter="${2:?--strategy requires an ID}"; shift 2 ;;
@@ -30,18 +32,32 @@ if [[ ! -f "${setup_file}" ]]; then
   echo "ROS install setup file not found: ${setup_file}" >&2
   exit 2
 fi
-if [[ -e "${output_directory}" ]]; then
-  echo "Output directory already exists; choose a new directory: ${output_directory}" >&2
-  exit 2
-fi
-
 ros_distro="${ROS_DISTRO:-jazzy}"
 source "/opt/ros/${ros_distro}/setup.bash"
 source "${setup_file}"
 set -u
 simulation_share="$(ros2 pkg prefix cs625_simulation)/share/cs625_simulation"
-mkdir -p "${output_directory}/episodes" "${output_directory}/logs" "${output_directory}/models"
-cp "${manifest}" "${output_directory}/matrix_manifest.json"
+if [[ -e "${output_directory}" ]]; then
+  if [[ "${resume}" != "true" ]]; then
+    echo "Output directory already exists; choose a new directory or pass --resume: ${output_directory}" >&2
+    exit 2
+  fi
+  [[ -f "${output_directory}/matrix_manifest.json" ]] || {
+    echo "Cannot resume without the original matrix_manifest.json: ${output_directory}" >&2
+    exit 2
+  }
+  cmp -s "${manifest}" "${output_directory}/matrix_manifest.json" || {
+    echo "Cannot resume: matrix manifest differs from the recorded run." >&2
+    exit 2
+  }
+  [[ -d "${output_directory}/episodes" && -d "${output_directory}/logs" && -d "${output_directory}/models" ]] || {
+    echo "Cannot resume: output directory is missing required matrix subdirectories." >&2
+    exit 2
+  }
+else
+  mkdir -p "${output_directory}/episodes" "${output_directory}/logs" "${output_directory}/models"
+  cp "${manifest}" "${output_directory}/matrix_manifest.json"
+fi
 
 cleanup_pids=()
 stop_process() {
@@ -99,12 +115,21 @@ for scene in "${scenes[@]}"; do
     [[ -z "${seed_filter}" || "${seed}" == "${seed_filter}" ]] || continue
     for strategy in "${strategies[@]}"; do
       [[ -z "${strategy_filter}" || "${strategy}" == "${strategy_filter}" ]] || continue
+      label="${scene}_${strategy}_seed${seed}"
+      episode="${output_directory}/episodes/${scene}_${strategy}_seed${seed}_p4_loop.json"
+      if [[ -f "${episode}" ]]; then
+        if ! python3 -c 'import json,sys; payload=json.load(open(sys.argv[1])); assert payload.get("termination_reason"); assert payload.get("strategy")' "${episode}"; then
+          echo "Cannot resume: existing episode is not a complete JSON record: ${episode}" >&2
+          exit 1
+        fi
+        echo "[$((cell + 1))/${planned_cells}] resume-skip ${label}"
+        cell=$((cell + 1))
+        continue
+      fi
       domain=$((70 + cell))
       export ROS_DOMAIN_ID="${domain}"
-      label="${scene}_${strategy}_seed${seed}"
       planning_log="${output_directory}/logs/${label}_planning.log"
       loop_log="${output_directory}/logs/${label}_loop.log"
-      episode="${output_directory}/episodes/${scene}_${strategy}_seed${seed}_p4_loop.json"
       gazebo_model="${output_directory}/models/${label}.urdf"
       echo "[$((cell + 1))/${planned_cells}] ${label} (ROS_DOMAIN_ID=${ROS_DOMAIN_ID})"
 

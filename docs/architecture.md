@@ -61,7 +61,7 @@ the underlay and are composed by `cs625_bringup`.
 | `cs625_view_generation` | Candidate camera poses only | P3 |
 | `cs625_view_evaluation` | Strategy plugins and score terms | P4/P5 |
 | `cs625_motion_adapter` | Camera/tool transform, IK, collision, MoveIt and execution gate | P3/P6 |
-| `cs625_task_orchestrator` | Active-localization state machine | P4 |
+| `cs625_task_orchestrator` | P7 task-level evidence, grasp state orchestration and atomic episode logging | P7 |
 | `cs625_experiment_tools` | Episode logs, rosbag and metrics | P4/P5 |
 
 ## 3. Phase 0–1 restriction

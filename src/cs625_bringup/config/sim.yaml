@@ -7,3 +7,6 @@
     input_depth_topic: /sim/camera/depth_image
     input_camera_info_topic: /sim/camera/camera_info
     input_points_topic: /sim/camera/points
+    # Gazebo RGB-D points use camera-body X-forward coordinates. Normalize
+    # them to REP-103 optical axes before publishing /sensors/camera/points.
+    point_cloud_axis_convention: gazebo_camera_x_forward

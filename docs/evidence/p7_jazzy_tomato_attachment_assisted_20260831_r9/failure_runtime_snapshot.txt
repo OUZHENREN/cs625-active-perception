@@ -1,0 +1,39 @@
+2026-08-31T23:55:15+08:00
+failure=E1_POSE_GOAL_PLANNING_FAILED
+--- P7 nodes ---
+WARNING: Be aware that there are nodes in the graph that share an exact name, which can have unintended side effects.
+/controller_manager
+/cs625_p7_arm_motion_adapter
+/cs625_p7_attachment_adapter
+/cs625_p7_gripper_adapter
+/gripper_controller
+/joint_trajectory_controller
+/move_group
+/move_group
+/move_group
+/move_group/move_group
+/move_group_private_106248227972272
+--- authoritative E1 parameters ---
+Parameter not set
+Parameter not set
+Parameter not set
+Parameter not set
+Parameter not set
+--- MoveIt planning failure ---
+[move_group-1] [INFO] [1788191649.114924327] [move_group.move_group.moveit.ros.move_group.plan_service]: Received new planning service request...
+[move_group-1] [INFO] [1788191649.119703933] [move_group]: Calling PlanningRequestAdapter 'ResolveConstraintFrames'
+[move_group-1] [INFO] [1788191649.119832619] [move_group]: Calling PlanningRequestAdapter 'ValidateWorkspaceBounds'
+[move_group-1] [WARN] [1788191649.119843400] [move_group.move_group.moveit.ros.validate_workspace_bounds]: It looks like the planning volume was not specified. Using default values.
+[move_group-1] [INFO] [1788191649.119857216] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateBounds'
+[move_group-1] [INFO] [1788191649.119893135] [move_group]: Calling PlanningRequestAdapter 'CheckStartStateCollision'
+[move_group-1] [INFO] [1788191649.120764591] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Planner configuration 'cs625_arm' will use planner 'geometric::RRTConnect'. Additional configuration parameters will be set when the planner is constructed.
+[move_group-1] [INFO] [1788191649.121030971] [move_group]: Calling Planner 'OMPL'
+[move_group-1] [ERROR] [1788191653.122145715] [move_group.move_group.moveit.planners.ompl.model_based_planning_context]: Unable to solve the planning problem
+[move_group-1] [ERROR] [1788191653.122290853] [move_group]: Planner 'OMPL' failed with error code FAILURE
+[move_group-1] [ERROR] [1788191653.122318205] [move_group.move_group.moveit.ros.move_group.plan_service]: Generating a plan with planning pipeline failed.
+[WARN] [1788191717.607180244] [cs625_p7_arm_motion_adapter]: Failed to get parameters: Invalid access to undeclared parameter(s): 
+[WARN] [1788191719.962512484] [cs625_p7_arm_motion_adapter]: Failed to get parameters: Invalid access to undeclared parameter(s): 
+--- matching processes ---
+   1466    1431    1466 /usr/bin/python3 /opt/ros/jazzy/bin/ros2 launch cs625_bringup sim_active_localization.launch.py strategy:=disabled launch_official_sim:=true launch_moveit:=false launch_fixture_world:=false headless:=true initial_positions_file:=/home/oy/cs625_p56_install/share/cs625_bringup/config/p7_safe_initial_positions.yaml initial_detach:=false initial_detach_topic:=/p7/attachment/detach world:=/tmp/p7_acceptance_20260831_r9_p7_ycb_tomato_light.sdf
+   1925    1431    1925 /usr/bin/python3 /opt/ros/jazzy/bin/ros2 launch cs625_bringup sim_moveit.launch.py cs_type:=cs625 use_fake_hardware:=true launch_rviz:=false description_package:=cs625_ap_description description_file:=cs625_active_perception.urdf.xacro initial_positions_file:=/home/oy/cs625_p56_install/share/cs625_bringup/config/p7_safe_initial_positions.yaml semantic_package:=cs625_bringup semantic_file:=config/cs625_active_perception.srdf
+   1934    1925    1925 /opt/ros/jazzy/lib/moveit_ros_move_group/move_group --ros-args -r __node:=move_group --params-file /tmp/launch_params_jbrhj114 --params-file /tmp/launch_params_svue966i

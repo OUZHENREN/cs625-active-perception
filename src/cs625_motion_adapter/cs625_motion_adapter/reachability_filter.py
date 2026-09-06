@@ -293,6 +293,11 @@ class ReachabilityFilter(Node):
         request.ik_request.group_name = self._planning_group
         request.ik_request.ik_link_name = self._tool_frame
         request.ik_request.pose_stamped = candidate.tool_pose
+        # An empty RobotState is valid only as a differential request: MoveIt
+        # then seeds IK from its monitored live /joint_states.  Without this
+        # flag it is interpreted as a complete (but empty) state and every
+        # candidate is rejected before kinematics is evaluated.
+        request.ik_request.robot_state.is_diff = True
         request.ik_request.avoid_collisions = True
         request.ik_request.timeout = Duration(sec=max(1, math.ceil(self._request_timeout)))
         self._future = self._ik_client.call_async(request)

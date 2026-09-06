@@ -2,7 +2,7 @@
 
 ## 1. Scope
 
-The simulation baseline is Ubuntu 22.04 + ROS 2 Humble + MoveIt 2 Humble + Gazebo Fortress/ros_gz. Phase 0–1 validates the official CS625 model, ros2_control, MoveIt, the Eye-in-Hand description extension, a minimal RGB-D sensor and normalized topics. It does not validate the paper method.
+The accepted simulation baseline is WSL2 Ubuntu 24.04 + ROS 2 Jazzy + MoveIt 2 + Gazebo Harmonic 8.11 / `ros_gz`. It reuses the pre-existing Jazzy underlay and application overlay supplied by the local workspace; it must not be reconstructed as a Humble environment. P4 validates the official CS625 model, `gz_ros2_control`, MoveIt, the Eye-in-Hand description extension, a minimal RGB-D sensor and normalized topics. It does not, by itself, validate a learned perception or grasp method.
 
 ## 2. Validation levels
 
@@ -49,7 +49,7 @@ joint, kinematic, physical and visual YAML files. The arm controller remains
 inactive unless `activate_joint_controller:=true` is supplied explicitly.
 
 The placeholders are deliberate. Until the PS800E1/Percipio driver and topic
-contract are verified in the Humble VM, no vendor topic is hardcoded in this
+contract are verified in the Jazzy environment, no vendor topic is hardcoded in this
 repository.
 
 Both profiles include exactly the same common sensor launch when
@@ -71,13 +71,13 @@ extension. The application does not copy that vendor launch. Instead,
 joint-limit, planning and controller files through `MoveItConfigsBuilder`,
 while explicitly loading the application Xacro and the normalized point-cloud
 sensor configuration. This keeps Gazebo/robot_state_publisher and MoveIt on
-the same link model. The Humble VM smoke test must still show that the
+the Jazzy overlay smoke test must still show that the
 control graph, planning scene and camera TF agree before S1 is declared pass.
 
 The simulation profile defaults to `cs625_bringup/config/sim_controllers.yaml`.
 It reuses the senior CS625 Xacro macro, meshes, physical/kinematic parameters
 and MoveIt configuration. The local `sim_control.launch.py` owns only process
-ordering: it uses the official Humble `robot_description` topic spawn pattern
+ordering: it uses the installed Jazzy `robot_description` topic spawn pattern
 and standard `joint_state_broadcaster` / `joint_trajectory_controller`
 plugins. No vendor model or driver implementation is copied into this
 repository.
@@ -99,13 +99,13 @@ same deterministic simulation control composition as the base entry.
 Runtime isolation showed that the senior `create -string` process can time out
 while Gazebo is starting, after which the former application retry could race
 the original request and create overlapping entities. `sim_control.launch.py`
-therefore follows the installed Humble `gz_ros2_control_demos` pattern: publish
+therefore follows the installed Jazzy `gz_ros2_control_demos` pattern: publish
 one robot description, create entity `cs` once with the create tool's default
 renaming-disabled behavior, then start the joint-state broadcaster and trajectory controller in order via
 process-exit event handlers. There is no timer-based second spawn.
 
 When `headless:=true`, the control launch passes both server-only mode and
-Fortress `--headless-rendering`. The latter selects EGL for server-side camera
+Harmonic `--headless-rendering`. The latter selects EGL for server-side camera
 rendering and requires the worlds' Sensors system to use Ogre2; `-s` alone is
 not a headless rendering configuration.
 
@@ -113,12 +113,12 @@ not a headless rendering configuration.
 
 The normalized `/sensors/camera/points` stream is consumed by MoveIt's
 upstream `occupancy_map_monitor/PointCloudOctomapUpdater`. The plugin is
-provided by the Humble `moveit_ros_perception` package, while
+provided by the Jazzy `moveit_ros_perception` package, while
 `moveit_ros_occupancy_map_monitor` provides the base monitor API. Both are
 runtime dependencies of `cs625_bringup`; the application does not implement
 or vendor an alternative octomap updater.
 
-Verify the plugin package in the sourced Humble environment before launch:
+Verify the plugin package in the sourced Jazzy environment before launch:
 
 ```bash
 ros2 pkg prefix moveit_ros_perception
@@ -126,7 +126,7 @@ ros2 pkg prefix moveit_ros_perception
 
 The application keeps the senior CS625 `gz_ros2_control` model integration,
 and explicitly points the Gazebo plugin at the `robot_description` parameter
-on `robot_state_publisher`. The controller manager name uses the Humble
+on `robot_state_publisher`. The controller manager name uses the Jazzy
 `controller_manager_name` element. The application MoveIt composition also
 preserves the senior profile's `octomap_frame=base_link` and 0.02 m resolution;
 only the point-cloud source is replaced by the normalized common topic.
@@ -136,13 +136,13 @@ the arm joint transforms are unavailable. It is not accepted as a sensor gate
 pass merely because point-cloud messages are flowing: controller activation,
 `/joint_states`, and the full camera TF chain must all pass.
 
-For Humble/Fortress, `sim_base.launch.py` resolves the installed
+For Jazzy/Harmonic, `sim_base.launch.py` resolves the installed
 `gz_ros2_control` prefix through the ament index, verifies that
 `libgz_ros2_control-system.so` exists, and prepends its library directory to
 both `IGN_GAZEBO_SYSTEM_PLUGIN_PATH` and `GZ_SIM_SYSTEM_PLUGIN_PATH` before
 starting the application simulation composition. This turns an otherwise silent
 Gazebo model-plugin lookup failure into an immediate launch error and supports
-both Fortress-era and renamed Gazebo environment variables.
+the installed Harmonic plugin environment.
 
 ## 4. Required checks
 
@@ -161,11 +161,8 @@ The task-specified smoke command is:
 timeout 60s ros2 launch cs625_bringup sim_base.launch.py launch_rviz:=false
 ```
 
-The exact command output, exit code and known limitations must be recorded in a work log. A launch that cannot be reproduced from the pinned Humble VM is a P0/P1 blocker; do not modify the official driver first.
+The exact command output, exit code and known limitations must be recorded in a work log. A launch that cannot be reproduced from the pinned Jazzy overlay is a P0/P1 blocker; do not modify the official driver first.
 
 ## 5. Reference checked for the fixture
 
-The fixture uses the Fortress-era `rgbd_camera` sensor shape and keeps its Gazebo integration unverified until the Humble VM. The official Fortress documentation and upstream example are the references for the eventual runtime check:
-
-- https://gazebosim.org/docs/fortress/comparison/
-- https://github.com/gazebosim/gz-sim/blob/ign-gazebo6/examples/worlds/depth_camera_sensor.sdf
+The fixture uses the `rgbd_camera` sensor shape and is exercised in the accepted Jazzy/Harmonic overlay. The official Harmonic documentation and the installed `gz_ros2_control_demos` examples remain the reference for future regression checks.

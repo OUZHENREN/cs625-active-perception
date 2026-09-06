@@ -1,0 +1,125 @@
+{
+  "captured_at_utc": "2026-09-01T06:19:35.245471+00:00",
+  "failure_codes": [
+    "P7_1_TARGET_NOT_OBSERVED_IN_POINT_CLOUD",
+    "P7_1_TARGET_OUTSIDE_CAMERA_FOV",
+    "P7_1_TARGET_RGB_ROI_UNAVAILABLE",
+    "P7_1_TIMESTAMP_EXACT_TF_UNAVAILABLE"
+  ],
+  "streams": {
+    "camera_info": {
+      "cdr_file": "camera_info.cdr",
+      "cdr_sha256": "c1009430cca2b2f73e68ba3e88ec2d07a828cd96a25db26d088ebf80ad35a006",
+      "cdr_size_bytes": 381,
+      "distortion_model": "plumb_bob",
+      "frame_id": "camera_color_optical_frame",
+      "header_valid": true,
+      "height": 240,
+      "k": [
+        277.19135641132203,
+        0.0,
+        160.0,
+        0.0,
+        277.19135641132203,
+        120.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "ros_type": "sensor_msgs/msg/CameraInfo",
+      "stamp_sec": 15.9,
+      "topic": "/sensors/camera/depth/camera_info",
+      "width": 320
+    },
+    "color": {
+      "cdr_file": "color.cdr",
+      "cdr_sha256": "a41c0fa75bbbfabd6cb13ab8366ff21f5ed6f5c3c427df222993d5b4720e33d0",
+      "cdr_size_bytes": 230472,
+      "encoding": "rgb8",
+      "frame_id": "camera_color_optical_frame",
+      "header_valid": true,
+      "height": 240,
+      "ros_type": "sensor_msgs/msg/Image",
+      "stamp_sec": 15.8,
+      "step": 960,
+      "topic": "/sensors/camera/color/image",
+      "width": 320
+    },
+    "depth": {
+      "cdr_file": "depth.cdr",
+      "cdr_sha256": "858bd0f5b75e957681c8a5b451875e7a335e1dd9982c1ba458b689e90f3d38ca",
+      "cdr_size_bytes": 307272,
+      "encoding": "32FC1",
+      "frame_id": "camera_depth_optical_frame",
+      "header_valid": true,
+      "height": 240,
+      "ros_type": "sensor_msgs/msg/Image",
+      "stamp_sec": 15.9,
+      "step": 1280,
+      "topic": "/sensors/camera/depth/image",
+      "width": 320
+    },
+    "points": {
+      "cdr_file": "points.cdr",
+      "cdr_sha256": "9c9175b444ae8e7fe97f588cb6b378ddd27f4a1f1d5779b514d84f84b6adc249",
+      "cdr_size_bytes": 1843353,
+      "fields": [
+        "x",
+        "y",
+        "z",
+        "rgb"
+      ],
+      "frame_id": "camera_depth_optical_frame",
+      "header_valid": true,
+      "height": 240,
+      "point_step": 24,
+      "ros_type": "sensor_msgs/msg/PointCloud2",
+      "row_step": 7680,
+      "stamp_sec": 15.9,
+      "topic": "/sensors/camera/points",
+      "width": 320
+    }
+  },
+  "synchronization": {
+    "maximum_stamp_sec": 15.9,
+    "minimum_stamp_sec": 15.8,
+    "spread_sec": 0.09999999999999964,
+    "within_slop": true
+  },
+  "target_visibility": {
+    "minimum_target_points": 12,
+    "point_cloud_support_pass": false,
+    "projected_inside_image": false
+  },
+  "tf": {
+    "base_to_color": {
+      "child_frame": "camera_color_optical_frame",
+      "orientation": {
+        "w": 0.5493636711745373,
+        "x": -0.831350057299374,
+        "y": -0.03223415164341589,
+        "z": 0.07757318151134045
+      },
+      "parent_frame": "base_link",
+      "stamp_sec": 15.8,
+      "translation_m": {
+        "x": 0.7768141206984646,
+        "y": -0.4552710406802567,
+        "z": 0.2739894833410688
+      }
+    },
+    "base_to_color_available": true,
+    "base_to_depth_available": false,
+    "base_to_depth_error": "Lookup would require extrapolation into the future.  Requested time 15.900000 but the latest data is at time 15.890000, when looking up transform from frame [camera_depth_optical_frame] to frame [base_link]",
+    "world_to_points_available": false,
+    "world_to_points_error": "Lookup would require extrapolation into the future.  Requested time 15.900000 but the latest data is at time 15.890000, when looking up transform from frame [camera_depth_optical_frame] to frame [world]"
+  },
+  "validations": {
+    "camera_info_valid": true,
+    "color_layout_valid": true,
+    "depth_layout_valid": true,
+    "point_cloud_layout_valid": true
+  },
+  "window_index": 1,
+  "window_pass": false
+}

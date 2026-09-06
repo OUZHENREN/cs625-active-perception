@@ -1,0 +1,43 @@
+{
+  "captured_at_utc": "2026-09-02T00:51:54.569081+00:00",
+  "claim_boundary": "A safe severe-view abstention is not full SE(3) success and is not a grasp authorization. It only permits P7.3 to seek another view.",
+  "failure_codes": [],
+  "full_single_view_severe_pose_pass": false,
+  "gate": "P7.2_POSE_ESTIMATION_HANDOFF",
+  "handoff_decision": "P7.3_REQUIRED_REOBSERVATION",
+  "interface_gate_pass": true,
+  "observable_strata": {
+    "light": {
+      "estimate_count": 5,
+      "full_se3_pose_success_rate": 1.0,
+      "gate_pass": true,
+      "path": "docs/evidence/p7_2_pose_occlusion_light_20260902_t19/evaluation.json"
+    },
+    "medium": {
+      "estimate_count": 5,
+      "full_se3_pose_success_rate": 1.0,
+      "gate_pass": true,
+      "path": "docs/evidence/p7_2_pose_occlusion_medium_20260902_t22/evaluation.json"
+    },
+    "unoccluded_reference": {
+      "estimate_count": 5,
+      "full_se3_pose_success_rate": 1.0,
+      "gate_pass": true,
+      "path": "docs/evidence/p7_2_pose_textured_20260902_t12/evaluation.json"
+    }
+  },
+  "schema": "p7_2_handoff_gate_v1",
+  "severe_rejection": {
+    "failure_codes": [
+      "CAD_TEMPLATE_SUPPORT_TOO_SPARSE",
+      "POSE_YAW_UNOBSERVABLE"
+    ],
+    "full_se3_gate_pass": false,
+    "ground_truth_read": false,
+    "path": "docs\\evidence\\p7_2_pose_occlusion_severe_v5_20260902_t33_rejection\\window_01_estimate.json",
+    "pose_valid_for_grasp": false,
+    "safe_reject": true,
+    "texture_yaw_observable": false,
+    "yaw_variance_rad2": 3.289868133696453
+  }
+}

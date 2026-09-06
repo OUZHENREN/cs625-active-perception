@@ -1,0 +1,83 @@
+{
+  "capture_schema": "p7_preflight_v1",
+  "captured_at_utc": "2026-09-02T08:23:36.634651+00:00",
+  "clock_regression_count": 860,
+  "clock_sample_count": 2745,
+  "controllers": {
+    "gripper_controller": {
+      "state": "active",
+      "type": "forward_command_controller/ForwardCommandController"
+    },
+    "joint_state_broadcaster": {
+      "state": "active",
+      "type": "joint_state_broadcaster/JointStateBroadcaster"
+    },
+    "joint_trajectory_controller": {
+      "state": "active",
+      "type": "joint_trajectory_controller/JointTrajectoryController"
+    }
+  },
+  "expected_joint_positions_rad": {
+    "elbow_joint": 2.530689404087395,
+    "shoulder_lift_joint": -0.927060302155889,
+    "shoulder_pan_joint": 3.871099320874653,
+    "wrist_1_joint": 0.234301688315232,
+    "wrist_2_joint": -2.247227163128973,
+    "wrist_3_joint": -5.871046201245675
+  },
+  "expected_positions_file": "/mnt/b/Recent/Robotic arm/Ubuntu_Share/cs625_active_perception/elite_ros/src/cs625_bringup/config/p7_3_severe_v5_nbv_e75_vminus110_a05_settled_positions.yaml",
+  "failure_codes": [
+    "INITIAL_JOINT_MISMATCH",
+    "CLOCK_REGRESSION",
+    "SETTLE_SIM_TIME_INCOMPLETE"
+  ],
+  "inactive_controllers": [],
+  "initial_positions_file": "/mnt/b/Recent/Robotic arm/Ubuntu_Share/cs625_active_perception/elite_ros/src/cs625_bringup/config/p7_3_severe_v5_nbv_e75_vminus110_a05_initial_positions.yaml",
+  "joint_errors_rad": {
+    "elbow_joint": 1.2757797751132358,
+    "shoulder_lift_joint": 0.28459533380777713,
+    "shoulder_pan_joint": 1.3696289529928976,
+    "wrist_1_joint": 0.04654624953602479,
+    "wrist_2_joint": 0.9404044979372863,
+    "wrist_3_joint": 3.986523078426668
+  },
+  "joint_sample_counts": {
+    "elbow_joint": 114,
+    "shoulder_lift_joint": 114,
+    "shoulder_pan_joint": 114,
+    "wrist_1_joint": 114,
+    "wrist_2_joint": 114,
+    "wrist_3_joint": 114
+  },
+  "joint_spreads_rad": {
+    "elbow_joint": 0.0,
+    "shoulder_lift_joint": 0.0,
+    "shoulder_pan_joint": 0.0,
+    "wrist_1_joint": 0.0,
+    "wrist_2_joint": 0.0,
+    "wrist_3_joint": 0.0
+  },
+  "joint_tolerance_rad": 0.002,
+  "observed_joint_positions_rad": {
+    "elbow_joint": 1.254909628974159,
+    "shoulder_lift_joint": -0.6424649683481118,
+    "shoulder_pan_joint": 2.5014703678817556,
+    "wrist_1_joint": 0.2808479378512568,
+    "wrist_2_joint": -1.3068226651916868,
+    "wrist_3_joint": -1.8845231228190071
+  },
+  "required_controllers": [
+    "gripper_controller",
+    "joint_state_broadcaster",
+    "joint_trajectory_controller"
+  ],
+  "runtime": {
+    "gz_partition": "p7_3_severe_v5_nbv_e75_vminus110_a05_20260902_r5",
+    "ign_partition": "p7_3_severe_v5_nbv_e75_vminus110_a05_20260902_r5",
+    "ros_domain_id": ""
+  },
+  "settle_sim_completed": false,
+  "settle_sim_sec": 5.0,
+  "stability_window_sec": 2.0,
+  "success": false
+}

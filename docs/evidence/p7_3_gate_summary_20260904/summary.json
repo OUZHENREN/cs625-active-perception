@@ -1,0 +1,56 @@
+{
+  "schema": "p7_3_gate_summary_v1",
+  "gate": "P7.3_NBV",
+  "gate_pass": true,
+  "decision": "P7.3_STOP_CRITERION_MET",
+  "ground_truth_used_by_estimator_or_nbv": false,
+  "legacy_coverage_proxy_used": false,
+  "sequence": [
+    {
+      "stage": "first_reobservation_pose_update_after_center_fix",
+      "evidence": "../p7_3_reobservation_pose_20260904_r12_chroma_circle/evaluation.json",
+      "translation_pose_success_rate": 1.0,
+      "full_se3_pose_success_rate": 0.0,
+      "translation_error_m": 0.017237901899676326,
+      "rotation_error_deg": 88.0,
+      "add_s_m": 0.00787391944375229,
+      "failure_codes": ["POSE_ROTATION_ERROR", "POSE_YAW_UNOBSERVABLE"]
+    },
+    {
+      "stage": "updated_geometry_information_nbv",
+      "rank_evidence": "../p7_3_geometry_nbv_20260904_r13_after_chroma/candidate_rank.json",
+      "static_screen_evidence": "../p7_3_geometry_nbv_20260904_r13_after_chroma/static_screen_all.json",
+      "ranked_candidate_count": 240,
+      "strict_static_feasible_candidate_count": 25,
+      "selected_feasible_candidate": "geometry_nbv_e75_v-110_a22",
+      "minimum_distal_link_origin_z_m": 0.159055354187282,
+      "maximum_scaled_pose_residual": 0.01004131816489959
+    },
+    {
+      "stage": "second_reobservation_sensor_gate",
+      "evidence": "../p7_3_reobservation_severe_v5_20260904_r13_e75_a22/sensor_gate/raw/gate.json",
+      "gate_pass": true,
+      "synchronized_window_count": 5,
+      "target_point_count_per_window": 4343,
+      "trajectory_commands_sent": 0
+    },
+    {
+      "stage": "second_reobservation_pose_update",
+      "evidence": "../p7_3_reobservation_pose_20260904_r13_e75_a22/evaluation.json",
+      "estimate_count": 5,
+      "full_se3_pose_success_rate": 1.0,
+      "translation_error_m": 0.0011236614080885295,
+      "rotation_error_deg": 1.0,
+      "add_s_m": 0.001008354331469087,
+      "measured_yaw_standard_deviation_deg": 2.5
+    },
+    {
+      "stage": "measured_covariance_stop_check",
+      "evidence": "../p7_3_geometry_nbv_20260904_r13_after_chroma/post_reobservation_stop.json",
+      "configured_yaw_standard_deviation_deg": 5.0,
+      "measured_yaw_standard_deviation_deg": 2.5,
+      "decision": "P7.3_STOP_CRITERION_MET"
+    }
+  ],
+  "claim_boundary": "P7.3 geometry/information NBV and measured post-observation uncertainty passed in simulation. The selected view was instantiated as a static Gazebo initial state; MoveIt planning/trajectory execution and grasp were not evaluated here and remain P7.4/P7.5."
+}

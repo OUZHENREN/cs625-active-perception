@@ -1,0 +1,342 @@
+{
+  "approach": {
+    "execution_success": true,
+    "plan_success": true,
+    "receipt": {
+      "cartesian_path_fraction": 1.0,
+      "code": "MOTION_SUCCEEDED",
+      "command_id": "p7-20260831-r5-e2-approach",
+      "execution_joint_tolerance_rad": 0.01,
+      "execution_terminal_joint_max_error_rad": 5e-06,
+      "execution_terminal_joint_positions_rad": {
+        "elbow_joint": -1.762782,
+        "shoulder_lift_joint": -2.011456,
+        "shoulder_pan_joint": 0.361986,
+        "wrist_1_joint": 2.168108,
+        "wrist_2_joint": -1.326389,
+        "wrist_3_joint": 0.14504
+      },
+      "execution_time_sec": 2.24982,
+      "fk_orientation_error_rad": 0.0,
+      "fk_position_error_m": 0.0,
+      "ik_time_sec": 0.016583,
+      "phase": "approach",
+      "physical_tool_frame": "p7_grasp_center_link",
+      "planned_terminal_joint_positions_rad": {
+        "elbow_joint": -1.762782,
+        "shoulder_lift_joint": -2.011458,
+        "shoulder_pan_joint": 0.36199,
+        "wrist_1_joint": 2.168109,
+        "wrist_2_joint": -1.326389,
+        "wrist_3_joint": 0.145044
+      },
+      "planned_trajectory_duration_sec": 2.246133,
+      "planning_mode": "cartesian_linear",
+      "planning_time_sec": 0.049729,
+      "planning_tip_frame": "my_end_effector_link",
+      "success": true,
+      "total_time_sec": 2.415181
+    }
+  },
+  "assembled_at_utc": "2026-08-31T11:09:33.560188+00:00",
+  "attachment": {
+    "attached": true,
+    "mechanism": "gazebo_detachable_joint_attachment_assisted",
+    "receipt": {
+      "action": "attach",
+      "attached": true,
+      "code": "ATTACHMENT_ATTACHED",
+      "command_id": "p7-20260831-r5-e3-attach",
+      "detail": "",
+      "elapsed_sec": 1.950525,
+      "mechanism": "gazebo_detachable_joint_attachment_assisted",
+      "success": true
+    },
+    "relative_translation_error_m": 0.0013033272010141016
+  },
+  "contact": {
+    "monitor_available": false,
+    "source": "not_instrumented",
+    "unexpected_collision": null
+  },
+  "contract_evaluation": {
+    "attachment_success": false,
+    "executable_grasp": false,
+    "metric_schema_version": "p7_grasp_evidence_v2",
+    "perception_success": false,
+    "physical_collision_metric_accepted": false,
+    "primary_failure_code": "PERCEPTION_STALE",
+    "task_success": false,
+    "thresholds": {
+      "attachment_relative_translation_max_m": 0.015,
+      "hold_duration_min_sec": 2.0,
+      "lift_height_min_m": 0.1,
+      "rotation_error_max_deg": 10.0,
+      "target_to_grasp_center_error_max_m": 0.015,
+      "translation_error_max_m": 0.02,
+      "visible_ratio_min": 0.15
+    },
+    "unexpected_physical_collision": null
+  },
+  "engineering_acceptance": {
+    "attachment_assisted_kinematic_chain_success": true,
+    "carried_object_collision_proxy_applied": true,
+    "formal_p7_episode_accepted": false,
+    "perception_aware_grasp_validated": false,
+    "real_contact_grasp_validated": false
+  },
+  "episode_schema": "p7_attachment_assisted_fixture_episode_v1",
+  "gripper": {
+    "command_reached": true,
+    "geometry_measurement_available": true,
+    "geometry_pass": true,
+    "receipt": {
+      "code": "GRIPPER_REACHED",
+      "command_id": "p7-20260831-r5-e3-close",
+      "elapsed_sec": 0.07035151700256392,
+      "max_terminal_error_m": 0.0019982029898189535,
+      "observed_positions_m": {
+        "gripper_left_finger_joint": 0.024998202989818953,
+        "gripper_right_finger_joint": 0.024000000000117584
+      },
+      "success": true,
+      "target_position": 0.023,
+      "target_tolerance_m": 0.002,
+      "terminal_errors_m": {
+        "gripper_left_finger_joint": 0.0019982029898189535,
+        "gripper_right_finger_joint": 0.001000000000117584
+      }
+    },
+    "target_to_grasp_center_error_m": 0.0013033272010141016
+  },
+  "hold": {
+    "duration_sec": 2.226153069997963,
+    "max_height_drift_m": 0.0,
+    "stable": true
+  },
+  "lift": {
+    "execution_success": true,
+    "height_delta_m": 0.11999908405652895,
+    "plan_success": true,
+    "receipt": {
+      "cartesian_path_fraction": 1.0,
+      "code": "MOTION_SUCCEEDED",
+      "command_id": "p7-20260831-r5-e4-lift",
+      "execution_joint_tolerance_rad": 0.01,
+      "execution_terminal_joint_max_error_rad": 1e-06,
+      "execution_terminal_joint_positions_rad": {
+        "elbow_joint": -1.666708,
+        "shoulder_lift_joint": -1.927973,
+        "shoulder_pan_joint": 0.361991,
+        "wrist_1_joint": 1.98855,
+        "wrist_2_joint": -1.326389,
+        "wrist_3_joint": 0.145045
+      },
+      "execution_time_sec": 1.099907,
+      "fk_orientation_error_rad": 0.0,
+      "fk_position_error_m": 0.0,
+      "ik_time_sec": 0.032177,
+      "phase": "lift",
+      "physical_tool_frame": "p7_grasp_center_link",
+      "planned_terminal_joint_positions_rad": {
+        "elbow_joint": -1.666708,
+        "shoulder_lift_joint": -1.927972,
+        "shoulder_pan_joint": 0.361991,
+        "wrist_1_joint": 1.988549,
+        "wrist_2_joint": -1.326389,
+        "wrist_3_joint": 0.145045
+      },
+      "planned_trajectory_duration_sec": 1.072,
+      "planning_mode": "cartesian_linear",
+      "planning_time_sec": 0.049677,
+      "planning_tip_frame": "my_end_effector_link",
+      "success": true,
+      "total_time_sec": 1.280964
+    }
+  },
+  "perception": {
+    "fresh_rgbd": false,
+    "rotation_error_deg": null,
+    "source": "not_executed_fixture_pose_control_only",
+    "translation_error_m": null,
+    "visible_ratio": null
+  },
+  "pregrasp": {
+    "execution_success": true,
+    "plan_success": true,
+    "receipt": {
+      "code": "MOTION_SUCCEEDED",
+      "command_id": "p7-20260831-r5-e1-pregrasp",
+      "execution_joint_tolerance_rad": 0.01,
+      "execution_terminal_joint_max_error_rad": 0.0,
+      "execution_terminal_joint_positions_rad": {
+        "elbow_joint": -1.392612,
+        "shoulder_lift_joint": -1.944611,
+        "shoulder_pan_joint": -0.22792,
+        "wrist_1_joint": 1.874121,
+        "wrist_2_joint": -1.347872,
+        "wrist_3_joint": -0.460799
+      },
+      "execution_time_sec": 5.499826,
+      "fk_orientation_error_rad": 0.001623,
+      "fk_position_error_m": 0.000519,
+      "ik_time_sec": 0.045854,
+      "phase": "pregrasp",
+      "physical_tool_frame": "p7_grasp_center_link",
+      "planned_terminal_joint_positions_rad": {
+        "elbow_joint": -1.392612,
+        "shoulder_lift_joint": -1.944612,
+        "shoulder_pan_joint": -0.22792,
+        "wrist_1_joint": 1.874122,
+        "wrist_2_joint": -1.347872,
+        "wrist_3_joint": -0.460799
+      },
+      "planned_trajectory_duration_sec": 5.464325,
+      "planning_mode": "joint_space",
+      "planning_time_sec": 0.049485,
+      "planning_tip_frame": "my_end_effector_link",
+      "success": true,
+      "total_time_sec": 5.694361
+    }
+  },
+  "random_seed": 0,
+  "scene_id": "p7_ycb_tomato_light",
+  "scene_transitions": {
+    "approach": {
+      "attached_relative_pose": null,
+      "capture_schema": "p7_planning_scene_transition_v1",
+      "captured_at_utc": "2026-08-31T11:09:08.759502+00:00",
+      "detail": "objects=p7_ground,p7_occluder removed=p7_target_contact_proxy attached=none",
+      "mode": "approach",
+      "planning_frame": "base_link",
+      "runtime": {
+        "gz_partition": "p7_acceptance_20260831_r5",
+        "ign_partition": "p7_acceptance_20260831_r5",
+        "ros_domain_id": "80"
+      },
+      "source_identity": null,
+      "success": true
+    },
+    "attached": {
+      "attached_relative_pose": {
+        "orientation": {
+          "w": 0.09585173483720077,
+          "x": -0.6198816203591024,
+          "y": -0.7750367538218152,
+          "z": 0.07666323691976325
+        },
+        "position": {
+          "x": 0.00124971538083914,
+          "y": -3.615666056222153e-07,
+          "z": -0.0003430050742694829
+        }
+      },
+      "capture_schema": "p7_planning_scene_transition_v1",
+      "captured_at_utc": "2026-08-31T11:09:26.975126+00:00",
+      "detail": "objects=p7_ground,p7_occluder removed=p7_target_contact_proxy attached=p7_target_contact_proxy cylinder_radius_m=0.034 cylinder_height_m=0.101855",
+      "mode": "attached",
+      "planning_frame": "base_link",
+      "runtime": {
+        "gz_partition": "p7_acceptance_20260831_r5",
+        "ign_partition": "p7_acceptance_20260831_r5",
+        "ros_domain_id": "80"
+      },
+      "source_identity": {
+        "grasp_pose_file": {
+          "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/grasp_before_lift.json",
+          "sha256": "19ed343eec62bcbf8edf0f0749b71d2fcfd4a04afe2b7309813299f4fd1f68d8"
+        },
+        "model_pose_file": {
+          "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/target_before_lift.json",
+          "sha256": "3292727842d6e7d002227cdc7a94e82ee4371c294afa3b114b28497e304f83cf"
+        }
+      },
+      "success": true
+    },
+    "full": {
+      "attached_relative_pose": null,
+      "capture_schema": "p7_planning_scene_transition_v1",
+      "captured_at_utc": "2026-08-31T11:08:57.667711+00:00",
+      "detail": "objects=p7_ground,p7_occluder,p7_target_contact_proxy attached=none",
+      "mode": "full",
+      "planning_frame": "base_link",
+      "runtime": {
+        "gz_partition": "p7_acceptance_20260831_r5",
+        "ign_partition": "p7_acceptance_20260831_r5",
+        "ros_domain_id": "80"
+      },
+      "source_identity": null,
+      "success": true
+    }
+  },
+  "source_files": {
+    "approach": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/e2_approach.json",
+      "sha256": "7fc894c2a659f736a5289acf187be1538f3b1e107ea21e2a27e7b48828d92124"
+    },
+    "attachment": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/e3_attachment.json",
+      "sha256": "675a13da22f8e025c491a878e5ade53cc49ed59a819e9dc6a34d13a308fbae24"
+    },
+    "detach": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/e0_detach.json",
+      "sha256": "8e82fbfc91189ece2eb216f6ff61e8e921d5d9fb972ba9498dc0118b8ee44e63"
+    },
+    "episode_end": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/episode_end.json",
+      "sha256": "0014cabaa5c1d420a05ca12150503ec61a4e49d3c5853fe02d583110e390575b"
+    },
+    "episode_start": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/episode_start.json",
+      "sha256": "4ab6e97ef1ca97e2cd2a5916f0611ab1f2c51b22fd643fb26d2e76b1e830b1f8"
+    },
+    "geometry": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/e3_geometry.json",
+      "sha256": "a78a706b3dc520d2ef9523b0844e3635cd39b1b1558e2469a28cfef8398d3abe"
+    },
+    "gripper": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/e3_gripper.json",
+      "sha256": "b0e684e743e6a4ef5fb54e9651c0460245408ff5157086cef6246d305cfc9670"
+    },
+    "hold": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/hold_trace.json",
+      "sha256": "bf48a9b15b1e5329ab2692554a9415ef9e49ed87df43e025f70369bf9623f060"
+    },
+    "lift": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/e4_lift.json",
+      "sha256": "fd30ab4240c811d339d0de28ed6bfe8e064640a666d18cf23971562847ad2676"
+    },
+    "lift_measurement": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/e4_lift_measurement.json",
+      "sha256": "f0c3449130678b4e6bf6c4346a6df3dc34440e8f8b95478da9b2a3b33904dce3"
+    },
+    "preflight": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/preflight.json",
+      "sha256": "c6084cea9320e5d43f8bfbe7f161699f084336d726ae40117323504b36d09a9f"
+    },
+    "pregrasp": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/e1_pregrasp.json",
+      "sha256": "b3dc09c74bd6a78bcc3e106b90d65654cc2c55a68db0f80402945a49d6f2519e"
+    },
+    "scene_approach": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/scene_approach.json",
+      "sha256": "8cc4129da33ba7496f4a32a6c96f78d69ded8962e857f4c26a02200b1e9f2ddd"
+    },
+    "scene_attached": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/scene_attached.json",
+      "sha256": "5aa66e6aed29f2761f412e35e14431b56a6c278e6d363bd92cb8e72adfbfd224"
+    },
+    "scene_full": {
+      "path": "docs/evidence/p7_jazzy_tomato_attachment_assisted_20260831_r5/scene_full.json",
+      "sha256": "c7effe99ba6dde4343d602221c898717f11f591c3ab7a3afec3dd0f77df8b88a"
+    }
+  },
+  "strategy": "fixture_pose_control_only",
+  "timing": {
+    "episode_wall_time_reason": "boot-scoped monotonic markers",
+    "episode_wall_time_sec": 39.751413598,
+    "recorded_phase_sum_sec": 13.637535587000526,
+    "replan_after_execution_failure_count": 0,
+    "replan_count_reason": "tracked runner aborts on the first failed phase; this successful run issued each phase once"
+  }
+}

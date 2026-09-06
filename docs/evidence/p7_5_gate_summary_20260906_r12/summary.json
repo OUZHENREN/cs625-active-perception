@@ -1,0 +1,100 @@
+{
+  "schema": "p7_5_physical_contact_gate_summary_v1",
+  "gate": "P7.5 grasp closed loop",
+  "gate_pass": true,
+  "accepted_scope": "single frozen severe_v5 tomato scene; simulation-only; no real robot connection",
+  "source_run": "docs/evidence/p7_5_perception_grasp_20260906_r12",
+  "grasp_run": "docs/evidence/p7_5_perception_grasp_20260906_r12/grasp_top110_exec01",
+  "object": "005_tomato_soup_can",
+  "candidate_id": "tomato_top_yaw0_standoff_1",
+  "grasp_template": {
+    "type": "top approach to upper sidewall",
+    "pitch_deg": 110.0,
+    "yaw_deg": 0.0,
+    "grasp_offset_object_m": [0.01, 0.0, 0.03],
+    "lift_pose_key": "pregrasp"
+  },
+  "perception": {
+    "fresh_rgbd": true,
+    "post_move_windows": 3,
+    "full_se3_pose_success_rate": 1.0,
+    "translation_error_m": 0.0010921254830468501,
+    "rotation_error_deg": 1.0,
+    "add_m": 0.0011373448693649739,
+    "add_s_m": 0.0009948975461554397,
+    "ground_truth_used_for_grasp_generation": false
+  },
+  "nbv_motion": {
+    "success": true,
+    "planning_time_sec": 0.079776,
+    "execution_time_sec": 16.99977,
+    "planned_joint_path_length_rad": 5.211175,
+    "actual_cartesian_path_length_m": 5.750236,
+    "terminal_position_error_m": 0.001794,
+    "terminal_orientation_error_rad": 0.000501,
+    "replanning_count": 0
+  },
+  "grasp_execution": {
+    "pregrasp": {
+      "success": true,
+      "planning_time_sec": 0.118413,
+      "execution_time_sec": 16.048712,
+      "planned_joint_path_length_rad": 4.496911,
+      "terminal_position_error_m": 0.001017,
+      "terminal_orientation_error_rad": 0.001051
+    },
+    "approach": {
+      "success": true,
+      "planning_time_sec": 0.048604,
+      "ik_time_sec": 0.018111,
+      "execution_time_sec": 2.099442,
+      "planned_joint_path_length_rad": 0.432078
+    },
+    "close": {
+      "success": true,
+      "bilateral_finger_contact_observed": true,
+      "simultaneous_contact_message_count": 970,
+      "unexpected_environment_collision": false
+    },
+    "lift": {
+      "success": true,
+      "planning_time_sec": 0.048852,
+      "ik_time_sec": 0.038139,
+      "execution_time_sec": 2.3991,
+      "planned_joint_path_length_rad": 0.430023,
+      "height_delta_m": 0.14092775857335627,
+      "height_gate_pass": true,
+      "minimum_height_m": 0.1,
+      "bilateral_finger_contact_observed": true,
+      "simultaneous_contact_message_count": 3623,
+      "unexpected_environment_collision": false
+    },
+    "hold": {
+      "success": true,
+      "clock_domain": "simulation",
+      "duration_sec": 2.59900000000016,
+      "requested_duration_sec": 2.2,
+      "height_min_m": 0.19185096076861718,
+      "height_max_m": 0.19185163290444235,
+      "max_height_drift_m": 6.721358251637888e-7,
+      "height_drift_threshold_m": 0.01,
+      "sample_count": 6,
+      "bilateral_finger_contact_observed": true,
+      "simultaneous_contact_message_count": 6009,
+      "unexpected_environment_collision": false
+    }
+  },
+  "important_failures_retained": [
+    {
+      "stage": "vertical_lift",
+      "primary_failure_code": "IK_TIMEOUT",
+      "evidence": "docs/evidence/p7_5_perception_grasp_20260906_r12/grasp_top110_exec01/lift_vertical_failed01.json"
+    },
+    {
+      "stage": "attached_scene_remove_absent_target",
+      "primary_failure_code": "PLANNING_SCENE_APPLICATION_FAILED",
+      "evidence": "docs/evidence/p7_5_perception_grasp_20260906_r12/grasp_top110_exec01/scene_carried_stage_failed01.json"
+    }
+  ],
+  "claim_boundary": "This accepts P7.5 for one perception-conditioned physical-contact simulation episode. It is not the 3-occlusion x 5-seed x baseline formal matrix, and it does not claim real-robot execution."
+}

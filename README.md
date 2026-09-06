@@ -15,6 +15,7 @@ sim/real 应用接口组织候选视点生成、可达性筛选、策略选择�
 | 候选视点与硬可达性筛选 | 仿真通过 | IK、关节限位、碰撞与规划服务筛选 |
 | P4 主动感知闭环 | 仿真通过 | 选点、规划、Gazebo 运动、传感器稳定状态、失败码记录 |
 | P5 联合评分基础 | 仿真通过 | 可复现评分与 paired-experiment 工具 |
+| P7 五级门禁 | P7.1--P7.4 `PASS / FROZEN`；P7.5 单场景 `PASS`；正式矩阵 `NOT ACCEPTED` | r12 severe-v5 番茄罐完成一次感知条件下的仿真接触抓取闭环：NBV 后 3/3 位姿更新、MoveIt 预抓取/接近/抬升、双指接触、抬升 0.140928 m、保持 2.599 s；这不是 3 遮挡 × 5 seed × 多基线正式抓取矩阵，也不是真机结论 |
 | P6 真机准备 | 暂时仅软件验收 | 真机 R1--R4 尚未验收 |
 
 ## 最低可展示实验（仿真）
@@ -29,17 +30,20 @@ sim/real 应用接口组织候选视点生成、可达性筛选、策略选择�
 | 总量 | 3 × 5 × 3 = 45 |
 
 每个单元启动独立的 Gazebo + MoveIt 进程，并导出可达率、规划时间、运动代价、
-成功观测率、失败码和终止原因。2026-08-21 的完整仿真运行得到 45/45 个有效
-episode；三种基线各 15 个样本。对应聚合结果为：
+成功观测率、失败码和终止原因。2026-09-06 的完整仿真运行得到 45/45 个有效
+episode；三种基线各 15 个样本。本轮矩阵全部以 `MAX_FAILED_ATTEMPTS` 终止，
+因此只能作为可达性、规划时间和执行失败码的可审计数据，不能写成成功观测率
+对比实验。对应聚合结果为：
 
-| 基线 | 平均可达率 | 平均规划时间 (s) | 平均运动代价 | 平均成功观测率 |
+| 基线 | 平均可达率 | 平均规划时间总量 (s) | 平均墙钟时间 (s) | 平均成功观测率 |
 | --- | ---: | ---: | ---: | ---: |
-| `coverage_nbv` | 0.7667 | 0.2550 | 40.7146 | 0.7400 |
-| `fixed_view` | 0.7528 | 0.2312 | 37.9201 | 0.6833 |
-| `random_reachable` | 0.7028 | 0.2414 | 38.2754 | 0.6300 |
+| `coverage_nbv` | 0.752778 | 0.195406 | 102.413204 | 0.0 |
+| `fixed_view` | 0.758333 | 0.187946 | 101.152591 | 0.0 |
+| `random_reachable` | 0.744444 | 0.175477 | 90.748936 | 0.0 |
 
-这是当前 Gazebo 配置下的描述性仿真结果，不是对真实机器人性能的结论。原始
-episode 与运行日志保留在本地实验归档，未混入源码仓库。
+这是当前 Gazebo 配置下的描述性仿真结果，不是对真实机器人性能的结论。GitHub
+仓库保留源码、协议、汇总 CSV/JSON 和必要小型日志；大体积原始 RGB-D/点云帧
+继续保留在本地实验归档。
 
 ## 快速复现
 
@@ -88,6 +92,12 @@ pytest -q \
   src/cs625_view_evaluation/tests/test_joint_score.py
 ```
 
+P7 的当前串行门禁、停止条件与复现入口见
+[`docs/p7_five_gate_protocol.md`](docs/p7_five_gate_protocol.md)。历史临时验收见
+[`docs/p7_simulation_temporary_acceptance_2026-08-31.md`](docs/p7_simulation_temporary_acceptance_2026-08-31.md)。
+2026-09-06 r12 证明 P7.5 在一个 severe-v5 番茄罐场景中完成感知条件下的
+仿真接触抓取闭环；正式多场景、多 seed、多策略抓取实验尚未完成。
+
 ## 仓库结构
 
 ```text
@@ -120,6 +130,8 @@ test/                           # 静态契约检查与固定测试数据
 - [仿真基线与运行边界](docs/simulation.md)
 - [接口与话题契约](docs/interfaces.md)
 - [P5 实验协议](docs/p5_experiment_protocol.md)
+- [P7 抓取闭环仿真协议](docs/p7_attachment_assisted_grasp_protocol.md)
+- [P7 仿真临时验收（2026-08-31）](docs/p7_simulation_temporary_acceptance_2026-08-31.md)
 - [P6 仿真临时验收](docs/p6_simulation_temporary_acceptance.md)
 - [P6 真机现场运行手册](docs/p6_on_site_runbook.md)
 - [依赖、来源与复用规则](docs/dependencies.md)

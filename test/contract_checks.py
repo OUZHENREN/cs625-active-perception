@@ -22,8 +22,36 @@ EXPECTED_PACKAGES = {
     "cs625_motion_adapter",
     "cs625_view_evaluation",
     "cs625_experiment_tools",
+    "cs625_task_orchestrator",
 }
 GENERATED_DIRS = {"build", "install", "log", ".colcon"}
+GENERATED_EVIDENCE_DIR = pathlib.Path("docs/evidence")
+
+
+def is_generated_directory(directory: str) -> bool:
+    """Recognize standard colcon output roots, including named overlays.
+
+    A reproducible build may use an isolated ``build_<label>`` / ``install_<label>`` /
+    ``log_<label>`` triplet.  These generated directories must be excluded from
+    source-contract scans just like their unlabelled counterparts.
+    """
+    return directory in GENERATED_DIRS or any(
+        directory.startswith(f"{prefix}_") for prefix in ("build", "install", "log")
+    )
+
+
+def source_scan_directories(current_root: str, directories: list[str]) -> list[str]:
+    """Exclude build products and machine-written runtime evidence from source scans."""
+
+    retained = []
+    for directory in directories:
+        if is_generated_directory(directory) or directory == ".git":
+            continue
+        relative = (pathlib.Path(current_root) / directory).relative_to(ROOT)
+        if relative == GENERATED_EVIDENCE_DIR:
+            continue
+        retained.append(directory)
+    return retained
 
 
 def fail(message: str) -> None:
@@ -62,6 +90,7 @@ def main() -> int:
         src / "cs625_bringup" / "config" / "sim_gz_bridge.yaml",
         src / "cs625_bringup" / "config" / "moveit_sensors_3d.yaml",
         src / "cs625_bringup" / "config" / "sim_controllers.yaml",
+        src / "cs625_ap_description" / "urdf" / "cs625_parallel_gripper.xacro",
         ROOT / "scripts" / "bootstrap_humble.sh",
         ROOT / "scripts" / "build.sh",
         ROOT / "scripts" / "test.sh",
@@ -100,6 +129,10 @@ def main() -> int:
         src / "cs625_motion_adapter" / "cs625_motion_adapter" / "real_view_executor.py",
         src / "cs625_experiment_tools" / "cs625_experiment_tools" / "paired_experiment.py",
         src / "cs625_experiment_tools" / "cs625_experiment_tools" / "p4_matrix_summary.py",
+        src / "cs625_task_orchestrator" / "cs625_task_orchestrator" / "p7_episode_contract.py",
+        src / "cs625_task_orchestrator" / "cs625_task_orchestrator" / "p7_episode_recorder.py",
+        src / "cs625_task_orchestrator" / "cs625_task_orchestrator" / "p7_gripper_adapter.py",
+        src / "cs625_task_orchestrator" / "cs625_task_orchestrator" / "p7_attachment_adapter.py",
         ROOT / "docs" / "p5_experiment_protocol.md",
         ROOT / "docs" / "minimum_showcase_experiment.md",
         ROOT / "scripts" / "run_minimum_showcase_matrix.sh",
@@ -107,6 +140,10 @@ def main() -> int:
         ROOT / "docs" / "p6_on_site_runbook.md",
         ROOT / "test" / "data" / "p5_candidate_snapshot.json",
         ROOT / "test" / "data" / "p5_paired_experiment.json",
+        ROOT / "test" / "data" / "p7_smoke_evidence.yaml",
+        ROOT / "test" / "data" / "p7_smoke_evidence.json",
+        ROOT / "test" / "data" / "p7_gripper_close_command.json",
+        ROOT / "test" / "p7_attachment_smoke_publisher.py",
     ]
     for path in required_files:
         if not path.exists():
@@ -128,6 +165,7 @@ def main() -> int:
                 "cs625_motion_adapter",
                 "cs625_view_evaluation",
                 "cs625_experiment_tools",
+                "cs625_task_orchestrator",
             ) else "ament_cmake"
         )
         if build_type != expected_build_type:
@@ -434,6 +472,7 @@ def main() -> int:
         "EXECUTION_GATE_CLOSED",
         "FollowJointTrajectory",
         "SENSOR_SETTLED",
+        "trajectory_execution_time_sec",
         "_publish_status_with_replay",
         "ClockType.STEADY_TIME",
     ):
@@ -447,6 +486,8 @@ def main() -> int:
         "max_failed_attempts must be between 1 and 10",
         "NO_REACHABLE_AFTER_FAILURE",
         "view_records",
+        "replan_after_execution_failure_count",
+        "candidate_collision_rejection_rate",
         "_publish_selection_with_replay",
     ):
         if marker not in coordinator_source:
@@ -470,7 +511,7 @@ def main() -> int:
         or len(matrix_manifest["strategies"]) < 3
     ):
         fail("minimum showcase must register 3 scenes × 5 seeds × at least 3 baselines")
-    for marker in ("reachability_rate", "planning_time_sec_total", "motion_cost_total", "successful_observation_rate", "failure_codes"):
+    for marker in ("reachability_rate", "planning_time_sec_total", "motion_cost_total", "successful_observation_rate", "failure_codes", "episode_wall_time_sec", "replan_after_execution_failure_count", "candidate_collision_rejection_rate"):
         if marker not in p4_matrix_source:
             fail(f"P4 matrix export is missing metric: {marker}")
     for scene in matrix_manifest["scene_ids"]:
@@ -650,11 +691,7 @@ def main() -> int:
     for current_root, directories, filenames in os.walk(
         ROOT, topdown=True, onerror=lambda _error: None
     ):
-        directories[:] = [
-            directory
-            for directory in directories
-            if directory not in GENERATED_DIRS and directory != ".git"
-        ]
+        directories[:] = source_scan_directories(current_root, directories)
         for filename in filenames:
             path = pathlib.Path(current_root) / filename
             # The checker necessarily contains the literals it is validating.
@@ -674,11 +711,7 @@ def main() -> int:
     for current_root, directories, filenames in os.walk(
         ROOT, topdown=True, onerror=lambda _error: None
     ):
-        directories[:] = [
-            directory
-            for directory in directories
-            if directory not in GENERATED_DIRS and directory != ".git"
-        ]
+        directories[:] = source_scan_directories(current_root, directories)
         for filename in filenames:
             if not filename.endswith(".py"):
                 continue

@@ -1,0 +1,25 @@
+2026-08-31T23:36:57+08:00
+failure=ATTACHMENT_ADAPTER_SUBSCRIPTION_UNAVAILABLE
+--- nodes ---
+WARNING: Be aware that there are nodes in the graph that share an exact name, which can have unintended side effects.
+/clock_bridge
+/controller_manager
+/gripper_controller
+/gz_ros_control
+/joint_state_broadcaster
+/joint_trajectory_controller
+/move_group
+/move_group
+/move_group
+/move_group/move_group
+/move_group_private_101171800536160
+/robot_state_publisher
+/transform_listener_impl_5c03e5906890
+--- attachment command topic ---
+Unknown topic '/p7/attachment_command'
+--- attachment state topic ---
+Unknown topic '/p7/attachment/state'
+--- matching processes ---
+    441     329     441 /usr/bin/python3 /opt/ros/jazzy/bin/ros2 launch cs625_bringup sim_active_localization.launch.py strategy:=disabled launch_official_sim:=true launch_moveit:=false launch_fixture_world:=false headless:=true initial_positions_file:=/home/oy/cs625_p56_install/share/cs625_bringup/config/p7_safe_initial_positions.yaml initial_detach:=false initial_detach_topic:=/p7/attachment/detach world:=/tmp/p7_acceptance_20260831_r7_p7_ycb_tomato_light.sdf
+    887     329     887 /usr/bin/python3 /opt/ros/jazzy/bin/ros2 launch cs625_bringup sim_moveit.launch.py cs_type:=cs625 use_fake_hardware:=true launch_rviz:=false description_package:=cs625_ap_description description_file:=cs625_active_perception.urdf.xacro initial_positions_file:=/home/oy/cs625_p56_install/share/cs625_bringup/config/p7_safe_initial_positions.yaml semantic_package:=cs625_bringup semantic_file:=config/cs625_active_perception.srdf
+    896     887     887 /opt/ros/jazzy/lib/moveit_ros_move_group/move_group --ros-args -r __node:=move_group --params-file /tmp/launch_params_1tghq3f8 --params-file /tmp/launch_params_uavxqh8j

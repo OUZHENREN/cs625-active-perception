@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<!-- P7 attachment-assisted grasp fixture.  The tomato-can mesh is the
+     versioned official YCB Google-16k asset (metres), not a primitive proxy. -->
+<sdf version="1.9">
+  <world name="p7_ycb_tomato_light">
+    <physics name="p7_physics" type="ignored">
+      <max_step_size>0.001</max_step_size><real_time_factor>1.0</real_time_factor>
+    </physics>
+    <plugin filename="ignition-gazebo-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="ignition-gazebo-sensors-system" name="gz::sim::systems::Sensors"><render_engine>ogre2</render_engine></plugin>
+    <plugin filename="ignition-gazebo-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="ignition-gazebo-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <light type="directional" name="sun"><pose>0 0 5 0 0 0</pose><diffuse>0.8 0.8 0.8 1</diffuse><specular>0.2 0.2 0.2 1</specular><direction>-0.5 0.1 -0.9</direction></light>
+
+    <!-- The robot base and target poses use z=0 as the support surface.  A
+         0.1 m box must therefore be centred at z=-0.05; leaving it at the
+         origin embeds both fixtures 50 mm into a static collision body. -->
+    <model name="ground_plane"><static>true</static><pose>0 0 -0.05 0 0 0</pose><link name="link"><collision name="collision"><geometry><box><size>10 10 0.1</size></box></geometry></collision><visual name="visual"><geometry><box><size>10 10 0.1</size></box></geometry></visual></link></model>
+    <!-- Keep a reproducible visual occluder without allowing it to touch the
+         target during its gravity-settling phase. -->
+    <model name="occluder"><static>true</static><pose>0.60 0.30 0.22 0 0 0.18</pose><link name="link"><collision name="collision"><geometry><box><size>0.10 0.18 0.44</size></box></geometry></collision><visual name="visual"><geometry><box><size>0.10 0.18 0.44</size></box></geometry><material><diffuse>0.38 0.38 0.38 1</diffuse></material></visual></link></model>
+
+    <model name="target_object">
+      <!-- The Google-16k mesh origin is near its bottom, so start just above
+           the ground contact plane instead of dropping it through a long
+           settling transient. -->
+      <pose>0.72 0 0.005 0 0 0</pose>
+      <static>false</static>
+      <link name="target_link">
+        <!-- AABB centre of the versioned YCB mesh: (-0.0091685, 0.0840170,
+             0.0510065) m.  Inertia is expressed about this centre. -->
+        <inertial><pose>-0.0091685 0.0840170 0.0510065 0 0 0</pose><mass>0.349</mass><inertia><ixx>0.000435190</ixx><iyy>0.000435853</iyy><izz>0.000267596</izz><ixy>0</ixy><ixz>0</ixz><iyz>0</iyz></inertia></inertial>
+        <!-- DART in the installed Harmonic build cannot create a mesh
+             collision shape from SDF.  Preserve the official mesh for
+             rendering; use a conservative, explicitly named cylinder proxy
+             for gravity/contact only.  This cannot be reported as mesh-level
+             physical-contact validation. -->
+        <collision name="ycb_contact_proxy_cylinder">
+          <pose>-0.0091685 0.0840170 0.0510065 0 0 0</pose>
+          <geometry><cylinder><radius>0.0340</radius><length>0.101855</length></cylinder></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <!-- Ogre2 in the frozen Harmonic runtime did not render the DAE in
+             P7.1 r3/r4.  Use the OBJ from the same versioned official
+             Google-16k archive; its MTL references the same texture map. -->
+        <visual name="ycb_visual"><geometry><mesh><uri>model://ycb/005_tomato_soup_can/google_16k/textured.obj</uri></mesh></geometry></visual>
+      </link>
+    </model>
+  </world>
+</sdf>

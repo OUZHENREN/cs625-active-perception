@@ -1,0 +1,59 @@
+{
+  "capture_schema": "p7_preflight_v1",
+  "captured_at_utc": "2026-08-31T15:34:32.411137+00:00",
+  "clock_regression_count": 0,
+  "clock_sample_count": 148,
+  "controllers": {
+    "gripper_controller": {
+      "state": "active",
+      "type": "forward_command_controller/ForwardCommandController"
+    },
+    "joint_state_broadcaster": {
+      "state": "active",
+      "type": "joint_state_broadcaster/JointStateBroadcaster"
+    },
+    "joint_trajectory_controller": {
+      "state": "active",
+      "type": "joint_trajectory_controller/JointTrajectoryController"
+    }
+  },
+  "expected_joint_positions_rad": {
+    "elbow_joint": 0.0,
+    "shoulder_lift_joint": -0.35,
+    "shoulder_pan_joint": 0.0,
+    "wrist_1_joint": 0.05,
+    "wrist_2_joint": 0.0,
+    "wrist_3_joint": 0.0
+  },
+  "failure_codes": [],
+  "inactive_controllers": [],
+  "initial_positions_file": "/home/oy/cs625_p56_install/share/cs625_bringup/config/p7_safe_initial_positions.yaml",
+  "joint_errors_rad": {
+    "elbow_joint": 1.7074452175185435e-11,
+    "shoulder_lift_joint": 1.2344014699294803e-12,
+    "shoulder_pan_joint": 2.0949665884436747e-20,
+    "wrist_1_joint": 5.026102520289122e-10,
+    "wrist_2_joint": 8.669260775559877e-13,
+    "wrist_3_joint": 5.249413171284203e-10
+  },
+  "joint_tolerance_rad": 0.002,
+  "observed_joint_positions_rad": {
+    "elbow_joint": -1.7074452175185435e-11,
+    "shoulder_lift_joint": -0.3500000000012344,
+    "shoulder_pan_joint": -2.0949665884436747e-20,
+    "wrist_1_joint": 0.04999999949738975,
+    "wrist_2_joint": 8.669260775559877e-13,
+    "wrist_3_joint": -5.249413171284203e-10
+  },
+  "required_controllers": [
+    "gripper_controller",
+    "joint_state_broadcaster",
+    "joint_trajectory_controller"
+  ],
+  "runtime": {
+    "gz_partition": "p7_acceptance_20260831_r7",
+    "ign_partition": "p7_acceptance_20260831_r7",
+    "ros_domain_id": "82"
+  },
+  "success": true
+}

@@ -7,6 +7,8 @@ the transient-local robot_description topic, and controllers are spawned only
 after entity creation succeeds.
 """
 
+import os
+
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
@@ -43,6 +45,9 @@ def _compose(context):
             LaunchConfiguration("controllers_file"),
         ]
     )
+    attachment_enabled = os.getenv("CS625_P7_ATTACHMENT_ENABLED", "true").lower()
+    if attachment_enabled not in ("true", "false"):
+        raise ValueError("CS625_P7_ATTACHMENT_ENABLED must be true or false")
     robot_description_content = Command(
         [
             FindExecutable(name="xacro"),
@@ -71,6 +76,9 @@ def _compose(context):
             "simulation_controllers:=",
             controllers_path,
             " ",
+            "initial_positions_file:=",
+            LaunchConfiguration("initial_positions_file"),
+            " ",
             "camera_image_width:=",
             LaunchConfiguration("camera_image_width"),
             " ",
@@ -82,6 +90,9 @@ def _compose(context):
             " ",
             "camera_enabled:=",
             LaunchConfiguration("camera_enabled"),
+            " ",
+            "p7_attachment_enabled:=",
+            attachment_enabled,
         ]
     )
     gazebo_model_path = LaunchConfiguration("gazebo_model_file")
@@ -178,6 +189,8 @@ def _compose(context):
             "sim_ignition:=true",
             "simulation_controllers:=",
             controllers_path,
+            "initial_positions_file:=",
+            LaunchConfiguration("initial_positions_file"),
             "camera_image_width:=",
             LaunchConfiguration("camera_image_width"),
             "camera_image_height:=",
@@ -186,6 +199,8 @@ def _compose(context):
             LaunchConfiguration("camera_update_rate"),
             "camera_enabled:=",
             LaunchConfiguration("camera_enabled"),
+            "p7_attachment_enabled:=",
+            attachment_enabled,
         ],
         output="screen",
     )
@@ -223,21 +238,74 @@ def _compose(context):
         ],
         output="screen",
     )
+    gripper_spawner = Node(
+        package="controller_manager",
+        executable="spawner",
+        name="spawner_gripper_controller",
+        arguments=[
+            "gripper_controller",
+            "-c",
+            "/controller_manager",
+            "--controller-manager-timeout",
+            LaunchConfiguration("controller_manager_timeout"),
+            "--switch-timeout",
+            LaunchConfiguration("controller_switch_timeout"),
+            "--service-call-timeout",
+            LaunchConfiguration("controller_service_call_timeout"),
+        ],
+        output="screen",
+    )
 
     start_spawn_after_model_prepared = RegisterEventHandler(
         OnProcessExit(target_action=prepare_gazebo_model, on_exit=[spawn_robot])
     )
     # ``ros_gz_sim create`` returns as soon as the entity request is accepted.
-    # In Harmonic on WSL, gz_ros2_control exposes the model only a few render
-    # iterations later; spawning controllers immediately races that setup and
-    # yields "No state interfaces found".  Give the control plugin a bounded
-    # settling interval before querying its interfaces.
+    # RSP starts at t=7 s below; the controller manager only becomes fully
+    # configurable after it receives that robot_description and initializes
+    # its resource manager.  Its services exist earlier, so the spawner's own
+    # service wait is not a readiness test.  Start controllers at t=12 s to
+    # avoid the observed "already loaded / failed to configure" race.
     start_joint_state_after_spawn = RegisterEventHandler(
         OnProcessExit(
             target_action=spawn_robot,
-            on_exit=[TimerAction(period=5.0, actions=[joint_state_spawner])],
+            on_exit=[TimerAction(period=12.0, actions=[joint_state_spawner])],
         )
     )
+    initial_detach_enabled = (
+        LaunchConfiguration("initial_detach").perform(context).lower()
+        in ("1", "true", "yes", "on")
+    )
+    if initial_detach_enabled:
+        initial_detach_topic = LaunchConfiguration("initial_detach_topic").perform(context)
+        if not initial_detach_topic.startswith("/"):
+            raise ValueError(
+                "initial_detach_topic must be an absolute Gazebo transport topic"
+            )
+        detach_process = ExecuteProcess(
+            cmd=[
+                FindExecutable(name="gz"),
+                "topic",
+                "-t",
+                initial_detach_topic,
+                "-m",
+                "gz.msgs.Empty",
+                "-p",
+                "unused: true",
+            ],
+            output="screen",
+        )
+        # DetachableJoint is attached by default in Gazebo Harmonic.  Its
+        # transport subscriber is created a few seconds after entity creation,
+        # so publish at t=9 s (after RSP and plugin setup, before controllers)
+        # rather than immediately after ``create`` exits.
+        actions.append(
+            RegisterEventHandler(
+                OnProcessExit(
+                    target_action=spawn_robot,
+                    on_exit=[TimerAction(period=9.0, actions=[detach_process])],
+                )
+            )
+        )
     # Gazebo's control plugin can also subscribe to /robot_description.  The
     # full RSP description is deliberately suitable for MoveIt and may contain
     # a non-Gazebo mock hardware stanza, while the generated model passed to
@@ -253,7 +321,7 @@ def _compose(context):
         )
     )
     start_trajectory_after_joint_state = RegisterEventHandler(
-        OnProcessExit(target_action=joint_state_spawner, on_exit=[trajectory_spawner])
+        OnProcessExit(target_action=joint_state_spawner, on_exit=[trajectory_spawner, gripper_spawner])
     )
     # Register handlers before their target processes can exit.
     return actions + [
@@ -279,6 +347,27 @@ def generate_launch_description():
             DeclareLaunchArgument("controllers_file", default_value="sim_controllers.yaml"),
             DeclareLaunchArgument("description_package", default_value="cs625_ap_description"),
             DeclareLaunchArgument("description_file", default_value="cs625_active_perception.urdf.xacro"),
+            DeclareLaunchArgument(
+                "initial_positions_file",
+                default_value=PathJoinSubstitution(
+                    [
+                        FindPackageShare("eli_cs_robot_description"),
+                        "config",
+                        "initial_positions.yaml",
+                    ]
+                ),
+                description="Joint positions used when Gazebo initializes ros2_control.",
+            ),
+            DeclareLaunchArgument(
+                "initial_detach",
+                default_value="false",
+                description="Publish one Gazebo DetachableJoint detach command after robot spawn.",
+            ),
+            DeclareLaunchArgument(
+                "initial_detach_topic",
+                default_value="/p7/attachment/detach",
+                description="Absolute Gazebo transport topic used by initial_detach.",
+            ),
             DeclareLaunchArgument("world_file", default_value="empty.sdf"),
             DeclareLaunchArgument("headless", default_value="true"),
             DeclareLaunchArgument(

@@ -1,0 +1,493 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="cs625">
+  
+  
+  <link name="world" />
+  <ros2_control name="cs" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+    <joint name="shoulder_pan_joint">
+      <command_interface name="position" />
+      <command_interface name="velocity" />
+      <state_interface name="position">
+        
+        <param name="initial_value">0.05455765903</param>
+      </state_interface>
+      <state_interface name="velocity" />
+      <state_interface name="effort" />
+    </joint>
+    <joint name="shoulder_lift_joint">
+      <command_interface name="position" />
+      <command_interface name="velocity" />
+      <state_interface name="position">
+        
+        <param name="initial_value">1.108876761951</param>
+      </state_interface>
+      <state_interface name="velocity" />
+      <state_interface name="effort" />
+    </joint>
+    <joint name="elbow_joint">
+      <command_interface name="position" />
+      <command_interface name="velocity" />
+      <state_interface name="position">
+        
+        <param name="initial_value">2.452457211538</param>
+      </state_interface>
+      <state_interface name="velocity" />
+      <state_interface name="effort" />
+    </joint>
+    <joint name="wrist_1_joint">
+      <command_interface name="position" />
+      <command_interface name="velocity" />
+      <state_interface name="position">
+        
+        <param name="initial_value">-1.895614420889</param>
+      </state_interface>
+      <state_interface name="velocity" />
+      <state_interface name="effort" />
+    </joint>
+    <joint name="wrist_2_joint">
+      <command_interface name="position" />
+      <command_interface name="velocity" />
+      <state_interface name="position">
+        
+        <param name="initial_value">-1.512710623701</param>
+      </state_interface>
+      <state_interface name="velocity" />
+      <state_interface name="effort" />
+    </joint>
+    <joint name="wrist_3_joint">
+      <command_interface name="position" />
+      <command_interface name="velocity" />
+      <state_interface name="position">
+        
+        <param name="initial_value">-1.023236708061</param>
+      </state_interface>
+      <state_interface name="velocity" />
+      <state_interface name="effort" />
+    </joint>
+  </ros2_control>
+  
+  
+  
+  
+  <link name="base_link" />
+  <link name="base_link_inertia">
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="file://${CS625_UNDERLAY_INSTALL}/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/base.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="1.50561968754018" />
+      <origin rpy="0 0 0" xyz="-2.4008693014781e-05 0.00117748953656619 0.0762927770474629" />
+      <inertia ixx="0.00678289120631133" ixy="2.67618063769984e-07" ixz="-2.56895564177072e-06" iyy="0.00685230321535615" iyz="9.42628790478668e-05" izz="0.0100437671447022" />
+    </inertial>
+  </link>
+  <link name="shoulder_link">
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="file://${CS625_UNDERLAY_INSTALL}/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/shoulder.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="17.04" />
+      <origin rpy="0 0 0" xyz="9.9e-05 -0.026311 -0.026723" />
+      <inertia ixx="0.13029" ixy="-8.271e-05" ixz="0.0001067" iyy="0.085215" iyz="-0.00066335" izz="0.11386" />
+    </inertial>
+  </link>
+  <link name="upperarm_link">
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="file://${CS625_UNDERLAY_INSTALL}/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/upperarm.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="26.543" />
+      <origin rpy="0 0 0" xyz="-0.27762 -1.7e-05 0.20184" />
+      <inertia ixx="1.197" ixy="-0.00083272" ixz="-1.5396" iyy="6.1117" iyz="-0.00015496" izz="5.022" />
+    </inertial>
+  </link>
+  <link name="forearm_link">
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="file://${CS625_UNDERLAY_INSTALL}/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/forearm.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="7.816" />
+      <origin rpy="0 0 0" xyz="-0.30259 2.1e-05 0.07237" />
+      <inertia ixx="0.067797" ixy="4.4997e-05" ixz="-0.12636" iyy="1.3409" iyz="1.45e-05" izz="1.2908" />
+    </inertial>
+  </link>
+  <link name="wrist_1_link">
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="file://${CS625_UNDERLAY_INSTALL}/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/wrist1.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="3.095" />
+      <origin rpy="0 0 0" xyz="-3.7e-05 -0.01051 -0.014865" />
+      <inertia ixx="0.0079584" ixy="-3.024e-06" ixz="5.734e-06" iyy="0.0066863" iyz="1.766e-05" izz="0.0048407" />
+    </inertial>
+  </link>
+  <link name="wrist_2_link">
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="file://${CS625_UNDERLAY_INSTALL}/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/wrist2.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="3.095" />
+      <origin rpy="0 0 0" xyz="3.7e-05 0.01051 -0.014865" />
+      <inertia ixx="0.007958413" ixy="-3.024e-06" ixz="5.734e-06" iyy="0.006686348" iyz="1.766e-05" izz="0.004840671" />
+    </inertial>
+  </link>
+  <link name="wrist_3_link">
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <geometry>
+        <mesh filename="file://${CS625_UNDERLAY_INSTALL}/eli_cs_robot_description/share/eli_cs_robot_description/meshes/cs625/collision/wrist3.stl" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.879" />
+      <origin rpy="0 0 0" xyz="0.000242 -0.001192 -0.050422" />
+      <inertia ixx="0.004065851" ixy="1.5185e-05" ixz="-1.1453e-05" iyy="0.004060372" iyz="4.2152e-05" izz="0.001170392" />
+    </inertial>
+  </link>
+  
+  <joint name="base_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="world" />
+    <child link="base_link" />
+  </joint>
+  
+  <joint name="base_link-base_link_inertia" type="fixed">
+    <parent link="base_link" />
+    <child link="base_link_inertia" />
+    <origin rpy="0 0 0" xyz="0 0 0" />
+  </joint>
+  <joint name="shoulder_pan_joint" type="revolute">
+    <parent link="base_link_inertia" />
+    <child link="shoulder_link" />
+    <origin rpy="0 0 0" xyz="0 0 0.231007" />
+    <axis xyz="0 0 1" />
+    <limit effort="730.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="2.0943951023931953" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <joint name="shoulder_lift_joint" type="revolute">
+    <parent link="shoulder_link" />
+    <child link="upperarm_link" />
+    <origin rpy="1.5707999 0 0" xyz="0 0 0" />
+    <axis xyz="0 0 1" />
+    <limit effort="730.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="2.0943951023931953" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <joint name="elbow_joint" type="revolute">
+    <parent link="upperarm_link" />
+    <child link="forearm_link" />
+    <origin rpy="0 0 0" xyz="-0.750517 0 0" />
+    <axis xyz="0 0 1" />
+    <limit effort="430.0" lower="-3.141592653589793" upper="3.141592653589793" velocity="2.6179938779914944" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <joint name="wrist_1_joint" type="revolute">
+    <parent link="forearm_link" />
+    <child link="wrist_1_link" />
+    <origin rpy="0 0 0" xyz="-0.623098 0 0.171144" />
+    <axis xyz="0 0 1" />
+    <limit effort="100.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.6651914291880923" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <joint name="wrist_2_joint" type="revolute">
+    <parent link="wrist_1_link" />
+    <child link="wrist_2_link" />
+    <origin rpy="1.5707999 0 0" xyz="0 -0.127906 0" />
+    <axis xyz="0 0 1" />
+    <limit effort="100.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.6651914291880923" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <joint name="wrist_3_joint" type="revolute">
+    <parent link="wrist_2_link" />
+    <child link="wrist_3_link" />
+    <origin rpy="-1.5707999 0 0" xyz="0 0.127478 0" />
+    <axis xyz="0 0 1" />
+    <limit effort="100.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.6651914291880923" />
+    <dynamics damping="0" friction="0" />
+  </joint>
+  <link name="ft_frame" />
+  <joint name="wrist_3_link-ft_frame" type="fixed">
+    <parent link="wrist_3_link" />
+    <child link="ft_frame" />
+    <origin rpy="0 0 0" xyz="0 0 0" />
+  </joint>
+  
+  <link name="base" />
+  <joint name="base_link-base_fixed_joint" type="fixed">
+    <origin rpy="0 0 0" xyz="0 0 0" />
+    <parent link="base_link" />
+    <child link="base" />
+  </joint>
+  
+  <link name="flange" />
+  <joint name="wrist_3-flange" type="fixed">
+    <parent link="wrist_3_link" />
+    <child link="flange" />
+    <origin rpy="0 0 0" xyz="0 0 0" />
+  </joint>
+  
+  <gazebo reference="world" />
+  <gazebo>
+    
+    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+      <robot_param>robot_description</robot_param>
+      <robot_param_node>robot_state_publisher</robot_param_node>
+      <parameters>${CS625_APP_INSTALL}/share/cs625_bringup/config/sim_controllers.yaml</parameters>
+      
+      <position_proportional_gain>0.5</position_proportional_gain>
+      <controller_manager_name>controller_manager</controller_manager_name>
+    </plugin>
+  </gazebo>
+  
+  <gazebo reference="base_link">
+    <gravity>false</gravity>
+  </gazebo>
+  <gazebo reference="shoulder_link">
+    <gravity>false</gravity>
+  </gazebo>
+  <gazebo reference="upperarm_link">
+    <gravity>false</gravity>
+  </gazebo>
+  <gazebo reference="forearm_link">
+    <gravity>false</gravity>
+  </gazebo>
+  <gazebo reference="wrist_1_link">
+    <gravity>false</gravity>
+  </gazebo>
+  <gazebo reference="wrist_2_link">
+    <gravity>false</gravity>
+  </gazebo>
+  <gazebo reference="wrist_3_link">
+    <gravity>false</gravity>
+  </gazebo>
+  <gazebo reference="my_end_effector_link">
+    <gravity>false</gravity>
+  </gazebo>
+  <gazebo reference="gripper_base_link">
+    <gravity>false</gravity>
+  </gazebo>
+  <gazebo reference="gripper_left_finger_link">
+    <gravity>false</gravity>
+  </gazebo>
+  <gazebo reference="gripper_right_finger_link">
+    <gravity>false</gravity>
+  </gazebo>
+  
+  <link name="my_end_effector_link">
+    <collision>
+      <geometry>
+        <mesh filename="file://${CS625_UNDERLAY_INSTALL}/eli_cs_robot_description/share/eli_cs_robot_description/meshes/visual/tool0_collision.STL" scale="0.001 0.001 0.001" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="flange_to_eef_joint" type="fixed">
+    <parent link="flange" />
+    <child link="my_end_effector_link" />
+    <origin rpy="0 0 0" xyz="-0.046 0 0.353" />
+  </joint>
+  
+  <link name="tool0" />
+  <joint name="eef_to_tool0" type="fixed">
+    <parent link="my_end_effector_link" />
+    <child link="tool0" />
+    <origin rpy="0 0 0" xyz="0 0 0" />
+  </joint>
+  <link name="gripper_base_link">
+    <visual>
+      <geometry>
+        <box size="0.080 0.090 0.050" />
+      </geometry>
+      <material name="gripper_dark">
+        <color rgba="0.18 0.18 0.18 1" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.080 0.090 0.050" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.25" />
+      <inertia ixx="0.00020" ixy="0" ixz="0" iyy="0.00017" iyz="0" izz="0.00028" />
+    </inertial>
+  </link>
+  <joint name="tool0_to_gripper_base" type="fixed">
+    <parent link="tool0" />
+    <child link="gripper_base_link" />
+    <origin rpy="0 0 0" xyz="0.085 0 0" />
+  </joint>
+  <link name="gripper_right_finger_link">
+    <visual>
+      <origin xyz="0.045 0 0" />
+      <geometry>
+        <box size="0.090 0.014 0.070" />
+      </geometry>
+      <material name="gripper_finger">
+        <color rgba="0.32 0.32 0.32 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.045 0 0" />
+      <geometry>
+        <box size="0.090 0.014 0.070" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.045 0 0" />
+      <mass value="0.04" />
+      <inertia ixx="0.00002" ixy="0" ixz="0" iyy="0.00003" iyz="0" izz="0.00003" />
+    </inertial>
+  </link>
+  <joint name="gripper_right_finger_joint" type="prismatic">
+    <parent link="gripper_base_link" />
+    <child link="gripper_right_finger_link" />
+    <origin rpy="0 0 0" xyz="0.005 -0.018 0" />
+    <axis xyz="0 -1 0" />
+    <limit effort="80" lower="0.0" upper="0.040" velocity="0.10" />
+  </joint>
+  <link name="gripper_left_finger_link">
+    <visual>
+      <origin xyz="0.045 0 0" />
+      <geometry>
+        <box size="0.090 0.014 0.070" />
+      </geometry>
+      <material name="gripper_finger_left">
+        <color rgba="0.32 0.32 0.32 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0.045 0 0" />
+      <geometry>
+        <box size="0.090 0.014 0.070" />
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.045 0 0" />
+      <mass value="0.04" />
+      <inertia ixx="0.00002" ixy="0" ixz="0" iyy="0.00003" iyz="0" izz="0.00003" />
+    </inertial>
+  </link>
+  <joint name="gripper_left_finger_joint" type="prismatic">
+    <parent link="gripper_base_link" />
+    <child link="gripper_left_finger_link" />
+    <origin rpy="0 0 0" xyz="0.005 0.018 0" />
+    <axis xyz="0 1 0" />
+    <mimic joint="gripper_right_finger_joint" multiplier="1.0" offset="0.0" />
+    <limit effort="80" lower="0.0" upper="0.040" velocity="0.10" />
+  </joint>
+  <ros2_control name="cs625_parallel_gripper" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+    <joint name="gripper_right_finger_joint">
+      <command_interface name="position" />
+      <state_interface name="position">
+        <param name="initial_value">0.030</param>
+      </state_interface>
+      <state_interface name="velocity" />
+      <state_interface name="effort" />
+    </joint>
+    <joint name="gripper_left_finger_joint">
+      <state_interface name="position" />
+      <state_interface name="velocity" />
+      <state_interface name="effort" />
+    </joint>
+  </ros2_control>
+  
+  <link name="p7_grasp_center_link" />
+  <joint name="gripper_base_to_p7_grasp_center" type="fixed">
+    <parent link="gripper_base_link" />
+    <child link="p7_grasp_center_link" />
+    <origin rpy="0 0 0" xyz="0.080 0 0" />
+  </joint>
+  <link name="camera_mount_link">
+    <inertial>
+      <mass value="0.01" />
+      <origin rpy="0 0 0" xyz="0 0 0" />
+      <inertia ixx="0.000001" ixy="0" ixz="0" iyy="0.000001" iyz="0" izz="0.000001" />
+    </inertial>
+  </link>
+  <joint name="tool0_to_camera_mount" type="fixed">
+    <parent link="tool0" />
+    <child link="camera_mount_link" />
+    <origin rpy="0 0.785398163397 0" xyz="0.03 0 0.15" />
+  </joint>
+  <link name="camera_link">
+    <visual>
+      <geometry>
+        <box size="0.03 0.05 0.02" />
+      </geometry>
+      <material name="camera_body">
+        <color rgba="0.20 0.20 0.20 1.0" />
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.03 0.05 0.02" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.05" />
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001" />
+    </inertial>
+  </link>
+  <joint name="camera_mount_to_camera" type="fixed">
+    <parent link="camera_mount_link" />
+    <child link="camera_link" />
+    <origin rpy="0 0 0" xyz="0 0 0" />
+  </joint>
+  <link name="camera_depth_optical_frame" />
+  <joint name="camera_to_depth_optical" type="fixed">
+    <parent link="camera_link" />
+    <child link="camera_depth_optical_frame" />
+    <origin rpy="-1.570796326795 0 -1.570796326795" xyz="0 0 0" />
+  </joint>
+  
+  <link name="camera_color_optical_frame" />
+  <joint name="camera_to_color_optical" type="fixed">
+    <parent link="camera_link" />
+    <child link="camera_color_optical_frame" />
+    <origin rpy="-1.570796326795 0 -1.570796326795" xyz="0 0 0" />
+  </joint>
+  <gazebo reference="camera_link">
+    <sensor name="camera_sensor" type="rgbd_camera">
+      <pose>0 0 0 0 0 0</pose>
+      <always_on>1</always_on>
+      <update_rate>10.0</update_rate>
+      <visualize>false</visualize>
+      <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image>
+          <width>320</width>
+          <height>240</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>5.0</far>
+        </clip>
+        <optical_frame_id>camera_depth_optical_frame</optical_frame_id>
+      </camera>
+      <topic>/camera</topic>
+    </sensor>
+  </gazebo>
+</robot>

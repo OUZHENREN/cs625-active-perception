@@ -2,6 +2,9 @@
 build/
 install/
 log/
+build_*/
+install_*/
+log_*/
 .colcon/
 
 # ROS runtime and bags
@@ -18,8 +21,13 @@ __pycache__/
 .vscode/
 .idea/
 
+# Large generated simulation evidence. Commit summaries, JSON/CSV receipts and
+# figures explicitly; keep raw captured frames and arrays in local archives.
+docs/evidence/**/*.cdr
+docs/evidence/**/*.npy
+docs/evidence/**/*.ppm
+
 # Local secrets and machine-specific configuration
 *.local.yaml
 *.local.yml
 *.secret
-

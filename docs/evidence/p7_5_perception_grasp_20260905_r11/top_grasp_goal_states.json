@@ -1,0 +1,1600 @@
+{
+  "schema": "p7_pregrasp_branch_selection_v1",
+  "success": false,
+  "motion_commanded": false,
+  "records": [
+    {
+      "candidate_id": "tomato_historical_r5",
+      "position_m": [
+        0.7113133181155422,
+        0.08281617038442404,
+        0.0509275
+      ],
+      "orientation_xyzw": [
+        0.6131674654867538,
+        0.7802972509927206,
+        -0.07608041669435832,
+        0.09681750646121179
+      ],
+      "ik_success": true,
+      "planning_success": false,
+      "ik_error_code": 1,
+      "joint_bounds_from_active_moveit_urdf": {
+        "shoulder_pan_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "shoulder_lift_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "elbow_joint": [
+          -2.991592653589793,
+          2.991592653589793
+        ],
+        "wrist_1_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_2_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_3_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ]
+      },
+      "raw_ik_joint_positions_rad": {
+        "shoulder_pan_joint": 0.3601355129940606,
+        "shoulder_lift_joint": -3.5492120612527303,
+        "elbow_joint": 1.7617755874151693,
+        "wrist_1_joint": 0.18612495761355796,
+        "wrist_2_joint": -1.3257536284695495,
+        "wrist_3_joint": 0.12515411705629334,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "bounded_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -5.923049794185526,
+        "shoulder_lift_joint": -3.5492120612527303,
+        "elbow_joint": 1.7617755874151693,
+        "wrist_1_joint": -6.0970603495660285,
+        "wrist_2_joint": -1.3257536284695495,
+        "wrist_3_joint": 0.12515411705629334,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "requested_physical_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.0509275
+        },
+        "orientation": {
+          "x": 0.6131674654867538,
+          "y": 0.7802972509927206,
+          "z": -0.07608041669435832,
+          "w": 0.09681750646121179
+        }
+      },
+      "requested_tip_pose": {
+        "position": {
+          "x": 0.7491484879202329,
+          "y": -0.07264253020483732,
+          "z": 0.09125233523771209
+        },
+        "orientation": {
+          "x": 0.6131674654867538,
+          "y": 0.7802972509927206,
+          "z": -0.07608041669435832,
+          "w": 0.09681750646121179
+        }
+      },
+      "physical_to_tip_tf": {
+        "position": {
+          "x": -0.165,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "orientation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        }
+      },
+      "fk_poses": [
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113133037805752,
+              "y": 0.082816163834991,
+              "z": 0.05092754173446992
+            },
+            "orientation": {
+              "x": 0.6131674682486624,
+              "y": 0.780297245832122,
+              "z": -0.07608042842544169,
+              "w": 0.09681752134263498
+            }
+          }
+        },
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7491484715166311,
+              "y": -0.07264253567280733,
+              "z": 0.09125238308231125
+            },
+            "orientation": {
+              "x": 0.6131674682486624,
+              "y": 0.780297245832122,
+              "z": -0.07608042842544169,
+              "w": 0.09681752134263498
+            }
+          }
+        }
+      ],
+      "ik_physical_fk_position_error_m": 4.4611123404272253e-08,
+      "ik_physical_fk_orientation_error_rad": 4.2146848510894035e-08,
+      "state_valid": false,
+      "state_contacts": [
+        "camera_link<->p7_ground",
+        "forearm_link<->p7_ground",
+        "gripper_base_link<->p7_occluder",
+        "gripper_base_link<->p7_target_contact_proxy",
+        "gripper_right_finger_link<->p7_occluder",
+        "gripper_right_finger_link<->upperarm_link",
+        "p7_ground<->upperarm_link",
+        "p7_occluder<->upperarm_link",
+        "p7_target_contact_proxy<->upperarm_link"
+      ]
+    },
+    {
+      "candidate_id": "tomato_tool_x_standoff_1",
+      "position_m": [
+        0.7113133181155422,
+        0.08281617038442404,
+        0.0509275
+      ],
+      "orientation_xyzw": [
+        0.6131674654867538,
+        0.7802972509927206,
+        -0.07608041669435832,
+        0.09681750646121179
+      ],
+      "ik_success": true,
+      "planning_success": false,
+      "ik_error_code": 1,
+      "joint_bounds_from_active_moveit_urdf": {
+        "shoulder_pan_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "shoulder_lift_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "elbow_joint": [
+          -2.991592653589793,
+          2.991592653589793
+        ],
+        "wrist_1_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_2_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_3_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ]
+      },
+      "raw_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -5.923049840658043,
+        "shoulder_lift_joint": -1.7182499044045099,
+        "elbow_joint": -2.1707820871290653,
+        "wrist_1_joint": 5.429318728652742,
+        "wrist_2_joint": 1.3257536658817615,
+        "wrist_3_joint": 3.266752290588935,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "bounded_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -5.923049840658043,
+        "shoulder_lift_joint": -1.7182499044045099,
+        "elbow_joint": -2.1707820871290653,
+        "wrist_1_joint": -0.8538665785268442,
+        "wrist_2_joint": 1.3257536658817615,
+        "wrist_3_joint": 3.266752290588935,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "requested_physical_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.0509275
+        },
+        "orientation": {
+          "x": 0.6131674654867538,
+          "y": 0.7802972509927206,
+          "z": -0.07608041669435832,
+          "w": 0.09681750646121179
+        }
+      },
+      "requested_tip_pose": {
+        "position": {
+          "x": 0.7491484879202329,
+          "y": -0.07264253020483732,
+          "z": 0.09125233523771209
+        },
+        "orientation": {
+          "x": 0.6131674654867538,
+          "y": 0.7802972509927206,
+          "z": -0.07608041669435832,
+          "w": 0.09681750646121179
+        }
+      },
+      "physical_to_tip_tf": {
+        "position": {
+          "x": -0.165,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "orientation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        }
+      },
+      "fk_poses": [
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113133030979741,
+              "y": 0.08281614976676882,
+              "z": 0.05092751761288014
+            },
+            "orientation": {
+              "x": 0.6131674659013836,
+              "y": 0.7802972507763374,
+              "z": -0.07608041534778764,
+              "w": 0.09681750663734799
+            }
+          }
+        },
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7491484727236128,
+              "y": -0.07264255092407529,
+              "z": 0.0912523526269713
+            },
+            "orientation": {
+              "x": 0.6131674659013836,
+              "y": 0.7802972507763374,
+              "z": -0.07608041534778764,
+              "w": 0.09681750663734799
+            }
+          }
+        }
+      ],
+      "ik_physical_fk_position_error_m": 3.0997235435950886e-08,
+      "ik_physical_fk_orientation_error_rad": 2.9802322387695312e-08,
+      "state_valid": false,
+      "state_contacts": [
+        "camera_link<->p7_ground",
+        "gripper_base_link<->p7_occluder",
+        "gripper_base_link<->p7_target_contact_proxy",
+        "gripper_right_finger_link<->p7_occluder"
+      ]
+    },
+    {
+      "candidate_id": "tomato_tool_x_standoff_2",
+      "position_m": [
+        0.7113133181155422,
+        0.08281617038442404,
+        0.0509275
+      ],
+      "orientation_xyzw": [
+        0.6131674654867538,
+        0.7802972509927206,
+        -0.07608041669435832,
+        0.09681750646121179
+      ],
+      "ik_success": false,
+      "planning_success": false,
+      "ik_error_code": -31
+    },
+    {
+      "candidate_id": "tomato_top_yaw180_standoff_1",
+      "position_m": [
+        0.7113133181155422,
+        0.08281617038442404,
+        0.0809275
+      ],
+      "orientation_xyzw": [
+        -0.7070798567270162,
+        -0.006170592427165293,
+        0.7070798567270162,
+        -0.006170592427165293
+      ],
+      "ik_success": true,
+      "planning_success": false,
+      "ik_error_code": 1,
+      "joint_bounds_from_active_moveit_urdf": {
+        "shoulder_pan_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "shoulder_lift_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "elbow_joint": [
+          -2.991592653589793,
+          2.991592653589793
+        ],
+        "wrist_1_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_2_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_3_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ]
+      },
+      "raw_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.208898325582086,
+        "shoulder_lift_joint": -0.33360685138962665,
+        "elbow_joint": 1.040622663927592,
+        "wrist_1_joint": -3.8486048800475294,
+        "wrist_2_joint": 1.6555552913203473,
+        "wrist_3_joint": 1.570796630395507,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "bounded_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.208898325582086,
+        "shoulder_lift_joint": -0.33360685138962665,
+        "elbow_joint": 1.040622663927592,
+        "wrist_1_joint": -3.8486048800475294,
+        "wrist_2_joint": 1.6555552913203473,
+        "wrist_3_joint": 1.570796630395507,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "requested_physical_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.0809275
+        },
+        "orientation": {
+          "x": -0.7070798567270162,
+          "y": -0.006170592427165293,
+          "z": 0.7070798567270162,
+          "w": -0.006170592427165293
+        }
+      },
+      "requested_tip_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.24592750000000002
+        },
+        "orientation": {
+          "x": -0.7070798567270162,
+          "y": -0.006170592427165293,
+          "z": 0.7070798567270162,
+          "w": -0.006170592427165293
+        }
+      },
+      "physical_to_tip_tf": {
+        "position": {
+          "x": -0.165,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "orientation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        }
+      },
+      "fk_poses": [
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113104148539643,
+              "y": 0.08281623818137406,
+              "z": 0.0809276144388386
+            },
+            "orientation": {
+              "x": -0.7070798567265273,
+              "y": -0.006170592422878975,
+              "z": 0.7070798567275058,
+              "w": -0.006170592431351435
+            }
+          }
+        },
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113104148541753,
+              "y": 0.08281623818335299,
+              "z": 0.24592761443883857
+            },
+            "orientation": {
+              "x": -0.7070798567265273,
+              "y": -0.006170592422878975,
+              "z": 0.7070798567275058,
+              "w": -0.006170592431351435
+            }
+          }
+        }
+      ],
+      "ik_physical_fk_position_error_m": 2.906307014763565e-06,
+      "ik_physical_fk_orientation_error_rad": 4.2146848510894035e-08,
+      "state_valid": false,
+      "state_contacts": [
+        "forearm_link<->my_end_effector_link",
+        "gripper_left_finger_link<->p7_occluder",
+        "p7_ground<->wrist_1_link"
+      ]
+    },
+    {
+      "candidate_id": "tomato_top_yaw180_standoff_2",
+      "position_m": [
+        0.7113133181155422,
+        0.08281617038442404,
+        0.0809275
+      ],
+      "orientation_xyzw": [
+        -0.7070798567270162,
+        -0.006170592427165293,
+        0.7070798567270162,
+        -0.006170592427165293
+      ],
+      "ik_success": true,
+      "planning_success": false,
+      "ik_error_code": 1,
+      "joint_bounds_from_active_moveit_urdf": {
+        "shoulder_pan_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "shoulder_lift_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "elbow_joint": [
+          -2.991592653589793,
+          2.991592653589793
+        ],
+        "wrist_1_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_2_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_3_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ]
+      },
+      "raw_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.208898325582086,
+        "shoulder_lift_joint": -0.33360685138962665,
+        "elbow_joint": 1.040622663927592,
+        "wrist_1_joint": -3.8486048800475294,
+        "wrist_2_joint": 1.6555552913203473,
+        "wrist_3_joint": 1.570796630395507,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "bounded_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.208898325582086,
+        "shoulder_lift_joint": -0.33360685138962665,
+        "elbow_joint": 1.040622663927592,
+        "wrist_1_joint": -3.8486048800475294,
+        "wrist_2_joint": 1.6555552913203473,
+        "wrist_3_joint": 1.570796630395507,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "requested_physical_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.0809275
+        },
+        "orientation": {
+          "x": -0.7070798567270162,
+          "y": -0.006170592427165293,
+          "z": 0.7070798567270162,
+          "w": -0.006170592427165293
+        }
+      },
+      "requested_tip_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.24592750000000002
+        },
+        "orientation": {
+          "x": -0.7070798567270162,
+          "y": -0.006170592427165293,
+          "z": 0.7070798567270162,
+          "w": -0.006170592427165293
+        }
+      },
+      "physical_to_tip_tf": {
+        "position": {
+          "x": -0.165,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "orientation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        }
+      },
+      "fk_poses": [
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113104148539643,
+              "y": 0.08281623818137406,
+              "z": 0.0809276144388386
+            },
+            "orientation": {
+              "x": -0.7070798567265273,
+              "y": -0.006170592422878975,
+              "z": 0.7070798567275058,
+              "w": -0.006170592431351435
+            }
+          }
+        },
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113104148541753,
+              "y": 0.08281623818335299,
+              "z": 0.24592761443883857
+            },
+            "orientation": {
+              "x": -0.7070798567265273,
+              "y": -0.006170592422878975,
+              "z": 0.7070798567275058,
+              "w": -0.006170592431351435
+            }
+          }
+        }
+      ],
+      "ik_physical_fk_position_error_m": 2.906307014763565e-06,
+      "ik_physical_fk_orientation_error_rad": 4.2146848510894035e-08,
+      "state_valid": false,
+      "state_contacts": [
+        "forearm_link<->my_end_effector_link",
+        "gripper_left_finger_link<->p7_occluder",
+        "p7_ground<->wrist_1_link"
+      ]
+    },
+    {
+      "candidate_id": "tomato_top_yaw0_standoff_1",
+      "position_m": [
+        0.7113133181155422,
+        0.08281617038442404,
+        0.0809275
+      ],
+      "orientation_xyzw": [
+        -0.006170592427165336,
+        0.7070798567270162,
+        0.006170592427165336,
+        0.7070798567270162
+      ],
+      "ik_success": true,
+      "planning_success": false,
+      "ik_error_code": 1,
+      "joint_bounds_from_active_moveit_urdf": {
+        "shoulder_pan_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "shoulder_lift_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "elbow_joint": [
+          -2.991592653589793,
+          2.991592653589793
+        ],
+        "wrist_1_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_2_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_3_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ]
+      },
+      "raw_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.6128055728481256,
+        "shoulder_lift_joint": -0.1118177998819272,
+        "elbow_joint": 2.8532606995608596,
+        "wrist_1_joint": -5.883039602956557,
+        "wrist_2_joint": -1.082130114997064,
+        "wrist_3_joint": 1.5707982326457595,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "bounded_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.6128055728481256,
+        "shoulder_lift_joint": -0.1118177998819272,
+        "elbow_joint": 2.8532606995608596,
+        "wrist_1_joint": -5.883039602956557,
+        "wrist_2_joint": -1.082130114997064,
+        "wrist_3_joint": 1.5707982326457595,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "requested_physical_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.0809275
+        },
+        "orientation": {
+          "x": -0.006170592427165336,
+          "y": 0.7070798567270162,
+          "z": 0.006170592427165336,
+          "w": 0.7070798567270162
+        }
+      },
+      "requested_tip_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.24592750000000002
+        },
+        "orientation": {
+          "x": -0.006170592427165336,
+          "y": 0.7070798567270162,
+          "z": 0.006170592427165336,
+          "w": 0.7070798567270162
+        }
+      },
+      "physical_to_tip_tf": {
+        "position": {
+          "x": -0.165,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "orientation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        }
+      },
+      "fk_poses": [
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113131769497746,
+              "y": 0.08281610467870973,
+              "z": 0.08092750040281703
+            },
+            "orientation": {
+              "x": -0.006170590757848846,
+              "y": 0.7070798558554007,
+              "z": 0.006170594118141901,
+              "w": 0.7070798575984425
+            }
+          }
+        },
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113131765499021,
+              "y": 0.08281610389108186,
+              "z": 0.245927500402817
+            },
+            "orientation": {
+              "x": -0.006170590757848846,
+              "y": 0.7070798558554007,
+              "z": 0.006170594118141901,
+              "w": 0.7070798575984425
+            }
+          }
+        }
+      ],
+      "ik_physical_fk_position_error_m": 1.5570862887417472e-07,
+      "ik_physical_fk_orientation_error_rad": 4.2146848510894035e-08,
+      "state_valid": false,
+      "state_contacts": [
+        "gripper_right_finger_link<->p7_occluder",
+        "my_end_effector_link<->upperarm_link",
+        "p7_ground<->wrist_1_link",
+        "upperarm_link<->wrist_2_link",
+        "upperarm_link<->wrist_3_link"
+      ]
+    },
+    {
+      "candidate_id": "tomato_top_yaw0_standoff_2",
+      "position_m": [
+        0.7113133181155422,
+        0.08281617038442404,
+        0.0809275
+      ],
+      "orientation_xyzw": [
+        -0.006170592427165336,
+        0.7070798567270162,
+        0.006170592427165336,
+        0.7070798567270162
+      ],
+      "ik_success": true,
+      "planning_success": false,
+      "ik_error_code": 1,
+      "joint_bounds_from_active_moveit_urdf": {
+        "shoulder_pan_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "shoulder_lift_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "elbow_joint": [
+          -2.991592653589793,
+          2.991592653589793
+        ],
+        "wrist_1_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_2_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_3_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ]
+      },
+      "raw_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.6128055728481256,
+        "shoulder_lift_joint": -0.1118177998819272,
+        "elbow_joint": 2.8532606995608596,
+        "wrist_1_joint": -5.883039602956557,
+        "wrist_2_joint": -1.082130114997064,
+        "wrist_3_joint": 1.5707982326457595,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "bounded_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.6128055728481256,
+        "shoulder_lift_joint": -0.1118177998819272,
+        "elbow_joint": 2.8532606995608596,
+        "wrist_1_joint": -5.883039602956557,
+        "wrist_2_joint": -1.082130114997064,
+        "wrist_3_joint": 1.5707982326457595,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "requested_physical_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.0809275
+        },
+        "orientation": {
+          "x": -0.006170592427165336,
+          "y": 0.7070798567270162,
+          "z": 0.006170592427165336,
+          "w": 0.7070798567270162
+        }
+      },
+      "requested_tip_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.24592750000000002
+        },
+        "orientation": {
+          "x": -0.006170592427165336,
+          "y": 0.7070798567270162,
+          "z": 0.006170592427165336,
+          "w": 0.7070798567270162
+        }
+      },
+      "physical_to_tip_tf": {
+        "position": {
+          "x": -0.165,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "orientation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        }
+      },
+      "fk_poses": [
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113131769497746,
+              "y": 0.08281610467870973,
+              "z": 0.08092750040281703
+            },
+            "orientation": {
+              "x": -0.006170590757848846,
+              "y": 0.7070798558554007,
+              "z": 0.006170594118141901,
+              "w": 0.7070798575984425
+            }
+          }
+        },
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113131765499021,
+              "y": 0.08281610389108186,
+              "z": 0.245927500402817
+            },
+            "orientation": {
+              "x": -0.006170590757848846,
+              "y": 0.7070798558554007,
+              "z": 0.006170594118141901,
+              "w": 0.7070798575984425
+            }
+          }
+        }
+      ],
+      "ik_physical_fk_position_error_m": 1.5570862887417472e-07,
+      "ik_physical_fk_orientation_error_rad": 4.2146848510894035e-08,
+      "state_valid": false,
+      "state_contacts": [
+        "gripper_right_finger_link<->p7_occluder",
+        "my_end_effector_link<->upperarm_link",
+        "p7_ground<->wrist_1_link",
+        "upperarm_link<->wrist_2_link",
+        "upperarm_link<->wrist_3_link"
+      ]
+    },
+    {
+      "candidate_id": "tomato_top_yaw90_standoff_1",
+      "position_m": [
+        0.7113133181155422,
+        0.08281617038442404,
+        0.0809275
+      ],
+      "orientation_xyzw": [
+        -0.5043442292812726,
+        0.49561769378289877,
+        0.5043442292812726,
+        0.49561769378289877
+      ],
+      "ik_success": true,
+      "planning_success": false,
+      "ik_error_code": 1,
+      "joint_bounds_from_active_moveit_urdf": {
+        "shoulder_pan_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "shoulder_lift_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "elbow_joint": [
+          -2.991592653589793,
+          2.991592653589793
+        ],
+        "wrist_1_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_2_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_3_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ]
+      },
+      "raw_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.855987775510327,
+        "shoulder_lift_joint": -0.6163724212765387,
+        "elbow_joint": 1.874269040013598,
+        "wrist_1_joint": -4.399484464091132,
+        "wrist_2_joint": 0.7318478208569069,
+        "wrist_3_joint": 1.5707926169780102,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "bounded_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.855987775510327,
+        "shoulder_lift_joint": -0.6163724212765387,
+        "elbow_joint": 1.874269040013598,
+        "wrist_1_joint": -4.399484464091132,
+        "wrist_2_joint": 0.7318478208569069,
+        "wrist_3_joint": 1.5707926169780102,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "requested_physical_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.0809275
+        },
+        "orientation": {
+          "x": -0.5043442292812726,
+          "y": 0.49561769378289877,
+          "z": 0.5043442292812726,
+          "w": 0.49561769378289877
+        }
+      },
+      "requested_tip_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.24592750000000002
+        },
+        "orientation": {
+          "x": -0.5043442292812726,
+          "y": 0.49561769378289877,
+          "z": 0.5043442292812726,
+          "w": 0.49561769378289877
+        }
+      },
+      "physical_to_tip_tf": {
+        "position": {
+          "x": -0.165,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "orientation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        }
+      },
+      "fk_poses": [
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113134377858146,
+              "y": 0.08281593437895146,
+              "z": 0.08092727149368267
+            },
+            "orientation": {
+              "x": 0.5043442058990788,
+              "y": -0.4956178992306178,
+              "z": -0.5043439584678665,
+              "w": -0.4956177877106702
+            }
+          }
+        },
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113134148444813,
+              "y": 0.08281599340794871,
+              "z": 0.24592727149367044
+            },
+            "orientation": {
+              "x": 0.5043442058990788,
+              "y": -0.4956178992306178,
+              "z": -0.5043439584678665,
+              "w": -0.4956177877106702
+            }
+          }
+        }
+      ],
+      "ik_physical_fk_position_error_m": 3.496207863281252e-07,
+      "ik_physical_fk_orientation_error_rad": 7.077659420393693e-07,
+      "state_valid": false,
+      "state_contacts": [
+        "gripper_base_link<->p7_occluder",
+        "gripper_left_finger_link<->p7_occluder",
+        "p7_ground<->wrist_1_link"
+      ]
+    },
+    {
+      "candidate_id": "tomato_top_yaw90_standoff_2",
+      "position_m": [
+        0.7113133181155422,
+        0.08281617038442404,
+        0.0809275
+      ],
+      "orientation_xyzw": [
+        -0.5043442292812726,
+        0.49561769378289877,
+        0.5043442292812726,
+        0.49561769378289877
+      ],
+      "ik_success": true,
+      "planning_success": false,
+      "ik_error_code": 1,
+      "joint_bounds_from_active_moveit_urdf": {
+        "shoulder_pan_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "shoulder_lift_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "elbow_joint": [
+          -2.991592653589793,
+          2.991592653589793
+        ],
+        "wrist_1_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_2_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_3_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ]
+      },
+      "raw_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.855987775510327,
+        "shoulder_lift_joint": -0.6163724212765387,
+        "elbow_joint": 1.874269040013598,
+        "wrist_1_joint": -4.399484464091132,
+        "wrist_2_joint": 0.7318478208569069,
+        "wrist_3_joint": 1.5707926169780102,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "bounded_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -3.855987775510327,
+        "shoulder_lift_joint": -0.6163724212765387,
+        "elbow_joint": 1.874269040013598,
+        "wrist_1_joint": -4.399484464091132,
+        "wrist_2_joint": 0.7318478208569069,
+        "wrist_3_joint": 1.5707926169780102,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "requested_physical_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.0809275
+        },
+        "orientation": {
+          "x": -0.5043442292812726,
+          "y": 0.49561769378289877,
+          "z": 0.5043442292812726,
+          "w": 0.49561769378289877
+        }
+      },
+      "requested_tip_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.24592750000000002
+        },
+        "orientation": {
+          "x": -0.5043442292812726,
+          "y": 0.49561769378289877,
+          "z": 0.5043442292812726,
+          "w": 0.49561769378289877
+        }
+      },
+      "physical_to_tip_tf": {
+        "position": {
+          "x": -0.165,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "orientation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        }
+      },
+      "fk_poses": [
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113134377858146,
+              "y": 0.08281593437895146,
+              "z": 0.08092727149368267
+            },
+            "orientation": {
+              "x": 0.5043442058990788,
+              "y": -0.4956178992306178,
+              "z": -0.5043439584678665,
+              "w": -0.4956177877106702
+            }
+          }
+        },
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113134148444813,
+              "y": 0.08281599340794871,
+              "z": 0.24592727149367044
+            },
+            "orientation": {
+              "x": 0.5043442058990788,
+              "y": -0.4956178992306178,
+              "z": -0.5043439584678665,
+              "w": -0.4956177877106702
+            }
+          }
+        }
+      ],
+      "ik_physical_fk_position_error_m": 3.496207863281252e-07,
+      "ik_physical_fk_orientation_error_rad": 7.077659420393693e-07,
+      "state_valid": false,
+      "state_contacts": [
+        "gripper_base_link<->p7_occluder",
+        "gripper_left_finger_link<->p7_occluder",
+        "p7_ground<->wrist_1_link"
+      ]
+    },
+    {
+      "candidate_id": "tomato_top_yaw-90_standoff_1",
+      "position_m": [
+        0.7113133181155422,
+        0.08281617038442404,
+        0.0809275
+      ],
+      "orientation_xyzw": [
+        0.49561769378289866,
+        0.5043442292812728,
+        -0.49561769378289866,
+        0.5043442292812728
+      ],
+      "ik_success": true,
+      "planning_success": false,
+      "ik_error_code": 1,
+      "joint_bounds_from_active_moveit_urdf": {
+        "shoulder_pan_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "shoulder_lift_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "elbow_joint": [
+          -2.991592653589793,
+          2.991592653589793
+        ],
+        "wrist_1_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_2_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_3_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ]
+      },
+      "raw_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -2.657256633211935,
+        "shoulder_lift_joint": -0.5769834056841937,
+        "elbow_joint": 1.7256089050727996,
+        "wrist_1_joint": -4.290210214401867,
+        "wrist_2_joint": 2.6747099257739633,
+        "wrist_3_joint": 1.5708034157443145,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "bounded_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -2.657256633211935,
+        "shoulder_lift_joint": -0.5769834056841937,
+        "elbow_joint": 1.7256089050727996,
+        "wrist_1_joint": -4.290210214401867,
+        "wrist_2_joint": 2.6747099257739633,
+        "wrist_3_joint": 1.5708034157443145,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "requested_physical_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.0809275
+        },
+        "orientation": {
+          "x": 0.49561769378289866,
+          "y": 0.5043442292812728,
+          "z": -0.49561769378289866,
+          "w": 0.5043442292812728
+        }
+      },
+      "requested_tip_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.24592750000000002
+        },
+        "orientation": {
+          "x": 0.49561769378289866,
+          "y": 0.5043442292812728,
+          "z": -0.49561769378289866,
+          "w": 0.5043442292812728
+        }
+      },
+      "physical_to_tip_tf": {
+        "position": {
+          "x": -0.165,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "orientation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        }
+      },
+      "fk_poses": [
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113133178109429,
+              "y": 0.0828161704086508,
+              "z": 0.080927500509265
+            },
+            "orientation": {
+              "x": 0.4956176937842805,
+              "y": 0.5043442292865936,
+              "z": -0.4956176937809849,
+              "w": 0.5043442292764736
+            }
+          }
+        },
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113133178120883,
+              "y": 0.08281617040644706,
+              "z": 0.24592750050926498
+            },
+            "orientation": {
+              "x": 0.4956176937842805,
+              "y": 0.5043442292865936,
+              "z": -0.4956176937809849,
+              "w": 0.5043442292764736
+            }
+          }
+        }
+      ],
+      "ik_physical_fk_position_error_m": 5.939011220660992e-10,
+      "ik_physical_fk_orientation_error_rad": 4.2146848510894035e-08,
+      "state_valid": false,
+      "state_contacts": [
+        "forearm_link<->my_end_effector_link",
+        "forearm_link<->wrist_3_link",
+        "gripper_base_link<->p7_occluder",
+        "gripper_right_finger_link<->p7_occluder",
+        "p7_ground<->wrist_1_link"
+      ]
+    },
+    {
+      "candidate_id": "tomato_top_yaw-90_standoff_2",
+      "position_m": [
+        0.7113133181155422,
+        0.08281617038442404,
+        0.0809275
+      ],
+      "orientation_xyzw": [
+        0.49561769378289866,
+        0.5043442292812728,
+        -0.49561769378289866,
+        0.5043442292812728
+      ],
+      "ik_success": true,
+      "planning_success": false,
+      "ik_error_code": 1,
+      "joint_bounds_from_active_moveit_urdf": {
+        "shoulder_pan_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "shoulder_lift_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "elbow_joint": [
+          -2.991592653589793,
+          2.991592653589793
+        ],
+        "wrist_1_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_2_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ],
+        "wrist_3_joint": [
+          -6.133185307179586,
+          6.133185307179586
+        ]
+      },
+      "raw_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -2.657256633211935,
+        "shoulder_lift_joint": -0.5769834056841937,
+        "elbow_joint": 1.7256089050727996,
+        "wrist_1_joint": -4.290210214401867,
+        "wrist_2_joint": 2.6747099257739633,
+        "wrist_3_joint": 1.5708034157443145,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "bounded_ik_joint_positions_rad": {
+        "shoulder_pan_joint": -2.657256633211935,
+        "shoulder_lift_joint": -0.5769834056841937,
+        "elbow_joint": 1.7256089050727996,
+        "wrist_1_joint": -4.290210214401867,
+        "wrist_2_joint": 2.6747099257739633,
+        "wrist_3_joint": 1.5708034157443145,
+        "gripper_left_finger_joint": 0.029999999999999975,
+        "gripper_right_finger_joint": 0.029999999999999985
+      },
+      "requested_physical_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.0809275
+        },
+        "orientation": {
+          "x": 0.49561769378289866,
+          "y": 0.5043442292812728,
+          "z": -0.49561769378289866,
+          "w": 0.5043442292812728
+        }
+      },
+      "requested_tip_pose": {
+        "position": {
+          "x": 0.7113133181155422,
+          "y": 0.08281617038442404,
+          "z": 0.24592750000000002
+        },
+        "orientation": {
+          "x": 0.49561769378289866,
+          "y": 0.5043442292812728,
+          "z": -0.49561769378289866,
+          "w": 0.5043442292812728
+        }
+      },
+      "physical_to_tip_tf": {
+        "position": {
+          "x": -0.165,
+          "y": 0.0,
+          "z": 0.0
+        },
+        "orientation": {
+          "x": 0.0,
+          "y": 0.0,
+          "z": 0.0,
+          "w": 1.0
+        }
+      },
+      "fk_poses": [
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113133178109429,
+              "y": 0.0828161704086508,
+              "z": 0.080927500509265
+            },
+            "orientation": {
+              "x": 0.4956176937842805,
+              "y": 0.5043442292865936,
+              "z": -0.4956176937809849,
+              "w": 0.5043442292764736
+            }
+          }
+        },
+        {
+          "header": {
+            "stamp": {
+              "sec": 0,
+              "nanosec": 0
+            },
+            "frame_id": "base_link"
+          },
+          "pose": {
+            "position": {
+              "x": 0.7113133178120883,
+              "y": 0.08281617040644706,
+              "z": 0.24592750050926498
+            },
+            "orientation": {
+              "x": 0.4956176937842805,
+              "y": 0.5043442292865936,
+              "z": -0.4956176937809849,
+              "w": 0.5043442292764736
+            }
+          }
+        }
+      ],
+      "ik_physical_fk_position_error_m": 5.939011220660992e-10,
+      "ik_physical_fk_orientation_error_rad": 4.2146848510894035e-08,
+      "state_valid": false,
+      "state_contacts": [
+        "forearm_link<->my_end_effector_link",
+        "forearm_link<->wrist_3_link",
+        "gripper_base_link<->p7_occluder",
+        "gripper_right_finger_link<->p7_occluder",
+        "p7_ground<->wrist_1_link"
+      ]
+    }
+  ],
+  "source_candidates": "docs/evidence/p7_5_perception_grasp_20260905_r11/top_grasp_candidates.json"
+}

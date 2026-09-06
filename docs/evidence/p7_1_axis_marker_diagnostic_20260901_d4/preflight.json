@@ -1,0 +1,78 @@
+{
+  "capture_schema": "p7_preflight_v1",
+  "captured_at_utc": "2026-09-01T12:01:05.866560+00:00",
+  "clock_regression_count": 0,
+  "clock_sample_count": 1968,
+  "controllers": {
+    "gripper_controller": {
+      "state": "active",
+      "type": "forward_command_controller/ForwardCommandController"
+    },
+    "joint_state_broadcaster": {
+      "state": "active",
+      "type": "joint_state_broadcaster/JointStateBroadcaster"
+    },
+    "joint_trajectory_controller": {
+      "state": "active",
+      "type": "joint_trajectory_controller/JointTrajectoryController"
+    }
+  },
+  "expected_joint_positions_rad": {
+    "elbow_joint": 1.269496637,
+    "shoulder_lift_joint": -0.468793309,
+    "shoulder_pan_joint": 0.434425123,
+    "wrist_1_joint": -1.820428866,
+    "wrist_2_joint": 1.585136685,
+    "wrist_3_joint": 1.547477498
+  },
+  "failure_codes": [
+    "INITIAL_JOINT_MISMATCH"
+  ],
+  "inactive_controllers": [],
+  "initial_positions_file": "/home/oy/cs625_p56_install/share/cs625_bringup/config/p7_1_observation_initial_positions.yaml",
+  "joint_errors_rad": {
+    "elbow_joint": 3.4208547283753887e-07,
+    "shoulder_lift_joint": 0.021249503930622804,
+    "shoulder_pan_joint": 3.649381907777638e-10,
+    "wrist_1_joint": 3.637216638985308e-07,
+    "wrist_2_joint": 6.874175895177359e-09,
+    "wrist_3_joint": 7.192748823214856e-07
+  },
+  "joint_sample_counts": {
+    "elbow_joint": 200,
+    "shoulder_lift_joint": 200,
+    "shoulder_pan_joint": 200,
+    "wrist_1_joint": 200,
+    "wrist_2_joint": 200,
+    "wrist_3_joint": 200
+  },
+  "joint_spreads_rad": {
+    "elbow_joint": 0.0,
+    "shoulder_lift_joint": 0.0,
+    "shoulder_pan_joint": 0.0,
+    "wrist_1_joint": 0.0,
+    "wrist_2_joint": 0.0,
+    "wrist_3_joint": 0.0
+  },
+  "joint_tolerance_rad": 0.002,
+  "observed_joint_positions_rad": {
+    "elbow_joint": 1.2694969790854729,
+    "shoulder_lift_joint": -0.4900428129306228,
+    "shoulder_pan_joint": 0.4344251233649382,
+    "wrist_1_joint": -1.8204285022783362,
+    "wrist_2_joint": 1.585136678125824,
+    "wrist_3_joint": 1.5474767787251176
+  },
+  "required_controllers": [
+    "gripper_controller",
+    "joint_state_broadcaster",
+    "joint_trajectory_controller"
+  ],
+  "runtime": {
+    "gz_partition": "p7_1_axis_diagnostic_20260901_d4",
+    "ign_partition": "p7_1_axis_diagnostic_20260901_d4",
+    "ros_domain_id": "94"
+  },
+  "stability_window_sec": 2.0,
+  "success": false
+}

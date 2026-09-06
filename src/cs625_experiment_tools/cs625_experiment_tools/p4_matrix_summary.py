@@ -15,6 +15,12 @@ def _episode_metrics(record: dict) -> dict:
     successes = [view for view in views if view.get("success")]
     failures = [view for view in views if not view.get("success")]
     attempts = len(views)
+    candidate_collision_rate = record.get("candidate_collision_rejection_rate")
+    if candidate_collision_rate is not None:
+        candidate_collision_rate = float(candidate_collision_rate)
+    episode_wall_time = record.get("episode_wall_time_sec")
+    if episode_wall_time is not None:
+        episode_wall_time = float(episode_wall_time)
     return {
         "scene_id": record["scene_id"],
         "random_seed": int(record["random_seed"]),
@@ -26,14 +32,24 @@ def _episode_metrics(record: dict) -> dict:
         "successful_observation_count": len(successes),
         "successful_observation_rate": len(successes) / max(1, attempts),
         "planning_time_sec_total": sum(float(view.get("planning_time_sec", 0.0)) for view in views),
+        "execution_ik_time_sec_total": sum(float(view.get("execution_ik_time_sec", 0.0)) for view in views),
+        "execution_motion_planning_time_sec_total": sum(float(view.get("execution_motion_planning_time_sec", 0.0)) for view in views),
+        "trajectory_execution_time_sec_total": sum(float(view.get("trajectory_execution_time_sec", 0.0)) for view in views),
+        "sensor_settle_wait_time_sec_total": sum(float(view.get("sensor_settle_wait_time_sec", 0.0)) for view in views),
+        "episode_wall_time_sec": episode_wall_time,
+        "replan_after_execution_failure_count": int(record.get("replan_after_execution_failure_count", 0)),
+        "candidate_collision_rejection_count": record.get("candidate_collision_rejection_count"),
+        "candidate_collision_rejection_rate": candidate_collision_rate,
+        "candidate_collision_metric_scope": record.get("candidate_collision_metric_scope", "NOT_RECORDED"),
         "motion_cost_total": sum(float(view.get("motion_cost", 0.0)) for view in successes),
         "failure_codes": "|".join(sorted(str(view.get("code", "UNKNOWN")) for view in failures)),
         "termination_reason": record.get("termination_reason", "UNKNOWN"),
     }
 
 
-def _mean(rows: list[dict], key: str) -> float:
-    return sum(float(row[key]) for row in rows) / len(rows)
+def _mean(rows: list[dict], key: str) -> float | None:
+    values = [float(row[key]) for row in rows if row.get(key) is not None]
+    return sum(values) / len(values) if values else None
 
 
 def run(input_directory: Path, manifest_path: Path, output_directory: Path) -> dict:
@@ -75,6 +91,16 @@ def run(input_directory: Path, manifest_path: Path, output_directory: Path) -> d
             "episode_count": len(rows),
             "mean_reachability_rate": _mean(rows, "reachability_rate"),
             "mean_planning_time_sec_total": _mean(rows, "planning_time_sec_total"),
+            "mean_execution_ik_time_sec_total": _mean(rows, "execution_ik_time_sec_total"),
+            "mean_execution_motion_planning_time_sec_total": _mean(rows, "execution_motion_planning_time_sec_total"),
+            "mean_trajectory_execution_time_sec_total": _mean(rows, "trajectory_execution_time_sec_total"),
+            "mean_sensor_settle_wait_time_sec_total": _mean(rows, "sensor_settle_wait_time_sec_total"),
+            "mean_episode_wall_time_sec": _mean(rows, "episode_wall_time_sec"),
+            "mean_replan_after_execution_failure_count": _mean(rows, "replan_after_execution_failure_count"),
+            "mean_candidate_collision_rejection_rate": _mean(rows, "candidate_collision_rejection_rate"),
+            "candidate_collision_metric_episode_count": sum(
+                row.get("candidate_collision_rejection_rate") is not None for row in rows
+            ),
             "mean_motion_cost_total": _mean(rows, "motion_cost_total"),
             "mean_successful_observation_rate": _mean(rows, "successful_observation_rate"),
         }

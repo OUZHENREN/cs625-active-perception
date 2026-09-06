@@ -22,6 +22,32 @@ from std_msgs.msg import String
 from cs625_ap_interfaces.msg import ViewSelection
 
 
+def execution_status_payload(
+    selection: ViewSelection,
+    success: bool,
+    code: str,
+    profile: str,
+    selection_started: float,
+    finished_at: float,
+    phase_durations: dict[str, float],
+) -> dict:
+    """Build the immutable, per-attempt runtime record for a P4 episode."""
+    return {
+        "cycle_index": selection.cycle_index,
+        "candidate_id": selection.candidate.candidate_id,
+        "success": success,
+        "code": code,
+        "profile": profile,
+        "motion_cost": selection.candidate.motion_cost,
+        "planning_time_sec": selection.candidate.planning_time_sec,
+        "view_wall_time_sec": max(0.0, finished_at - selection_started),
+        "execution_ik_time_sec": phase_durations.get("ik_wall_time_sec", 0.0),
+        "execution_motion_planning_time_sec": phase_durations.get("plan_wall_time_sec", 0.0),
+        "trajectory_execution_time_sec": phase_durations.get("result_wall_time_sec", 0.0),
+        "sensor_settle_wait_time_sec": phase_durations.get("waiting_sensor_wall_time_sec", 0.0),
+    }
+
+
 class SimViewExecutor(Node):
     """Plan, execute in Gazebo, then require a post-motion RGB-D frame."""
 
@@ -87,6 +113,8 @@ class SimViewExecutor(Node):
         self._phase = "idle"
         self._motion_stamp = None
         self._phase_started = 0.0
+        self._selection_started = 0.0
+        self._phase_durations = {}
         # Progress and timeout monitoring must remain live even when Gazebo
         # has not started publishing /clock yet.  Sensor-success validation
         # below still compares Gazebo timestamps.
@@ -104,11 +132,28 @@ class SimViewExecutor(Node):
             f"for cycle {selection.cycle_index}"
         )
         self._selection = selection
+        self._selection_started = time.monotonic()
+        self._phase_durations = {}
         if not self._enabled:
             self._finish(False, "EXECUTION_GATE_CLOSED")
             return
-        self._phase = "waiting_moveit"
-        self._phase_started = time.monotonic()
+        self._set_phase("waiting_moveit")
+
+    def _set_phase(self, phase: str) -> None:
+        """Enter an executor phase and retain its steady-clock duration.
+
+        These durations are runtime evidence for the simulation execution
+        chain.  They are deliberately separate from the P3 candidate planning
+        duration carried in ``planning_time_sec``.
+        """
+        now = time.monotonic()
+        if self._phase != "idle":
+            field = f"{self._phase}_wall_time_sec"
+            self._phase_durations[field] = self._phase_durations.get(field, 0.0) + max(
+                0.0, now - self._phase_started
+            )
+        self._phase = phase
+        self._phase_started = now
 
     def _request_ik(self) -> None:
         assert self._selection is not None
@@ -116,11 +161,13 @@ class SimViewExecutor(Node):
         request.ik_request.group_name = self._group
         request.ik_request.ik_link_name = self._tool
         request.ik_request.pose_stamped = self._selection.candidate.tool_pose
+        # Seed from MoveIt's monitored current state; do not send an empty
+        # RobotState as a complete state (which is rejected by MoveIt).
+        request.ik_request.robot_state.is_diff = True
         request.ik_request.avoid_collisions = True
         request.ik_request.timeout = Duration(sec=5)
         self._future = self._ik.call_async(request)
-        self._phase = "ik"
-        self._phase_started = time.monotonic()
+        self._set_phase("ik")
 
     def _advance(self) -> None:
         if self._phase == "waiting_moveit":
@@ -157,8 +204,7 @@ class SimViewExecutor(Node):
             request.motion_plan_request.max_acceleration_scaling_factor = self._max_acceleration_scale
             request.motion_plan_request.goal_constraints = [self._constraints(response.solution.joint_state)]
             self._future = self._plan.call_async(request)
-            self._phase = "plan"
-            self._phase_started = time.monotonic()
+            self._set_phase("plan")
             return
         if self._phase == "plan":
             if response.motion_plan_response.error_code.val != MoveItErrorCodes.SUCCESS:
@@ -170,24 +216,21 @@ class SimViewExecutor(Node):
             goal = FollowJointTrajectory.Goal()
             goal.trajectory = response.motion_plan_response.trajectory.joint_trajectory
             self._future = self._execute.send_goal_async(goal)
-            self._phase = "goal"
-            self._phase_started = time.monotonic()
+            self._set_phase("goal")
             return
         if self._phase == "goal":
             if not response.accepted:
                 self._finish(False, "EXECUTION_REJECTED")
                 return
             self._future = response.get_result_async()
-            self._phase = "result"
-            self._phase_started = time.monotonic()
+            self._set_phase("result")
             return
         if response.result.error_code != FollowJointTrajectory.Result.SUCCESSFUL:
             self._finish(False, "EXECUTION_FAILED")
             return
         now = self.get_clock().now().to_msg()
         self._motion_stamp = (now.sec, now.nanosec)
-        self._phase = "waiting_sensor"
-        self._phase_started = time.monotonic()
+        self._set_phase("waiting_sensor")
 
     def _on_cloud(self, cloud: PointCloud2) -> None:
         if self._phase != "waiting_sensor" or self._motion_stamp is None:
@@ -208,16 +251,25 @@ class SimViewExecutor(Node):
     def _finish(self, success: bool, code: str) -> None:
         if self._selection is None:
             return
+        now = time.monotonic()
+        if self._phase != "idle":
+            field = f"{self._phase}_wall_time_sec"
+            self._phase_durations[field] = self._phase_durations.get(field, 0.0) + max(
+                0.0, now - self._phase_started
+            )
         message = String()
-        message.data = json.dumps({
-            "cycle_index": self._selection.cycle_index,
-            "candidate_id": self._selection.candidate.candidate_id,
-            "success": success,
-            "code": code,
-            "profile": self._profile,
-            "motion_cost": self._selection.candidate.motion_cost,
-            "planning_time_sec": self._selection.candidate.planning_time_sec,
-        }, sort_keys=True)
+        message.data = json.dumps(
+            execution_status_payload(
+                self._selection,
+                success,
+                code,
+                self._profile,
+                self._selection_started,
+                now,
+                self._phase_durations,
+            ),
+            sort_keys=True,
+        )
         self._publish_status_with_replay(message)
         self.get_logger().info(
             f"P4 execution completed: {code}; "
@@ -226,6 +278,8 @@ class SimViewExecutor(Node):
         self._selection = None
         self._future = None
         self._phase = "idle"
+        self._selection_started = 0.0
+        self._phase_durations = {}
 
     def _publish_status_with_replay(self, message: String) -> None:
         """Publish a bounded duplicate status burst for WSL DDS discovery."""

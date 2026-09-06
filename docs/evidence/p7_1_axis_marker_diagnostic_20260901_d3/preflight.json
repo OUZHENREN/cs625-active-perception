@@ -1,0 +1,61 @@
+{
+  "capture_schema": "p7_preflight_v1",
+  "captured_at_utc": "2026-09-01T11:51:57.730737+00:00",
+  "clock_regression_count": 0,
+  "clock_sample_count": 125,
+  "controllers": {
+    "gripper_controller": {
+      "state": "active",
+      "type": "forward_command_controller/ForwardCommandController"
+    },
+    "joint_state_broadcaster": {
+      "state": "active",
+      "type": "joint_state_broadcaster/JointStateBroadcaster"
+    },
+    "joint_trajectory_controller": {
+      "state": "active",
+      "type": "joint_trajectory_controller/JointTrajectoryController"
+    }
+  },
+  "expected_joint_positions_rad": {
+    "elbow_joint": 1.269496637,
+    "shoulder_lift_joint": -0.468793309,
+    "shoulder_pan_joint": 0.434425123,
+    "wrist_1_joint": -1.820428866,
+    "wrist_2_joint": 1.585136685,
+    "wrist_3_joint": 1.547477498
+  },
+  "failure_codes": [
+    "INITIAL_JOINT_MISMATCH"
+  ],
+  "inactive_controllers": [],
+  "initial_positions_file": "/home/oy/cs625_p56_install/share/cs625_bringup/config/p7_1_observation_initial_positions.yaml",
+  "joint_errors_rad": {
+    "elbow_joint": 3.4208259980239575e-07,
+    "shoulder_lift_joint": 0.021249503926948354,
+    "shoulder_pan_joint": 3.662866121523223e-10,
+    "wrist_1_joint": 3.6369617184561776e-07,
+    "wrist_2_joint": 6.833768662062312e-09,
+    "wrist_3_joint": 7.192748818773964e-07
+  },
+  "joint_tolerance_rad": 0.002,
+  "observed_joint_positions_rad": {
+    "elbow_joint": 1.2694969790825998,
+    "shoulder_lift_joint": -0.49004281292694835,
+    "shoulder_pan_joint": 0.43442512336628664,
+    "wrist_1_joint": -1.8204285023038282,
+    "wrist_2_joint": 1.5851366781662313,
+    "wrist_3_joint": 1.547476778725118
+  },
+  "required_controllers": [
+    "gripper_controller",
+    "joint_state_broadcaster",
+    "joint_trajectory_controller"
+  ],
+  "runtime": {
+    "gz_partition": "p7_1_axis_diagnostic_20260901_d3",
+    "ign_partition": "p7_1_axis_diagnostic_20260901_d3",
+    "ros_domain_id": "93"
+  },
+  "success": false
+}

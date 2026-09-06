@@ -1,0 +1,3122 @@
+{
+  "claim_boundary": "offline URDF/FK and image projection only; this is neither a P7.4 planning result nor trajectory execution evidence",
+  "gate": "P7.3_NBV_STATIC_PREFLIGHT",
+  "gate_decision": "P7.3_STATIC_CANDIDATE_READY_FOR_RUNTIME_REOBSERVATION",
+  "maximum_scaled_residual": 0.02,
+  "minimum_link_origin_z_m": 0.12,
+  "rank_input": "docs/evidence/p7_3_geometry_nbv_20260902_r9/severe_v5_wide_candidate_rank.json",
+  "recommended_candidate_id": "geometry_nbv_e65_v-110_a10",
+  "records": [
+    {
+      "candidate_id": "geometry_nbv_e60_v-110_a12",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT",
+        "STATIC_TARGET_PROJECTION_OUT_OF_FRAME"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 180.0,
+        "camera_position_world_m": [
+          0.27081613554348455,
+          0.0396488923198527,
+          0.657145282649107
+        ],
+        "candidate_id": "geometry_nbv_e60_v-110_a12",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              -1.1895246692412389e-16,
+              -0.946777421117878,
+              0.32188897909276193
+            ],
+            [
+              -1.0,
+              1.1262150987003168e-16,
+              -3.8289488138771775e-17
+            ],
+            [
+              0.0,
+              -0.32188897909276193,
+              -0.946777421117878
+            ]
+          ],
+          "translation_m": [
+            0.27081613554348455,
+            0.0396488923198527,
+            0.657145282649107
+          ]
+        },
+        "elevation_deg": 60.0,
+        "expected_posterior_yaw_variance_rad2": 0.006012888887981389,
+        "expected_yaw_information_gain_nats": 3.1523487243794297,
+        "expected_yaw_standard_deviation_deg": 4.442876300706599,
+        "external_occluded_surface_fraction": 0.24375226327115124,
+        "new_geometry_area_m2": 0.0006140356130332786,
+        "new_geometry_coverage_fraction": 0.336889590419163,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.489238314798593,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.4125747867684406,
+        "yaw_fisher_information_rad_minus2": 166.0054458909817
+      },
+      "preflight_pass": false,
+      "selection_score": 3.489238314798593,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.671895064702107,
+          "forearm_link": 0.1151610779247049,
+          "gripper_base_link": 0.5275300694127278,
+          "my_end_effector_link": 0.5808744179210155,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.11352435164283964,
+          "wrist_2_link": 0.20014154955455976,
+          "wrist_3_link": 0.2934966012875566
+        },
+        "camera_position_world_m": [
+          0.22388018034582652,
+          -0.03593358144917361,
+          0.6718950647021071
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 16.370674454844586,
+        "joint_positions_rad": {
+          "elbow_joint": 2.9839924545964363,
+          "shoulder_lift_joint": 0.15497442162069391,
+          "shoulder_pan_joint": 0.32370581553849026,
+          "wrist_1_joint": -5.4537058349856,
+          "wrist_2_joint": 1.6681149840944942,
+          "wrist_3_joint": 1.2773945706336054
+        },
+        "max_abs_scaled_residual": 2.8548161254781723,
+        "max_seed_delta_rad": 3.6332769689855997,
+        "minimum_distal_link_origin_z_m": 0.11352435164283964,
+        "projection": {
+          "camera_xyz_m": [
+            -0.23679666867363897,
+            -0.38615855003023114,
+            0.5573839620719444
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": false,
+          "u_px": 42.23918474558448,
+          "v_px": -72.03963435692279,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.27081613554348455,
+          0.0396488923198527,
+          0.657145282649107
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            -1.2e-16,
+            -0.946777421117878,
+            0.32188897909276193
+          ],
+          [
+            -1.0,
+            1.1e-16,
+            -4e-17
+          ],
+          [
+            0.0,
+            -0.32188897909276193,
+            -0.946777421117878
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e60_v-110_a13",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 195.0,
+        "camera_position_world_m": [
+          0.2827420963423106,
+          -0.05093777346602963,
+          0.657145282649107
+        ],
+        "candidate_id": "geometry_nbv_e60_v-110_a13",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.2588190451025208,
+              -0.9145167628051194,
+              0.31092087810352076
+            ],
+            [
+              -0.9659258262890683,
+              -0.2450440280583564,
+              0.08331099819781392
+            ],
+            [
+              0.0,
+              -0.32188897909276204,
+              -0.946777421117878
+            ]
+          ],
+          "translation_m": [
+            0.2827420963423106,
+            -0.05093777346602963,
+            0.657145282649107
+          ]
+        },
+        "elevation_deg": 60.0,
+        "expected_posterior_yaw_variance_rad2": 0.005969352948553749,
+        "expected_yaw_information_gain_nats": 3.1559821121545557,
+        "expected_yaw_standard_deviation_deg": 4.426762899114157,
+        "external_occluded_surface_fraction": 0.2508673828931568,
+        "new_geometry_area_m2": 0.0005964827141380297,
+        "new_geometry_coverage_fraction": 0.32725922241774075,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4832413345722966,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.4031698504480013,
+        "yaw_fisher_information_rad_minus2": 167.21838076652188
+      },
+      "preflight_pass": false,
+      "selection_score": 3.4832413345722966,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.6999386139064754,
+          "forearm_link": 0.1176262743119886,
+          "gripper_base_link": 0.5463275449412252,
+          "my_end_effector_link": 0.5922297274262003,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.10132763175422173,
+          "wrist_2_link": 0.17048253960421395,
+          "wrist_3_link": 0.2757878207200927
+        },
+        "camera_position_world_m": [
+          0.2845186523078588,
+          -0.08941173175690564,
+          0.6999386139064755
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 5.933993423622773,
+        "joint_positions_rad": {
+          "elbow_joint": 2.963782449709354,
+          "shoulder_lift_joint": 0.1516507714840779,
+          "shoulder_pan_joint": 0.932481027210014,
+          "wrist_1_joint": -5.257462630926216,
+          "wrist_2_joint": 1.380609869961203,
+          "wrist_3_joint": 0.9946220188932281
+        },
+        "max_abs_scaled_residual": 1.666122803243731,
+        "max_seed_delta_rad": 3.4370337649262153,
+        "minimum_distal_link_origin_z_m": 0.10132763175422173,
+        "projection": {
+          "camera_xyz_m": [
+            -0.17722212572335916,
+            -0.2714927683944406,
+            0.6463400052352931
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 83.99597577520744,
+          "v_px": 3.5667789127118255,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.2827420963423106,
+          -0.05093777346602963,
+          0.657145282649107
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.2588190451025208,
+            -0.9145167628051194,
+            0.31092087810352076
+          ],
+          [
+            -0.9659258262890683,
+            -0.2450440280583564,
+            0.08331099819781392
+          ],
+          [
+            0.0,
+            -0.32188897909276204,
+            -0.946777421117878
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e65_v-110_a13",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 195.0,
+        "camera_position_world_m": [
+          0.3350636099697702,
+          -0.03691826614277786,
+          0.6853429509256549
+        ],
+        "candidate_id": "geometry_nbv_e65_v-110_a13",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.2588190451025208,
+              -0.9381352904893528,
+              0.23003234257529306
+            ],
+            [
+              -0.9659258262890683,
+              -0.25137259347775887,
+              0.06163698042608913
+            ],
+            [
+              0.0,
+              -0.23814700499213312,
+              -0.971229120245721
+            ]
+          ],
+          "translation_m": [
+            0.3350636099697702,
+            -0.03691826614277786,
+            0.6853429509256549
+          ]
+        },
+        "elevation_deg": 65.0,
+        "expected_posterior_yaw_variance_rad2": 0.005976506472787905,
+        "expected_yaw_information_gain_nats": 3.1553832833188125,
+        "expected_yaw_standard_deviation_deg": 4.429414566255277,
+        "external_occluded_surface_fraction": 0.31330816231937436,
+        "new_geometry_area_m2": 0.0005701370020836816,
+        "new_geometry_coverage_fraction": 0.31280469249325327,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4681879758120657,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3869340276787529,
+        "yaw_fisher_information_rad_minus2": 167.01786644343133
+      },
+      "preflight_pass": false,
+      "selection_score": 3.4681879758120657,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7008466695863151,
+          "forearm_link": 0.11766254473501853,
+          "gripper_base_link": 0.5484781226439644,
+          "my_end_effector_link": 0.5966286214150129,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.11321369219897683,
+          "wrist_2_link": 0.18230470111610614,
+          "wrist_3_link": 0.2853176599337926
+        },
+        "camera_position_world_m": [
+          0.3410094245025221,
+          -0.07731772798937125,
+          0.7008466695863151
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 4.226641521425103,
+        "joint_positions_rad": {
+          "elbow_joint": 2.9828517988849113,
+          "shoulder_lift_joint": 0.15160188332683872,
+          "shoulder_pan_joint": 1.0825191294050183,
+          "wrist_1_joint": -5.275889343394749,
+          "wrist_2_joint": 1.2878143550905867,
+          "wrist_3_joint": 0.8826222533872049
+        },
+        "max_abs_scaled_residual": 1.7262791844080159,
+        "max_seed_delta_rad": 3.455460477394749,
+        "minimum_distal_link_origin_z_m": 0.11321369219897683,
+        "projection": {
+          "camera_xyz_m": [
+            -0.18085235735630423,
+            -0.23704896660821753,
+            0.6277920268529109
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 80.14758375145067,
+          "v_px": 15.334885153886972,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.3350636099697702,
+          -0.03691826614277786,
+          0.6853429509256549
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.2588190451025208,
+            -0.9381352904893528,
+            0.23003234257529306
+          ],
+          [
+            -0.9659258262890683,
+            -0.25137259347775887,
+            0.06163698042608913
+          ],
+          [
+            0.0,
+            -0.23814700499213312,
+            -0.971229120245721
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e65_v-110_a12",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 180.0,
+        "camera_position_world_m": [
+          0.324983352324995,
+          0.03964889231985269,
+          0.6853429509256549
+        ],
+        "candidate_id": "geometry_nbv_e65_v-110_a12",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              -1.1727729814823217e-16,
+              -0.971229120245721,
+              0.23814700499213307
+            ],
+            [
+              -1.0,
+              1.1390312710530266e-16,
+              -2.792923730757092e-17
+            ],
+            [
+              0.0,
+              -0.23814700499213307,
+              -0.971229120245721
+            ]
+          ],
+          "translation_m": [
+            0.324983352324995,
+            0.03964889231985269,
+            0.6853429509256549
+          ]
+        },
+        "elevation_deg": 65.0,
+        "expected_posterior_yaw_variance_rad2": 0.006081942283657036,
+        "expected_yaw_information_gain_nats": 3.1466393312503187,
+        "expected_yaw_standard_deviation_deg": 4.468314978735748,
+        "external_occluded_surface_fraction": 0.2978818799739526,
+        "new_geometry_area_m2": 0.0005816828255930517,
+        "new_geometry_coverage_fraction": 0.31913928884330706,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4657786200936256,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3922011757007715,
+        "yaw_fisher_information_rad_minus2": 164.1171955723894
+      },
+      "preflight_pass": false,
+      "selection_score": 3.4657786200936256,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.6956490277136529,
+          "forearm_link": 0.1153827605915196,
+          "gripper_base_link": 0.5485866296936931,
+          "my_end_effector_link": 0.5929728713666695,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.11541767123851714,
+          "wrist_2_link": 0.1898806565746987,
+          "wrist_3_link": 0.29045417034301524
+        },
+        "camera_position_world_m": [
+          0.3339327290045383,
+          -0.04184562451434493,
+          0.6956490277136529
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 15.33489982675547,
+        "joint_positions_rad": {
+          "elbow_joint": 2.986974190093944,
+          "shoulder_lift_joint": 0.15467547247297816,
+          "shoulder_pan_joint": 1.0586770906709586,
+          "wrist_1_joint": -5.333840557028152,
+          "wrist_2_joint": 1.3266158645104391,
+          "wrist_3_joint": 0.6900407056860175
+        },
+        "max_abs_scaled_residual": 3.469094761849492,
+        "max_seed_delta_rad": 3.5134116910281517,
+        "minimum_distal_link_origin_z_m": 0.1153827605915196,
+        "projection": {
+          "camera_xyz_m": [
+            -0.29009650939945325,
+            -0.21190644797137254,
+            0.5821691171651788
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 21.87476703988591,
+          "v_px": 19.103827369763962,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.324983352324995,
+          0.03964889231985269,
+          0.6853429509256549
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            -1.2e-16,
+            -0.971229120245721,
+            0.23814700499213307
+          ],
+          [
+            -1.0,
+            1.1e-16,
+            -3e-17
+          ],
+          [
+            0.0,
+            -0.23814700499213307,
+            -0.971229120245721
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e60_v-110_a14",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 210.0,
+        "camera_position_world_m": [
+          0.31770724421893093,
+          -0.13535110768014727,
+          0.657145282649107
+        ],
+        "candidate_id": "geometry_nbv_e60_v-110_a14",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.4999999999999997,
+              -0.8199332984176,
+              0.2787640330925699
+            ],
+            [
+              -0.8660254037844388,
+              -0.4733887105589387,
+              0.16094448954638088
+            ],
+            [
+              0.0,
+              -0.32188897909276193,
+              -0.946777421117878
+            ]
+          ],
+          "translation_m": [
+            0.31770724421893093,
+            -0.13535110768014727,
+            0.657145282649107
+          ]
+        },
+        "elevation_deg": 60.0,
+        "expected_posterior_yaw_variance_rad2": 0.006029097490611634,
+        "expected_yaw_information_gain_nats": 3.151002716178686,
+        "expected_yaw_standard_deviation_deg": 4.448860475112672,
+        "external_occluded_surface_fraction": 0.27311854147320924,
+        "new_geometry_area_m2": 0.0005733882607625975,
+        "new_geometry_coverage_fraction": 0.3145884900148269,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4655912061935132,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.38499158100573894,
+        "yaw_fisher_information_rad_minus2": 165.5583403108327
+      },
+      "preflight_pass": false,
+      "selection_score": 3.4655912061935132,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7074265509111013,
+          "forearm_link": 0.12854699104143605,
+          "gripper_base_link": 0.5496327342991725,
+          "my_end_effector_link": 0.5910320166361235,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.09765269719642172,
+          "wrist_2_link": 0.14899069750745564,
+          "wrist_3_link": 0.260326804950321
+        },
+        "camera_position_world_m": [
+          0.32434974199842553,
+          -0.13800235191346716,
+          0.7074265509111013
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 2.2609432684688704,
+        "joint_positions_rad": {
+          "elbow_joint": 2.955044644003052,
+          "shoulder_lift_joint": 0.136946897480424,
+          "shoulder_pan_joint": 1.191144690855146,
+          "wrist_1_joint": -5.075803145915899,
+          "wrist_2_joint": 1.2648279133521452,
+          "wrist_3_joint": 0.9672787387203444
+        },
+        "max_abs_scaled_residual": 1.6760422753998103,
+        "max_seed_delta_rad": 3.255374279915899,
+        "minimum_distal_link_origin_z_m": 0.09765269719642172,
+        "projection": {
+          "camera_xyz_m": [
+            -0.07386005723831969,
+            -0.21568107841080383,
+            0.6906310465856316
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 130.35556169719743,
+          "v_px": 33.434342443024434,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.31770724421893093,
+          -0.13535110768014727,
+          0.657145282649107
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.4999999999999997,
+            -0.8199332984176,
+            0.2787640330925699
+          ],
+          [
+            -0.8660254037844388,
+            -0.4733887105589387,
+            0.16094448954638088
+          ],
+          [
+            0.0,
+            -0.32188897909276193,
+            -0.946777421117878
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e60_v-110_a11",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 165.0,
+        "camera_position_world_m": [
+          0.2827420963423107,
+          0.13023555810573503,
+          0.657145282649107
+        ],
+        "candidate_id": "geometry_nbv_e60_v-110_a11",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              -0.2588190451025211,
+              -0.9145167628051194,
+              0.31092087810352065
+            ],
+            [
+              -0.9659258262890683,
+              0.24504402805835662,
+              -0.08331099819781398
+            ],
+            [
+              0.0,
+              -0.32188897909276193,
+              -0.946777421117878
+            ]
+          ],
+          "translation_m": [
+            0.2827420963423107,
+            0.13023555810573503,
+            0.657145282649107
+          ]
+        },
+        "elevation_deg": 60.0,
+        "expected_posterior_yaw_variance_rad2": 0.006260664362606704,
+        "expected_yaw_information_gain_nats": 3.1321582271600437,
+        "expected_yaw_standard_deviation_deg": 4.533491890900161,
+        "external_occluded_surface_fraction": 0.25941117604949415,
+        "new_geometry_area_m2": 0.0006046209888848061,
+        "new_geometry_coverage_fraction": 0.33172427295872875,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4638825001187725,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3965506623052459,
+        "yaw_fisher_information_rad_minus2": 159.42349380531397
+      },
+      "preflight_pass": false,
+      "selection_score": 3.4638825001187725,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.6706907679478875,
+          "forearm_link": 0.11873902589484638,
+          "gripper_base_link": 0.5136077275830087,
+          "my_end_effector_link": 0.5544527938413413,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.12815720480573295,
+          "wrist_2_link": 0.11383969016315983,
+          "wrist_3_link": 0.22487627447466246
+        },
+        "camera_position_world_m": [
+          0.28541645982486186,
+          0.15514791107666442,
+          0.6706907679478875
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 1.6614456570654235,
+        "joint_positions_rad": {
+          "elbow_joint": 3.0065582130266413,
+          "shoulder_lift_joint": 0.15015108220257223,
+          "shoulder_pan_joint": -2.2665399699757547,
+          "wrist_1_joint": -4.61533274187454,
+          "wrist_2_joint": 2.0729824772510135,
+          "wrist_3_joint": 3.580642488734854
+        },
+        "max_abs_scaled_residual": 1.0309747118523132,
+        "max_seed_delta_rad": 2.7949038758745397,
+        "minimum_distal_link_origin_z_m": 0.11383969016315983,
+        "projection": {
+          "camera_xyz_m": [
+            -0.017499780836871752,
+            -0.16590346485339866,
+            0.6449251864472214
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 152.47852605385833,
+          "v_px": 48.694044793961396,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.2827420963423107,
+          0.13023555810573503,
+          0.657145282649107
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            -0.2588190451025211,
+            -0.9145167628051194,
+            0.31092087810352065
+          ],
+          [
+            -0.9659258262890683,
+            0.24504402805835662,
+            -0.08331099819781398
+          ],
+          [
+            0.0,
+            -0.32188897909276193,
+            -0.946777421117878
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e65_v-110_a11",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 165.0,
+        "camera_position_world_m": [
+          0.3350636099697702,
+          0.11621605078248323,
+          0.6853429509256549
+        ],
+        "candidate_id": "geometry_nbv_e65_v-110_a11",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              -0.25881904510252096,
+              -0.9381352904893528,
+              0.23003234257529306
+            ],
+            [
+              -0.9659258262890683,
+              0.25137259347775903,
+              -0.06163698042608917
+            ],
+            [
+              0.0,
+              -0.23814700499213318,
+              -0.971229120245721
+            ]
+          ],
+          "translation_m": [
+            0.3350636099697702,
+            0.11621605078248323,
+            0.6853429509256549
+          ]
+        },
+        "elevation_deg": 65.0,
+        "expected_posterior_yaw_variance_rad2": 0.0061554415958175865,
+        "expected_yaw_information_gain_nats": 3.1406331295410075,
+        "expected_yaw_standard_deviation_deg": 4.495233337422697,
+        "external_occluded_surface_fraction": 0.31958941640334526,
+        "new_geometry_area_m2": 0.0005866997966244391,
+        "new_geometry_coverage_fraction": 0.3218918414315188,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.462524970972526,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3874185481627932,
+        "yaw_fisher_information_rad_minus2": 162.15391772918554
+      },
+      "preflight_pass": false,
+      "selection_score": 3.462524970972526,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.6836750536937244,
+          "forearm_link": 0.119234797270473,
+          "gripper_base_link": 0.5278474446331509,
+          "my_end_effector_link": 0.5720484055820942,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.1652795357212186,
+          "wrist_2_link": 0.14059618417830094,
+          "wrist_3_link": 0.2487203754968802
+        },
+        "camera_position_world_m": [
+          0.3409584592250917,
+          0.14252122851078433,
+          0.6836750536937244
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 1.4675126502033797,
+        "joint_positions_rad": {
+          "elbow_joint": 3.0660744952641608,
+          "shoulder_lift_joint": 0.149483025743642,
+          "shoulder_pan_joint": -2.374170116268637,
+          "wrist_1_joint": -4.592155102376371,
+          "wrist_2_joint": 2.0975850331292616,
+          "wrist_3_joint": 3.7061199201003063
+        },
+        "max_abs_scaled_residual": 1.056300915929839,
+        "max_seed_delta_rad": 2.808595239268637,
+        "minimum_distal_link_origin_z_m": 0.119234797270473,
+        "projection": {
+          "camera_xyz_m": [
+            -0.014092843019398893,
+            -0.13661052307534785,
+            0.6355457886045363
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 153.8534495196384,
+          "v_px": 60.41773721062527,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.3350636099697702,
+          0.11621605078248323,
+          0.6853429509256549
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            -0.25881904510252096,
+            -0.9381352904893528,
+            0.23003234257529306
+          ],
+          [
+            -0.9659258262890683,
+            0.25137259347775903,
+            -0.06163698042608917
+          ],
+          [
+            0.0,
+            -0.23814700499213318,
+            -0.971229120245721
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e60_v-110_a15",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 224.99999999999997,
+        "camera_position_world_m": [
+          0.37332876212819277,
+          -0.20783848109543884,
+          0.657145282649107
+        ],
+        "candidate_id": "geometry_nbv_e60_v-110_a15",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.7071067811865471,
+              -0.6694727347467635,
+              0.2276098799057069
+            ],
+            [
+              -0.707106781186548,
+              -0.6694727347467627,
+              0.22760987990570664
+            ],
+            [
+              0.0,
+              -0.32188897909276193,
+              -0.946777421117878
+            ]
+          ],
+          "translation_m": [
+            0.37332876212819277,
+            -0.20783848109543884,
+            0.657145282649107
+          ]
+        },
+        "elevation_deg": 60.0,
+        "expected_posterior_yaw_variance_rad2": 0.00604717673315976,
+        "expected_yaw_information_gain_nats": 3.1495056272818984,
+        "expected_yaw_standard_deviation_deg": 4.455525802782443,
+        "external_occluded_surface_fraction": 0.30825421077955495,
+        "new_geometry_area_m2": 0.0005477959181499569,
+        "new_geometry_coverage_fraction": 0.30054729494790156,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4500529222298,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3663984544988151,
+        "yaw_fisher_information_rad_minus2": 165.06246182845524
+      },
+      "preflight_pass": false,
+      "selection_score": 3.4500529222298,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7038308840110092,
+          "forearm_link": 0.6051971439679537,
+          "gripper_base_link": 0.5460808814797988,
+          "my_end_effector_link": 0.5875674164557845,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.09925086952447326,
+          "wrist_2_link": 0.1458000841845029,
+          "wrist_3_link": 0.25705095835974445
+        },
+        "camera_position_world_m": [
+          0.37808649644705805,
+          -0.20792427621682896,
+          0.7038308840110092
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 1.9916864501984297,
+        "joint_positions_rad": {
+          "elbow_joint": 2.716005096376649,
+          "shoulder_lift_joint": -0.5219558454095938,
+          "shoulder_pan_joint": 1.552811557116036,
+          "wrist_1_joint": -4.137332570756809,
+          "wrist_2_joint": 1.2138240044160105,
+          "wrist_3_joint": 0.8675675348789591
+        },
+        "max_abs_scaled_residual": 1.5561867120634085,
+        "max_seed_delta_rad": 2.3169037047568084,
+        "minimum_distal_link_origin_z_m": 0.09925086952447326,
+        "projection": {
+          "camera_xyz_m": [
+            -0.05089657336809584,
+            -0.23321519353643722,
+            0.6921322364817915
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 139.61648155516593,
+          "v_px": 26.59987727100369,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.37332876212819277,
+          -0.20783848109543884,
+          0.657145282649107
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.7071067811865471,
+            -0.6694727347467635,
+            0.2276098799057069
+          ],
+          [
+            -0.707106781186548,
+            -0.6694727347467627,
+            0.22760987990570664
+          ],
+          [
+            0.0,
+            -0.32188897909276193,
+            -0.946777421117878
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a13",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 195.0,
+        "camera_position_world_m": [
+          0.38955987285893806,
+          -0.02231603651111117,
+          0.7087123345501358
+        ],
+        "candidate_id": "geometry_nbv_e70_v-110_a13",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.2588190451025208,
+              -0.9546140421513862,
+              0.1473931220227415
+            ],
+            [
+              -0.9659258262890682,
+              -0.2557880616778737,
+              0.0394938680158955
+            ],
+            [
+              0.0,
+              -0.15259258838642104,
+              -0.9882891793243171
+            ]
+          ],
+          "translation_m": [
+            0.38955987285893806,
+            -0.02231603651111117,
+            0.7087123345501358
+          ]
+        },
+        "elevation_deg": 70.0,
+        "expected_posterior_yaw_variance_rad2": 0.006057459197816557,
+        "expected_yaw_information_gain_nats": 3.148656162069671,
+        "expected_yaw_standard_deviation_deg": 4.459312224943353,
+        "external_occluded_surface_fraction": 0.3881686567376708,
+        "new_geometry_area_m2": 0.0005465642505284613,
+        "new_geometry_coverage_fraction": 0.29987154261085314,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.448527704680524,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.371928534092297,
+        "yaw_fisher_information_rad_minus2": 164.7817542959972
+      },
+      "preflight_pass": false,
+      "selection_score": 3.448527704680524,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7076945683133252,
+          "forearm_link": 0.11812011875466101,
+          "gripper_base_link": 0.5573031673973198,
+          "my_end_effector_link": 0.6087405090913819,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.136493720714415,
+          "wrist_2_link": 0.2057834694507863,
+          "wrist_3_link": 0.3053086931554168
+        },
+        "camera_position_world_m": [
+          0.39817755048207115,
+          -0.06249753462403316,
+          0.7076945683133252
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 3.8587032324371693,
+        "joint_positions_rad": {
+          "elbow_joint": 3.020100249880485,
+          "shoulder_lift_joint": 0.15098516003455154,
+          "shoulder_pan_joint": 1.2072000321735301,
+          "wrist_1_joint": -5.314368504861119,
+          "wrist_2_joint": 1.1912143914223925,
+          "wrist_3_joint": 0.7970404972041288
+        },
+        "max_abs_scaled_residual": 1.7393823932246077,
+        "max_seed_delta_rad": 3.493939638861119,
+        "minimum_distal_link_origin_z_m": 0.11812011875466101,
+        "projection": {
+          "camera_xyz_m": [
+            -0.18149609260283855,
+            -0.20877925963780208,
+            0.6157468895081042
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 78.29573328072235,
+          "v_px": 26.0136443144919,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.38955987285893806,
+          -0.02231603651111117,
+          0.7087123345501358
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.2588190451025208,
+            -0.9546140421513862,
+            0.1473931220227415
+          ],
+          [
+            -0.9659258262890682,
+            -0.2557880616778737,
+            0.0394938680158955
+          ],
+          [
+            0.0,
+            -0.15259258838642104,
+            -0.9882891793243171
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a12",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 180.0,
+        "camera_position_world_m": [
+          0.3814020352155164,
+          0.039648892319852684,
+          0.7087123345501358
+        ],
+        "candidate_id": "geometry_nbv_e70_v-110_a12",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              -1.1593124873433585e-16,
+              -0.9882891793243171,
+              0.1525925883864211
+            ],
+            [
+              -1.0,
+              1.1457359866970007e-16,
+              -1.7690249319242302e-17
+            ],
+            [
+              0.0,
+              -0.1525925883864211,
+              -0.9882891793243171
+            ]
+          ],
+          "translation_m": [
+            0.3814020352155164,
+            0.039648892319852684,
+            0.7087123345501358
+          ]
+        },
+        "elevation_deg": 70.0,
+        "expected_posterior_yaw_variance_rad2": 0.006146172754044579,
+        "expected_yaw_information_gain_nats": 3.1413865951645756,
+        "expected_yaw_standard_deviation_deg": 4.4918476093080795,
+        "external_occluded_surface_fraction": 0.38576018019960456,
+        "new_geometry_area_m2": 0.0005497339755087622,
+        "new_geometry_coverage_fraction": 0.30161060680792773,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4429972019725033,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.37131096666075286,
+        "yaw_fisher_information_rad_minus2": 162.39891513759267
+      },
+      "preflight_pass": false,
+      "selection_score": 3.4429972019725033,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7076026532289057,
+          "forearm_link": 0.11585088095951623,
+          "gripper_base_link": 0.5574661914729102,
+          "my_end_effector_link": 0.5985306652978266,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.12612459035331966,
+          "wrist_2_link": 0.18050452187333588,
+          "wrist_3_link": 0.2855171245080372
+        },
+        "camera_position_world_m": [
+          0.41735711149263066,
+          -0.03130976151629725,
+          0.7076026532289059
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 14.644011701246535,
+        "joint_positions_rad": {
+          "elbow_joint": 3.0040382573421622,
+          "shoulder_lift_joint": 0.15404423663331082,
+          "shoulder_pan_joint": 1.4767382623777559,
+          "wrist_1_joint": -5.16801243189646,
+          "wrist_2_joint": 1.1435818825037434,
+          "wrist_3_joint": 0.2972691643178533
+        },
+        "max_abs_scaled_residual": 3.2031284465360397,
+        "max_seed_delta_rad": 3.3475835658964597,
+        "minimum_distal_link_origin_z_m": 0.11585088095951623,
+        "projection": {
+          "camera_xyz_m": [
+            -0.28669845255834003,
+            -0.09348027966568304,
+            0.5877410738270454
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 24.78683133678851,
+          "v_px": 75.91268558190727,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.3814020352155164,
+          0.03964889231985268,
+          0.7087123345501358
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            -1.2e-16,
+            -0.9882891793243171,
+            0.1525925883864211
+          ],
+          [
+            -1.0,
+            1.1e-16,
+            -2e-17
+          ],
+          [
+            0.0,
+            -0.1525925883864211,
+            -0.9882891793243171
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a11",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 165.0,
+        "camera_position_world_m": [
+          0.38955987285893806,
+          0.10161382115081655,
+          0.7087123345501358
+        ],
+        "candidate_id": "geometry_nbv_e70_v-110_a11",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              -0.2588190451025211,
+              -0.9546140421513862,
+              0.1473931220227415
+            ],
+            [
+              -0.9659258262890682,
+              0.255788061677874,
+              -0.03949386801589555
+            ],
+            [
+              0.0,
+              -0.1525925883864211,
+              -0.9882891793243171
+            ]
+          ],
+          "translation_m": [
+            0.38955987285893806,
+            0.10161382115081655,
+            0.7087123345501358
+          ]
+        },
+        "elevation_deg": 70.0,
+        "expected_posterior_yaw_variance_rad2": 0.006260372696402499,
+        "expected_yaw_information_gain_nats": 3.1321815212532473,
+        "expected_yaw_standard_deviation_deg": 4.533386288547477,
+        "external_occluded_surface_fraction": 0.3946204365370221,
+        "new_geometry_area_m2": 0.0005627571284362284,
+        "new_geometry_coverage_fraction": 0.30875573742018503,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4409372586734324,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3715854678548754,
+        "yaw_fisher_information_rad_minus2": 159.43093539121526
+      },
+      "preflight_pass": false,
+      "selection_score": 3.4409372586734324,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7079139292466109,
+          "forearm_link": 0.20630451645246164,
+          "gripper_base_link": 0.5552076615948359,
+          "my_end_effector_link": 0.6052557804936792,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.2268093844415268,
+          "wrist_2_link": 0.19275660040864068,
+          "wrist_3_link": 0.2950126939938766
+        },
+        "camera_position_world_m": [
+          0.39795458054374555,
+          0.128686449557129,
+          0.7079139292466109
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 1.5923451759695526,
+        "joint_positions_rad": {
+          "elbow_joint": 3.1415876104615537,
+          "shoulder_lift_joint": 0.03291990171330462,
+          "shoulder_pan_joint": -2.4162833155611376,
+          "wrist_1_joint": -4.475821089484327,
+          "wrist_2_joint": 2.158567103383123,
+          "wrist_3_joint": 3.770887334567803
+        },
+        "max_abs_scaled_residual": 1.0978900130682039,
+        "max_seed_delta_rad": 2.8507084385611376,
+        "minimum_distal_link_origin_z_m": 0.19275660040864068,
+        "projection": {
+          "camera_xyz_m": [
+            -0.01023813112166918,
+            -0.12681369953263502,
+            0.6366003704498719
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 155.5420675443105,
+          "v_px": 64.78221657309436,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.38955987285893806,
+          0.10161382115081655,
+          0.7087123345501358
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            -0.2588190451025211,
+            -0.9546140421513862,
+            0.1473931220227415
+          ],
+          [
+            -0.9659258262890682,
+            0.255788061677874,
+            -0.03949386801589555
+          ],
+          [
+            0.0,
+            -0.1525925883864211,
+            -0.9882891793243171
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e65_v-110_a14",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 210.0,
+        "camera_position_world_m": [
+          0.36461743000401775,
+          -0.10826749928939206,
+          0.6853429509256549
+        ],
+        "candidate_id": "geometry_nbv_e65_v-110_a14",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.49999999999999967,
+              -0.8411090910280058,
+              0.20624135615836686
+            ],
+            [
+              -0.8660254037844388,
+              -0.4856145601228602,
+              0.11907350249606648
+            ],
+            [
+              0.0,
+              -0.23814700499213312,
+              -0.971229120245721
+            ]
+          ],
+          "translation_m": [
+            0.36461743000401775,
+            -0.10826749928939206,
+            0.6853429509256549
+          ]
+        },
+        "elevation_deg": 65.0,
+        "expected_posterior_yaw_variance_rad2": 0.006252778043723726,
+        "expected_yaw_information_gain_nats": 3.132788455011902,
+        "expected_yaw_standard_deviation_deg": 4.530635658177586,
+        "external_occluded_surface_fraction": 0.341575828416094,
+        "new_geometry_area_m2": 0.000543629463249208,
+        "new_geometry_coverage_fraction": 0.2982613765822234,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4310498315941254,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.36833247405106934,
+        "yaw_fisher_information_rad_minus2": 159.6249501266915
+      },
+      "preflight_pass": false,
+      "selection_score": 3.4310498315941254,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.705999224365853,
+          "forearm_link": 0.11994443876275758,
+          "gripper_base_link": 0.5500729349570387,
+          "my_end_effector_link": 0.5960169101605558,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.11082430416522136,
+          "wrist_2_link": 0.1669176900490267,
+          "wrist_3_link": 0.2741675404319707
+        },
+        "camera_position_world_m": [
+          0.368079194372511,
+          -0.11025401549904396,
+          0.705999224365853
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 0.40694983689496417,
+        "joint_positions_rad": {
+          "elbow_joint": 2.9784294603079293,
+          "shoulder_lift_joint": 0.14852689422073712,
+          "shoulder_pan_joint": 1.241911963100468,
+          "wrist_1_joint": -5.151739112195152,
+          "wrist_2_joint": 1.2115079740051484,
+          "wrist_3_joint": 0.9374525932646454
+        },
+        "max_abs_scaled_residual": 0.6885424480066054,
+        "max_seed_delta_rad": 3.3313102461951516,
+        "minimum_distal_link_origin_z_m": 0.11082430416522136,
+        "projection": {
+          "camera_xyz_m": [
+            -0.07319960444474584,
+            -0.2083053927414736,
+            0.6632001421512762
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 129.40546849252166,
+          "v_px": 32.93660737993086,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.36461743000401775,
+          -0.10826749928939206,
+          0.6853429509256549
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.49999999999999967,
+            -0.8411090910280058,
+            0.20624135615836686
+          ],
+          [
+            -0.8660254037844388,
+            -0.4856145601228602,
+            0.11907350249606648
+          ],
+          [
+            0.0,
+            -0.23814700499213312,
+            -0.971229120245721
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e60_v-110_a16",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 239.99999999999997,
+        "camera_position_world_m": [
+          0.4458161355434844,
+          -0.26345999900470085,
+          0.657145282649107
+        ],
+        "candidate_id": "geometry_nbv_e60_v-110_a16",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.8660254037844384,
+              -0.4733887105589393,
+              0.16094448954638108
+            ],
+            [
+              -0.5000000000000003,
+              -0.8199332984175994,
+              0.2787640330925698
+            ],
+            [
+              0.0,
+              -0.3218889790927618,
+              -0.9467774211178779
+            ]
+          ],
+          "translation_m": [
+            0.4458161355434844,
+            -0.26345999900470085,
+            0.657145282649107
+          ]
+        },
+        "elevation_deg": 60.0,
+        "expected_posterior_yaw_variance_rad2": 0.006160966413060916,
+        "expected_yaw_information_gain_nats": 3.1401845557677195,
+        "expected_yaw_standard_deviation_deg": 4.497250233532203,
+        "external_occluded_surface_fraction": 0.3485689220271818,
+        "new_geometry_area_m2": 0.0005212066863602171,
+        "new_geometry_coverage_fraction": 0.28595915833648294,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4261437141042026,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3427090642920198,
+        "yaw_fisher_information_rad_minus2": 162.0082343990657
+      },
+      "preflight_pass": false,
+      "selection_score": 3.4261437141042026,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7036558277795146,
+          "forearm_link": 0.7078875959557187,
+          "gripper_base_link": 0.5460206671310126,
+          "my_end_effector_link": 0.5878136914129114,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.09932866241273441,
+          "wrist_2_link": 0.1468835958666334,
+          "wrist_3_link": 0.2578683348348455
+        },
+        "camera_position_world_m": [
+          0.4490951594809217,
+          -0.26272270502214534,
+          0.7036558277795146
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 2.017984419055587,
+        "joint_positions_rad": {
+          "elbow_joint": 2.475778735645444,
+          "shoulder_lift_joint": -0.6885300350260997,
+          "shoulder_pan_joint": 1.7920063905399646,
+          "wrist_1_joint": -3.738987941399617,
+          "wrist_2_joint": 1.216381698978837,
+          "wrist_3_joint": 0.8904181936682711
+        },
+        "max_abs_scaled_residual": 1.5503515043469216,
+        "max_seed_delta_rad": 1.9185590753996171,
+        "minimum_distal_link_origin_z_m": 0.09932866241273441,
+        "projection": {
+          "camera_xyz_m": [
+            -0.029652974048004037,
+            -0.24809754973722783,
+            0.6941711723971007
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 148.15919124153146,
+          "v_px": 20.931500660693757,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.4458161355434844,
+          -0.26345999900470085,
+          0.657145282649107
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.8660254037844384,
+            -0.4733887105589393,
+            0.16094448954638108
+          ],
+          [
+            -0.5000000000000003,
+            -0.8199332984175994,
+            0.2787640330925698
+          ],
+          [
+            0.0,
+            -0.3218889790927618,
+            -0.9467774211178779
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e60_v-110_a10",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 150.0,
+        "camera_position_world_m": [
+          0.317707244218931,
+          0.21464889231985265,
+          0.657145282649107
+        ],
+        "candidate_id": "geometry_nbv_e60_v-110_a10",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              -0.4999999999999999,
+              -0.8199332984175999,
+              0.2787640330925699
+            ],
+            [
+              -0.8660254037844387,
+              0.47338871055893883,
+              -0.16094448954638094
+            ],
+            [
+              0.0,
+              -0.32188897909276193,
+              -0.946777421117878
+            ]
+          ],
+          "translation_m": [
+            0.317707244218931,
+            0.21464889231985265,
+            0.657145282649107
+          ]
+        },
+        "elevation_deg": 60.0,
+        "expected_posterior_yaw_variance_rad2": 0.006576916367307243,
+        "expected_yaw_information_gain_nats": 3.1075183818538386,
+        "expected_yaw_standard_deviation_deg": 4.6465839940855895,
+        "external_occluded_surface_fraction": 0.3110019615910277,
+        "new_geometry_area_m2": 0.0005725818170984115,
+        "new_geometry_coverage_fraction": 0.31414603607574404,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4216644179295828,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.36186088005075073,
+        "yaw_fisher_information_rad_minus2": 151.74297518936677
+      },
+      "preflight_pass": false,
+      "selection_score": 3.4216644179295828,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.674902845679823,
+          "forearm_link": 0.47020825594224236,
+          "gripper_base_link": 0.5167493797430778,
+          "my_end_effector_link": 0.5570237211267863,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.12321810713103443,
+          "wrist_2_link": 0.11210778295756298,
+          "wrist_3_link": 0.2243679279491449
+        },
+        "camera_position_world_m": [
+          0.31770716130899235,
+          0.2146494225883643,
+          0.674902845679823
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 0.35420812063078544,
+        "joint_positions_rad": {
+          "elbow_joint": 2.8753442270803253,
+          "shoulder_lift_joint": -0.32437380256789605,
+          "shoulder_pan_joint": -2.2571592430976537,
+          "wrist_1_joint": -4.034793947394819,
+          "wrist_2_joint": 2.057321182615466,
+          "wrist_3_joint": 3.325958251098528
+        },
+        "max_abs_scaled_residual": 0.5919187676905321,
+        "max_seed_delta_rad": 2.6915843660976537,
+        "minimum_distal_link_origin_z_m": 0.11210778295756298,
+        "projection": {
+          "camera_xyz_m": [
+            -0.07766439539445644,
+            -0.13846531384791738,
+            0.6398433490175576
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 126.35442231710394,
+          "v_px": 60.01439849244971,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.317707244218931,
+          0.21464889231985265,
+          0.657145282649107
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            -0.4999999999999999,
+            -0.8199332984175999,
+            0.2787640330925699
+          ],
+          [
+            -0.8660254037844387,
+            0.47338871055893883,
+            -0.16094448954638094
+          ],
+          [
+            0.0,
+            -0.32188897909276193,
+            -0.946777421117878
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e65_v-110_a15",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 224.99999999999997,
+        "camera_position_world_m": [
+          0.4116307684324006,
+          -0.1695364747912311,
+          0.6853429509256549
+        ],
+        "candidate_id": "geometry_nbv_e65_v-110_a15",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.7071067811865471,
+              -0.6867626970115943,
+              0.16839536214920398
+            ],
+            [
+              -0.7071067811865479,
+              -0.6867626970115938,
+              0.16839536214920375
+            ],
+            [
+              0.0,
+              -0.23814700499213307,
+              -0.971229120245721
+            ]
+          ],
+          "translation_m": [
+            0.4116307684324006,
+            -0.1695364747912311,
+            0.6853429509256549
+          ]
+        },
+        "elevation_deg": 65.0,
+        "expected_posterior_yaw_variance_rad2": 0.006307989166272008,
+        "expected_yaw_information_gain_nats": 3.1283929051859873,
+        "expected_yaw_standard_deviation_deg": 4.550594125039392,
+        "external_occluded_surface_fraction": 0.3728534071938408,
+        "new_geometry_area_m2": 0.000517601181596993,
+        "new_geometry_coverage_fraction": 0.28398100430574746,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.412373909491735,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.34958323376172856,
+        "yaw_fisher_information_rad_minus2": 158.2251609673694
+      },
+      "preflight_pass": false,
+      "selection_score": 3.412373909491735,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7031534675398242,
+          "forearm_link": 0.6249696367172378,
+          "gripper_base_link": 0.5471376536591958,
+          "my_end_effector_link": 0.5928978989837631,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.11208424889061652,
+          "wrist_2_link": 0.16323055541335715,
+          "wrist_3_link": 0.27065750484640644
+        },
+        "camera_position_world_m": [
+          0.4136655761533826,
+          -0.16948619480562466,
+          0.7031534675398242
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 0.3020594673766048,
+        "joint_positions_rad": {
+          "elbow_joint": 2.7273311641470817,
+          "shoulder_lift_joint": -0.5526230816670991,
+          "shoulder_pan_joint": 1.5956109838126524,
+          "wrist_1_joint": -4.156883975645093,
+          "wrist_2_joint": 1.1665968576269103,
+          "wrist_3_joint": 0.844545086764158
+        },
+        "max_abs_scaled_residual": 0.5936838871389776,
+        "max_seed_delta_rad": 2.336455109645093,
+        "minimum_distal_link_origin_z_m": 0.11208424889061652,
+        "projection": {
+          "camera_xyz_m": [
+            -0.05226979485623602,
+            -0.2227220171330029,
+            0.6649452418273338
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 138.21063386253405,
+          "v_px": 27.15533528429411,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.4116307684324006,
+          -0.1695364747912311,
+          0.6853429509256549
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.7071067811865471,
+            -0.6867626970115943,
+            0.16839536214920398
+          ],
+          [
+            -0.7071067811865479,
+            -0.6867626970115938,
+            0.16839536214920375
+          ],
+          [
+            0.0,
+            -0.23814700499213307,
+            -0.971229120245721
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a12",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 180.0,
+        "camera_position_world_m": [
+          0.43964280397172006,
+          0.03964889231985268,
+          0.7270755784023478
+        ],
+        "candidate_id": "geometry_nbv_e75_v-110_a12",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              -1.1489925990280747e-16,
+              -0.9978277610029335,
+              0.06587685004516416
+            ],
+            [
+              -1.0,
+              1.146496712497125e-16,
+              -7.569201314917599e-18
+            ],
+            [
+              0.0,
+              -0.06587685004516416,
+              -0.9978277610029335
+            ]
+          ],
+          "translation_m": [
+            0.43964280397172006,
+            0.03964889231985268,
+            0.7270755784023478
+          ]
+        },
+        "elevation_deg": 75.0,
+        "expected_posterior_yaw_variance_rad2": 0.006300449671266783,
+        "expected_yaw_information_gain_nats": 3.1289908773854807,
+        "expected_yaw_standard_deviation_deg": 4.54787380967898,
+        "external_occluded_surface_fraction": 0.4560172775911065,
+        "new_geometry_area_m2": 0.000516048640934089,
+        "new_geometry_coverage_fraction": 0.28312920552252857,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.412120082908009,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.350199166871369,
+        "yaw_fisher_information_rad_minus2": 158.4148664018782
+      },
+      "preflight_pass": false,
+      "selection_score": 3.412120082908009,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7274678037580217,
+          "forearm_link": 0.6603660993321936,
+          "gripper_base_link": 0.5765513824683446,
+          "my_end_effector_link": 0.6290608046141655,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.3039008160126402,
+          "wrist_2_link": 0.22606441370915017,
+          "wrist_3_link": 0.3254457612697096
+        },
+        "camera_position_world_m": [
+          0.45493816508695795,
+          0.06792992582481164,
+          0.7274678037580217
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 2.1489045895669068,
+        "joint_positions_rad": {
+          "elbow_joint": 3.1415926535893424,
+          "shoulder_lift_joint": -2.532547644921107,
+          "shoulder_pan_joint": 2.628340118828252,
+          "wrist_1_joint": -1.5256171621103487,
+          "wrist_2_joint": 1.383192446379705,
+          "wrist_3_joint": -1.1670644554181016
+        },
+        "max_abs_scaled_residual": 1.1912116507489892,
+        "max_seed_delta_rad": 2.7145419534181014,
+        "minimum_distal_link_origin_z_m": 0.22606441370915017,
+        "projection": {
+          "camera_xyz_m": [
+            -0.005021871609518544,
+            -0.09717463465631375,
+            0.6448580916112497
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 157.84135545281313,
+          "v_px": 78.2296180515379,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.43964280397172006,
+          0.03964889231985268,
+          0.7270755784023478
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            -1.1e-16,
+            -0.9978277610029335,
+            0.06587685004516416
+          ],
+          [
+            -1.0,
+            1.1e-16,
+            -1e-17
+          ],
+          [
+            0.0,
+            -0.06587685004516416,
+            -0.9978277610029335
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e65_v-110_a10",
+      "failure_codes": [],
+      "geometry_candidate": {
+        "azimuth_deg": 150.0,
+        "camera_position_world_m": [
+          0.3646174300040178,
+          0.18756528392909744,
+          0.6853429509256549
+        ],
+        "candidate_id": "geometry_nbv_e65_v-110_a10",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              -0.49999999999999994,
+              -0.8411090910280057,
+              0.20624135615836678
+            ],
+            [
+              -0.8660254037844387,
+              0.4856145601228604,
+              -0.11907350249606652
+            ],
+            [
+              0.0,
+              -0.23814700499213307,
+              -0.971229120245721
+            ]
+          ],
+          "translation_m": [
+            0.3646174300040178,
+            0.18756528392909744,
+            0.6853429509256549
+          ]
+        },
+        "elevation_deg": 65.0,
+        "expected_posterior_yaw_variance_rad2": 0.006623335413314537,
+        "expected_yaw_information_gain_nats": 3.1040018400394156,
+        "expected_yaw_standard_deviation_deg": 4.6629526646843225,
+        "external_occluded_surface_fraction": 0.37078841092900267,
+        "new_geometry_area_m2": 0.0005539220914580465,
+        "new_geometry_coverage_fraction": 0.30390840947089137,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.407910249510307,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3506051516219308,
+        "yaw_fisher_information_rad_minus2": 150.6773679983938
+      },
+      "preflight_pass": true,
+      "selection_score": 3.407910249510307,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.6853430611471797,
+          "forearm_link": 0.5184892690102709,
+          "gripper_base_link": 0.5285591965689241,
+          "my_end_effector_link": 0.5726205329234547,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.1562863541216979,
+          "wrist_2_link": 0.13789139280319498,
+          "wrist_3_link": 0.2469050637317994
+        },
+        "camera_position_world_m": [
+          0.3646173864714593,
+          0.18756586485446988,
+          0.6853430611471797
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 0.00023368253946332447,
+        "joint_positions_rad": {
+          "elbow_joint": 2.9143673841011397,
+          "shoulder_lift_joint": -0.39309117063604343,
+          "shoulder_pan_joint": -2.336492660347368,
+          "wrist_1_joint": -3.9477558567164692,
+          "wrist_2_joint": 2.098157842081621,
+          "wrist_3_joint": 3.4227177456259663
+        },
+        "max_abs_scaled_residual": 0.01385458891673684,
+        "max_seed_delta_rad": 2.770917783347368,
+        "minimum_distal_link_origin_z_m": 0.13789139280319498,
+        "projection": {
+          "camera_xyz_m": [
+            -0.07766425680271744,
+            -0.1160123984196933,
+            0.6291376080295376
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 125.78195228982119,
+          "v_px": 68.88616787795695,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.3646174300040178,
+          0.18756528392909744,
+          0.6853429509256549
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            -0.49999999999999994,
+            -0.8411090910280057,
+            0.20624135615836678
+          ],
+          [
+            -0.8660254037844387,
+            0.4856145601228604,
+            -0.11907350249606652
+          ],
+          [
+            0.0,
+            -0.23814700499213307,
+            -0.971229120245721
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a11",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 165.0,
+        "camera_position_world_m": [
+          0.44581613554348465,
+          0.08654000099529918,
+          0.7270755784023478
+        ],
+        "candidate_id": "geometry_nbv_e75_v-110_a11",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              -0.25881904510252113,
+              -0.9638276045409295,
+              0.0636321508131962
+            ],
+            [
+              -0.9659258262890683,
+              0.25825682827956586,
+              -0.017050183423051368
+            ],
+            [
+              0.0,
+              -0.06587685004516416,
+              -0.9978277610029335
+            ]
+          ],
+          "translation_m": [
+            0.44581613554348465,
+            0.08654000099529918,
+            0.7270755784023478
+          ]
+        },
+        "elevation_deg": 75.0,
+        "expected_posterior_yaw_variance_rad2": 0.006442375263106992,
+        "expected_yaw_information_gain_nats": 3.1178527301112555,
+        "expected_yaw_standard_deviation_deg": 4.598811849041686,
+        "external_occluded_surface_fraction": 0.4744864079170682,
+        "new_geometry_area_m2": 0.0005190853497233859,
+        "new_geometry_coverage_fraction": 0.28479529061357856,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.402648020724834,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.34754525641619854,
+        "yaw_fisher_information_rad_minus2": 154.91828898170886
+      },
+      "preflight_pass": false,
+      "selection_score": 3.402648020724834,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7277964683246695,
+          "forearm_link": 0.808080395555649,
+          "gripper_base_link": 0.5789447115925056,
+          "my_end_effector_link": 0.6351307983069857,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.32897900599411245,
+          "wrist_2_link": 0.2443786526562123,
+          "wrist_3_link": 0.339983497482134
+        },
+        "camera_position_world_m": [
+          0.4438342013916369,
+          0.07970846113580429,
+          0.7277964683246694
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 0.10911015472843749,
+        "joint_positions_rad": {
+          "elbow_joint": 3.1415926535897896,
+          "shoulder_lift_joint": -2.26447191044678,
+          "shoulder_pan_joint": -3.339648760070497,
+          "wrist_1_joint": -1.7251985988072402,
+          "wrist_2_joint": 1.5810163911935922,
+          "wrist_3_joint": 4.663721992007854
+        },
+        "max_abs_scaled_residual": 0.289485732070659,
+        "max_seed_delta_rad": 3.774073883070497,
+        "minimum_distal_link_origin_z_m": 0.2443786526562123,
+        "projection": {
+          "camera_xyz_m": [
+            -0.10259787511232325,
+            -0.1314732195844148,
+            0.6330609581327579
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 115.07661023483877,
+          "v_px": 62.43328450413603,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.44581613554348465,
+          0.08654000099529918,
+          0.7270755784023478
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            -0.25881904510252113,
+            -0.9638276045409295,
+            0.0636321508131962
+          ],
+          [
+            -0.9659258262890683,
+            0.25825682827956586,
+            -0.01705018342305137
+          ],
+          [
+            0.0,
+            -0.06587685004516416,
+            -0.9978277610029335
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a10",
+      "failure_codes": [],
+      "geometry_candidate": {
+        "azimuth_deg": 150.0,
+        "camera_position_world_m": [
+          0.4134774426352678,
+          0.15935594248383672,
+          0.7087123345501358
+        ],
+        "candidate_id": "geometry_nbv_e70_v-110_a10",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              -0.49999999999999994,
+              -0.8558835355801335,
+              0.132149057971863
+            ],
+            [
+              -0.8660254037844388,
+              0.4941445896621585,
+              -0.07629629419321052
+            ],
+            [
+              0.0,
+              -0.15259258838642115,
+              -0.9882891793243171
+            ]
+          ],
+          "translation_m": [
+            0.4134774426352678,
+            0.15935594248383672,
+            0.7087123345501358
+          ]
+        },
+        "elevation_deg": 70.0,
+        "expected_posterior_yaw_variance_rad2": 0.0065307039057785005,
+        "expected_yaw_information_gain_nats": 3.1110440144279234,
+        "expected_yaw_standard_deviation_deg": 4.630230691006244,
+        "external_occluded_surface_fraction": 0.428653821209077,
+        "new_geometry_area_m2": 0.0005276199349364744,
+        "new_geometry_coverage_fraction": 0.28947777621507575,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.4005217906429994,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3345959938538243,
+        "yaw_fisher_information_rad_minus2": 152.8188872822243
+      },
+      "preflight_pass": true,
+      "selection_score": 3.4005217906429994,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7087125133796285,
+          "forearm_link": 0.6757141112533006,
+          "gripper_base_link": 0.5552028267621678,
+          "my_end_effector_link": 0.6054317046318283,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.21540428876650858,
+          "wrist_2_link": 0.19063581817886094,
+          "wrist_3_link": 0.2934753328343297
+        },
+        "camera_position_world_m": [
+          0.41347741157358686,
+          0.1593564550856385,
+          0.7087125133796285
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 0.00022788126313635183,
+        "joint_positions_rad": {
+          "elbow_joint": 2.9445907634207003,
+          "shoulder_lift_joint": -0.6342013581742262,
+          "shoulder_pan_joint": -2.367221654362049,
+          "wrist_1_joint": -3.6863087111147355,
+          "wrist_2_joint": 2.1761764376210597,
+          "wrist_3_joint": 3.4754552226274646
+        },
+        "max_abs_scaled_residual": 0.014008233886810245,
+        "max_seed_delta_rad": 2.801646777362049,
+        "minimum_distal_link_origin_z_m": 0.19063581817886094,
+        "projection": {
+          "camera_xyz_m": [
+            -0.07766440415537836,
+            -0.11107989318310858,
+            0.6311191681423889
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 125.88932388779949,
+          "v_px": 71.213038969997,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.4134774426352678,
+          0.15935594248383672,
+          0.7087123345501358
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            -0.49999999999999994,
+            -0.8558835355801335,
+            0.132149057971863
+          ],
+          [
+            -0.8660254037844388,
+            0.4941445896621585,
+            -0.07629629419321052
+          ],
+          [
+            0.0,
+            -0.15259258838642115,
+            -0.9882891793243171
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a14",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 210.0,
+        "camera_position_world_m": [
+          0.4134774426352678,
+          -0.08005815784413137,
+          0.7087123345501358
+        ],
+        "candidate_id": "geometry_nbv_e70_v-110_a14",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.4999999999999998,
+              -0.8558835355801335,
+              0.132149057971863
+            ],
+            [
+              -0.8660254037844388,
+              -0.49414458966215835,
+              0.0762962941932105
+            ],
+            [
+              0.0,
+              -0.1525925883864211,
+              -0.9882891793243171
+            ]
+          ],
+          "translation_m": [
+            0.4134774426352678,
+            -0.08005815784413137,
+            0.7087123345501358
+          ]
+        },
+        "elevation_deg": 70.0,
+        "expected_posterior_yaw_variance_rad2": 0.006484268329210867,
+        "expected_yaw_information_gain_nats": 3.114611887856031,
+        "expected_yaw_standard_deviation_deg": 4.613740049711674,
+        "external_occluded_surface_fraction": 0.40482843884653885,
+        "new_geometry_area_m2": 0.0005142701860084759,
+        "new_geometry_coverage_fraction": 0.28215345926489865,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.3967653471209296,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3501522130296888,
+        "yaw_fisher_information_rad_minus2": 153.91544089523344
+      },
+      "preflight_pass": false,
+      "selection_score": 3.3967653471209296,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7086748256682304,
+          "forearm_link": 0.11988455908488888,
+          "gripper_base_link": 0.5552866332629111,
+          "my_end_effector_link": 0.6056913436290388,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.13159493347875575,
+          "wrist_2_link": 0.1915536069305005,
+          "wrist_3_link": 0.29419347987299826
+        },
+        "camera_position_world_m": [
+          0.41417054103396755,
+          -0.08230020584846354,
+          0.7086748256682304
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 0.012986872054660915,
+        "joint_positions_rad": {
+          "elbow_joint": 3.0117809665499764,
+          "shoulder_lift_joint": 0.14860756747567974,
+          "shoulder_pan_joint": 1.308174843003835,
+          "wrist_1_joint": -5.219084224056832,
+          "wrist_2_joint": 1.1469510329638943,
+          "wrist_3_joint": 0.8965141956916572
+        },
+        "max_abs_scaled_residual": 0.09813187620177921,
+        "max_seed_delta_rad": 3.398655358056832,
+        "minimum_distal_link_origin_z_m": 0.11988455908488888,
+        "projection": {
+          "camera_xyz_m": [
+            -0.07357464254138434,
+            -0.19673301924235656,
+            0.642901697991925
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 128.2778019917741,
+          "v_px": 35.177246187070295,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.4134774426352678,
+          -0.08005815784413137,
+          0.7087123345501358
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.4999999999999998,
+            -0.8558835355801335,
+            0.132149057971863
+          ],
+          [
+            -0.8660254037844388,
+            -0.49414458966215835,
+            0.0762962941932105
+          ],
+          [
+            0.0,
+            -0.1525925883864211,
+            -0.9882891793243171
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e75_v-110_a13",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 195.0,
+        "camera_position_world_m": [
+          0.44581613554348465,
+          -0.007242216355593814,
+          0.7270755784023478
+        ],
+        "candidate_id": "geometry_nbv_e75_v-110_a13",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.25881904510252085,
+              -0.9638276045409295,
+              0.0636321508131962
+            ],
+            [
+              -0.9659258262890683,
+              -0.25825682827956564,
+              0.01705018342305134
+            ],
+            [
+              0.0,
+              -0.06587685004516411,
+              -0.9978277610029335
+            ]
+          ],
+          "translation_m": [
+            0.44581613554348465,
+            -0.007242216355593814,
+            0.7270755784023478
+          ]
+        },
+        "elevation_deg": 75.0,
+        "expected_posterior_yaw_variance_rad2": 0.006496034798696576,
+        "expected_yaw_information_gain_nats": 3.1137054011127963,
+        "expected_yaw_standard_deviation_deg": 4.6179242400734966,
+        "external_occluded_surface_fraction": 0.45542748996023796,
+        "new_geometry_area_m2": 0.0005059466513167698,
+        "new_geometry_coverage_fraction": 0.2775867661715184,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.391292167284315,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3479911489539649,
+        "yaw_fisher_information_rad_minus2": 153.63609850056463
+      },
+      "preflight_pass": false,
+      "selection_score": 3.391292167284315,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7237547176672835,
+          "forearm_link": 0.1191521637958871,
+          "gripper_base_link": 0.5771904522110521,
+          "my_end_effector_link": 0.6335801413441378,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.17852542946541117,
+          "wrist_2_link": 0.25046651152016247,
+          "wrist_3_link": 0.3440159197352237
+        },
+        "camera_position_world_m": [
+          0.4561852097104887,
+          -0.04629191195068741,
+          0.7237547176672835
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 3.802890662229828,
+        "joint_positions_rad": {
+          "elbow_joint": 3.0874312602979965,
+          "shoulder_lift_joint": 0.1495943704296353,
+          "shoulder_pan_joint": 1.2920462888424749,
+          "wrist_1_joint": -5.405171232853503,
+          "wrist_2_joint": 1.0919885681470085,
+          "wrist_3_joint": 0.7586409293601268
+        },
+        "max_abs_scaled_residual": 1.7376270263625593,
+        "max_seed_delta_rad": 3.5847423668535026,
+        "minimum_distal_link_origin_z_m": 0.1191521637958871,
+        "projection": {
+          "camera_xyz_m": [
+            -0.18143590464783238,
+            -0.19515891700669957,
+            0.612367488448153
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 77.8720858638366,
+          "v_px": 31.660292322276305,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.44581613554348465,
+          -0.00724221635559381,
+          0.7270755784023478
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.25881904510252085,
+            -0.9638276045409295,
+            0.0636321508131962
+          ],
+          [
+            -0.9659258262890683,
+            -0.25825682827956564,
+            0.01705018342305134
+          ],
+          [
+            0.0,
+            -0.06587685004516411,
+            -0.9978277610029335
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e65_v-110_a16",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 239.99999999999997,
+        "camera_position_world_m": [
+          0.4728997439342396,
+          -0.216549813219614,
+          0.6853429509256549
+        ],
+        "candidate_id": "geometry_nbv_e65_v-110_a16",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.8660254037844383,
+              -0.485614560122861,
+              0.11907350249606669
+            ],
+            [
+              -0.5000000000000006,
+              -0.8411090910280052,
+              0.20624135615836667
+            ],
+            [
+              0.0,
+              -0.238147004992133,
+              -0.971229120245721
+            ]
+          ],
+          "translation_m": [
+            0.4728997439342396,
+            -0.216549813219614,
+            0.6853429509256549
+          ]
+        },
+        "elevation_deg": 65.0,
+        "expected_posterior_yaw_variance_rad2": 0.006444244157403341,
+        "expected_yaw_information_gain_nats": 3.117707704154605,
+        "expected_yaw_standard_deviation_deg": 4.599478844494207,
+        "external_occluded_surface_fraction": 0.4074100384352235,
+        "new_geometry_area_m2": 0.0004891946824909857,
+        "new_geometry_coverage_fraction": 0.26839582708485155,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.3861035312394567,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3198521797858571,
+        "yaw_fisher_information_rad_minus2": 154.87327299917638
+      },
+      "preflight_pass": false,
+      "selection_score": 3.3861035312394567,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7036162211317809,
+          "forearm_link": 0.7223724285731449,
+          "gripper_base_link": 0.5476876210169564,
+          "my_end_effector_link": 0.5936259339390637,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.11187856730127288,
+          "wrist_2_link": 0.16451065289619735,
+          "wrist_3_link": 0.27176556843121
+        },
+        "camera_position_world_m": [
+          0.4742986456211819,
+          -0.2161836965510353,
+          0.7036162211317809
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 0.32531491010613905,
+        "joint_positions_rad": {
+          "elbow_joint": 2.486068607127833,
+          "shoulder_lift_joint": -0.7137891034255486,
+          "shoulder_pan_joint": 1.826859628972899,
+          "wrist_1_joint": -3.767164504046403,
+          "wrist_2_joint": 1.1761640554564106,
+          "wrist_3_joint": 0.8752712111179902
+        },
+        "max_abs_scaled_residual": 0.6091090068708671,
+        "max_seed_delta_rad": 1.946735638046403,
+        "minimum_distal_link_origin_z_m": 0.11187856730127288,
+        "projection": {
+          "camera_xyz_m": [
+            -0.03243550778744839,
+            -0.23577092771666855,
+            0.6673114894740242
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 146.5267681715185,
+          "v_px": 22.06423194114197,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.4728997439342396,
+          -0.216549813219614,
+          0.6853429509256549
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.8660254037844383,
+            -0.485614560122861,
+            0.11907350249606669
+          ],
+          [
+            -0.5000000000000006,
+            -0.8411090910280052,
+            0.20624135615836667
+          ],
+          [
+            0.0,
+            -0.238147004992133,
+            -0.971229120245721
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e70_v-110_a15",
+      "failure_codes": [],
+      "geometry_candidate": {
+        "azimuth_deg": 224.99999999999997,
+        "camera_position_world_m": [
+          0.4515248016899017,
+          -0.12964244153372997,
+          0.7087123345501358
+        ],
+        "candidate_id": "geometry_nbv_e70_v-110_a15",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.7071067811865471,
+              -0.6988259804735131,
+              0.10789925400684608
+            ],
+            [
+              -0.707106781186548,
+              -0.6988259804735123,
+              0.10789925400684591
+            ],
+            [
+              0.0,
+              -0.15259258838642115,
+              -0.9882891793243171
+            ]
+          ],
+          "translation_m": [
+            0.4515248016899017,
+            -0.12964244153372997,
+            0.7087123345501358
+          ]
+        },
+        "elevation_deg": 70.0,
+        "expected_posterior_yaw_variance_rad2": 0.006597479265238246,
+        "expected_yaw_information_gain_nats": 3.105957557721728,
+        "expected_yaw_standard_deviation_deg": 4.653842157400155,
+        "external_occluded_surface_fraction": 0.43211081199173645,
+        "new_geometry_area_m2": 0.00048439949916903537,
+        "new_geometry_coverage_fraction": 0.26576495794464566,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.3717225156663737,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.3292948436965711,
+        "yaw_fisher_information_rad_minus2": 151.26907818168513
+      },
+      "preflight_pass": true,
+      "selection_score": 3.3717225156663737,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7087124332000008,
+          "forearm_link": 0.6610901607749943,
+          "gripper_base_link": 0.5552026955820918,
+          "my_end_effector_link": 0.6054314944539146,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.1350772446581021,
+          "wrist_2_link": 0.1906350375920997,
+          "wrist_3_link": 0.293474925093562
+        },
+        "camera_position_world_m": [
+          0.4515248509456441,
+          -0.12964266450640266,
+          0.7087124332000008
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 0.00012318414909210322,
+        "joint_positions_rad": {
+          "elbow_joint": 2.74676447959347,
+          "shoulder_lift_joint": -0.6102217371854308,
+          "shoulder_pan_joint": 1.6375830702247614,
+          "wrist_1_joint": -4.156671407920321,
+          "wrist_2_joint": 1.1098457906338213,
+          "wrist_3_joint": 0.8257550646054707
+        },
+        "max_abs_scaled_residual": 0.011681212709601603,
+        "max_seed_delta_rad": 2.3362425419203205,
+        "minimum_distal_link_origin_z_m": 0.1350772446581021,
+        "projection": {
+          "camera_xyz_m": [
+            -0.05229790199491623,
+            -0.20963526730418564,
+            0.6463362018079476
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 137.5712294145258,
+          "v_px": 30.094647440212825,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.4515248016899017,
+          -0.12964244153372997,
+          0.7087123345501358
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.7071067811865471,
+            -0.6988259804735131,
+            0.10789925400684608
+          ],
+          [
+            -0.707106781186548,
+            -0.6988259804735123,
+            0.10789925400684591
+          ],
+          [
+            0.0,
+            -0.15259258838642115,
+            -0.9882891793243171
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "Both `ftol` and `xtol` termination conditions are satisfied."
+      }
+    },
+    {
+      "candidate_id": "geometry_nbv_e60_v-110_a17",
+      "failure_codes": [
+        "STATIC_IK_RESIDUAL_EXCEEDED",
+        "STATIC_FLOOR_CLEARANCE_INSUFFICIENT"
+      ],
+      "geometry_candidate": {
+        "azimuth_deg": 255.00000000000003,
+        "camera_position_world_m": [
+          0.5302294697576023,
+          -0.2984251468813213,
+          0.657145282649107
+        ],
+        "candidate_id": "geometry_nbv_e60_v-110_a17",
+        "candidate_optical_range_m": 0.7,
+        "candidate_pose_world_from_camera": {
+          "rotation_matrix": [
+            [
+              0.9659258262890683,
+              -0.2450440280583563,
+              0.08331099819781387
+            ],
+            [
+              -0.2588190451025207,
+              -0.9145167628051194,
+              0.31092087810352076
+            ],
+            [
+              0.0,
+              -0.32188897909276193,
+              -0.946777421117878
+            ]
+          ],
+          "translation_m": [
+            0.5302294697576023,
+            -0.2984251468813213,
+            0.657145282649107
+          ]
+        },
+        "elevation_deg": 60.0,
+        "expected_posterior_yaw_variance_rad2": 0.00665492817878476,
+        "expected_yaw_information_gain_nats": 3.1016225511461966,
+        "expected_yaw_standard_deviation_deg": 4.674060385166916,
+        "external_occluded_surface_fraction": 0.4031270716234791,
+        "new_geometry_area_m2": 0.0004884233951500965,
+        "new_geometry_coverage_fraction": 0.26797266160250427,
+        "prior_yaw_variance_rad2": 3.289868133696453,
+        "selection_score": 3.3695952127487008,
+        "self_occlusion_safe": true,
+        "target_pixel_offset_px": [
+          0.0,
+          -110.0
+        ],
+        "target_projection_v_px": 130.0,
+        "visible_surface_fraction": 0.31553465884760085,
+        "yaw_fisher_information_rad_minus2": 149.96061829503478
+      },
+      "preflight_pass": false,
+      "selection_score": 3.3695952127487008,
+      "static_fk": {
+        "articulated_link_origin_z_m": {
+          "camera_link": 0.7048802592812103,
+          "forearm_link": 0.7213313682928741,
+          "gripper_base_link": 0.5473590571801678,
+          "my_end_effector_link": 0.5894703326288987,
+          "shoulder_link": 0.231007,
+          "upperarm_link": 0.231007,
+          "wrist_1_link": 0.09878446537239405,
+          "wrist_2_link": 0.14939265000912125,
+          "wrist_3_link": 0.26010554386019946
+        },
+        "camera_position_world_m": [
+          0.5325058666822451,
+          -0.2974226779243344,
+          0.7048802592812103
+        ],
+        "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+        "cost": 2.148359192617499,
+        "joint_positions_rad": {
+          "elbow_joint": 2.240667136734293,
+          "shoulder_lift_joint": -0.711955462800655,
+          "shoulder_pan_joint": 1.9856550088899874,
+          "wrist_1_joint": -3.5063020174020143,
+          "wrist_2_joint": 1.2396133156862184,
+          "wrist_3_joint": 0.9584103972463545
+        },
+        "max_abs_scaled_residual": 1.5911658877367785,
+        "max_seed_delta_rad": 1.6858731514020142,
+        "minimum_distal_link_origin_z_m": 0.09878446537239405,
+        "projection": {
+          "camera_xyz_m": [
+            -0.007772178472399272,
+            -0.25750562340639616,
+            0.6957527958418185
+          ],
+          "height": 240,
+          "horizontal_fov_rad": 1.047,
+          "inside_image": true,
+          "u_px": 156.90352564026918,
+          "v_px": 17.40848551072139,
+          "width": 320
+        },
+        "proximal_joints_locked": false,
+        "requested_camera_position_world_m": [
+          0.5302294697576023,
+          -0.2984251468813213,
+          0.657145282649107
+        ],
+        "requested_camera_rotation_matrix": [
+          [
+            0.9659258262890683,
+            -0.2450440280583563,
+            0.08331099819781387
+          ],
+          [
+            -0.2588190451025207,
+            -0.9145167628051194,
+            0.31092087810352076
+          ],
+          [
+            0.0,
+            -0.32188897909276193,
+            -0.946777421117878
+          ]
+        ],
+        "requested_optical_range_m": null,
+        "solver_converged": true,
+        "solver_message": "`ftol` termination condition is satisfied."
+      }
+    }
+  ],
+  "schema": "p7_3_static_candidate_screen_v1",
+  "screened_candidate_count": 24
+}

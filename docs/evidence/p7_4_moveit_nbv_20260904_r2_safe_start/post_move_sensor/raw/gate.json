@@ -1,0 +1,56 @@
+{
+  "capture_schema": "p7_1_sensor_gate_v1",
+  "claim_boundary": "P7.1 sensor-input evidence only; no pose estimate, NBV, MoveIt plan, trajectory execution, grasp, or task success was evaluated",
+  "failure_codes": [
+    "P7_1_INSUFFICIENT_SYNCHRONIZED_WINDOWS"
+  ],
+  "finished_at_utc": "2026-09-04T05:26:46.257866+00:00",
+  "gate": "P7.1_PERCEPTION_INPUT",
+  "gate_pass": false,
+  "gate_rules_version": "p7_1_sensor_gate_rules_v1",
+  "record_status": "incomplete",
+  "runtime": {
+    "gz_partition": "p7_4_nbv_r2",
+    "ign_partition": "p7_4_nbv_r2",
+    "real_hardware_connected": false,
+    "ros_domain_id": "85",
+    "trajectory_commands_sent": 0
+  },
+  "scope": {
+    "discard_initial_windows": 0,
+    "expected_windows": 3,
+    "ground_truth_use": "visibility_audit_only_not_pose_estimation",
+    "minimum_target_points": 12,
+    "minimum_window_separation_sec": 0.5,
+    "p7_2_pose_estimation_evaluated": false,
+    "p7_3_nbv_evaluated": false,
+    "p7_4_moveit_evaluated": false,
+    "p7_5_grasp_evaluated": false,
+    "raw_format": "ROS 2 CDR serialization plus inspectable PPM/NumPy derivatives",
+    "sync_slop_sec": 0.15
+  },
+  "started_at_utc": "2026-09-04T05:26:03.227610+00:00",
+  "target_ground_truth_source": {
+    "collision_proxy_height_m": 0.101855,
+    "collision_proxy_radius_m": 0.034,
+    "local_collision_center_m": [
+      -0.0091685,
+      0.084017,
+      0.0510065
+    ],
+    "model_orientation": {
+      "w": 0.999999999999875,
+      "x": 0.0,
+      "y": 0.0,
+      "z": -4.999999999999791e-07
+    },
+    "model_position_world_m": [
+      0.720697,
+      -1e-06,
+      -7.9e-05
+    ],
+    "path": "docs/evidence/p7_4_moveit_nbv_20260904_r2_safe_start/post_move_target_ground_truth.json",
+    "sha256": "c50d37e36ee731a57a326071ea22bb54ec070504d1b98ad375fd39e6a66ca8ae"
+  },
+  "windows": []
+}

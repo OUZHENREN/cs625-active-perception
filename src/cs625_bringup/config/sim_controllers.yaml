@@ -10,6 +10,8 @@ controller_manager:
       type: joint_state_broadcaster/JointStateBroadcaster
     joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
+    gripper_controller:
+      type: forward_command_controller/ForwardCommandController
 
 joint_trajectory_controller:
   ros__parameters:
@@ -28,3 +30,28 @@ joint_trajectory_controller:
     state_publish_rate: 50.0
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
+    # A controller result must reflect its measured joint state, not merely
+    # elapsed trajectory time.  These bounds match P7's adapter-side terminal
+    # state gate and make an untracked Gazebo command an explicit failure.
+    constraints:
+      stopped_velocity_tolerance: 0.01
+      # Controller feedback reaches the goal, but Gazebo's action monitor can
+      # observe it just after one simulation second.  Preserve 0.01 rad final
+      # precision while allowing a bounded 5 s result-settling window.
+      goal_time: 5.0
+      # The virtual position plant can lag a retimed point transiently; do
+      # not abort before the terminal measurement.  The strict goal tolerance
+      # remains the acceptance gate, together with the adapter's independent
+      # observed-terminal check.
+      shoulder_pan_joint: {trajectory: 10.0, goal: 0.01}
+      shoulder_lift_joint: {trajectory: 10.0, goal: 0.01}
+      elbow_joint: {trajectory: 10.0, goal: 0.01}
+      wrist_1_joint: {trajectory: 10.0, goal: 0.01}
+      wrist_2_joint: {trajectory: 10.0, goal: 0.01}
+      wrist_3_joint: {trajectory: 10.0, goal: 0.01}
+
+gripper_controller:
+  ros__parameters:
+    joints:
+      - gripper_right_finger_joint
+    interface_name: position

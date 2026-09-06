@@ -66,6 +66,9 @@ def _compose(context):
                     "controllers_file": LaunchConfiguration("controllers_file"),
                     "description_package": LaunchConfiguration("description_package"),
                     "description_file": LaunchConfiguration("description_file"),
+                    "initial_positions_file": LaunchConfiguration("initial_positions_file"),
+                    "initial_detach": LaunchConfiguration("initial_detach"),
+                    "initial_detach_topic": LaunchConfiguration("initial_detach_topic"),
                     "prefix": LaunchConfiguration("prefix"),
                     "world_file": LaunchConfiguration("world"),
                     "launch_rviz": "false",
@@ -102,8 +105,10 @@ def _compose(context):
                         "launch_rviz": LaunchConfiguration("launch_rviz"),
                         "description_package": LaunchConfiguration("description_package"),
                         "description_file": LaunchConfiguration("description_file"),
+                        "initial_positions_file": LaunchConfiguration("initial_positions_file"),
                         "moveit_config_package": LaunchConfiguration("moveit_config_package"),
-                        "moveit_config_file": LaunchConfiguration("moveit_config_file"),
+                        "semantic_package": LaunchConfiguration("semantic_package"),
+                        "semantic_file": LaunchConfiguration("semantic_file"),
                         "moveit_controllers_file": LaunchConfiguration("moveit_controllers_file"),
                         "sensors_config": LaunchConfiguration("moveit_sensors_config"),
                     }.items(),
@@ -180,6 +185,7 @@ def _compose(context):
 
 def generate_launch_description():
     gz_control_lib_dir = Path(get_package_prefix("gz_ros2_control")) / "lib"
+    ycb_resource_dir = Path(get_package_prefix("cs625_simulation")) / "share" / "cs625_simulation" / "assets"
     gz_control_library = gz_control_lib_dir / "libgz_ros2_control-system.so"
     if not gz_control_library.is_file():
         raise RuntimeError(
@@ -192,7 +198,10 @@ def generate_launch_description():
     # actual ament package lib directory to both before the senior launch
     # starts Gazebo, avoiding a silent model-plugin lookup failure.
     # Unique IGN_PARTITION prevents stale server connections across runs
-    ign_partition = f"cs625_{int(time.time())}"
+    # Keep the historical unique default, while allowing an explicitly named
+    # partition for repeatable headless evidence collection and Gazebo topic
+    # inspection in a single simulation session.
+    ign_partition = os.environ.get("CS625_GZ_PARTITION", f"cs625_{int(time.time())}")
     plugin_environment = [
         SetEnvironmentVariable(
             "IGN_GAZEBO_SYSTEM_PLUGIN_PATH",
@@ -208,6 +217,14 @@ def generate_launch_description():
                 str(gz_control_lib_dir),
                 os.pathsep,
                 EnvironmentVariable("GZ_SIM_SYSTEM_PLUGIN_PATH", default_value=""),
+            ],
+        ),
+        SetEnvironmentVariable(
+            "GZ_SIM_RESOURCE_PATH",
+            [
+                str(ycb_resource_dir),
+                os.pathsep,
+                EnvironmentVariable("GZ_SIM_RESOURCE_PATH", default_value=""),
             ],
         ),
         SetEnvironmentVariable("IGN_PARTITION", ign_partition),
@@ -273,9 +290,13 @@ def generate_launch_description():
         DeclareLaunchArgument("controllers_file", default_value="sim_controllers.yaml", description="Simulation controller YAML file using standard Humble ros2_controllers."),
         DeclareLaunchArgument("description_package", default_value="cs625_ap_description", description="Application description wrapper package."),
         DeclareLaunchArgument("description_file", default_value="cs625_active_perception.urdf.xacro", description="Application xacro wrapper file."),
+        DeclareLaunchArgument("initial_positions_file", default_value=PathJoinSubstitution([FindPackageShare("eli_cs_robot_description"), "config", "initial_positions.yaml"]), description="Joint positions used to initialize the Gazebo and MoveIt robot descriptions."),
+        DeclareLaunchArgument("initial_detach", default_value="false", description="Publish a one-shot Gazebo DetachableJoint detach command after robot spawn."),
+        DeclareLaunchArgument("initial_detach_topic", default_value="/p7/attachment/detach", description="Absolute Gazebo transport detach topic used when initial_detach is true."),
         DeclareLaunchArgument("prefix", default_value="", description="Optional TF and joint-name prefix; must match the underlay controller configuration."),
         DeclareLaunchArgument("moveit_config_package", default_value="elite_cs625_moveit_config", description="Underlay MoveIt configuration package."),
-        DeclareLaunchArgument("moveit_config_file", default_value="cs625.srdf.xacro", description="Underlay MoveIt SRDF xacro file."),
+        DeclareLaunchArgument("semantic_package", default_value="cs625_bringup", description="Package containing the application SRDF overlay."),
+        DeclareLaunchArgument("semantic_file", default_value="config/cs625_active_perception.srdf", description="Application SRDF that preserves the senior arm semantics and adds gripper-adjacency exemptions."),
         DeclareLaunchArgument("moveit_controllers_file", default_value="cs625_moveit_controllers.yaml", description="Reused MoveIt trajectory/controller configuration."),
         DeclareLaunchArgument("moveit_sensors_config", default_value=moveit_sensors_default, description="Normalized point-cloud configuration for MoveIt scene updates."),
         DeclareLaunchArgument("headless", default_value="false", description="Run Gazebo without GUI. WSL2/GPU: false; VMware headless: true (Xvfb+ogre1 fallback)."),

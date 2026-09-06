@@ -1,0 +1,631 @@
+ambient {
+  r: 0.4
+  g: 0.4
+  b: 0.4
+  a: 1
+}
+background {
+  r: 0.7
+  g: 0.7
+  b: 0.7
+  a: 1
+}
+shadows: true
+grid: true
+model {
+  name: "ground_plane"
+  id: 4
+  pose {
+    position {
+      z: -0.05
+    }
+    orientation {
+      w: 1
+    }
+  }
+  link {
+    id: 5
+    name: "link"
+    pose {
+      position {
+      }
+      orientation {
+        w: 1
+      }
+    }
+    visual {
+      name: "visual"
+      id: 6
+      parent_id: 5
+      cast_shadows: true
+      pose {
+        position {
+        }
+        orientation {
+          w: 1
+        }
+      }
+      geometry {
+        box {
+          size {
+            x: 10
+            y: 10
+            z: 0.1
+          }
+        }
+      }
+    }
+  }
+}
+model {
+  name: "occluder"
+  id: 8
+  pose {
+    position {
+      x: 0.6
+      y: 0.3
+      z: 0.22
+    }
+    orientation {
+      z: 0.089878549198011012
+      w: 0.99595273301199427
+    }
+  }
+  link {
+    id: 9
+    name: "link"
+    pose {
+      position {
+      }
+      orientation {
+        w: 1
+      }
+    }
+    visual {
+      name: "visual"
+      id: 10
+      parent_id: 9
+      cast_shadows: true
+      pose {
+        position {
+        }
+        orientation {
+          w: 1
+        }
+      }
+      geometry {
+        box {
+          size {
+            x: 0.1
+            y: 0.18
+            z: 0.44
+          }
+        }
+      }
+      material {
+        ambient {
+          a: 1
+        }
+        diffuse {
+          r: 0.38
+          g: 0.38
+          b: 0.38
+          a: 1
+        }
+        specular {
+          a: 1
+        }
+        emissive {
+          a: 1
+        }
+        lighting: true
+      }
+    }
+  }
+}
+model {
+  name: "target_object"
+  id: 12
+  pose {
+    position {
+      x: 0.72
+      y: 7.1054273576010015e-21
+      z: 0.0049902
+    }
+    orientation {
+      x: 5.6843418860808012e-20
+      y: 7.1054273576010015e-21
+      z: -6.3108872417680942e-36
+      w: 1
+    }
+  }
+  link {
+    id: 13
+    name: "target_link"
+    pose {
+      position {
+      }
+      orientation {
+        w: 1
+      }
+    }
+    visual {
+      name: "ycb_visual"
+      id: 14
+      parent_id: 13
+      cast_shadows: true
+      pose {
+        position {
+        }
+        orientation {
+          w: 1
+        }
+      }
+      geometry {
+        type: MESH
+        mesh {
+          filename: "/home/oy/cs625_p56_install/share/cs625_simulation/assets/ycb/005_tomato_soup_can/google_16k/textured.obj"
+          scale {
+            x: 1
+            y: 1
+            z: 1
+          }
+        }
+      }
+    }
+  }
+}
+model {
+  name: "p7_1_axis_marker"
+  id: 16
+  pose {
+    position {
+      x: 0.7108315
+      y: 0.084017
+      z: 0.0509275
+    }
+    orientation {
+      w: 1
+    }
+  }
+  link {
+    id: 17
+    name: "marker_link"
+    pose {
+      position {
+      }
+      orientation {
+        w: 1
+      }
+    }
+    visual {
+      name: "marker_visual"
+      id: 18
+      parent_id: 17
+      cast_shadows: true
+      pose {
+        position {
+        }
+        orientation {
+          w: 1
+        }
+      }
+      geometry {
+        type: SPHERE
+        sphere {
+          radius: 0.08
+        }
+      }
+      material {
+        ambient {
+          r: 1
+          a: 1
+        }
+        diffuse {
+          r: 1
+          a: 1
+        }
+        specular {
+          a: 1
+        }
+        emissive {
+          r: 1
+          a: 1
+        }
+        lighting: true
+      }
+    }
+  }
+}
+model {
+  name: "cs"
+  id: 21
+  pose {
+    position {
+    }
+    orientation {
+      w: 1
+    }
+  }
+  link {
+    id: 22
+    name: "base_link"
+    pose {
+      position {
+      }
+      orientation {
+        w: 1
+      }
+    }
+  }
+  link {
+    id: 24
+    name: "shoulder_link"
+    pose {
+      position {
+        z: 0.231007
+      }
+      orientation {
+        z: 0.18578244207127442
+        w: 0.98259090379365588
+      }
+    }
+  }
+  link {
+    id: 26
+    name: "upperarm_link"
+    pose {
+      position {
+        x: -1.3083805735340468e-17
+        y: -5.1309469732224613e-18
+        z: 0.231007
+      }
+      orientation {
+        x: 0.63599224165837276
+        y: 0.3090560712118588
+        z: -0.055523262086776527
+        w: 0.70492225157437871
+      }
+    }
+  }
+  link {
+    id: 28
+    name: "forearm_link"
+    pose {
+      position {
+        x: -0.60251731748513
+        y: -0.23628929078653604
+        z: 0.61102807899315126
+      }
+      orientation {
+        x: 0.69521856827131245
+        y: -0.12912369625029271
+        z: 0.37403063092164868
+        w: 0.6000827447359256
+      }
+    }
+  }
+  link {
+    id: 30
+    name: "wrist_1_link"
+    pose {
+      position {
+        x: -0.96801207757584051
+        y: -0.5634570280731257
+        z: 0.19041395849194048
+      }
+      orientation {
+        x: 0.54162758336125438
+        y: 0.45457820839191027
+        z: -0.22545155051673935
+        w: 0.67020132181833747
+      }
+    }
+  }
+  link {
+    id: 32
+    name: "wrist_2_link"
+    pose {
+      position {
+        x: -1.0696487493387112
+        y: -0.60331539235900744
+        z: 0.12377131009453347
+      }
+      orientation {
+        x: 0.71979324645483023
+        y: -0.49235337181629607
+        z: -0.27516675089705722
+        w: 0.40468394929858176
+      }
+    }
+  }
+  link {
+    id: 34
+    name: "wrist_3_link"
+    pose {
+      position {
+        x: -1.1316125071385343
+        y: -0.62723512422294891
+        z: 0.23257838537404829
+      }
+      orientation {
+        x: 0.049565933008691908
+        y: -0.26603427626433024
+        z: 0.17632758754865341
+        w: 0.94640243237576482
+      }
+    }
+    visual {
+      name: "wrist_3_link_fixed_joint_lump__camera_link_visual"
+      id: 35
+      parent_id: 34
+      cast_shadows: true
+      pose {
+        position {
+          x: 0.0040000000000000044
+          y: 1.3877787807814457e-17
+          z: 0.403
+        }
+        orientation {
+          y: 0.38268343236488267
+          w: 0.92387953251137256
+        }
+      }
+      geometry {
+        box {
+          size {
+            x: 0.03
+            y: 0.05
+            z: 0.02
+          }
+        }
+      }
+      material {
+        ambient {
+          r: 0.25
+          g: 0.25
+          b: 0.25
+          a: 1
+        }
+        diffuse {
+          r: 0.25
+          g: 0.25
+          b: 0.25
+          a: 1
+        }
+        specular {
+          a: 1
+        }
+        emissive {
+          a: 1
+        }
+        lighting: true
+      }
+    }
+    visual {
+      name: "wrist_3_link_fixed_joint_lump__gripper_base_link_visual_1"
+      id: 36
+      parent_id: 34
+      cast_shadows: true
+      pose {
+        position {
+          x: 0.039000000000000007
+          y: 1.3877787807814457e-17
+          z: 0.353
+        }
+        orientation {
+          w: 1
+        }
+      }
+      geometry {
+        box {
+          size {
+            x: 0.08
+            y: 0.09
+            z: 0.05
+          }
+        }
+      }
+      material {
+        ambient {
+          r: 0.225000009
+          g: 0.225000009
+          b: 0.225000009
+          a: 1
+        }
+        diffuse {
+          r: 0.225000009
+          g: 0.225000009
+          b: 0.225000009
+          a: 1
+        }
+        specular {
+          a: 1
+        }
+        emissive {
+          a: 1
+        }
+        lighting: true
+      }
+    }
+    sensor {
+      name: "camera_sensor"
+      id: 41
+      parent_id: 34
+      type: "rgbd_camera"
+      pose {
+        position {
+          x: 0.004
+          y: 1.3877787807814457e-17
+          z: 0.403
+        }
+        orientation {
+          y: 0.38268335688530941
+          w: 0.92387956377603186
+        }
+      }
+    }
+  }
+  link {
+    id: 42
+    name: "gripper_left_finger_link"
+    pose {
+      position {
+        x: -1.2746421213306713
+        y: -0.66315394700260477
+        z: 0.556802640534226
+      }
+      orientation {
+        x: 0.049565933008691908
+        y: -0.26603427626433024
+        z: 0.17632758754865341
+        w: 0.94640243237576482
+      }
+    }
+    visual {
+      name: "gripper_left_finger_link_visual"
+      id: 43
+      parent_id: 42
+      cast_shadows: true
+      pose {
+        position {
+          x: 0.045
+          y: 5.5511151231257827e-17
+        }
+        orientation {
+          w: 1
+        }
+      }
+      geometry {
+        box {
+          size {
+            x: 0.09
+            y: 0.014
+            z: 0.07
+          }
+        }
+      }
+      material {
+        ambient {
+          r: 0.4
+          g: 0.4
+          b: 0.4
+          a: 1
+        }
+        diffuse {
+          r: 0.4
+          g: 0.4
+          b: 0.4
+          a: 1
+        }
+        specular {
+          a: 1
+        }
+        emissive {
+          a: 1
+        }
+        lighting: true
+      }
+    }
+  }
+  link {
+    id: 45
+    name: "gripper_right_finger_link"
+    pose {
+      position {
+        x: -1.2508737928083158
+        y: -0.72472558462296577
+        z: 0.55680262239432943
+      }
+      orientation {
+        x: 0.049565933008691908
+        y: -0.26603427626433024
+        z: 0.17632758754865341
+        w: 0.94640243237576482
+      }
+    }
+    visual {
+      name: "gripper_right_finger_link_visual"
+      id: 46
+      parent_id: 45
+      cast_shadows: true
+      pose {
+        position {
+          x: 0.045
+          y: 5.5511151231257827e-17
+        }
+        orientation {
+          w: 1
+        }
+      }
+      geometry {
+        box {
+          size {
+            x: 0.09
+            y: 0.014
+            z: 0.07
+          }
+        }
+      }
+      material {
+        ambient {
+          r: 0.4
+          g: 0.4
+          b: 0.4
+          a: 1
+        }
+        diffuse {
+          r: 0.4
+          g: 0.4
+          b: 0.4
+          a: 1
+        }
+        specular {
+          a: 1
+        }
+        emissive {
+          a: 1
+        }
+        lighting: true
+      }
+    }
+  }
+}
+light {
+  name: "sun"
+  type: DIRECTIONAL
+  pose {
+    position {
+      z: 5
+    }
+    orientation {
+      w: 1
+    }
+  }
+  diffuse {
+    r: 0.8
+    g: 0.8
+    b: 0.8
+    a: 1
+  }
+  specular {
+    r: 0.2
+    g: 0.2
+    b: 0.2
+    a: 1
+  }
+  attenuation_constant: 1
+  attenuation_linear: 1
+  direction {
+    x: -0.5
+    y: 0.1
+    z: -0.9
+  }
+  range: 10
+  id: 19
+  parent_id: 1
+  intensity: 1
+  visualize_visual: true
+}
+origin_visual: true
+

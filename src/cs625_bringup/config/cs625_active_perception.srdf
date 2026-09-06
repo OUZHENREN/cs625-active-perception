@@ -1,0 +1,39 @@
+<?xml version="1.0"?>
+<!--
+  Application semantic overlay for the reused CS625 MoveIt configuration.
+  The arm group, virtual joint, and original disabled-collision pairs are
+  preserved verbatim.  The three final pairs cover the application-owned
+  parallel gripper's mechanically adjacent links; without them MoveIt marks
+  the nominal open-gripper state as self-collision and rejects all IK calls
+  made with avoid_collisions=true.
+-->
+<robot name="cs625">
+  <group name="cs625_arm">
+    <chain base_link="base_link" tip_link="my_end_effector_link"/>
+  </group>
+  <group_state group="cs625_arm" name="home">
+    <joint name="elbow_joint" value="0"/>
+    <joint name="shoulder_lift_joint" value="0"/>
+    <joint name="shoulder_pan_joint" value="0"/>
+    <joint name="wrist_1_joint" value="0"/>
+    <joint name="wrist_2_joint" value="0"/>
+    <joint name="wrist_3_joint" value="0"/>
+  </group_state>
+  <virtual_joint child_link="base_link" name="virtual_joint" parent_frame="world" type="fixed"/>
+
+  <disable_collisions link1="base_link_inertia" link2="shoulder_link" reason="Adjacent"/>
+  <disable_collisions link1="base_link_inertia" link2="upperarm_link" reason="Never"/>
+  <disable_collisions link1="forearm_link" link2="upperarm_link" reason="Adjacent"/>
+  <disable_collisions link1="forearm_link" link2="wrist_1_link" reason="Adjacent"/>
+  <disable_collisions link1="my_end_effector_link" link2="wrist_1_link" reason="Never"/>
+  <disable_collisions link1="my_end_effector_link" link2="wrist_2_link" reason="Never"/>
+  <disable_collisions link1="my_end_effector_link" link2="wrist_3_link" reason="Adjacent"/>
+  <disable_collisions link1="shoulder_link" link2="upperarm_link" reason="Adjacent"/>
+  <disable_collisions link1="shoulder_link" link2="wrist_1_link" reason="Never"/>
+  <disable_collisions link1="wrist_1_link" link2="wrist_2_link" reason="Adjacent"/>
+  <disable_collisions link1="wrist_2_link" link2="wrist_3_link" reason="Adjacent"/>
+
+  <disable_collisions link1="gripper_base_link" link2="gripper_left_finger_link" reason="Adjacent"/>
+  <disable_collisions link1="gripper_base_link" link2="gripper_right_finger_link" reason="Adjacent"/>
+  <disable_collisions link1="gripper_left_finger_link" link2="gripper_right_finger_link" reason="Never"/>
+</robot>

@@ -1,0 +1,25 @@
+{
+  "schema": "p7_gazebo_contact_capture_v1",
+  "captured_at_utc": "2026-09-06T01:35:21Z",
+  "started_at_utc": "2026-09-06T01:35:11Z",
+  "duration_sec": 9.73062,
+  "monitor_available": true,
+  "monitor_implementation": "native_gz_transport_counter",
+  "phase_policy": "grasp",
+  "finger_target_contact_allowed": true,
+  "classification_scope": "robot contacts with ground, occluder and target in severe-v5; pedestal-ground support allowed; self-contact is outside this sensor scope",
+  "topics": {
+    "/p7/contacts/ground": {"message_count": 6139, "first_sim_stamp_sec": 1599.527, "last_sim_stamp_sec": 1605.665},
+    "/p7/contacts/occluder": {"message_count": 0, "first_sim_stamp_sec": 0, "last_sim_stamp_sec": 0},
+    "/p7/contacts/target": {"message_count": 6139, "first_sim_stamp_sec": 1599.527, "last_sim_stamp_sec": 1605.665}
+  },
+  "collision_pairs": [
+    {"collision_pair": ["cs::base_link::base_link_inertia_collision", "ground_plane::link::collision"], "record_count": 6139, "first_sim_stamp_sec": 1599.527, "last_sim_stamp_sec": 1605.665, "finger_target_contact": false, "unexpected_robot_contact": false},
+    {"collision_pair": ["cs::gripper_left_finger_link::gripper_left_finger_link_collision", "target_object::target_link::ycb_contact_proxy_cylinder"], "record_count": 6139, "first_sim_stamp_sec": 1599.527, "last_sim_stamp_sec": 1605.665, "finger_target_contact": true, "unexpected_robot_contact": false},
+    {"collision_pair": ["cs::gripper_right_finger_link::gripper_right_finger_link_collision", "target_object::target_link::ycb_contact_proxy_cylinder"], "record_count": 6139, "first_sim_stamp_sec": 1599.527, "last_sim_stamp_sec": 1605.665, "finger_target_contact": true, "unexpected_robot_contact": false},
+    {"collision_pair": ["ground_plane::link::collision", "target_object::target_link::ycb_contact_proxy_cylinder"], "record_count": 12278, "first_sim_stamp_sec": 1599.527, "last_sim_stamp_sec": 1605.665, "finger_target_contact": false, "unexpected_robot_contact": false}
+  ],
+  "bilateral_finger_contact": {"observed": true, "simultaneous_message_count": 6139, "first_sim_stamp_sec": 1599.527, "last_sim_stamp_sec": 1605.665},
+  "unexpected_collision": false,
+  "claim_boundary": "Gazebo physical-contact observation only; MoveIt collision rejection is reported separately"
+}

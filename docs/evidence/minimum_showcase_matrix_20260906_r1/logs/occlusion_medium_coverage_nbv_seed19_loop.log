@@ -1,0 +1,37 @@
+[INFO] [launch]: All log files can be found below /home/oy/.ros/log/2026-09-06-10-35-17-411465-OY-14934
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [sim_episode_coordinator-1]: process started with pid [14939]
+[INFO] [sim_view_executor-2]: process started with pid [14940]
+[sim_episode_coordinator-1] [INFO] [1788662149.949812774] [cs625_sim_episode_coordinator]: P4 received 15/24 reachable candidates
+[sim_episode_coordinator-1] [INFO] [1788662149.970715393] [cs625_sim_episode_coordinator]: P4 selected fibonacci_23; executor subscribers=1
+[sim_view_executor-2] [INFO] [1788662150.054934164] [cs625_sim_view_executor]: P4 executor received selection fibonacci_23 for cycle 0
+[sim_episode_coordinator-1] [INFO] [1788662194.095323042] [cs625_sim_episode_coordinator]: P4 selected fibonacci_22; executor subscribers=1
+[sim_view_executor-2] [INFO] [1788662194.103499363] [cs625_sim_view_executor]: P4 execution completed: EXECUTION_FAILED; coordinator subscribers=1
+[sim_view_executor-2] [INFO] [1788662194.134826205] [cs625_sim_view_executor]: P4 executor received selection fibonacci_22 for cycle 0
+[sim_view_executor-2] [INFO] [1788662194.380976649] [cs625_sim_view_executor]: P4 execution completed: PLANNING_FAILED; coordinator subscribers=1
+[sim_episode_coordinator-1] [INFO] [1788662194.381627509] [cs625_sim_episode_coordinator]: P4 selected fibonacci_21; executor subscribers=1
+[sim_view_executor-2] [INFO] [1788662194.421353819] [cs625_sim_view_executor]: P4 executor received selection fibonacci_21 for cycle 0
+[sim_view_executor-2] [INFO] [1788662244.107430039] [cs625_sim_view_executor]: P4 execution completed: EXECUTION_FAILED; coordinator subscribers=1
+[sim_episode_coordinator-1] [INFO] [1788662244.116383121] [cs625_sim_episode_coordinator]: P4 episode finished: MAX_FAILED_ATTEMPTS
+[sim_view_executor-2] Traceback (most recent call last):
+[sim_view_executor-2]   File "/home/oy/cs625_p56_install/lib/cs625_motion_adapter/sim_view_executor", line 33, in <module>
+[sim_view_executor-2]     sys.exit(load_entry_point('cs625-motion-adapter', 'console_scripts', 'sim_view_executor')())
+[sim_view_executor-2]              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[sim_view_executor-2]   File "/home/oy/cs625_p56_build/cs625_motion_adapter/cs625_motion_adapter/sim_view_executor.py", line 313, in main
+[sim_view_executor-2]     rclpy.spin(node)
+[sim_view_executor-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/__init__.py", line 247, in spin
+[sim_view_executor-2]     executor.spin_once()
+[sim_view_executor-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 926, in spin_once
+[sim_view_executor-2]     self._spin_once_impl(timeout_sec)
+[sim_view_executor-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 907, in _spin_once_impl
+[sim_view_executor-2]     handler, entity, node = self.wait_for_ready_callbacks(
+[sim_view_executor-2]                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+[sim_view_executor-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 877, in wait_for_ready_callbacks
+[sim_view_executor-2]     return next(self._cb_iter)
+[sim_view_executor-2]            ^^^^^^^^^^^^^^^^^^^
+[sim_view_executor-2]   File "/opt/ros/jazzy/lib/python3.12/site-packages/rclpy/executors.py", line 757, in _wait_for_ready_callbacks
+[sim_view_executor-2]     wait_set = _rclpy.WaitSet(
+[sim_view_executor-2]                ^^^^^^^^^^^^^^^
+[sim_view_executor-2] rclpy._rclpy_pybind11.RCLError: failed to initialize wait set: the given context is not valid, either rcl_init() was not called or rcl_shutdown() was called., at ./src/rcl/wait.c:130
+[INFO] [sim_episode_coordinator-1]: process has finished cleanly [pid 14939]
+[ERROR] [sim_view_executor-2]: process has died [pid 14940, exit code 1, cmd '/home/oy/cs625_p56_install/lib/cs625_motion_adapter/sim_view_executor --ros-args -r __node:=cs625_sim_view_executor --params-file /tmp/launch_params_zph26etf --params-file /tmp/launch_params_m2opzhx9'].

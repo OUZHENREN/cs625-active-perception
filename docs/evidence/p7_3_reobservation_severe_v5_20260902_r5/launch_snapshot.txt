@@ -1,0 +1,900 @@
+[INFO] [launch]: All log files can be found below /home/oy/.ros/log/2026-09-02-16-22-34-788450-OY-3977
+[INFO] [launch]: Default logging verbosity is set to INFO
+[INFO] [launch.user]: Phase 1 active-localization framework: strategy='disabled'; no target-perception/NBV algorithm is started.
+[INFO] [launch.user]: gz_ros2_control_plugin=/opt/ros/jazzy/lib/libgz_ros2_control-system.so
+[INFO] [launch.user]: ign_partition=p7_3_severe_v5_nbv_e75_vminus110_a05_20260902_r5
+[INFO] [launch.user]: CS625 sim_base profile: cs625
+[INFO] [launch.user]: execute=false (safe default is false)
+
+[INFO] [parameter_bridge-1]: process started with pid [4001]
+[INFO] [gazebo-2]: process started with pid [4002]
+[INFO] [python3-3]: process started with pid [4003]
+[INFO] [parameter_bridge-4]: process started with pid [4004]
+[INFO] [rgbd_sensor_adapter-5]: process started with pid [4005]
+[parameter_bridge-1] [INFO] [1788337356.233647001] [clock_bridge]: Creating GZ->ROS Bridge: [/clock (gz.msgs.Clock) -> /clock (rosgraph_msgs/msg/Clock)] (Lazy 0)
+[gazebo-2] [1;33m[Wrn] [SystemLoader.cc:75] [0m[1;33mTrying to load deprecated plugin [[0m[1;33mignition-gazebo-physics-system[0m[1;33m]. Using [[0m[1;33mgz-sim-physics-system[0m[1;33m] instead.[0m[1;33m[0m
+[python3-3] Prepared Gazebo model at /tmp/cs625_active_perception_gazebo_model.urdf (removed 8 mesh visual elements).
+[gazebo-2] [1;33m[Wrn] [SystemLoader.cc:75] [0m[1;33mTrying to load deprecated plugin [[0m[1;33mignition-gazebo-sensors-system[0m[1;33m]. Using [[0m[1;33mgz-sim-sensors-system[0m[1;33m] instead.[0m[1;33m[0m
+[INFO] [python3-3]: process has finished cleanly [pid 4003]
+[gazebo-2] [1;33m[Wrn] [SystemLoader.cc:75] [0m[1;33mTrying to load deprecated plugin [[0m[1;33mignition-gazebo-user-commands-system[0m[1;33m]. Using [[0m[1;33mgz-sim-user-commands-system[0m[1;33m] instead.[0m[1;33m[0m
+[INFO] [create-6]: process started with pid [4061]
+[gazebo-2] [1;32m[Msg] [0m[1;32mGazebo Sim Server v[0m[1;32m8.11.0[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mLoading SDF world file[[0m[1;32m/tmp/p7_3_severe_v5_nbv_e75_vminus110_a05_20260902_r5_p7_ycb_tomato_occlusion_severe_v5.sdf[0m[1;32m].[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing entity system service on [[0m[1;32m/[0m[1;32mentity/system/add[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;36m[Dbg] [Physics.cc:906] [0m[1;36mLoaded [[0m[1;36mgz::physics::dartsim::Plugin[0m[1;36m] from library [[0m[1;36m/opt/ros/jazzy/opt/gz_physics_vendor/lib/gz-physics-7/engine-plugins/libgz-physics-dartsim-plugin.so[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SystemManager.cc:80] [0m[1;36mLoaded system [[0m[1;36mgz::sim::systems::Physics[0m[1;36m] for entity [[0m[1;36m1[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:697] [0m[1;36mConfiguring Sensors system[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:557] [0m[1;36mSensorsPrivate::Run[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SystemManager.cc:80] [0m[1;36mLoaded system [[0m[1;36mgz::sim::systems::Sensors[0m[1;36m] for entity [[0m[1;36m1[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:532] [0m[1;36mSensorsPrivate::RenderThread started[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:337] [0m[1;36mWaiting for init[0m[1;36m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mCreate[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/create_multiple[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mCreate[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/create_multiple/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mRemove[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/remove[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mRemove[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/remove/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPose[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/set_pose[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPose[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/set_pose/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPose[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/set_pose_vector[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPose[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/set_pose_vector/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mLight configuration[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/light_config[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mLight configuration[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/light_config/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPhysics[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/set_physics[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPhysics[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/set_physics/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mSphericalCoordinates[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/set_spherical_coordinates[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mSphericalCoordinates[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/set_spherical_coordinates/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mEnable collision[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/enable_collision[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mEnable collision[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/enable_collision/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mDisable collision[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/disable_collision[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;33m[Wrn] [SystemLoader.cc:75] [0m[1;33mTrying to load deprecated plugin [[0m[1;33mignition-gazebo-scene-broadcaster-system[0m[1;33m]. Using [[0m[1;33mgz-sim-scene-broadcaster-system[0m[1;33m] instead.[0m[1;33m[0m
+[create-6] [INFO] [1788337357.022685264] [cs625_spawn_robot]: Requesting list of world names.
+[create-6] [INFO] [1788337357.226528647] [cs625_spawn_robot]: Entity creation successful.
+[parameter_bridge-4] [INFO] [1788337357.229201638] [cs625_sim_sensor_bridge]: Creating GZ->ROS Bridge: [/camera/image (gz.msgs.Image) -> /sim/camera/image (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1788337357.236303870] [cs625_sim_sensor_bridge]: Creating GZ->ROS Bridge: [/camera/depth_image (gz.msgs.Image) -> /sim/camera/depth_image (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1788337357.238046520] [cs625_sim_sensor_bridge]: Creating GZ->ROS Bridge: [/camera/camera_info (gz.msgs.CameraInfo) -> /sim/camera/camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-4] [INFO] [1788337357.246376996] [cs625_sim_sensor_bridge]: Creating GZ->ROS Bridge: [/camera/points (gz.msgs.PointCloudPacked) -> /sim/camera/points (sensor_msgs/msg/PointCloud2)] (Lazy 0)
+[rgbd_sensor_adapter-5] [INFO] [1788337357.286445354] [cs625_sensor_adapter]: RGB-D adapter configured for streams: color, depth, camera_info, points
+[INFO] [create-6]: process has finished cleanly [pid 4061]
+[gazebo-2] [INFO] [1788337358.958689897] [gz_ros_control]: [gz_ros2_control] Fixed joint ['base_joint'] (Entity='45') is skipped.
+[gazebo-2] [INFO] [1788337358.964439946] [gz_ros_control]: Loading controller_manager
+[gazebo-2] [INFO] [1788337359.045406313] [controller_manager]: Using ROS clock for triggering controller manager cycles.
+[gazebo-2] [INFO] [1788337359.066855505] [controller_manager]: Subscribing to '/robot_description' topic for robot description.
+[gazebo-2] [WARN] [1788337359.079413251] [gz_ros_control]: Waiting RM to load and initialize hardware...
+[gazebo-2] [WARN] [1788337360.063860822] [controller_manager]: Waiting for data on 'robot_description' topic to finish initialization
+[gazebo-2] [INFO] [1788337360.469392889] [controller_manager]: Received robot description from topic.
+[gazebo-2] [INFO] [1788337360.469646679] [controller_manager]: Enforcing command limits is disabled. Command limits from URDF will be ignored.
+[gazebo-2] [INFO] [1788337360.486597310] [gz_ros_control]: The position_proportional_gain has been set to: 0.5
+[gazebo-2] [INFO] [1788337360.486974224] [gz_ros_control]: Loading joint: shoulder_pan_joint
+[gazebo-2] [INFO] [1788337360.487058654] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788337360.487085084] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487214779] [gz_ros_control]: 			 found initial value: 2.501470
+[gazebo-2] [INFO] [1788337360.487259865] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.487289681] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788337360.487301934] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788337360.487311933] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487338704] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.487362890] [gz_ros_control]: Loading joint: shoulder_lift_joint
+[gazebo-2] [INFO] [1788337360.487371516] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788337360.487378529] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487385883] [gz_ros_control]: 			 found initial value: -0.642465
+[gazebo-2] [INFO] [1788337360.487394770] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.487404568] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788337360.487411632] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788337360.487418294] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487430498] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.487446047] [gz_ros_control]: Loading joint: elbow_joint
+[gazebo-2] [INFO] [1788337360.487454192] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788337360.487461075] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487468319] [gz_ros_control]: 			 found initial value: 1.254910
+[gazebo-2] [INFO] [1788337360.487476064] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.487483318] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788337360.487493026] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788337360.487500550] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487512613] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.487528683] [gz_ros_control]: Loading joint: wrist_1_joint
+[gazebo-2] [INFO] [1788337360.487537400] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788337360.487543712] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487551697] [gz_ros_control]: 			 found initial value: 0.280846
+[gazebo-2] [INFO] [1788337360.487561245] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.487569290] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788337360.487576153] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788337360.487583227] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487593606] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.487608124] [gz_ros_control]: Loading joint: wrist_2_joint
+[gazebo-2] [INFO] [1788337360.487622160] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788337360.487629134] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487636147] [gz_ros_control]: 			 found initial value: -1.306834
+[gazebo-2] [INFO] [1788337360.487644032] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.487651065] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788337360.487658549] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788337360.487665603] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487679890] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.487694908] [gz_ros_control]: Loading joint: wrist_3_joint
+[gazebo-2] [INFO] [1788337360.487704807] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788337360.487712241] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487719715] [gz_ros_control]: 			 found initial value: -1.884398
+[gazebo-2] [INFO] [1788337360.487786201] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.487802041] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788337360.487809916] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788337360.487816809] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.487829303] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.488459841] [controller_manager]: Initialize hardware 'cs' 
+[gazebo-2] [WARN] [1788337360.488696749] [controller_manager.hardware_component.system.cs]: Executor is not available during hardware component initialization for 'cs'. Skipping node creation!
+[gazebo-2] [INFO] [1788337360.489124840] [controller_manager]: Successful initialization of hardware 'cs'
+[gazebo-2] [INFO] [1788337360.489897896] [gz_ros_control]: The position_proportional_gain has been set to: 0.5
+[gazebo-2] [INFO] [1788337360.489985462] [gz_ros_control]: Loading joint: gripper_right_finger_joint
+[gazebo-2] [INFO] [1788337360.490006251] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788337360.490018715] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.490031740] [gz_ros_control]: 			 found initial value: 0.030000
+[gazebo-2] [INFO] [1788337360.490046077] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.490057959] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788337360.490068008] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788337360.490082205] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.490161215] [gz_ros_control]: Loading joint: gripper_left_finger_joint
+[gazebo-2] [INFO] [1788337360.490187304] [gz_ros_control]: Joint 'gripper_left_finger_joint'is mimicking joint 'gripper_right_finger_joint' with multiplier: 1 and offset: 0
+[gazebo-2] [INFO] [1788337360.490200559] [gz_ros_control]: 	State:
+[gazebo-2] [INFO] [1788337360.490210418] [gz_ros_control]: 		 position
+[gazebo-2] [INFO] [1788337360.490219716] [gz_ros_control]: 		 velocity
+[gazebo-2] [INFO] [1788337360.490231488] [gz_ros_control]: 		 effort
+[gazebo-2] [INFO] [1788337360.490240705] [gz_ros_control]: 	Command:
+[gazebo-2] [INFO] [1788337360.490473757] [controller_manager]: Initialize hardware 'cs625_parallel_gripper' 
+[gazebo-2] [WARN] [1788337360.490531095] [controller_manager.hardware_component.system.cs625_parallel_gripper]: Executor is not available during hardware component initialization for 'cs625_parallel_gripper'. Skipping node creation!
+[gazebo-2] [INFO] [1788337360.490611618] [controller_manager]: Successful initialization of hardware 'cs625_parallel_gripper'
+[gazebo-2] [INFO] [1788337360.490869616] [controller_manager]: Activating component 'cs625_parallel_gripper'.
+[gazebo-2] [INFO] [1788337360.490910494] [resource_manager]: 'configure' hardware 'cs625_parallel_gripper' 
+[gazebo-2] [INFO] [1788337360.490927957] [gz_ros_control]: System Successfully configured!
+[gazebo-2] [INFO] [1788337360.490943676] [resource_manager]: Successful 'configure' of hardware 'cs625_parallel_gripper'
+[gazebo-2] [INFO] [1788337360.490965347] [resource_manager]: 'activate' hardware 'cs625_parallel_gripper' 
+[gazebo-2] [INFO] [1788337360.491014901] [resource_manager]: Successful 'activate' of hardware 'cs625_parallel_gripper'
+[gazebo-2] [INFO] [1788337360.491348333] [controller_manager]: Activating component 'cs'.
+[gazebo-2] [INFO] [1788337360.491367529] [resource_manager]: 'configure' hardware 'cs' 
+[gazebo-2] [INFO] [1788337360.491373240] [gz_ros_control]: System Successfully configured!
+[gazebo-2] [INFO] [1788337360.491383139] [resource_manager]: Successful 'configure' of hardware 'cs'
+[gazebo-2] [INFO] [1788337360.491392126] [resource_manager]: 'activate' hardware 'cs' 
+[gazebo-2] [INFO] [1788337360.491398618] [resource_manager]: Successful 'activate' of hardware 'cs'
+[gazebo-2] [WARN] [1788337360.491454434] [controller_manager]: Component 'cs625_parallel_gripper' does not have read or write statistics initialized, skipping registration.
+[gazebo-2] [WARN] [1788337360.491466035] [controller_manager]: Component 'cs' does not have read or write statistics initialized, skipping registration.
+[gazebo-2] [INFO] [1788337360.491478269] [controller_manager]: Resource Manager has been successfully initialized. Starting Controller Manager services...
+[gazebo-2] [1;32m[Msg] [0m[1;32mDisable collision[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/disable_collision/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mMaterial[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/visual_config[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mMaterial[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/visual_config/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mMaterial[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/wheel_slip[0m[1;32m] (async)[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mMaterial[0m[1;32m service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/wheel_slip/blocking[0m[1;32m] (blocking)[0m[1;32m[0m
+[gazebo-2] [1;36m[Dbg] [SystemManager.cc:80] [0m[1;36mLoaded system [[0m[1;36mgz::sim::systems::UserCommands[0m[1;36m] for entity [[0m[1;36m1[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SystemManager.cc:80] [0m[1;36mLoaded system [[0m[1;36mgz::sim::systems::SceneBroadcaster[0m[1;36m] for entity [[0m[1;36m1[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mLoaded level [[0m[1;32mdefault[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing world controls on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5[0m[1;32m/control], [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5[0m[1;32m/control/state] and [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5[0m[1;32m/playback/control][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing GUI information on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5[0m[1;32m/[0m[1;32mgui/info[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mWorld [[0m[1;32mp7_ycb_tomato_occlusion_severe_v5[0m[1;32m] initialized with [[0m[1;32mp7_physics[0m[1;32m] physics profile.[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing world SDF generation service on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5[0m[1;32m/[0m[1;32mgenerate_world_sdf[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing world names on [[0m[1;32m/gazebo/worlds[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mResource path add service on [[0m[1;32m/gazebo/resource_paths/add[0m[1;32m].[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mResource path get service on [[0m[1;32m/gazebo/resource_paths/get[0m[1;32m].[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mResource path resolve service on [[0m[1;32m/gazebo/resource_paths/resolve[0m[1;32m].[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mResource paths published on [[0m[1;32m/gazebo/resource_paths[0m[1;32m].[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServer control service on [[0m[1;32m/server_control[0m[1;32m].[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mFound no publishers on /stats, adding root stats topic[0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mFound no publishers on /clock, adding root clock topic[0m[1;32m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:551] [0m[1;36mCreating PostUpdate worker threads: [0m[1;36m3[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:562] [0m[1;36mCreating postupdate worker thread ([0m[1;36m0[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:562] [0m[1;36mCreating postupdate worker thread ([0m[1;36m1[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SystemManager.cc:80] [0m[1;36mLoaded system [[0m[1;36mgz_ros2_control::GazeboSimROS2ControlPlugin[0m[1;36m] for entity [[0m[1;36m18[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [UserCommands.cc:1094] [0m[1;36mCreated entity [[0m[1;36m18[0m[1;36m] named [[0m[1;36mcs[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mbase_link_inertia_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;31m[Err] [Physics.cc:1808] [0m[1;31mAttempting to create a mimic constraint for joint [[0m[1;31mgripper_left_finger_joint[0m[1;31m] but the chosen physics engine does not support [0m[1;31mmimic constraints, so no constraint will be [0m[1;31mcreated.[0m[1;31m[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mshoulder_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mupperarm_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mforearm_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mwrist_1_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mwrist_2_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mwrist_3_link_collision[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:332] [0m[1;36mMesh construction from an SDF has not been implemented yet for [0m[1;36mdartsim. Use AttachMeshShapeFeature to use mesh shapes.[0m
+[gazebo-2] [1;36m[Dbg] [SDFFeatures.cc:864] [0m[1;36mThe geometry element of collision [[0m[1;36mwrist_3_link_fixed_joint_lump__my_end_effector_link_collision_1[0m[1;36m] [0m[1;36mcouldn't be created[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:953] [0m[1;36mInitialization needed[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:349] [0m[1;36mInitializing render context[0m[1;36m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mLoading plugin [[0m[1;32mgz-rendering-ogre2[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing scene information on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5[0m[1;32m/[0m[1;32mscene/info[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing graph information on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5[0m[1;32m/[0m[1;32mscene/graph[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing full state on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5[0m[1;32m/[0m[1;32mstate[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mServing full state (async) on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5[0m[1;32m/[0m[1;32mstate_async[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPublishing scene information on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/scene/info[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPublishing entity deletions on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/scene/deletion[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPublishing state changes on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5/state[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPublishing pose messages on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5[0m[1;32m/[0m[1;32mpose/info[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [1;32m[Msg] [0m[1;32mPublishing dynamic pose messages on [[0m[1;32m/world/p7_ycb_tomato_occlusion_severe_v5[0m[1;32m/[0m[1;32mdynamic_pose/info[0m[1;32m][0m[1;32m[0m
+[gazebo-2] [WARN] [1788337361.414733606] [gz_ros_control]:  Desired controller update period (0.01 s) is slower than the gazebo simulation period (0.001 s).
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:578] [0m[1;36mExiting postupdate worker thread ([0m[1;36m0[Dbg] [SimulationRunner.cc:578] [0m[1;36mExiting postupdate worker thread ([0m[1;36m1[0m[1;36m)[0m[1;36m0[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:551] [0m[1;36mCreating PostUpdate worker threads: [0m[1;36m4[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:562] [0m[1;36mCreating postupdate worker thread ([0m[1;36m0[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:562] [0m[1;36mCreating postupdate worker thread ([0m[1;36m1[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [SimulationRunner.cc:562] [0m[1;36mCreating postupdate worker thread ([0m[1;36m2[0m[1;36m)[0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [RenderUtil.cc:2646] [0m[1;36mCreate scene [[0m[1;36mscene[0m[1;36m][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [Sensors.cc:953] [0m[1;36mInitialization needed[0m[1;36mRendering Thread initialized[0m[1;36mInitialization needed[0m[1;36m[0m
+[gazebo-2] [1;36m[0m
+[INFO] [robot_state_publisher-7]: process started with pid [4232]
+[robot_state_publisher-7] [INFO] [1788337364.544971689] [robot_state_publisher]: Robot initialized
+[gazebo-2] [INFO] [1788337365.637682926] [controller_manager]: Received robot description from topic.
+[gazebo-2] [WARN] [1788337365.638181452] [controller_manager]: ResourceManager has already loaded a urdf. Ignoring attempt to reload a robot description.
+[robot_state_publisher-7] [WARN] [1788337366.173725148] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337366.253129668] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337366.274895911] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[INFO] [gz-8]: process started with pid [4248]
+[robot_state_publisher-7] [WARN] [1788337366.422665160] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337366.443563142] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337366.520508527] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337366.602200457] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337366.645071466] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337366.717182690] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337366.781358701] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337366.815569700] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337366.904937687] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.004174059] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.076742608] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.121968395] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.257924727] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.372303657] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.517128075] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[INFO] [gz-8]: process has finished cleanly [pid 4248]
+[robot_state_publisher-7] [WARN] [1788337367.593284981] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.723731942] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.773539642] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.825050997] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.881357890] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.921029840] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337367.942863750] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337368.085733729] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337368.188294762] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337368.294098553] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337368.453692334] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337368.490048490] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337368.591850953] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337368.650013663] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337368.693274962] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337368.791803958] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337368.844589082] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[gazebo-2] [1;36m[Dbg] [RgbdCameraSensor.cc:210] [0m[1;36mRGB images for [[0m[1;36mcs::wrist_3_link::camera_sensor[0m[1;36m] advertised on [[0m[1;36m/camera[0m[1;36m/image][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [RgbdCameraSensor.cc:224] [0m[1;36mDepth images for [[0m[1;36mcs::wrist_3_link::camera_sensor[0m[1;36m] advertised on [[0m[1;36m/camera[0m[1;36m/depth_image][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [RgbdCameraSensor.cc:238] [0m[1;36mPoints for [[0m[1;36mcs::wrist_3_link::camera_sensor[0m[1;36m] advertised on [[0m[1;36m/camera[0m[1;36m/points][0m[1;36m[0m
+[gazebo-2] [1;36m[Dbg] [CameraSensor.cc:695] [0m[1;36mCamera info for [[0m[1;36mcs::wrist_3_link::camera_sensor[0m[1;36m] advertised on [[0m[1;36m/camera/camera_info[0m[1;36m][0m[1;36m[0m
+[robot_state_publisher-7] [WARN] [1788337368.945657565] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337369.069806338] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337369.148652294] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337369.324954209] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337369.356905435] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[INFO] [spawner-9]: process started with pid [4256]
+[robot_state_publisher-7] [WARN] [1788337369.411921137] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337369.554041057] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337369.658332135] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337369.736321694] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337369.878351932] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337369.912294082] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337369.946865216] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337370.044230830] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337370.159106903] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337370.184947931] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337370.298491275] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337370.391033222] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337370.511344227] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337370.585611638] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337370.626910216] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337370.731470304] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337370.830717366] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[spawner-9] [WARN] [1788337370.923097268] [spawner_joint_state_broadcaster]: Controller already loaded, skipping load_controller
+[gazebo-2] [INFO] [1788337370.933366283] [controller_manager]: Configuring controller: 'joint_state_broadcaster'
+[gazebo-2] [ERROR] [1788337370.933716817] [controller_manager]: Could not configure controller with name 'joint_state_broadcaster' because no controller with this name exists
+[spawner-9] [ERROR] [1788337370.936228151] [spawner_joint_state_broadcaster]: Failed to configure controller
+[robot_state_publisher-7] [WARN] [1788337370.976077112] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.030994285] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.119883903] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.224181170] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[ERROR] [spawner-9]: process has died [pid 4256, exit code 1, cmd '/opt/ros/jazzy/lib/controller_manager/spawner joint_state_broadcaster -c /controller_manager --controller-manager-timeout 60 --switch-timeout 60 --service-call-timeout 60 --ros-args -r __node:=spawner_joint_state_broadcaster'].
+[INFO] [spawner-10]: process started with pid [4271]
+[INFO] [spawner-11]: process started with pid [4272]
+[robot_state_publisher-7] [WARN] [1788337371.397026361] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.435438861] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.506001315] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.567093722] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.624472542] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.720868168] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.807001165] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.875886574] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.946532240] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337371.995623462] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.087913392] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.149311522] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.180401369] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.217641505] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.300881613] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.374348930] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.420024980] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.463505289] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.507423435] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.583109971] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.620420613] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.675964211] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.711969789] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.759915623] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.873416861] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337372.946834124] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337373.026135261] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337373.052630925] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[spawner-11] [INFO] [1788337373.058671868] [spawner_gripper_controller]: waiting for service /controller_manager/list_controllers to become available...
+[robot_state_publisher-7] [WARN] [1788337373.148307998] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337373.199074913] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337373.283256874] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337373.325840159] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337373.449460763] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337373.549091875] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[spawner-11] [WARN] [1788337373.563887906] [spawner_gripper_controller]: Controller already loaded, skipping load_controller
+[robot_state_publisher-7] [WARN] [1788337373.584449090] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337373.631340121] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[spawner-11] [ERROR] [1788337373.654035196] [spawner_gripper_controller]: Failed to configure controller
+[robot_state_publisher-7] [WARN] [1788337373.736216992] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337373.889744789] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337373.935761884] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337373.983881214] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[spawner-10] [INFO] [1788337374.037989897] [spawner_joint_trajectory_controller]: waiting for service /controller_manager/list_controllers to become available...
+[robot_state_publisher-7] [WARN] [1788337374.106393548] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[ERROR] [spawner-11]: process has died [pid 4272, exit code 1, cmd '/opt/ros/jazzy/lib/controller_manager/spawner gripper_controller -c /controller_manager --controller-manager-timeout 60 --switch-timeout 60 --service-call-timeout 60 --ros-args -r __node:=spawner_gripper_controller'].
+[robot_state_publisher-7] [WARN] [1788337374.165839341] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337374.217693986] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337374.260535215] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337374.322011230] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337374.372290944] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337374.425096412] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337374.522546726] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337374.586946247] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337374.772748895] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[gazebo-2] [INFO] [1788337374.799919539] [controller_manager]: Loading controller : 'joint_trajectory_controller' of type 'joint_trajectory_controller/JointTrajectoryController'
+[gazebo-2] [INFO] [1788337374.800140838] [controller_manager]: Loading controller 'joint_trajectory_controller'
+[robot_state_publisher-7] [WARN] [1788337374.804916913] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[gazebo-2] [INFO] [1788337374.834142073] [controller_manager]: Controller 'joint_trajectory_controller' node arguments: --ros-args --params-file /home/oy/cs625_p56_install/share/cs625_bringup/config/sim_controllers.yaml -p use_sim_time:=true --param use_sim_time:=true 
+[robot_state_publisher-7] [WARN] [1788337374.911726683] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337374.942059541] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[spawner-10] [INFO] [1788337374.956089830] [spawner_joint_trajectory_controller]: Loaded joint_trajectory_controller
+[robot_state_publisher-7] [WARN] [1788337375.011778670] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[gazebo-2] [INFO] [1788337375.045007551] [controller_manager]: Configuring controller: 'joint_trajectory_controller'
+[gazebo-2] [INFO] [1788337375.046845825] [joint_trajectory_controller]: No specific joint names are used for command interfaces. Using 'joints' parameter.
+[gazebo-2] [INFO] [1788337375.047009255] [joint_trajectory_controller]: Command interfaces are [position] and state interfaces are [position velocity].
+[gazebo-2] [INFO] [1788337375.047076773] [joint_trajectory_controller]: Using 'splines' interpolation method.
+[robot_state_publisher-7] [WARN] [1788337375.084662764] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[gazebo-2] [INFO] [1788337375.092660810] [joint_trajectory_controller]: Action status changes will be monitored at 20.00 Hz.
+[robot_state_publisher-7] [WARN] [1788337375.115516539] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[gazebo-2] [INFO] [1788337375.128820447] [joint_trajectory_controller]: Setting initial scaling factor to 1.000000
+[gazebo-2] [INFO] [1788337375.128923372] [joint_trajectory_controller]: No scaling interface set. This controller will not read speed scaling from the hardware.
+[spawner-10] [INFO] [1788337375.159001221] [spawner_joint_trajectory_controller]: waiting for service /controller_manager/switch_controller to become available...
+[robot_state_publisher-7] [WARN] [1788337375.258328571] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337375.319760372] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337375.344728428] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[gazebo-2] [INFO] [1788337375.411420091] [controller_manager]: Activating controllers: [ joint_trajectory_controller ]
+[spawner-10] [ERROR] [1788337375.414336504] [spawner_joint_trajectory_controller]: Failed to activate controller : joint_trajectory_controller
+[gazebo-2] [INFO] [1788337375.419633669] [controller_manager]: Successfully switched controllers!
+[robot_state_publisher-7] [WARN] [1788337375.448906407] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337375.533799500] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337375.622414030] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337375.657830123] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337375.680931837] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337375.748280768] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[ERROR] [spawner-10]: process has died [pid 4271, exit code 1, cmd '/opt/ros/jazzy/lib/controller_manager/spawner joint_trajectory_controller -c /controller_manager --controller-manager-timeout 60 --switch-timeout 60 --service-call-timeout 60 --ros-args -r __node:=spawner_joint_trajectory_controller'].
+[robot_state_publisher-7] [WARN] [1788337375.850790648] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337375.872850621] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337375.899910477] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337375.963754993] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337375.997641925] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.047431304] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.165001482] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.190477580] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.267729055] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.335477121] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.359338092] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.451815117] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.549032117] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.600507069] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.673125946] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.737550163] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.921530693] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337376.975636276] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.014676486] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.138458632] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.204826395] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.266267878] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.350389773] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.382333337] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.434455865] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.591244208] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.653868416] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.794744300] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.845890108] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337377.950510264] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.027166164] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.106954315] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.148403634] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.273062387] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.360238378] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.405908088] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.520207282] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.638115670] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.687927634] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.780324976] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.911165738] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337378.992629163] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.115929644] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.225740789] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.345491737] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.413461260] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.459473962] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.503117022] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.562537692] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.721328952] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.768666356] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.829666972] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.877564554] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337379.940414637] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337380.035948059] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337380.264542463] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337380.346573403] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337380.392709989] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337380.488777436] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337380.573008067] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337380.683396685] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337380.847873877] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337380.908421568] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337381.046325719] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337381.300974389] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337381.359855899] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337381.417339105] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337381.465980073] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337381.563429047] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337381.632126739] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337381.762622931] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337381.926052494] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337382.128557957] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337382.193792214] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337382.324623728] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337382.406639434] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337382.490372932] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337382.553618705] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337382.614003488] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337382.725810943] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337382.854667990] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337382.931037907] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337383.008471961] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337383.177908697] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337383.255403755] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337383.305962893] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337383.365017671] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337383.485755768] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337383.521446700] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337383.642616001] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337383.722982639] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337383.785410074] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337383.890722172] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.080273078] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.128573469] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.238195491] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.380417185] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.466843871] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.498427389] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.573353418] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.613677586] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.694233507] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.766756753] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.796714357] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.868259006] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337384.986329330] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337385.102295467] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337385.258846863] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337385.291927254] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337385.363102995] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337385.490783742] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337385.560737531] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337385.680208262] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337385.748408885] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337385.793362082] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337385.931848710] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337385.998033849] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.040054163] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.158027558] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.250205440] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.294236832] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.334672906] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.452066335] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.500072353] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.579815032] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.616051115] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.648386495] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.694018578] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.886762558] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.963556351] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337386.995608235] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.069131505] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.130359730] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.218146365] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.258218492] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.411430160] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.467538823] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.510567833] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.572868176] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.637719395] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.686799420] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.763727086] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.807937548] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.874627673] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337387.969173397] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337388.009401664] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337388.046898149] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337388.174482176] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337388.297977108] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337388.405251376] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337388.452104714] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337388.513109222] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337388.623308591] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337388.712074943] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337388.878981612] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337388.929805802] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.071181435] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.150504374] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.282916084] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.358317522] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.471837533] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.539916406] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.581297128] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.708033512] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.735183279] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.767272837] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.881283202] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337389.996603269] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337390.036602843] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337390.134530780] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337390.188391989] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337390.294700481] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337390.342035226] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337390.468776967] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337390.599866783] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337390.865256306] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337390.924123891] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337390.968672410] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337390.997646778] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337391.121566265] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337391.265226132] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337391.350681591] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337391.405377196] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337391.512228524] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337391.545274778] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337391.600328796] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337391.717379846] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337391.758861825] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337391.880592670] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337391.959467264] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.054565492] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.157644141] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.302360803] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.371099781] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.443607924] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.527913887] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.603708846] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.659981907] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.748214277] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.847034829] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.874902621] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.935813383] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337392.977404377] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.104865168] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.179663697] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.267044692] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.421830019] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.457082664] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.517408918] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.598497778] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.663989044] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.717846373] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.752709293] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.788910349] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.825258173] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.853031442] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.883428299] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.955894691] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337393.990077488] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.027161567] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.109648167] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.186076570] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.254110117] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.324266804] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.412797786] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.534950312] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.633226891] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.678216198] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.753520050] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.778713898] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.808293952] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337394.906464864] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.033902027] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.124076982] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.206308330] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.306684374] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.373490835] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.451235129] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.527175581] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.680852787] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.759079763] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.882886699] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.935570554] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337395.979050762] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.054768707] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.094793829] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.134689741] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.184301472] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.268924049] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.329857303] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.435240351] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.667196400] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.741427100] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.848083608] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.868795432] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.922321606] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337396.958685855] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.013658233] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.134488274] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.187276013] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.225204903] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.267127885] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.352335614] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.442060990] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.479013023] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.570772073] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.593882886] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.625337966] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.698830978] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.748079094] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.783230594] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.894515895] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337397.936802573] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.024818321] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.097744213] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.146220122] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.298426242] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.377364924] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.406244427] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.447612999] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.493908794] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.553612696] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.601212980] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.652172189] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.713941634] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.800049589] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.880906182] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.930304302] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337398.952714143] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.078230599] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.239273623] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.272906059] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.309139834] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.370085501] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.466128168] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.556820369] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.652092884] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.697359340] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.794347813] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.889805365] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337399.911727472] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337400.079267040] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337400.249098698] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337400.297527146] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337400.391774437] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337400.422159830] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337400.514682420] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337400.619284144] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337400.738764429] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337400.795714276] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337400.906204024] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337400.956465067] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.140461280] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.262889543] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.295026773] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.392191737] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.455166358] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.549117321] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.651726354] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.713706975] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.762663973] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.827589482] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.862905909] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.904354077] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.949871702] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337401.994238201] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.099026147] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.288139104] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.327486937] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.363378118] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.454305887] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.508718251] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.587516315] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.654825871] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.718674027] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.781091671] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.834937948] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.892563980] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337402.949780249] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.037680898] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.107783743] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.208200685] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.279935365] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.376790764] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.451423760] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.507278035] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.541091365] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.643805125] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.675211448] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.747990924] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.791617730] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337403.827795294] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.055630478] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.146513687] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.211785326] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.248209400] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.368140057] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.435601798] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.530720438] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.691856020] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.750085166] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.806463498] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.861663849] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337404.921606359] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337405.018508913] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337405.165461086] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337405.243631894] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337405.374369751] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337405.439793313] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337405.506015902] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337405.661516365] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337405.743723528] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337405.790695033] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337405.863586513] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337405.951261572] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.137344037] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.203808355] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.235604588] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.362603147] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.399009874] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.433954182] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.512902674] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.556198461] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.715113844] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.737518452] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.795225690] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.828053802] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337406.869922394] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.005349904] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.061165366] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.115796119] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.149403327] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.217875711] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.343264675] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.482427461] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.533399432] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.574790115] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.754342986] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.876347428] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337407.962570429] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.011572217] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.104714328] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.171676951] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.238637265] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.300820826] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.374327950] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.419562418] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.601640525] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.655434261] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.706987773] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.777092076] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.898311137] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337408.995923061] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.049681921] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.116705253] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.193946397] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.230262760] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.313883931] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.403558296] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.442990501] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.482957999] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.647881143] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.697923865] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.770547596] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.840100783] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337409.935757073] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.024794407] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.058177169] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.197698691] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.264282677] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.348406174] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.395571726] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.469079446] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.549073634] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.585329653] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.620795173] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.721018286] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.779172250] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.834147482] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.872028049] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337410.969727035] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.028755212] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.075072736] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.138041459] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.192730212] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.249176208] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.325287776] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.371749959] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.471662760] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.504390770] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.655864704] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.688588422] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.811547313] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.892617374] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337411.982449728] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337412.064140485] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337412.179913049] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337412.280400585] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337412.498580442] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337412.524518106] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337412.599021203] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337412.703845971] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337412.738301189] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337412.799222387] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337412.871628397] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337412.946881747] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.032088631] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.103565654] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.263923022] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.316802821] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.343597033] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.410091084] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.450329998] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.539306240] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.686113808] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.798442668] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.912020747] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337413.997374140] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.046852455] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.083464836] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.137774975] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.262422776] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.300274423] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.367405301] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.547170387] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.619377430] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.791253151] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.839236900] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.927061077] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337414.957972701] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.044250648] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.078187381] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.154396895] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.189337131] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.247263028] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.325969171] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.374968935] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.413143903] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.441338078] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.537822753] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.602708319] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.639077138] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.776389713] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.862405458] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337415.906871783] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337416.020603797] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337416.099625316] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337416.148715142] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337416.267246749] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337416.324393865] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337416.388053077] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337416.441114840] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337416.513862588] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337416.716932948] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337416.801881768] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!
+[robot_state_publisher-7] [WARN] [1788337416.988177211] [robot_state_publisher]: Moved backwards in time, re-publishing joint transforms!

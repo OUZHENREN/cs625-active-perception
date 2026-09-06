@@ -1,0 +1,76 @@
+/cs625_p7_arm_motion_adapter:
+  ros__parameters:
+    # Explicit simulation gate: never reuse this profile for real hardware.
+    execute: true
+    require_confirmation: false
+    command_topic: /p7/arm_motion_command
+    status_topic: /p7/arm_motion_status
+    joint_states_topic: /joint_states
+    planning_group: cs625_arm
+    # MoveIt must solve IK on the declared SRDF tip.  Commands are expressed
+    # at the physical midpoint of the two finger pads; the adapter uses live
+    # TF to convert that grasp reference to the planning tip first.
+    planning_tip_frame: my_end_effector_link
+    physical_tool_frame: p7_grasp_center_link
+    joint_names: [shoulder_pan_joint, shoulder_lift_joint, elbow_joint, wrist_1_joint, wrist_2_joint, wrist_3_joint]
+    ik_service: /compute_ik
+    fk_service: /compute_fk
+    plan_service: /plan_kinematic_path
+    cartesian_path_service: /compute_cartesian_path
+    controller_action: /joint_trajectory_controller/follow_joint_trajectory
+    request_timeout_sec: 8.0
+    # Previous target-conditioned E1 trajectories required about 152 s of
+    # wall time on the validated WSL CPU simulation.  Keep the per-phase cap
+    # below the 300 s episode budget but avoid falsely aborting a live action.
+    execution_timeout_sec: 240.0
+    planning_time_sec: 4.0
+    # Let the single authoritative MoveIt pose-goal request sample up to five
+    # collision-free IK branches.  The adapter executes exactly the trajectory
+    # returned by this same request; no independent pre-plan is accepted.
+    planning_attempts: 5
+    # Keep the pose sampling region substantially tighter than the independent
+    # post-plan physical-grasp-center FK acceptance gate below.
+    goal_position_tolerance_m: 0.001
+    goal_orientation_tolerance_rad: 0.005
+    max_velocity_scale: 0.25
+    max_acceleration_scale: 0.25
+    fk_position_tolerance_m: 0.008
+    fk_orientation_tolerance_rad: 0.05
+    # A controller action result is accepted only when the observed six-axis
+    # terminal state also agrees with the planned terminal state.
+    execution_joint_tolerance_rad: 0.01
+    # E2 approach and E4 lift must not use unconstrained OMPL joint-space arcs
+    # near the object. Keep tool orientation fixed and sample a collision-
+    # checked straight line at 5 mm Cartesian resolution; reject any truncated
+    # path or joint jump.
+    approach_cartesian_max_step_m: 0.005
+    approach_min_fraction: 0.999
+    approach_revolute_jump_threshold_rad: 0.5
+    approach_prismatic_jump_threshold_m: 0.02
+    approach_max_cartesian_speed_mps: 0.05
+    # The CS625 pan/lift/wrist limits are +/-360 degrees.  KDL may return an
+    # equivalent multi-turn solution; select the 2pi-equivalent nearest to
+    # the monitored state before handing it to Gazebo's position loop.
+    wrap_solution_joint_names: [shoulder_pan_joint, shoulder_lift_joint, wrist_1_joint, wrist_2_joint, wrist_3_joint]
+
+/cs625_p7_gripper_adapter:
+  ros__parameters:
+    command_topic: /p7/gripper_command
+    status_topic: /p7/gripper_status
+    controller_command_topic: /gripper_controller/commands
+    joint_states_topic: /joint_states
+    joint_name: gripper_right_finger_joint
+    peer_joint_name: gripper_left_finger_joint
+    target_tolerance_m: 0.002
+    timeout_sec: 5.0
+    minimum_position_m: 0.0
+    maximum_position_m: 0.04
+
+/cs625_p7_attachment_adapter:
+  ros__parameters:
+    command_topic: /p7/attachment_command
+    status_topic: /p7/attachment_status
+    attach_topic: /p7/attachment/attach
+    detach_topic: /p7/attachment/detach
+    state_topic: /p7/attachment/state
+    monitor_timeout_sec: 4.0

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 
 import rclpy
@@ -24,6 +25,7 @@ class SimEpisodeCoordinator(Node):
             ("reachable_candidates_topic", "/view_planner/reachable_candidates"),
             ("selected_view_topic", "/view_planner/selected_view"),
             ("execution_status_topic", "/motion/execution_status"),
+            ("motion_status_topic", "/motion/status"),
             ("state_topic", "/active_localization/state"),
             ("strategy", "predefined_scan"), ("random_seed", 17),
             ("max_views", 3), ("fixed_candidate_id", ""),
@@ -66,6 +68,7 @@ class SimEpisodeCoordinator(Node):
         self._state_pub = self.create_publisher(ActiveLocalizationState, str(self.get_parameter("state_topic").value), retained)
         self.create_subscription(ViewCandidateArray, str(self.get_parameter("reachable_candidates_topic").value), self._on_candidates, retained)
         self.create_subscription(String, str(self.get_parameter("execution_status_topic").value), self._on_execution, 10)
+        self.create_subscription(String, str(self.get_parameter("motion_status_topic").value), self._on_motion_status, retained)
         self._available = []
         self._header = None
         self._cycle = 0
@@ -76,6 +79,35 @@ class SimEpisodeCoordinator(Node):
         self._selection_replay_message = None
         self._selection_replay_remaining = 0
         self._selection_replay_timer = None
+        self._episode_started = None
+        self._replan_after_execution_failure_count = 0
+        self._candidate_failure_counts = None
+        self._candidate_status_source_count = None
+
+    def _on_motion_status(self, message: String) -> None:
+        """Store the P3 hard-filter result without conflating it with contact.
+
+        ``COLLISION`` here is a candidate rejected by MoveIt's state-validity
+        query.  It is not a physical collision during Gazebo trajectory
+        execution, which is intentionally not claimed by this P4 loop.
+        """
+        try:
+            detail = json.loads(message.data)
+        except json.JSONDecodeError:
+            return
+        if not detail.get("planning_only"):
+            return
+        failures = detail.get("failure_counts")
+        if not isinstance(failures, dict):
+            return
+        self._candidate_failure_counts = {
+            str(code): int(count)
+            for code, count in failures.items()
+            if isinstance(count, int) and count >= 0
+        }
+        source_count = detail.get("candidate_count")
+        if isinstance(source_count, int) and source_count >= 0:
+            self._candidate_status_source_count = source_count
 
     def _on_candidates(self, message: ViewCandidateArray) -> None:
         if self._available or self._waiting or self._records:
@@ -87,6 +119,7 @@ class SimEpisodeCoordinator(Node):
         self._reachable_count = len(message.candidates)
         self._header = message.header
         self._source_count = message.source_candidate_count or len(message.candidates)
+        self._episode_started = time.monotonic()
         self._select_next()
 
     def _select_next(self) -> None:
@@ -137,6 +170,7 @@ class SimEpisodeCoordinator(Node):
             if not self._available:
                 self._finish(result.get("code", "NO_REACHABLE_AFTER_FAILURE"))
                 return
+            self._replan_after_execution_failure_count += 1
             self._select_next()
             return
         self._available = [item for item in self._available if item.candidate_id != result.get("candidate_id")]
@@ -149,6 +183,12 @@ class SimEpisodeCoordinator(Node):
 
     def _finish(self, reason: str) -> None:
         self._directory.mkdir(parents=True, exist_ok=True)
+        status_source_count = self._candidate_status_source_count
+        collision_count = None
+        collision_rate = None
+        if self._candidate_failure_counts is not None and status_source_count:
+            collision_count = int(self._candidate_failure_counts.get("COLLISION", 0))
+            collision_rate = collision_count / status_source_count
         record = {
             "scene_id": self._scene,
             "strategy": self._strategy,
@@ -159,6 +199,16 @@ class SimEpisodeCoordinator(Node):
             "termination_reason": reason,
             "profile": "sim",
             "max_failed_attempts": self._max_failed_attempts,
+            "episode_wall_time_sec": (
+                max(0.0, time.monotonic() - self._episode_started)
+                if self._episode_started is not None else None
+            ),
+            "replan_after_execution_failure_count": self._replan_after_execution_failure_count,
+            "candidate_failure_counts": self._candidate_failure_counts,
+            "candidate_collision_rejection_count": collision_count,
+            "candidate_collision_rejection_rate": collision_rate,
+            "candidate_collision_metric_scope": "p3_moveit_state_validity",
+            "metric_schema_version": "p4_extended_v1",
         }
         destination = self._directory / f"{self._scene}_{self._strategy}_seed{self._seed}_p4_loop.json"
         temporary = destination.with_suffix(".tmp")
