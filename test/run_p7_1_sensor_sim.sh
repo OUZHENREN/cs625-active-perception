@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # Launch only the P7.1 eye-in-hand RGB-D gate in the existing Jazzy/Harmonic stack.
 set -eo pipefail
-source /opt/ros/jazzy/setup.bash
-cs625_underlay_setup="${CS625_UNDERLAY_SETUP:-$HOME/cs625_colcon_jazzy/install/setup.bash}"
-cs625_app_install="${CS625_APP_INSTALL:-$HOME/cs625_p56_install}"
-source "$cs625_underlay_setup"
-source "$cs625_app_install/setup.bash"
-
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Single supported environment entry point: ROS Jazzy -> vendor underlay ->
+# this repository's installed overlay.
+# shellcheck source=scripts/source_dev_env.sh
+source "$repo_root/scripts/source_dev_env.sh" --full
+cs625_app_install="$CS625_APP_INSTALL"
 export IGN_PARTITION="${IGN_PARTITION:-p7_1_sensor_$(date +%Y%m%d_%H%M%S)_$$}"
 export GZ_PARTITION="${GZ_PARTITION:-$IGN_PARTITION}"
 export CS625_GZ_PARTITION="$IGN_PARTITION"

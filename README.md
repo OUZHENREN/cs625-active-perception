@@ -47,25 +47,43 @@ episode；三种基线各 15 个样本。本轮矩阵全部以 `MAX_FAILED_ATTEM
 
 ## 快速复现
 
-当前验证环境为 Ubuntu 24.04、ROS 2 Jazzy、MoveIt 2 与 Gazebo。需先准备官方
-Elite/CS625、MoveIt 与仿真依赖 underlay，再构建本应用工作区：
+当前验证环境为 Ubuntu 24.04、ROS 2 Jazzy、MoveIt 2 与 Gazebo Harmonic。所有
+build/test/launch 命令都必须先加载唯一环境入口，固定链为 ROS 2 Jazzy → CS625
+vendor underlay → 本仓库 overlay：
+
+```text
+/opt/ros/jazzy/setup.bash
+  -> $HOME/cs625_underlay_jazzy/install/setup.bash
+  -> $PWD/install/setup.bash
+```
+
+vendor underlay 位置可用 `CS625_UNDERLAY_SETUP` 覆盖；入口会在任一段 setup.bash
+缺失时直接失败，不会静默跳过。
+
+首次构建时 overlay 尚不存在，因此先只加载 ROS 与 vendor underlay。`scripts/build.sh`
+等价于 `colcon build --symlink-install`，产物固定落在本仓库 `build/`、`install/`、
+`log/`：
 
 ```bash
-source /opt/ros/jazzy/setup.bash
-source <underlay>/install/setup.bash
-colcon build --symlink-install
-source install/setup.bash
+source scripts/source_dev_env.sh --no-overlay
+bash scripts/build.sh
+```
+
+构建完成后校验完整链条（断言 `ROS_DISTRO=jazzy`，并解析 underlay 与 overlay 中的包）：
+
+```bash
+source scripts/source_dev_env.sh --verify
 ```
 
 运行完整 45-cell 矩阵时，指定一个新的空输出目录：
 
 ```bash
 scripts/run_minimum_showcase_matrix.sh \
-  <application-install>/setup.bash \
-  <new-output-directory>
+  "$PWD/install/setup.bash" \
+  "$HOME/cs625_matrix_run_$(date +%Y%m%d_%H%M%S)"
 ```
 
-脚本完成后在 `<new-output-directory>/summary/` 生成：
+脚本完成后在输出目录的 `summary/` 生成：
 
 - `matrix_validation.md`：45-cell 完整性校验；
 - `episode_metrics.csv`：逐 episode 的全部指标、失败码与终止原因；
@@ -76,21 +94,27 @@ scripts/run_minimum_showcase_matrix.sh \
 
 ```bash
 scripts/run_minimum_showcase_matrix.sh \
-  <application-install>/setup.bash <temporary-output-directory> \
+  "$PWD/install/setup.bash" "$HOME/cs625_matrix_smoke" \
   --scene occlusion_medium --seed 17 --strategy fixed_view
 ```
 
 ## 验证
 
-在已 source 的 Jazzy、underlay 和本项目 install 环境中运行：
+先加载唯一环境入口，再运行静态契约检查与单元测试：
 
 ```bash
+source scripts/source_dev_env.sh --verify
 python3 test/contract_checks.py
 pytest -q \
   src/cs625_experiment_tools/tests/test_paired_experiment.py \
   src/cs625_experiment_tools/tests/test_p4_matrix_summary.py \
   src/cs625_view_evaluation/tests/test_joint_score.py
 ```
+
+`test/contract_checks.py` 除既有静态契约外，还会校验环境本身：`ROS_DISTRO`
+必须是 `jazzy`，`scripts/source_dev_env.sh` 必须存在，`scripts/` 与 `test/`
+中不得出现旧环境引用，且 `AMENT_PREFIX_PATH` 必须按“本仓库 overlay → CS625
+underlay → `/opt/ros/jazzy`”排序。
 
 P7 的当前串行门禁、停止条件与复现入口见
 [`docs/p7_five_gate_protocol.md`](docs/p7_five_gate_protocol.md)。历史临时验收见
@@ -100,20 +124,28 @@ P7 的当前串行门禁、停止条件与复现入口见
 
 ## 仓库结构
 
+应用层共 **11 个 ROS 2 package**，与 `colcon list` 一致。package 的完整职责、构建
+类型与文件层级以 [`docs/project_layout.md`](docs/project_layout.md) 为唯一详细来源；
+本 README 与 `AGENTS.md` 只保留简要列表，不再各自维护不同版本。
+
 ```text
 src/
 ├── cs625_ap_description/       # 应用层 Eye-in-Hand 描述扩展
 ├── cs625_ap_interfaces/        # 候选、选择与状态 ROS 接口
 ├── cs625_bringup/              # sim/real 启动、配置与矩阵清单
-├── cs625_view_generation/      # 候选视点生成
+├── cs625_experiment_tools/     # 矩阵收集与 paired-experiment 工具
 ├── cs625_motion_adapter/       # 可达性、规划与仿真/真机执行适配器
+├── cs625_sensor_adapter/       # 仿真/真机相机话题归一化
+├── cs625_simulation/           # 仅 Gazebo：worlds、YCB 资产与真值
+├── cs625_target_perception/    # 目标位姿与定位质量接口层
+├── cs625_task_orchestrator/    # P7 抓取证据与 episode 编排
 ├── cs625_view_evaluation/      # 策略、P4 协调器与联合评分
-└── cs625_experiment_tools/     # 矩阵收集与 paired-experiment 工具
+└── cs625_view_generation/      # 候选视点生成
 docs/                           # 实验协议、接口、仿真与真机边界说明
 ├── evidence/                   # 已筛选的 JSON/CSV/PNG/TXT 证据；原始帧本地归档
 ├── diagnostics/                # 诊断输出与人工审计辅助材料
 └── worklogs/                   # 仓库内早期工作日志归档
-scripts/                        # 可复现矩阵运行脚本
+scripts/                        # 环境入口、构建/测试与可复现矩阵运行脚本
 test/                           # 仓库级 contract check、P7 运行/采集工具与固定测试数据
 ```
 
@@ -130,7 +162,7 @@ test/                           # 仓库级 contract check、P7 运行/采集工
 ## 文档入口
 
 - [最低可展示实验](docs/minimum_showcase_experiment.md)
-- [项目文件层级](docs/project_layout.md)
+- [项目文件层级与 package 结构（唯一详细来源）](docs/project_layout.md)
 - [仿真基线与运行边界](docs/simulation.md)
 - [接口与话题契约](docs/interfaces.md)
 - [P5 实验协议](docs/p5_experiment_protocol.md)

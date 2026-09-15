@@ -12,9 +12,11 @@ if [[ "${CS625_P7_SIMULATION_EXECUTION:-}" != "1" ]]; then
   exit 2
 fi
 
-source /opt/ros/jazzy/setup.bash
-source "${CS625_UNDERLAY_SETUP:-$HOME/cs625_colcon_jazzy/install/setup.bash}"
-source "${CS625_APP_INSTALL:-$HOME/cs625_p56_install}/setup.bash"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Single supported environment entry point: ROS Jazzy -> vendor underlay ->
+# this repository's installed overlay.
+# shellcheck source=scripts/source_dev_env.sh
+source "$repo_root/scripts/source_dev_env.sh" --full
 set -u
 export IGN_PARTITION="${IGN_PARTITION:-p7_tipfix_20260829}"
 export GZ_PARTITION="${GZ_PARTITION:-$IGN_PARTITION}"

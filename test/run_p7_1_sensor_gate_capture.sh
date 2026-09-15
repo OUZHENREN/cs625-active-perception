@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Capture one immutable five-window P7.1 gate record from an already-ready sim.
 set -eo pipefail
-source /opt/ros/jazzy/setup.bash
-cs625_underlay_setup="${CS625_UNDERLAY_SETUP:-$HOME/cs625_colcon_jazzy/install/setup.bash}"
-cs625_app_install="${CS625_APP_INSTALL:-$HOME/cs625_p56_install}"
-source "$cs625_underlay_setup"
-source "$cs625_app_install/setup.bash"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Single supported environment entry point: ROS Jazzy -> vendor underlay ->
+# this repository's installed overlay.
+# shellcheck source=scripts/source_dev_env.sh
+source "$repo_root/scripts/source_dev_env.sh" --full
+cs625_app_install="$CS625_APP_INSTALL"
 # The installed overlays can clear GZ_PARTITION while leaving IGN_PARTITION.
 # Harmonic discovery uses GZ_PARTITION, so restore the isolated session's
 # matching value after all setup scripts are sourced.  This is essential for
@@ -28,7 +29,6 @@ if [[ -e "$output_dir" ]]; then
   exit 3
 fi
 mkdir -p "$output_dir"
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 initial_positions="${P7_OBSERVATION_INITIAL_POSITIONS:-$cs625_app_install/share/cs625_bringup/config/p7_1_observation_initial_positions.yaml}"
 expected_positions="${P7_OBSERVATION_EXPECTED_POSITIONS:-$cs625_app_install/share/cs625_bringup/config/p7_1_observation_settled_positions.yaml}"

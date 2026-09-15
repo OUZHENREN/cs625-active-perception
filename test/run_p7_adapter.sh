@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Start exactly one P7 simulation adapter in the existing Jazzy overlay.
 set -eo pipefail
-source /opt/ros/jazzy/setup.bash
-cs625_underlay_setup="${CS625_UNDERLAY_SETUP:-$HOME/cs625_colcon_jazzy/install/setup.bash}"
-cs625_app_install="${CS625_APP_INSTALL:-$HOME/cs625_p56_install}"
-source "$cs625_underlay_setup"
-source "$cs625_app_install/setup.bash"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Single supported environment entry point: ROS Jazzy -> vendor underlay ->
+# this repository's installed overlay.
+# shellcheck source=scripts/source_dev_env.sh
+source "$repo_root/scripts/source_dev_env.sh" --full
+cs625_app_install="$CS625_APP_INSTALL"
 p7_params_file="${P7_PARAMS_FILE:-$cs625_app_install/share/cs625_bringup/config/p7_static_grasp_sim.yaml}"
 
 case "${1:?expected arm, gripper, or attachment}" in

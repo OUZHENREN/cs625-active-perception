@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Run one abort-on-failure P7 fixture episode and preserve every gate receipt.
 set -eo pipefail
-source /opt/ros/jazzy/setup.bash
-cs625_underlay_setup="${CS625_UNDERLAY_SETUP:-$HOME/cs625_colcon_jazzy/install/setup.bash}"
-cs625_app_install="${CS625_APP_INSTALL:-$HOME/cs625_p56_install}"
-source "$cs625_underlay_setup"
-source "$cs625_app_install/setup.bash"
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Single supported environment entry point: ROS Jazzy -> vendor underlay ->
+# this repository's installed overlay.
+# shellcheck source=scripts/source_dev_env.sh
+source "$repo_root/scripts/source_dev_env.sh" --full
+cs625_app_install="$CS625_APP_INSTALL"
 
 if [[ "${CS625_P7_SIMULATION_EXECUTION:-}" != "1" ]]; then
   echo "Set CS625_P7_SIMULATION_EXECUTION=1 only for the isolated P7 simulation." >&2
@@ -17,7 +18,6 @@ if [[ -e "$output_dir" ]]; then
   exit 3
 fi
 mkdir -p "$output_dir"
-repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 p7_run_id="${P7_RUN_ID:-p7-$(date +%Y%m%d-%H%M%S)}"
 

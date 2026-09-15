@@ -25,6 +25,61 @@ Do not mix ROS distributions within one sourced shell.  The older Humble/VM
 notes remain historical project context only; the active P4/P7 simulation
 evidence in this repository is Jazzy/Harmonic.
 
+## Environment entry (mandatory)
+
+Every build, test, launch and `ros2` command must load the environment through
+the single supported entry point before doing anything else:
+
+```bash
+source scripts/source_dev_env.sh
+```
+
+The chain is fixed and must not be reordered, shortened or mixed with another
+distribution:
+
+```text
+/opt/ros/jazzy/setup.bash
+  -> $HOME/cs625_underlay_jazzy/install/setup.bash
+  -> <repository>/install/setup.bash
+```
+
+Supported variants:
+
+```bash
+source scripts/source_dev_env.sh --full         # complete chain (explicit form required in scripts)
+source scripts/source_dev_env.sh --no-overlay   # first build: ROS Jazzy + vendor underlay only
+source scripts/source_dev_env.sh --verify       # assert ROS_DISTRO=jazzy and resolve packages
+```
+
+Sourcing only affects the current shell, so the entry point and the command must
+run in the same shell:
+
+```bash
+source scripts/source_dev_env.sh && <command>
+```
+
+Inside a script, always pass an explicit mode flag.  Bash makes `source <file>`
+with no arguments inherit the calling script's positional parameters, so a bare
+`source` inside a script that takes arguments would feed those arguments to the
+entry point as flags:
+
+```bash
+source "$repo_root/scripts/source_dev_env.sh" --full
+```
+
+Prohibited:
+
+- relying on an implicit ROS source from `~/.bashrc` or any other ambient shell
+  state;
+- ROS 2 Humble (`/opt/ros/humble`, a Humble underlay) for build, test or launch;
+- any pre-Jazzy or temporary external overlay left over from early bring-up.
+
+The entry point fails fast instead of degrading silently: a missing setup file,
+an already-sourced non-Jazzy distribution, a missing overlay, or an
+unresolvable package under `--verify` all abort before the real command starts.
+`scripts/build.sh`, `scripts/test.sh`, `scripts/run_minimum_showcase_matrix.sh`
+and the `test/` runners already route through it.
+
 ## Current package boundary
 
 The repository has moved beyond the Phase 0--1 bootstrap.  Keep the existing
@@ -33,13 +88,18 @@ application packages separated by responsibility:
 - `cs625_ap_interfaces`: ROS messages, services and actions only;
 - `cs625_ap_description`: camera/tool extensions to the official CS625 description;
 - `cs625_sensor_adapter`: normalized simulated and real camera inputs;
-- `cs625_simulation`: Gazebo-only worlds, sensors and ground truth;
-- `cs625_bringup`: launch composition and profiles only.
+- `cs625_target_perception`: target pose and localization quality interface layer;
 - `cs625_view_generation`: candidate view generation;
 - `cs625_view_evaluation`: strategy scoring and episode coordination;
 - `cs625_motion_adapter`: TF conversion, IK, MoveIt planning and execution adapters;
 - `cs625_task_orchestrator`: task-level evidence and grasp episode orchestration;
-- `cs625_experiment_tools`: episode summaries and experiment metrics.
+- `cs625_experiment_tools`: episode summaries and experiment metrics;
+- `cs625_simulation`: Gazebo-only worlds, sensors and ground truth;
+- `cs625_bringup`: launch composition and profiles only.
+
+That list is the complete current package set (11 packages) and must match
+`colcon list`.  [`docs/project_layout.md`](docs/project_layout.md) is the single
+detailed source for package structure; do not maintain a different list here.
 
 Do not create a mega-node that owns perception, planning, execution and logging.
 

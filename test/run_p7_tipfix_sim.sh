@@ -4,12 +4,12 @@
 # ROS 2 Jazzy setup scripts intentionally probe optional unset environment
 # variables, so nounset must not be enabled before sourcing them.
 set -eo pipefail
-source /opt/ros/jazzy/setup.bash
-cs625_underlay_setup="${CS625_UNDERLAY_SETUP:-$HOME/cs625_colcon_jazzy/install/setup.bash}"
-cs625_app_install="${CS625_APP_INSTALL:-$HOME/cs625_p56_install}"
-source "$cs625_underlay_setup"
-source "$cs625_app_install/setup.bash"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Single supported environment entry point: ROS Jazzy -> vendor underlay ->
+# this repository's installed overlay.
+# shellcheck source=scripts/source_dev_env.sh
+source "$repo_root/scripts/source_dev_env.sh" --full
+cs625_app_install="$CS625_APP_INSTALL"
 # Keep all Gazebo / ROS bridge processes in the same isolated fixture.
 export IGN_PARTITION="${IGN_PARTITION:-p7_tipfix_$(date +%Y%m%d_%H%M%S)_$$}"
 export GZ_PARTITION="${GZ_PARTITION:-$IGN_PARTITION}"

@@ -32,8 +32,13 @@ if [[ ! -f "${setup_file}" ]]; then
   echo "ROS install setup file not found: ${setup_file}" >&2
   exit 2
 fi
-ros_distro="${ROS_DISTRO:-jazzy}"
-source "/opt/ros/${ros_distro}/setup.bash"
+# Load the single supported environment entry point (ROS Jazzy -> vendor
+# underlay -> this repository's overlay) and assert that the whole chain
+# resolves before the matrix starts.
+# shellcheck source=scripts/source_dev_env.sh
+source "${script_directory}/source_dev_env.sh" --verify
+# A recorded matrix keeps passing the install setup file it was produced with,
+# so a published run remains reproducible against that install.
 source "${setup_file}"
 set -u
 simulation_share="$(ros2 pkg prefix cs625_simulation)/share/cs625_simulation"

@@ -3,10 +3,11 @@
 # Requires run_p7_tipfix_sim.sh in the same ROS domain / Gazebo partition.
 # Optional second argument --capture-only starts a NEW capture without motion.
 set -eo pipefail
-source /opt/ros/jazzy/setup.bash
-source "${CS625_UNDERLAY_SETUP:-$HOME/cs625_colcon_jazzy/install/setup.bash}"
-source "${CS625_APP_INSTALL:-$HOME/cs625_p56_install}/setup.bash"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Single supported environment entry point: ROS Jazzy -> vendor underlay ->
+# this repository's installed overlay.
+# shellcheck source=scripts/source_dev_env.sh
+source "$repo_root/scripts/source_dev_env.sh" --full
 cd "$repo_root"
 out="${1:?provide an evidence directory}"
 mkdir -p "$out"

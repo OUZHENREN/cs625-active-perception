@@ -58,7 +58,143 @@ def fail(message: str) -> None:
     raise AssertionError(message)
 
 
+# Legacy environment references that must not return to the active scripts.
+LEGACY_ENV_LITERALS = (
+    "/opt/ros/humble",
+    "cs625_colcon_jazzy",
+    "cs625_p56_install",
+)
+
+# Historical Humble-era helper scripts that are allowed to keep mentioning them.
+LEGACY_ENV_ALLOWED_FILES = frozenset(
+    {
+        "wsl_local_build.sh",
+        "bootstrap_humble.sh",
+        "doctor_humble.sh",
+    }
+)
+
+ENVIRONMENT_ENTRY_SCRIPT = pathlib.Path("scripts") / "source_dev_env.sh"
+
+
+def check_environment_contract() -> None:
+    """Detect a wrong or stale ROS environment instead of relying on inspection.
+
+    Checks that depend on a variable are skipped while that variable is absent,
+    so a plain ``python3 test/contract_checks.py`` still works outside a sourced
+    shell.  As soon as a ROS environment is present it must be the Jazzy chain
+    loaded by ``scripts/source_dev_env.sh``.
+    """
+
+    # 1) ROS distribution: only Jazzy is supported.
+    ros_distro = os.environ.get("ROS_DISTRO")
+    if ros_distro and ros_distro != "jazzy":
+        fail(
+            "ROS_DISTRO must be 'jazzy' when set, "
+            f"got {ros_distro!r}; start a fresh shell and load the environment "
+            "with `source scripts/source_dev_env.sh`"
+        )
+
+    # 2) The single environment entry point must exist.
+    entry_relative = ENVIRONMENT_ENTRY_SCRIPT
+    if not (ROOT / entry_relative).is_file():
+        fail(f"environment entry point is missing: {entry_relative}")
+
+    # 3) No legacy environment reference inside scripts/ or test/.
+    checker_path = pathlib.Path(__file__).resolve()
+    for scan_root in (ROOT / "scripts", ROOT / "test"):
+        for current_root, directories, filenames in os.walk(
+            scan_root, topdown=True, onerror=lambda _error: None
+        ):
+            directories[:] = source_scan_directories(current_root, directories)
+            for filename in filenames:
+                path = pathlib.Path(current_root) / filename
+                # This checker necessarily contains the literals it forbids.
+                if path.resolve() == checker_path:
+                    continue
+                if filename in LEGACY_ENV_ALLOWED_FILES:
+                    continue
+                try:
+                    text = path.read_text(encoding="utf-8")
+                except (UnicodeDecodeError, OSError):
+                    continue
+                for literal in LEGACY_ENV_LITERALS:
+                    if literal in text:
+                        fail(
+                            f"legacy environment reference {literal!r} in "
+                            f"{path.relative_to(ROOT)}; route the script through "
+                            "scripts/source_dev_env.sh instead"
+                        )
+
+    # 4) AMENT_PREFIX_PATH must order repository overlay > underlay > ROS.
+    prefix_path = os.environ.get("AMENT_PREFIX_PATH")
+    if not prefix_path:
+        print(
+            "environment contract: AMENT_PREFIX_PATH is not set, "
+            "prefix-order check skipped"
+        )
+        return
+
+    repository_install = (ROOT / "install").resolve()
+    underlay_setup = os.environ.get("CS625_UNDERLAY_SETUP", "")
+    if underlay_setup:
+        underlay_install = pathlib.Path(underlay_setup).resolve().parent.parent
+    else:
+        underlay_install = pathlib.Path.home() / "cs625_underlay_jazzy" / "install"
+    ros_prefix = pathlib.Path("/opt/ros/jazzy")
+
+    def layer_of(entry: str) -> int | None:
+        """Classify one AMENT_PREFIX_PATH entry: 0 overlay, 1 underlay, 2 ROS."""
+
+        resolved = pathlib.Path(entry).resolve()
+        if resolved == repository_install or repository_install in resolved.parents:
+            return 0
+        if resolved == underlay_install or underlay_install in resolved.parents:
+            return 1
+        if resolved == ros_prefix or ros_prefix in resolved.parents:
+            return 2
+        return None
+
+    entries = [entry for entry in prefix_path.split(os.pathsep) if entry]
+    classified = [(index, layer_of(entry), entry) for index, entry in enumerate(entries)]
+    known = [item for item in classified if item[1] is not None]
+    if not known:
+        fail(
+            "AMENT_PREFIX_PATH contains none of the expected layers "
+            "(repository install, CS625 underlay, /opt/ros/jazzy); load the "
+            "environment with `source scripts/source_dev_env.sh`"
+        )
+
+    layers = [layer for _index, layer, _entry in known]
+    if layers != sorted(layers):
+        observed = " > ".join(f"{entry}" for _index, _layer, entry in known)
+        fail(
+            "AMENT_PREFIX_PATH order must be: repository install > CS625 underlay "
+            f"> /opt/ros/jazzy; observed order: {observed}"
+        )
+
+    expected_layers = []
+    if repository_install.is_dir():
+        expected_layers.append((0, "repository install"))
+    if underlay_install.is_dir():
+        expected_layers.append((1, "CS625 underlay"))
+    if ros_prefix.is_dir():
+        expected_layers.append((2, "/opt/ros/jazzy"))
+    present_layers = set(layers)
+    missing_layers = [
+        name for layer, name in expected_layers if layer not in present_layers
+    ]
+    if missing_layers:
+        fail(
+            "AMENT_PREFIX_PATH is missing required layer(s): "
+            + ", ".join(missing_layers)
+            + "; load the environment with `source scripts/source_dev_env.sh`"
+        )
+
+
 def main() -> int:
+    check_environment_contract()
+
     src = ROOT / "src"
     package_dirs = {
         path.name
