@@ -408,7 +408,7 @@ def main() -> int:
         ".sensors_3d(file_path=sensors_file)",
         'package="moveit_ros_move_group"',
         '"use_sim_time": True',
-        '"octomap_frame": "base_link"',
+        '"octomap_frame": "world"',
         '"octomap_resolution": 0.02',
     ):
         if moveit_marker not in moveit_launch_text:

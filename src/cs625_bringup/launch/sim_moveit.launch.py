@@ -93,9 +93,11 @@ def _compose(context):
                 # occupancy-map message filter on the same clock so it can
                 # resolve camera-frame transforms at cloud timestamps.
                 "use_sim_time": True,
-                # Preserve the senior CS625 MoveIt runtime contract. The
-                # normalized point-cloud topic still comes from sensors_file.
-                "octomap_frame": "base_link",
+                # Jazzy's PlanningSceneMonitor uses the planning frame as the
+                # effective Octomap frame.  This model's planning frame is
+                # world, so keep the explicit parameter aligned with runtime.
+                # The normalized point-cloud topic still comes from sensors_file.
+                "octomap_frame": "world",
                 "octomap_resolution": 0.02,
             },
         ],

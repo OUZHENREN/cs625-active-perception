@@ -127,9 +127,12 @@ ros2 pkg prefix moveit_ros_perception
 The application keeps the senior CS625 `gz_ros2_control` model integration,
 and explicitly points the Gazebo plugin at the `robot_description` parameter
 on `robot_state_publisher`. The controller manager name uses the Jazzy
-`controller_manager_name` element. The application MoveIt composition also
-preserves the senior profile's `octomap_frame=base_link` and 0.02 m resolution;
-only the point-cloud source is replaced by the normalized common topic.
+`controller_manager_name` element. On Jazzy, MoveIt's occupancy-map monitor
+uses the planning frame as its effective Octomap frame. The CS625 planning
+frame is `world`, so the application declares `octomap_frame=world` and keeps
+the 0.02 m resolution; only the point-cloud source is replaced by the
+normalized common topic. `world -> base_link` is a fixed TF, and timestamped
+point-cloud transforms to both frames have been verified at runtime.
 
 Repeated `Message Filter dropping message` output is downstream evidence that
 the arm joint transforms are unavailable. It is not accepted as a sensor gate
