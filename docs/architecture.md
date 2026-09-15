@@ -47,22 +47,37 @@ interfaces and TF/topic contract. No second copy of the active-perception core
 may be created for real hardware. Vendor and senior-reference packages stay in
 the underlay and are composed by `cs625_bringup`.
 
-## 2. Target package responsibilities
+## 2. Target package responsibilities (future target architecture / roadmap)
 
-| Package | Responsibility | Phase |
-|---|---|---|
-| `cs625_ap_interfaces` | Stable messages, services and actions only | P1 |
-| `cs625_ap_description` | Include official CS625 description and add camera/tool links | P1 |
-| `cs625_sensor_adapter` | Normalize simulated/real RGB-D input and freshness checks | P1/P2 |
-| `cs625_simulation` | Gazebo worlds, sensors, target/occluder models and truth | P1/P2 |
-| `cs625_bringup` | Launch composition and profile configuration | P1 |
-| `cs625_target_perception` | Target cloud, pose and localization quality | P2 |
-| `cs625_scene_mapping` | ROI, fused cloud and optional OctoMap | P2/P3 |
-| `cs625_view_generation` | Candidate camera poses only | P3 |
-| `cs625_view_evaluation` | Strategy plugins and score terms | P4/P5 |
-| `cs625_motion_adapter` | Camera/tool transform, IK, collision, MoveIt and execution gate | P3/P6 |
-| `cs625_task_orchestrator` | P7 task-level evidence, grasp state orchestration and atomic episode logging | P7 |
-| `cs625_experiment_tools` | Episode logs, rosbag and metrics | P4/P5 |
+This section is the **future target architecture / roadmap**, not the current
+repository layout.  Some rows below are planned and do not exist yet, so this
+table must not be read as an inventory of available packages, and a
+`planned / not currently implemented` row must never be referenced as an
+existing dependency.
+
+The single source of truth for the ROS 2 packages that actually exist today is
+[`project_layout.md`](project_layout.md); that list must match `colcon list`
+exactly (currently **11 packages**).  The table below is a superset of it.
+
+The `Status` column refers to **package existence only**: `implemented` means the
+package exists in this repository today.  It does not claim that the target
+responsibility, or any runtime capability, is complete — see the capability
+gates in [`p7_five_gate_protocol.md`](p7_five_gate_protocol.md) and `README.md`.
+
+| Package | Responsibility | Phase | Status |
+|---|---|---|---|
+| `cs625_ap_interfaces` | Stable messages, services and actions only | P1 | implemented |
+| `cs625_ap_description` | Include official CS625 description and add camera/tool links | P1 | implemented |
+| `cs625_sensor_adapter` | Normalize simulated/real RGB-D input and freshness checks | P1/P2 | implemented |
+| `cs625_simulation` | Gazebo worlds, sensors, target/occluder models and truth | P1/P2 | implemented |
+| `cs625_bringup` | Launch composition and profile configuration | P1 | implemented |
+| `cs625_target_perception` | Target cloud, pose and localization quality | P2 | implemented |
+| `cs625_scene_mapping` | ROI, fused cloud and optional OctoMap | P2/P3 | planned / not currently implemented |
+| `cs625_view_generation` | Candidate camera poses only | P3 | implemented |
+| `cs625_view_evaluation` | Strategy plugins and score terms | P4/P5 | implemented |
+| `cs625_motion_adapter` | Camera/tool transform, IK, collision, MoveIt and execution gate | P3/P6 | implemented |
+| `cs625_task_orchestrator` | P7 task-level evidence, grasp state orchestration and atomic episode logging | P7 | implemented |
+| `cs625_experiment_tools` | Episode logs, rosbag and metrics | P4/P5 | implemented |
 
 ## 3. Phase 0–1 restriction
 

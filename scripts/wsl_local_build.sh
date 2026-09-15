@@ -1,4 +1,25 @@
 #!/usr/bin/env bash
+# ---------------------------------------------------------------------------
+# HISTORICAL MIGRATION TOOL -- NOT PART OF THE CURRENT JAZZY WORKFLOW.
+#
+# This script is a legacy Humble/WSL migration utility.  It targets the old
+# Humble environment and the retired colcon artifact location, and it owns
+# WSL-specific behaviour (source-tree copy to local ext4, simulator process
+# cleanup) that the current workflow does not use.
+#
+# It is kept unchanged for historical reference only.  Do not use it for Jazzy
+# development and do not treat it as a supported build/test entry point.
+#
+# Current development entry points:
+#   scripts/source_dev_env.sh   single environment entry point
+#                               (ROS Jazzy -> CS625 vendor underlay ->
+#                               repository overlay)
+#   scripts/build.sh            build the application overlay
+#   scripts/test.sh             run tests and print colcon test results
+#
+# The legacy environment references below are whitelisted in
+# test/contract_checks.py as an explicitly historical exception.
+# ---------------------------------------------------------------------------
 # Copy elite_ros source tree to WSL ext4, build, test, then launch.
 #
 # The /mnt/b symlink-install forces Gazebo/Ogre to load SDF, DAE/STL meshes
