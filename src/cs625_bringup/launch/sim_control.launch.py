@@ -157,51 +157,65 @@ def _compose(context):
     )
     # Harmonic/Ogre2 on the target WSL renderer stalls while loading the
     # upstream DAE visual meshes into a camera render scene.  Gazebo receives
-    # a visual-mesh-free but kinematically identical URDF; RSP and MoveIt keep
-    # the complete official description above.  The generated file retains
-    # collision, joints, ros2_control and the eye-in-hand RGB-D sensor.
+    # a visual-mesh-free but kinematically identical URDF by default; RSP and
+    # MoveIt keep the complete official description above.  The generated file
+    # retains collision, joints, ros2_control and the eye-in-hand RGB-D sensor.
+    # ``gazebo_visuals:=true`` keeps the mesh visuals so the arm is drawn in the
+    # Gazebo GUI; that path is opt-in because it is the one that can stall the
+    # sensor render scene.
+    gazebo_visuals = LaunchConfiguration("gazebo_visuals").perform(context).lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+    prepare_gazebo_model_cmd = [
+        FindExecutable(name="python3"),
+        PathJoinSubstitution(
+            [
+                FindPackageShare("cs625_bringup"),
+                "scripts",
+                "prepare_gazebo_model.py",
+            ]
+        ),
+    ]
+    if gazebo_visuals:
+        prepare_gazebo_model_cmd.append("--keep-visuals")
+    prepare_gazebo_model_cmd += [
+        "--output",
+        gazebo_model_path,
+        "--xacro",
+        FindExecutable(name="xacro"),
+        description_path,
+        "name:=cs",
+        "cs_type:=",
+        LaunchConfiguration("cs_type"),
+        "prefix:=",
+        LaunchConfiguration("prefix"),
+        "safety_limits:=",
+        LaunchConfiguration("safety_limits"),
+        "safety_pos_margin:=",
+        LaunchConfiguration("safety_pos_margin"),
+        "safety_k_position:=",
+        LaunchConfiguration("safety_k_position"),
+        "sim_ignition:=true",
+        "simulation_controllers:=",
+        controllers_path,
+        "initial_positions_file:=",
+        LaunchConfiguration("initial_positions_file"),
+        "camera_image_width:=",
+        LaunchConfiguration("camera_image_width"),
+        "camera_image_height:=",
+        LaunchConfiguration("camera_image_height"),
+        "camera_update_rate:=",
+        LaunchConfiguration("camera_update_rate"),
+        "camera_enabled:=",
+        LaunchConfiguration("camera_enabled"),
+        "p7_attachment_enabled:=",
+        attachment_enabled,
+    ]
     prepare_gazebo_model = ExecuteProcess(
-        cmd=[
-            FindExecutable(name="python3"),
-            PathJoinSubstitution(
-                [
-                    FindPackageShare("cs625_bringup"),
-                    "scripts",
-                    "prepare_gazebo_model.py",
-                ]
-            ),
-            "--output",
-            gazebo_model_path,
-            "--xacro",
-            FindExecutable(name="xacro"),
-            description_path,
-            "name:=cs",
-            "cs_type:=",
-            LaunchConfiguration("cs_type"),
-            "prefix:=",
-            LaunchConfiguration("prefix"),
-            "safety_limits:=",
-            LaunchConfiguration("safety_limits"),
-            "safety_pos_margin:=",
-            LaunchConfiguration("safety_pos_margin"),
-            "safety_k_position:=",
-            LaunchConfiguration("safety_k_position"),
-            "sim_ignition:=true",
-            "simulation_controllers:=",
-            controllers_path,
-            "initial_positions_file:=",
-            LaunchConfiguration("initial_positions_file"),
-            "camera_image_width:=",
-            LaunchConfiguration("camera_image_width"),
-            "camera_image_height:=",
-            LaunchConfiguration("camera_image_height"),
-            "camera_update_rate:=",
-            LaunchConfiguration("camera_update_rate"),
-            "camera_enabled:=",
-            LaunchConfiguration("camera_enabled"),
-            "p7_attachment_enabled:=",
-            attachment_enabled,
-        ],
+        cmd=prepare_gazebo_model_cmd,
         output="screen",
     )
     joint_state_spawner = Node(
@@ -389,6 +403,15 @@ def generate_launch_description():
                 "camera_enabled",
                 default_value="true",
                 description="Instantiate the eye-in-hand RGB-D sensor in Gazebo.",
+            ),
+            DeclareLaunchArgument(
+                "gazebo_visuals",
+                default_value="false",
+                description=(
+                    "Keep the CS625 mesh visuals in the Gazebo entity so the arm "
+                    "is drawn in the GUI.  Slower and unverified for RGB-D; the "
+                    "default mesh-free model is the accepted sensor path."
+                ),
             ),
             DeclareLaunchArgument(
                 "gazebo_model_file",

@@ -147,6 +147,72 @@ starting the application simulation composition. This turns an otherwise silent
 Gazebo model-plugin lookup failure into an immediate launch error and supports
 the installed Harmonic plugin environment.
 
+## 3.4 Visualization and manual run
+
+By default the Gazebo entity is spawned from a visual-mesh-free URDF.
+`sim_control.launch.py` runs `prepare_gazebo_model.py`, which removes every
+mesh-based `<visual>` before `ros_gz_sim create`.  On the supported WSL2
+software-renderer path this keeps the RGB-D render scene from stalling, while
+links, joints, inertials, collisions, `ros2_control` and the eye-in-hand sensor
+remain intact.  The consequence is that the arm is **not drawn in the Gazebo
+GUI**; only world geometry (ground plane, occluder, target) is visible there.
+
+`gazebo_visuals:=true` keeps the mesh visuals so the arm is drawn in the Gazebo
+GUI:
+
+```bash
+source scripts/source_dev_env.sh
+ros2 launch cs625_bringup sim_base.launch.py \
+  headless:=false gazebo_visuals:=true launch_rviz:=true
+```
+
+The mesh path was exercised on the supported WSL2 machine on 2026-09-16 with
+`headless:=true gazebo_visuals:=true`: the controller manager received the
+robot description and all three controllers activated, and the eye-in-hand
+sensor advertised `/camera/image`, `/camera/depth_image`, `/camera/camera_info`
+and `/camera/points`.  So the meshes did **not** stall the render scene on that
+path.  The point-cloud rate was only about 2 Hz on the software renderer, well
+below the configured 10 Hz, so a GUI demo should still be treated as a
+visualisation path rather than a timing-representative one; the mesh-free model
+remains the configuration for recorded evidence and matrix runs.
+
+Re-check throughput whenever the renderer or driver changes:
+
+```bash
+source scripts/source_dev_env.sh
+ros2 topic hz /sensors/camera/points
+ros2 topic echo /sensors/camera/status --once
+```
+
+See the arm without touching the Gazebo renderer through RViz, which is given
+the complete application Xacro by MoveIt.  The switch must be requested
+explicitly because it defaults to `false`:
+
+```bash
+source scripts/source_dev_env.sh
+ros2 launch cs625_bringup sim_base.launch.py headless:=true launch_rviz:=true
+```
+
+Gazebo stays server-only (`headless:=true`), the accepted sensor/physics
+configuration, while RViz renders the arm and the MoveIt planning scene.  Both
+MoveIt profiles load the application layout `cs625_bringup/config/cs625_moveit.rviz`
+(switchable through `moveit_rviz_config`) instead of the vendor `moveit.rviz`.
+The application layout is a copy of the vendor layout with every `elite_*` panel
+removed: `elite_dashboard_rviz_plugin` has no source in the audited underlay at
+all, and `elite_io_rviz_plugin` omits `<build_type>ament_cmake</build_type>` in
+its `package.xml`, so colcon installs it as a plain CMake package and RViz
+cannot discover it.  Removing those panels is the application-layer fix; the
+vendor file is never edited.
+
+One vendor display is retained as-is: a standalone `RobotModel` display whose
+description topic `/preview_robot_description` has no publisher.  It reports a
+display status only; the MoveIt MotionPlanning display loads the model itself
+(RViz log line `Loading robot model 'cs625'`), and the arm pose follows
+`/joint_states` once the controllers are active.
+
+The Gazebo GUI path keeps `LIBGL_ALWAYS_SOFTWARE=1`, which `sim_base.launch.py`
+sets for the whole launch.
+
 ## 4. Required checks
 
 ```bash

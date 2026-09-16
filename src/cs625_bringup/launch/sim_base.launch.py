@@ -58,6 +58,13 @@ def _compose(context):
             [FindPackageShare(official_package), "launch", official_file]
         )
         actions.append(
+            # Do not pass ``launch_rviz`` to this include.  The supported
+            # control launch (sim_control.launch.py) has no RViz, and
+            # IncludeLaunchDescription publishes arguments it does not declare
+            # as *global* launch configurations.  A hardcoded
+            # ``"launch_rviz": "false"`` would therefore leak into the context
+            # and silently disable the application RViz include started later
+            # by sim_moveit.launch.py, even when launch_rviz:=true was given.
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(official_launch_path),
                 launch_arguments={
@@ -71,12 +78,12 @@ def _compose(context):
                     "initial_detach_topic": LaunchConfiguration("initial_detach_topic"),
                     "prefix": LaunchConfiguration("prefix"),
                     "world_file": LaunchConfiguration("world"),
-                    "launch_rviz": "false",
                     "headless": LaunchConfiguration("headless"),
                     "camera_image_width": LaunchConfiguration("camera_image_width"),
                     "camera_image_height": LaunchConfiguration("camera_image_height"),
                     "camera_update_rate": LaunchConfiguration("camera_update_rate"),
                     "camera_enabled": LaunchConfiguration("camera_enabled"),
+                    "gazebo_visuals": LaunchConfiguration("gazebo_visuals"),
                     "gazebo_model_file": LaunchConfiguration("gazebo_model_file"),
                 }.items(),
             )
@@ -271,6 +278,7 @@ def generate_launch_description():
         DeclareLaunchArgument("launch_rviz", default_value="false", description="Reserved RViz profile switch."),
         DeclareLaunchArgument("use_fake_hardware", default_value="true", description="Use fake hardware when supported."),
         DeclareLaunchArgument("camera_enabled", default_value="true", description="Enable the profile camera path."),
+        DeclareLaunchArgument("gazebo_visuals", default_value="false", description="Keep the CS625 mesh visuals in the Gazebo entity so the arm is drawn in the Gazebo GUI. Default false keeps the accepted renderer-safe mesh-free model."),
         DeclareLaunchArgument("launch_sensor_adapter", default_value="true", description="Start the common normalized RGB-D adapter after source topics are verified."),
         DeclareLaunchArgument("sensor_common_config", default_value=common_config_default, description="Shared normalized sensor configuration."),
         DeclareLaunchArgument("sensor_profile_config", default_value=sim_config_default, description="Simulation sensor profile configuration."),
@@ -294,6 +302,14 @@ def generate_launch_description():
         DeclareLaunchArgument("initial_detach", default_value="false", description="Publish a one-shot Gazebo DetachableJoint detach command after robot spawn."),
         DeclareLaunchArgument("initial_detach_topic", default_value="/p7/attachment/detach", description="Absolute Gazebo transport detach topic used when initial_detach is true."),
         DeclareLaunchArgument("prefix", default_value="", description="Optional TF and joint-name prefix; must match the underlay controller configuration."),
+        # These settings are consumed by sim_moveit.launch.py but were only
+        # available because the included control launch declared them and
+        # IncludeLaunchDescription publishes its arguments as global launch
+        # configurations.  Declare them here so the application MoveIt include
+        # no longer depends on include-order side effects.
+        DeclareLaunchArgument("safety_limits", default_value="true", description="Enable the CS625 safety-limit controller in the shared description."),
+        DeclareLaunchArgument("safety_pos_margin", default_value="0.15", description="Safety-limit joint position margin in radians."),
+        DeclareLaunchArgument("safety_k_position", default_value="20", description="Safety-limit position controller gain."),
         DeclareLaunchArgument("moveit_config_package", default_value="elite_cs625_moveit_config", description="Underlay MoveIt configuration package."),
         DeclareLaunchArgument("semantic_package", default_value="cs625_bringup", description="Package containing the application SRDF overlay."),
         DeclareLaunchArgument("semantic_file", default_value="config/cs625_active_perception.srdf", description="Application SRDF that preserves the senior arm semantics and adds gripper-adjacency exemptions."),

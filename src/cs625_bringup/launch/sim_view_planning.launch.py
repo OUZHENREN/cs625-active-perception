@@ -34,6 +34,11 @@ def generate_launch_description():
             DeclareLaunchArgument("headless", default_value="true"),
             DeclareLaunchArgument("world", default_value=world_default),
             DeclareLaunchArgument(
+                "gazebo_visuals",
+                default_value="false",
+                description="Keep mesh visuals in the Gazebo entity for GUI viewing; default mesh-free for sensor safety.",
+            ),
+            DeclareLaunchArgument(
                 "gazebo_model_file",
                 default_value="/tmp/cs625_active_perception_gazebo_model.urdf",
                 description="Per-run Gazebo-only model path; avoid sharing this file across concurrent simulations.",
@@ -49,6 +54,7 @@ def generate_launch_description():
                     "launch_sensor_adapter": LaunchConfiguration("launch_sim"),
                     "headless": LaunchConfiguration("headless"),
                     "world": LaunchConfiguration("world"),
+                    "gazebo_visuals": LaunchConfiguration("gazebo_visuals"),
                     "gazebo_model_file": LaunchConfiguration("gazebo_model_file"),
                 }.items(),
             ),

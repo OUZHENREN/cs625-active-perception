@@ -34,6 +34,7 @@ def _compose(context):
     semantic_file = LaunchConfiguration("semantic_file").perform(context)
     controllers_file = LaunchConfiguration("moveit_controllers_file").perform(context)
     sensors_file = LaunchConfiguration("sensors_config").perform(context)
+    rviz_config = LaunchConfiguration("moveit_rviz_config").perform(context)
 
     description_path = _resolve_share_file(
         description_package, f"urdf/{description_file}"
@@ -107,7 +108,7 @@ def _compose(context):
         executable="rviz2",
         name="moveit_rviz",
         output="screen",
-        arguments=["-d", str(moveit_share / "config" / "moveit.rviz")],
+        arguments=["-d", rviz_config],
         parameters=[moveit_config.to_dict()],
         condition=IfCondition(LaunchConfiguration("launch_rviz")),
     )
@@ -160,6 +161,19 @@ def generate_launch_description():
                     Path(get_package_share_directory("cs625_bringup"))
                     / "config"
                     / "moveit_sensors_3d.yaml"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "moveit_rviz_config",
+                default_value=str(
+                    Path(get_package_share_directory("cs625_bringup"))
+                    / "config"
+                    / "cs625_moveit.rviz"
+                ),
+                description=(
+                    "Application RViz layout.  Application-owned copy of the "
+                    "vendor layout with the unavailable elite_dashboard_* "
+                    "panels removed; the vendor file is never edited."
                 ),
             ),
             OpaqueFunction(function=_compose),
