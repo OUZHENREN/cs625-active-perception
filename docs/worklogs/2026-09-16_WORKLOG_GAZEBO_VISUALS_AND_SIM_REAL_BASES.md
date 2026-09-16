@@ -147,7 +147,7 @@ Critical-chain status
 - `elite_io_rviz_plugin` 已编入 underlay 但不可被发现（缺 `build_type`），未被任何配置引用；
   若要启用需 fork 并补 `<build_type>ament_cmake</build_type>`（按 vendor 修改策略登记）。
 - `move_group` 退出期在 `~rclcpp::Executor()` 处 segfault，属既有问题，与本次改动无关。
-- 本次**未推送**远端。
+- 远端已推送（见第八节）。
 
 ## 六、变更文件
 
@@ -186,3 +186,74 @@ Critical-chain status
 VS Code：`Ctrl+Shift+P` → `Tasks: Run Task`；`Ctrl+Shift+B` 为默认构建任务。
 真机控制器 IP 保存在仓库之外的 `~/.cs625_local.env`（`CS625_ROBOT_IP=...`），
 任务 7 读取该文件，缺失则立即报错退出。
+
+## 八、同日后半程：日志落库、镜像与 README 刷新
+
+前半程的工作日志原本只存在于本地 Obsidian。按用户要求改为**以仓库为准**，
+并新增了持久化机制。
+
+### 8.1 工作日志目录与命名
+
+- `docs/worklogs/` 从"早期日志归档"改为**仓库正式工作日志目录**；
+- 命名固定为日期在前：`YYYY-MM-DD_<TYPE>_<TOPIC>.md`；
+- `AGENTS.md` 新增 *Work-log storage and mirroring* 一节，使该约定在每次会话自动生效，
+  而不是依赖某次对话的记忆；
+- 两个 `WORKLOG_2026-08-02_*` 历史文件保留原名，README 已注明原因。
+
+### 8.2 镜像到 Obsidian 保管库
+
+- 新增 `scripts/sync_worklog.sh`：从环境变量或 `~/.cs625_local.env` 读取
+  `CS625_OBSIDIAN_WORKLOG_DIR`，复制后用 `sha256sum` 校验；
+- 保管库路径属机器本地配置，不写入仓库；路径缺失或盘未挂载时脚本以非零码退出
+  并给出提示，**不静默跳过**；
+- 实测：同步成功且校验一致；把路径指到不存在的位置时返回 `rc=4`。
+
+### 8.3 Google Drive 自动挂载
+
+WSL 的 drvfs 自动挂载不含 Google Drive 的虚拟盘，需手动挂载，而手动挂载在 WSL
+重启后丢失。已确认 `/etc/fstab` 加入：
+
+```text
+G: /mnt/g drvfs defaults,nofail 0 0
+```
+
+（`nofail` 用于避免 Google Drive 未启动时在开机阶段报错。）该条目的**真实重启验证
+尚未完成**，下次重启 WSL 后需 `ls "/mnt/g/我的云端硬盘"` 复核。
+
+### 8.4 Obsidian 目录内改名
+
+按要求把该目录中**文件名已含日期但日期不在最前**的 6 个文件改为日期在前，无日期
+的 7 个（`AGENTS.md`、`CLAUDE.md`、`README.md` 等）保持不动。改名前检查过引用：
+全库只有一处提及，且是反引号纯文本而非 `[[双链]]`，因此没有断链。
+
+### 8.5 README 刷新
+
+README 与实际仓库存在多处偏差，已按现状重写：包数量（`colcon list` = 11）核对无误；
+补充 `real_moveit.launch.py`、`scripts/sync_worklog.sh`、`.repos/real.repos`、
+真机底座与 SDK/驱动 underlay 供应、工作日志约定；修正"VS Code 任务随仓库分发"的
+错误暗示（`.vscode/` 被 `.gitignore` 忽略）；文档入口补齐
+`architecture.md` / `frames_and_topics.md` / `real_hardware_readiness.md` /
+`docs/worklogs/README.md`。校验：README 内全部相对链接可解析。
+
+### 8.6 推送
+
+`origin` = `https://github.com/OUZHENREN/cs625-active-perception.git`，与用户确认的
+目标一致；`git push origin main` 成功，本地与远端指向同一 commit。
+
+### 8.7 本节新增/修改文件
+
+```text
+新增  scripts/sync_worklog.sh
+修改  AGENTS.md
+修改  docs/worklogs/README.md
+修改  docs/project_layout.md
+修改  README.md
+新增  docs/worklogs/2026-09-16_WORKLOG_GAZEBO_VISUALS_AND_SIM_REAL_BASES.md
+```
+
+仓库外：
+
+```text
+~/.cs625_local.env   追加 CS625_OBSIDIAN_WORKLOG_DIR
+/etc/fstab           追加 G: /mnt/g drvfs defaults,nofail 0 0（用户执行）
+```
