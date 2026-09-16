@@ -45,6 +45,44 @@ episode；三种基线各 15 个样本。本轮矩阵全部以 `MAX_FAILED_ATTEM
 仓库保留源码、协议、汇总 CSV/JSON 和必要小型日志；大体积原始 RGB-D/点云帧
 继续保留在本地实验归档。
 
+## 日常启动（快速入口）
+
+在 VS Code 里打开本仓库后，`Ctrl+Shift+P` → **Tasks: Run Task** 即可选择下面这些
+任务；它们都会先加载 `scripts/source_dev_env.sh` 再执行，不需要手打命令。
+`Ctrl+Shift+B` 直接跑默认的构建任务。
+
+| 任务 | 作用 |
+| --- | --- |
+| `0. 环境校验` | `source_dev_env.sh --verify`，确认三段环境链完整 |
+| `1. 构建 overlay` | `colcon build --symlink-install`（默认构建任务） |
+| `2. 契约检查 + 单元测试` | 静态契约检查与三个核心单测 |
+| `3. 仿真底座（无头 Gazebo + RViz）` | 日常手工看机械臂：Gazebo 无头跑物理/传感器，RViz 显示机械臂 |
+| `4. 仿真底座（Gazebo GUI + 网格 + RViz）` | Gazebo 窗口里也能看到机械臂（软件渲染下点云约 2 Hz） |
+| `5. 仿真主动感知流水线` | `sim_active_localization.launch.py`（`strategy:=disabled`） |
+| `6. 真机底座 - fake hardware 冒烟` | 不接机器人，验证 driver + 描述 + MoveIt 能组装 |
+| `7. 真机底座 - 真驱动` | 启动真驱动；控制器保持 `inactive`、`execute:=false`。IP 从本机文件读取，见下 |
+| `8. 启动 DSH Harness` | 在本仓库目录下启动本 GUI（`npx @deepseek-ai/dsh web`） |
+
+真机 IP 只在**本机**保存一次，不写进仓库（仓库禁止硬编码 IP，契约检查会拦）：
+
+```bash
+printf 'CS625_ROBOT_IP=<控制器IP>\n' > ~/.cs625_local.env   # 只做一次
+```
+
+任务 `7` 会先 source 这个文件；文件缺失时命令会立即失败并提示，不会用错误的地址去连。
+这个 IP 就是机器人控制器地址，**夹爪没有独立 IP**：它通过机械臂的 tool IO / 工具通讯控制，
+驱动里 `remote_ip` / `local_port` / `remote_port` 虽然声明了但代码并未使用。
+
+不用 VS Code 时，直接在终端里跑等价命令（必须在**同一个 shell** 里 source）：
+
+```bash
+source scripts/source_dev_env.sh
+ros2 launch cs625_bringup sim_base.launch.py headless:=true launch_rviz:=true
+```
+
+真机与仿真是两个并列底座，主动感知由单独的 launch 叠加，见
+[`docs/real_hardware_readiness.md`](docs/real_hardware_readiness.md)。
+
 ## 快速复现
 
 当前验证环境为 Ubuntu 24.04、ROS 2 Jazzy、MoveIt 2 与 Gazebo Harmonic。所有
