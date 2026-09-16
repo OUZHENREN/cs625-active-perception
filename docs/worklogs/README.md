@@ -43,3 +43,18 @@ layer and the critical-chain status (`PASS`, `BLOCKED`, `NOT ACCEPTED` or
   under their original names; new entries follow the convention above.
 - Day-to-day notes may additionally be mirrored into a personal Obsidian vault,
   but this directory is what ships with the repository.
+
+## Mirroring to the Obsidian vault
+
+Saving a work log is not finished until it is mirrored, because the vault is
+where the day-to-day history is read:
+
+```bash
+scripts/sync_worklog.sh docs/worklogs/<file>.md
+```
+
+The vault directory is machine-local configuration and is not stored in this
+repository.  The script reads `CS625_OBSIDIAN_WORKLOG_DIR` from the environment
+or from `$HOME/.cs625_local.env` and verifies the copy with `sha256sum`.  It
+fails with instructions when the variable is unset or the vault drive is not
+mounted; that failure must be reported rather than ignored.

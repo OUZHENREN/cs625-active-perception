@@ -188,6 +188,31 @@ entire workspace.
 
 Every work log must state changed files, exact commands, pass/fail results, remaining limitations, whether fake hardware/Gazebo/real hardware was used, and whether real motion occurred.
 
+### Work-log storage and mirroring
+
+Tracked work logs live in `docs/worklogs/` and are named **date first**:
+
+```text
+YYYY-MM-DD_<TYPE>_<TOPIC>.md
+```
+
+`<TYPE>` is one of `WORKLOG`, `HANDOFF`, `PLAN`, `SPEC`, `REVIEW`.
+`docs/worklogs/README.md` holds the detailed convention; do not create a second
+log directory.
+
+Saving a work log is not finished until it is mirrored to the personal Obsidian
+vault, in the same turn:
+
+```bash
+scripts/sync_worklog.sh docs/worklogs/<file>.md
+```
+
+The vault location is machine-local configuration, not a repository value: the
+script reads `CS625_OBSIDIAN_WORKLOG_DIR` from the environment or from
+`$HOME/.cs625_local.env`.  When the vault drive is not mounted the script fails
+with instructions — report that to the user instead of silently dropping the
+mirror step.
+
 ### Capability-gate work-log requirements
 
 Every work log must additionally make the current system maturity and next allowed step explicit. Use this structure, adapting it to the task:
