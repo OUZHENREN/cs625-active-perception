@@ -27,6 +27,7 @@
 #   CS625_ROS_SETUP       ROS 2 setup file       (default /opt/ros/jazzy/setup.bash)
 #   CS625_UNDERLAY_SETUP  vendor underlay setup  (default $HOME/cs625_underlay_jazzy/install/setup.bash)
 #   CS625_OVERLAY_SETUP   project overlay setup  (default <repo>/install/setup.bash)
+#   ELITE_CS_SDK_PREFIX   Elite CS SDK prefix    (default $HOME/elite-sdk-1.2.0; skipped if absent)
 #
 # Guarantees:
 #   - refuses direct execution (the environment must land in the caller's shell);
@@ -150,6 +151,19 @@ _cs625_dev_env_main() {
     export CS625_DEV_ENV_CHAIN="${chain_id}"
     export CS625_DEV_ENV_SOURCED=1
 
+    # Real-profile Elite CS SDK.  The underlay driver writes `#include
+    # <Elite/...>` and links `elite-cs-series-sdk` by plain library name rather
+    # than through the SDK's imported target, so the compiler and the loader
+    # both need this prefix on their search paths.  A missing prefix means a
+    # simulation-only shell: skip it instead of failing the entry point.
+    local elite_sdk_prefix="${ELITE_CS_SDK_PREFIX:-${HOME}/elite-sdk-1.2.0}"
+    if [[ -d "${elite_sdk_prefix}" ]]; then
+      export CPLUS_INCLUDE_PATH="${elite_sdk_prefix}/include${CPLUS_INCLUDE_PATH:+:${CPLUS_INCLUDE_PATH}}"
+      export LIBRARY_PATH="${elite_sdk_prefix}/lib${LIBRARY_PATH:+:${LIBRARY_PATH}}"
+      export LD_LIBRARY_PATH="${elite_sdk_prefix}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+      export ELITE_CS_SDK_PREFIX="${elite_sdk_prefix}"
+    fi
+
     echo "CS625 dev env:"
     echo "  ROS_DISTRO ${ROS_DISTRO}"
     echo "  ros        ${ros_setup}"
@@ -158,6 +172,9 @@ _cs625_dev_env_main() {
       echo "  overlay    ${overlay_setup}"
     else
       echo "  overlay    (not loaded: --no-overlay)"
+    fi
+    if [[ -n "${ELITE_CS_SDK_PREFIX:-}" ]]; then
+      echo "  elite sdk  ${ELITE_CS_SDK_PREFIX}"
     fi
   fi
 

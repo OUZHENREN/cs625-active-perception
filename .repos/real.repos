@@ -1,0 +1,23 @@
+# Real-profile underlay sources, pinned for provenance.
+#
+# These entries are NOT meant to be imported wholesale with `vcs import` into
+# ~/cs625_underlay_jazzy/src.  That workspace already carries locally modified
+# plain copies of eli_cs_robot_description and eli_cs_robot_simulation_gz, and
+# importing the senior repository would duplicate package names and overwrite
+# those local modifications.  Provision only the two missing driver packages
+# from the pinned senior checkout as described in docs/dependencies.md.
+#
+# The Elite CS SDK is a plain CMake project without package.xml, so colcon
+# ignores it; build and install it separately as documented in
+# docs/dependencies.md.  scripts/source_dev_env.sh consumes the installed
+# prefix through ELITE_CS_SDK_PREFIX (default $HOME/elite-sdk-1.2.0).
+
+repositories:
+  elite_cs_series_sdk:
+    type: git
+    url: https://github.com/Elite-Robots/Elite_Robots_CS_SDK
+    version: 092f159575ab6c7a8977005785d18e89512a6bba  # tag v1.2.0, MIT
+  senior_cs625_driver_snapshot:
+    type: git
+    url: https://github.com/addission/elite_robot_project_20260305
+    version: 5c003831aedc744ccce39c1aa1028133d1d89680  # branch main

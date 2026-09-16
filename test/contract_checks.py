@@ -220,11 +220,13 @@ def main() -> int:
         src / "cs625_bringup" / "launch" / "sim_moveit.launch.py",
         src / "cs625_bringup" / "launch" / "sim_active_localization.launch.py",
         src / "cs625_bringup" / "launch" / "real_base.launch.py",
+        src / "cs625_bringup" / "launch" / "real_moveit.launch.py",
         src / "cs625_bringup" / "config" / "common.yaml",
         src / "cs625_bringup" / "config" / "sim.yaml",
         src / "cs625_bringup" / "config" / "real.yaml",
         src / "cs625_bringup" / "config" / "sim_gz_bridge.yaml",
         src / "cs625_bringup" / "config" / "moveit_sensors_3d.yaml",
+        src / "cs625_bringup" / "config" / "cs625_moveit.rviz",
         src / "cs625_bringup" / "config" / "sim_controllers.yaml",
         src / "cs625_ap_description" / "urdf" / "cs625_parallel_gripper.xacro",
         ROOT / "scripts" / "bootstrap_humble.sh",
@@ -534,26 +536,59 @@ def main() -> int:
         if bridge_marker not in bridge_config_text:
             fail(f"simulation bridge contract is missing: {bridge_marker}")
 
-    moveit_launch_text = (
-        ROOT / "src" / "cs625_bringup" / "launch" / "sim_moveit.launch.py"
-    ).read_text(encoding="utf-8")
-    for moveit_marker in (
+    # The simulation and real profiles must reuse one and the same MoveIt
+    # composition contract; only the clock differs.  Checking both files keeps
+    # the two profile entries from drifting apart.
+    moveit_reuse_markers = (
         "MoveItConfigsBuilder",
         ".robot_description(file_path=description_path",
         ".robot_description_semantic(file_path=srdf_path",
         ".sensors_3d(file_path=sensors_file)",
         'package="moveit_ros_move_group"',
-        '"use_sim_time": True',
         '"octomap_frame": "world"',
         '"octomap_resolution": 0.02',
+    )
+    for moveit_file, clock_marker in (
+        ("sim_moveit.launch.py", '"use_sim_time": True'),
+        ("real_moveit.launch.py", '"use_sim_time": use_sim_time'),
     ):
-        if moveit_marker not in moveit_launch_text:
-            fail(f"application MoveIt composition is missing reuse marker: {moveit_marker}")
+        moveit_launch_text = (
+            ROOT / "src" / "cs625_bringup" / "launch" / moveit_file
+        ).read_text(encoding="utf-8")
+        for moveit_marker in moveit_reuse_markers + (clock_marker,):
+            if moveit_marker not in moveit_launch_text:
+                fail(
+                    f"{moveit_file} is missing MoveIt reuse marker: {moveit_marker}"
+                )
     moveit_sensor_config = (
         src / "cs625_bringup" / "config" / "moveit_sensors_3d.yaml"
     ).read_text(encoding="utf-8")
     if "/sensors/camera/points" not in moveit_sensor_config:
         fail("MoveIt sensor configuration must consume the normalized point cloud topic")
+
+    # The application owns an RViz layout derived from the vendor file.  The
+    # vendor layout references elite_io_rviz_plugin and elite_dashboard_rviz_plugin
+    # panels; the latter have no source in the audited underlay at all, and the
+    # former declares no <build_type>ament_cmake</build_type> so colcon installs
+    # it as a plain CMake package and RViz cannot discover it.  The application
+    # layout therefore drops every elite_* panel instead of editing vendor code.
+    application_rviz_config = (
+        src / "cs625_bringup" / "config" / "cs625_moveit.rviz"
+    ).read_text(encoding="utf-8")
+    if "elite_io_rviz_plugin" in application_rviz_config or "elite_dashboard_rviz_plugin" in application_rviz_config:
+        fail(
+            "application RViz layout must not reference elite_* panels whose "
+            "plugin packages are unavailable in the audited underlay"
+        )
+    for rviz_marker in ("rviz_default_plugins/Grid", "Fixed Frame: world"):
+        if rviz_marker not in application_rviz_config:
+            fail(f"application RViz layout is missing: {rviz_marker}")
+    for moveit_file in ("sim_moveit.launch.py", "real_moveit.launch.py"):
+        moveit_launch_text = (
+            ROOT / "src" / "cs625_bringup" / "launch" / moveit_file
+        ).read_text(encoding="utf-8")
+        if "moveit_rviz_config" not in moveit_launch_text:
+            fail(f"{moveit_file} must expose the application RViz layout switch")
 
     view_planning_config = (
         src / "cs625_bringup" / "config" / "view_planning_sim.yaml"

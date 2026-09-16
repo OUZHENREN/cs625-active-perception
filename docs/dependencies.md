@@ -11,10 +11,12 @@ Every dependency must eventually include URL, branch/tag/commit, ROS distributio
 
 | Component | Official source | ROS baseline | Pin status | Purpose | Modification policy |
 |---|---|---|---|---|---|
-| Elite ROS 2 Driver | https://github.com/Elite-Robots/Elite_Robots_CS_ROS2_Driver | Humble | UNVERIFIED | Official CS625 driver and simulation/ros2_control integration | Do not edit in place |
-| Elite CS SDK | https://github.com/Elite-Robots/Elite_Robots_CS_SDK | Humble integration | UNVERIFIED | Official SDK dependency where required by driver | Do not vendor-edit |
-| Senior CS625 reference snapshot | https://github.com/addission/elite_robot_project_20260129 | Humble reference | REFERENCE_ONLY | CS625 URDF/Xacro, MoveIt planning, driver launch, controller, TCP-vision bridge, grasp task manager and simulation lessons | Do not copy-and-edit as vendor code; verify exact revision before underlay use |
-| Local senior remote observed in legacy worktree | https://github.com/addission/elite_robot_project_20260306 | Humble reference | UNVERIFIED | Provenance candidate for the local `eli_*` packages | Keep separate from the specification URL until verified |
+| Elite ROS 2 Driver | https://github.com/Elite-Robots/Elite_Robots_CS_ROS2_Driver | Jazzy | REFERENCE_ONLY | Upstream reference for the CS625 driver interface | Do not edit in place; the audited revision used here comes from the senior snapshot below |
+| Elite CS SDK | https://github.com/Elite-Robots/Elite_Robots_CS_SDK | Jazzy | `v1.2.0` = `092f159575ab6c7a8977005785d18e89512a6bba` | `elite-cs-series-sdk` 1.2.0 required by `eli_cs_robot_driver` (`find_package(... 1.2.0 REQUIRED)`) | MIT. Built with plain CMake and installed to `$HOME/elite-sdk-1.2.0`; never vendor-edit |
+| Senior CS625 snapshot (driver source) | https://github.com/addission/elite_robot_project_20260305 | Jazzy | `main` = `5c003831aedc744ccce39c1aa1028133d1d89680` | Source of `eli_cs_robot_driver` and `eli_cs_controllers` copied into the shared underlay | Copy only the missing packages; do not edit in place and do not overwrite the locally modified `eli_cs_robot_description` / `eli_cs_robot_simulation_gz` |
+| `elite_io_rviz_plugin` (same snapshot) | https://github.com/addission/elite_robot_project_20260305 | Jazzy | `main` = `5c003831aedc744ccce39c1aa1028133d1d89680` | Elite tool-IO RViz panel referenced by the vendor `moveit.rviz` | **Not usable as-is**: its `package.xml` has no `<build_type>ament_cmake</build_type>`, so colcon installs it as a plain CMake package, it never lands on `AMENT_PREFIX_PATH`, and RViz cannot discover it. Do not patch vendor in place; the application RViz layout drops all `elite_*` panels instead |
+| `elite_dashboard_rviz_plugin` | Not published in the audited snapshot | Jazzy | ABSENT | Panels referenced by the vendor `moveit.rviz` | No source in any audited revision; removed from the application RViz layout |
+| Senior CS625 reference (earlier snapshot) | https://github.com/addission/elite_robot_project_20260130 | Jazzy | `main` = `1b1e6c524b8cc2666e4b1eef5b83346f44eaa9c7` | Earlier audited revision; superseded by the 20260305 snapshot | Historical reference only |
 | AIRLab-POLIMI active vision | https://github.com/AIRLab-POLIMI/active-vision | Humble/Fortress reference | REFERENCE_ONLY | Modular bringup/interfaces/pointcloud/octomap/planning boundaries | Architecture reference only; do not import robot-specific code |
 | Existing CS625/NBV project | https://github.com/OUZHENREN/Robot | Humble/Jazzy legacy mix | REFERENCE_ONLY | Existing NBV, IK, trajectory, monitor and experiment assets | Migrate by responsibility; do not copy the legacy workspace wholesale |
 | MoveIt 2 | https://github.com/moveit/moveit2 | Humble | UNVERIFIED | Planning, IK integration and collision checking | Use upstream/underlay |
@@ -27,10 +29,60 @@ Every dependency must eventually include URL, branch/tag/commit, ROS distributio
 
 ## Provenance rule
 
-The specification and the local legacy worktree currently disagree on the
-senior repository suffix (`20260129` versus `20260306`). This is intentionally
-visible here. No `.repos` entry is promoted to `PINNED` until the exact URL,
-revision and Humble VM build have been checked.
+The senior repository URL and revision are now resolved: the audited driver
+source is `elite_robot_project_20260305` at
+`5c003831aedc744ccce39c1aa1028133d1d89680`. Earlier suffixes seen in the legacy
+notes (`20260129`, `20260306`) are historical and are not used.
+
+## Real-profile underlay provisioning
+
+The real driver needs two things the simulation profile does not: the Elite CS
+SDK and the senior driver packages. Provisioning is deliberately manual and
+minimal because the shared underlay already carries locally modified copies of
+`eli_cs_robot_description` and `eli_cs_robot_simulation_gz` that must not be
+overwritten.
+
+1. Build and install the SDK (plain CMake, no colcon):
+
+   ```bash
+   git clone --branch v1.2.0 --depth 1 \
+     https://github.com/Elite-Robots/Elite_Robots_CS_SDK "$HOME/elite_sdk_1_2_0_src"
+   cmake -S "$HOME/elite_sdk_1_2_0_src" -B "$HOME/elite_sdk_1_2_0_src/build" \
+     -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$HOME/elite-sdk-1.2.0"
+   cmake --build "$HOME/elite_sdk_1_2_0_src/build" -j"$(nproc)"
+   cmake --install "$HOME/elite_sdk_1_2_0_src/build"
+   ```
+
+2. Copy **only** the two missing packages from the pinned senior checkout into
+   the shared underlay, then build them there:
+
+   ```bash
+   U="$HOME/cs625_underlay_jazzy/src"
+   cp -a <pinned-checkout>/src/eli_cs_robot_driver   "$U/"
+   cp -a <pinned-checkout>/src/eli_cs_controllers    "$U/"
+   source scripts/source_dev_env.sh --no-overlay
+   ( cd "$HOME/cs625_underlay_jazzy" && \
+     colcon build --symlink-install \
+       --packages-up-to eli_cs_robot_driver eli_cs_controllers \
+       --cmake-args -DCMAKE_BUILD_TYPE=Release )
+   ```
+
+   `--packages-up-to` is required because the underlay sources contain
+   `eli_common_interface` and `eli_dashboard_interface`, which the driver
+   depends on and which the original underlay build never installed.
+
+3. Verify:
+
+   ```bash
+   source scripts/source_dev_env.sh --verify
+   ros2 pkg prefix eli_cs_robot_driver
+   ldd "$(ros2 pkg prefix eli_cs_robot_driver)/lib/libeli_cs_hardware_interface_plugin.so" | grep elite
+   ```
+
+   The `Elite CS SDK` include/library paths come from
+   `scripts/source_dev_env.sh`; the driver links the SDK by plain library name
+   rather than through its imported CMake target, so `CPLUS_INCLUDE_PATH`,
+   `LIBRARY_PATH` and `LD_LIBRARY_PATH` must all carry the prefix.
 
 ## Observed local revisions
 
@@ -42,13 +94,16 @@ revision and Humble VM build have been checked.
   `7f0c39bc3c159c22d9e50f39b9b364657df7be4f`, branch `master`, with local
   uncommitted NBV/simulation changes. It is evidence to inspect, not a pin.
 
-Neither observation is a Humble underlay reproducibility result. The first
-commit is the current clean audit source; the second must never be imported as
-an opaque dirty workspace.
+Neither observation is an underlay reproducibility result. The first commit is
+the current clean audit source; the second must never be imported as an opaque
+dirty workspace.
 
 ## P0 rule
 
-No dependency is imported from `.repos` until its exact revision has been checked in the Ubuntu 22.04 VM and added to this table. The current `.repos` files are intentionally empty placeholders, not a claim that the dependency chain has been validated.
+No dependency is imported from `.repos` until its exact revision has been
+checked in the supported Jazzy environment and added to this table. The
+`.repos` files remain placeholders for the shared underlay because the underlay
+packages here are plain copies, not per-package git repositories.
 
 ## Underlay/application split
 

@@ -7,7 +7,7 @@ execution is implemented in this repository.
 | Gate | Objective | Required evidence | Current code behavior |
 |---|---|---|---|
 | R0 | Profile safety | preflight, empty IP, safe defaults, bounded workspace and scales | Implemented without hardware |
-| R1 | Driver connection | Official Humble driver/SDK, robot connection and state feedback | Physical robot/operator required |
+| R1 | Driver connection | Official Elite driver + Elite CS SDK, robot connection and state feedback | Physical robot/operator required |
 | R2 | Camera and TF | Verified source topics, hand-eye transform and fresh cloud | Physical camera/calibration required |
 | R3 | Planning-only | Current state and collision-checked MoveIt plan without controller activation | Verified R1/R2 session required |
 | R4 | Low-speed confirmed motion | On-site review, limits, stop test and an explicitly confirmed trajectory | Default-off executor implemented; physical approval/evidence required |
@@ -24,11 +24,36 @@ released after review, `r4_authorized=true`, operator and approval IDs are
 non-empty, and both MoveIt scaling factors are positive and at most `0.10`.
 It replans with MoveIt immediately before sending the controller action.
 
-Before R1--R4, pin and build the official Elite driver/SDK in the approved
-Humble VM; confirm network, E-stop and workspace with the responsible operator;
-calibrate the camera and hand-eye transform; and record controller lifecycle,
-joint-state, camera freshness, TF and planning-only evidence. Never save a
-robot IP in this repository.
+Before R1--R4, confirm network, E-stop and workspace with the responsible
+operator; calibrate the camera and hand-eye transform; and record controller
+lifecycle, joint-state, camera freshness, TF and planning-only evidence. Never
+save a robot IP in this repository.
+
+The driver and SDK are provisioned in the shared Jazzy underlay (see
+[`dependencies.md`](dependencies.md)); `scripts/source_dev_env.sh` adds the SDK
+prefix to the compiler and loader search paths when it is present.
+
+## Profile base entries
+
+Simulation and hardware share one application core and one MoveIt
+configuration. Only the base composition differs, and the active-perception
+pipeline is layered on top instead of being folded into either base.
+
+| Entry | Starts | Does not start |
+|---|---|---|
+| `sim_base.launch.py` | Gazebo + `gz_ros2_control` + application description + MoveIt | active-perception nodes |
+| `real_base.launch.py` | Elite driver + `ros2_control` + application description + MoveIt | active-perception nodes |
+
+`real_base.launch.py` keeps `launch_driver:=false`, `robot_ip:=` empty,
+`activate_joint_controller:=false` and `execute:=false` by default, so it is a
+composition shell until R1 is authorised. MoveIt is skipped when the driver is
+not running, because no robot description is published in that case.
+
+Both bases reuse `elite_cs625_moveit_config` for SRDF, kinematics, joint limits
+and planning pipelines, and both build the planning model from the application
+Xacro, so the planning frame, octomap frame and self-collision exemptions are
+identical. The only intended difference is the clock: the simulation profile
+runs MoveIt on `/clock`, the real profile on wall time.
 
 ## Reuse map: senior CS625 worktree
 
