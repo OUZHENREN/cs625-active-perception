@@ -182,7 +182,7 @@ src/
 docs/                           # 实验协议、接口、仿真与真机边界说明
 ├── evidence/                   # 已筛选的 JSON/CSV/PNG/TXT 证据；原始帧本地归档
 ├── diagnostics/                # 诊断输出与人工审计辅助材料
-└── worklogs/                   # 仓库内早期工作日志归档
+└── worklogs/                   # 工作日志（文件名日期在前，YYYY-MM-DD_TYPE_TOPIC.md）
 scripts/                        # 环境入口、构建/测试与可复现矩阵运行脚本
 test/                           # 仓库级 contract check、P7 运行/采集工具与固定测试数据
 ```

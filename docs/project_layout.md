@@ -60,7 +60,7 @@ colcon list
 | `docs/evidence/p7_5_gate_summary_20260906_r12/` | frozen single-scene P7.5 summary |
 | `docs/evidence/p7_5_perception_grasp_20260906_r12/` | r12 non-raw receipts, logs and pose diagnostic figures |
 | `docs/diagnostics/p7/` | small diagnostic outputs for camera/pose/NBV debugging |
-| `docs/worklogs/` | early tracked work logs that no longer belong in the repository root |
+| `docs/worklogs/` | repository work logs; filenames start with `YYYY-MM-DD` |
 
 Large raw captures stay local: `.cdr`, `.npy` and `.ppm` under `docs/evidence`
 are ignored by `.gitignore`.  Use Git LFS or a separate data-release archive
