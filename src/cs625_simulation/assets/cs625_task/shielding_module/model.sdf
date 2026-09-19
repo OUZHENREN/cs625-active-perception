@@ -7,15 +7,20 @@
   -0.2400) to (0.0188, 0.1090, 0.2250) m, and the centre of mass sits at
   (-0.2085, 0.0634, -0.0184) m.
 
-  Mass properties: mass and inertia are the SolidWorks values, not an estimate.
-  Mass 19.0 kg over 3.084430e-3 m^3 gives an effective density of 6295 kg/m^3,
-  which is not aluminium: the part contains shielding material.
+  Mass properties: mass, centre of mass and inertia are the SolidWorks values.
+  The mass is user-overridden to 19.0 kg, so the density is a derived figure
+  rather than a material property: 19.0 kg over 3.41209164e-3 m^3 is 5568 kg/m^3,
+  well above aluminium, consistent with the shielding material inside.
+
+  Only the centre-of-mass position is needed from the geometry, and the measured
+  value differs from the mesh's geometric centroid by at most 1.0 mm
+  (-208.49 vs -208.502, 63.55 vs 63.361, -19.44 vs -18.444 mm), so the
+  uniform-density assumption was adequate there.
 
   SolidWorks reports the tensor in "positive tensor notation", where
   Lxy = integral(x*y) dm, so the inertia tensor off-diagonal is MINUS Lxy.  That
-  convention was confirmed against the gripper's own mass-properties block, whose
-  centre-of-mass and output-frame tensors differ by exactly +m*cx*cy on the
-  off-diagonal while matching the parallel-axis theorem on the diagonal.
+  convention was verified twice against the parallel-axis theorem, using both the
+  gripper and the module's own centre-of-mass and output-frame blocks.
 
   Values converted from g*mm^2 at 1e-9.  A uniform-density estimate from the mesh
   gave Ixx to -0.2% but Iyy -5.9% and Izz -9.8%, so the measured tensor matters.
@@ -24,7 +29,7 @@
   <model name="shielding_module">
     <link name="shielding_module_link">
       <inertial>
-        <pose>-0.208502 0.063361 -0.018444 0 0 0</pose>
+        <pose>-0.20849 0.06355 -0.01944 0 0 0</pose>
         <mass>19.0</mass>
         <inertia>
           <ixx>3.993602428e-01</ixx>

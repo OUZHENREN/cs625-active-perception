@@ -38,10 +38,15 @@ cs625_task_scene:
       # Mesh-frame bounding box and centre of mass, for cross-checks.
       bbox_min_m: [-0.4358, -0.0220, -0.2400]
       bbox_max_m: [ 0.0188,  0.1090,  0.2250]
-      centre_of_mass_m: [-0.208502, 0.063361, -0.018444]
-      # SolidWorks reports 3.084430e-3 m^3; the decimated mesh measures
-      # 3.0181e-3 m^3, i.e. 2.2% low because the tessellation is inscribed.
-      solidworks_volume_m3: 3.084430e-3
+      # Measured in SolidWorks; the mesh geometric centroid is within 1.0 mm.
+      centre_of_mass_m: [-0.20849, 0.06355, -0.01944]
+      mesh_centroid_m: [-0.208502, 0.063361, -0.018444]
+      # SolidWorks reports 3.41209164e-3 m^3 for the module assembly.  An earlier
+      # note quoted 3.084430e-3 m^3 for a different selection; the mesh measures
+      # 3.4297230e-3 m^3 before decimation, so the larger figure is the one that
+      # matches the geometry.  The mass is user-overridden, so the derived
+      # density (5568 kg/m^3) is not a material property.
+      solidworks_volume_m3: 3.41209164e-3
       # Initial pose: upright on the work surface, clear of the fixture.
       home_pose_world: [0.700, -0.550, 0.240, 0.0, 0.0, 0.0]
 
