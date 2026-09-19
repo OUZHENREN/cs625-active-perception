@@ -1,0 +1,182 @@
+---
+title: "屏蔽片模块插槽任务：从 SolidWorks 导出到 Gazebo 模型"
+date: 2026-09-19
+type: WORKLOG
+project: cs625-active-perception
+tags: [CS625, 精密光学模块, 屏蔽片模块, 插槽, 楔形槽, Gazebo, 模型, 质量属性]
+---
+
+# 屏蔽片模块插槽任务：从 SolidWorks 导出到 Gazebo 模型
+
+## 一、目标与结论
+
+把用户提供的 SolidWorks 导出（插槽架子 + 弹仓/屏蔽片模块）变成可用的
+Gazebo / MoveIt 模型，并解出两者在装配体坐标系下的精确相对位姿。
+
+**结论：几何、质量、惯量、位姿全部拿到，两个模型已入库并通过一致性校验。**
+唯一遗留是把夹具镜像进 MoveIt planning scene 和契约测试（下一步）。
+
+## 二、关键结果
+
+### 2.1 弹仓在装配坐标系下的位姿（精确解，非拟合）
+
+```
+R = [[ 0,  -0.994521895, -0.104528465],     t = [0.1480452, 0.2085, -0.0143114] m
+     [ 1,   0,             0           ],
+     [ 0,  -0.104528465,   0.994521895]]     det(R) = 1.000000000
+```
+
+解法：装配体 STL 的三角形数**精确等于**两份单独导出的和
+（150 114 + 276 642 = 426 756），说明 SolidWorks 对每个零件只三角化一次并
+在各次导出中复用。于是用三角形边长签名做 1:1 匹配 → Kabsch 求刚体变换 →
+迭代剔除离群点收敛。
+
+**独立验证**：把整个弹仓用该位姿放入装配体，全部顶点到装配网格的最近距离
+
+```
+中位数 0.008 µm   90 分位 0.014 µm   最大 0.027 µm   100% 顶点 < 1 µm
+```
+
+这是 float32 精度下的恒等关系，不是最小二乘拟合。
+
+### 2.2 槽是楔形，不是平行槽
+
+`0.104528465 = sin 6°`。拟合槽壁平面后，槽壁与弹仓面夹角 **12.62°**。
+沿插入方向射线投射得到的间隙：
+
+| 项目 | 测量值 |
+|---|---|
+| +Y 面命中槽壁 | 300 / 900 |
+| −Y 面命中槽壁 | **0 / 816**（另一侧无壁） |
+| 间隙范围 | **1.008 → 14.28 mm** |
+| 沿插入轴分布 | Z∈[80,160) 时中位 4.36 mm |
+
+因此初始"平行槽 + 单边 2 mm"的工作假设不成立——**是假设错了，不是装配体错了**。
+
+### 2.3 质量属性（实测，非估算）
+
+| | 体积 | 质量 | 等效密度 |
+|---|---:|---:|---:|
+| 弹仓 | 3084.430 cm³ (SolidWorks) | **19.0 kg** | **6295 kg/m³** |
+| 插槽架子 | 4804.13 cm³ | 12.965 kg | 2700 (铝) |
+
+> **修正**：弹仓不是铝。19.0 kg / 3084.43 cm³ = 6.16 g/cm³，之前按铝 6061 估的
+> 8.14 kg **低了 2.3 倍**。符合"屏蔽片"含高密度材料的预期。
+
+弹仓惯量（绕质心，kg·m²，等密度等效）：
+
+```
+ 3.983969590e-01  1.171961458e-06  2.749539088e-06
+ 1.171961458e-06  7.426666580e-01  3.706897912e-03
+ 2.749539088e-06  3.706897912e-03  3.925590894e-01
+```
+
+### 2.4 插入行程（自己推的，原 240 mm 不采用）
+
+```
+弹仓轴向   [-287.0, 178.0] mm   长 465.0
+架子轴向   [-259.3, 239.2] mm   长 498.5
+坐到底时轴向重叠 437.3 mm；弹仓顶面低于架子顶面 61.2 mm
+=> 完整插入行程 = 465 + 61 = 526 mm；加 20 mm 接近余量 = 546 mm
+```
+
+### 2.5 负载问题（新增，未解决）
+
+CS625 额定 25 kg。弹仓 19.0 kg + 夹爪 0.33 kg（**URDF 占位值**）+ 相机 0.06 kg
+= 19.39 kg = 额定的 78%。而 `cs625_parallel_gripper.xacro` 里 0.33 kg 的夹爪
+**不可能夹住 19 kg 工件**，真实值预计 2~5 kg，合计将到 ~22.5 kg（90%）。
+
+## 三、变更文件
+
+```text
+新增  test/inspect_stl_mass_properties.py
+新增  src/cs625_simulation/assets/cs625_task/shielding_module/{model.config,model.sdf,meshes/shielding_module.stl}
+新增  src/cs625_simulation/assets/cs625_task/slot_fixture/{model.config,model.sdf,meshes/slot_fixture.stl}
+新增  src/cs625_simulation/worlds/cs625_insertion_scene.sdf
+新增  src/cs625_bringup/config/cs625_task_scene.yaml
+```
+
+## 四、执行命令
+
+```bash
+# 1) 新建并验证质量属性工具（解析解 + 参考件双重验证）
+python3 test/inspect_stl_mass_properties.py --unit m --density 1092.8 \
+    src/cs625_simulation/assets/ycb/005_tomato_soup_can/google_16k/nontextured.stl
+python3 test/audit_binary_stl_extents.py "$D/插槽架子.STL" "$D/弹仓.STL"
+
+# 2) 连通分量 + 体积指纹 + 惯量特征值匹配
+# 3) 三角形边长签名 1:1 匹配 → Kabsch → 迭代剔离群点
+# 4) 射线投射量槽壁间隙（Möller-Trumbore，向量化）
+# 5) 减面（VTK vtkQuadricDecimation）并验证体积/包围盒
+# 6) 校验：XML/YAML 可解析、世界文件 <-> 配置一致、mesh URI 可解析
+python3 test/contract_checks.py
+git diff --cached --check
+```
+
+## 五、通过 / 失败
+
+```text
+质量属性工具（解析立方体 I=m/6 精确命中）           PASS
+质量属性工具（番茄罐 vs VTK 体积 319.361 cm³）       PASS
+弹仓位姿解算（顶点最大误差 0.027 µm）                PASS
+槽壁间隙射线投射                                     PASS
+减面（弹仓 +0.11%，架子 +0.05% 体积，包围盒不变）    PASS
+XML/YAML 解析、世界<->配置一致、mesh URI 解析        PASS
+python3 test/contract_checks.py                      PASS
+Gazebo 实际加载与楔形槽碰撞行为                      NOT VERIFIED（见限制）
+弹仓真实惯量（SolidWorks 惯性张量）                  NOT OBTAINED（用等密度等效）
+夹爪真实质量                                        UNKNOWN（URDF 为占位值）
+```
+
+## 六、限制
+
+- **本轮未启动 Gazebo**。沙箱禁止写 `/dev/shm` 与 `~/.ros`，`gz_ros2_control`
+  收不到 `robot_description`、控制器无法激活，因此**模型能否被 Gazebo 加载、
+  夹具的凹网格碰撞是否被 dartsim 退化为凸包，都未运行验证**。这是下一轮用户
+  本机执行的第一件事。
+- 夹具碰撞用网格（凸包仅占包围盒 57%，且楔形槽壁就是接触面）。若 dartsim
+  退化为凸包，槽会变成实心块，必须改成显式楔形板。
+- 弹仓惯量假设**密度均匀**。真实件含多种材料，需 SolidWorks 的惯性张量替换。
+- 弹仓碰撞用包围盒（凸包占 85%），是保守包络，无法解析真实壁厚。
+- 插入行程 546 mm 是几何推导值，未经任务验证。
+- 场景布局（夹具在 +X 0.62 m，弹仓初始在 −Y 0.55 m）是我定的**默认值**，
+  9/28 现场需按实际工位修正。
+
+## 七、能力层与关键链
+
+```text
+Capability layer
+- environment and dependencies   : Jazzy + underlay + overlay；VTK 9.1 可用；
+                                   open3d / sklearn 仍缺
+- robot model and simulation       : 任务模型已入库并静态校验；未运行时验证
+- kinematics, control, planning    : 未涉及
+- vision, hand-eye and TF          : 未涉及
+- active perception / NBV          : 未涉及
+- real-hardware integration        : 未涉及
+- force / contact                  : 两个模型都带 Gazebo contact sensor 话题
+
+Critical-chain status
+- URDF -> Gazebo entity           : NOT VERIFIED（模型已就位，未加载过）
+- ros2_control -> joint_states    : NOT STARTED（本轮范围外）
+- base_link -> camera optical TF  : NOT STARTED（本轮范围外）
+- RGB-D -> normalized topics      : NOT STARTED（本轮范围外）
+- point cloud -> MoveIt scene     : NOT STARTED（夹具尚未镜像进 planning scene）
+- NBV decision -> robot execution : NOT STARTED（本轮范围外）
+
+Sim/real alignment
+- reused common core      : 沿用 cs625_simulation assets/worlds 与 bringup config 范式
+- sim entry point         : 世界 cs625_insertion_scene.sdf（尚未接 launch）
+- real entry point        : 未涉及
+- real execution allowed  : 否
+- real motion occurred    : 无
+```
+
+## 八、下一步
+
+```text
+1. 用户本机：加载世界，确认两个模型出现、夹具碰撞不是凸包
+2. 夹具镜像进 MoveIt planning scene（沿用 FIXTURE_PROFILES 范式）+ 一致性测试
+3. 把世界接进 launch，暴露 scene config
+4. 索取 SolidWorks 惯性张量与真实夹爪质量
+5. 定义抓取模板（弹仓从哪个面夹、夹哪里）
+```
