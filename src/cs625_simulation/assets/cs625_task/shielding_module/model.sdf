@@ -7,16 +7,18 @@
   -0.2400) to (0.0188, 0.1090, 0.2250) m, and the centre of mass sits at
   (-0.2085, 0.0634, -0.0184) m.
 
-  Mass properties come from the geometry, rescaled to the authoritative
-  SolidWorks figures (19.0 kg over 3.0844e-3 m^3).  The effective density is
-  6295 kg/m^3, which is not aluminium: the part contains shielding material.
-  The tensor below is the uniform-density equivalent, computed with
-  test/inspect_stl_mass_properties.py from the decimated mesh at that density.
+  Mass properties: mass and inertia are the SolidWorks values, not an estimate.
+  Mass 19.0 kg over 3.084430e-3 m^3 gives an effective density of 6295 kg/m^3,
+  which is not aluminium: the part contains shielding material.
 
-  Collision is the bounding box.  The convex hull is 85% of the box volume, so
-  the envelope is a close approximation of the outer shape and is far more
-  stable for the wedge insertion than a concave mesh.  Replace it with a
-  decomposition only if the slot contact must resolve the real wall thickness.
+  SolidWorks reports the tensor in "positive tensor notation", where
+  Lxy = integral(x*y) dm, so the inertia tensor off-diagonal is MINUS Lxy.  That
+  convention was confirmed against the gripper's own mass-properties block, whose
+  centre-of-mass and output-frame tensors differ by exactly +m*cx*cy on the
+  off-diagonal while matching the parallel-axis theorem on the diagonal.
+
+  Values converted from g*mm^2 at 1e-9.  A uniform-density estimate from the mesh
+  gave Ixx to -0.2% but Iyy -5.9% and Izz -9.8%, so the measured tensor matters.
 -->
 <sdf version="1.9">
   <model name="shielding_module">
@@ -25,15 +27,21 @@
         <pose>-0.208502 0.063361 -0.018444 0 0 0</pose>
         <mass>19.0</mass>
         <inertia>
-          <ixx>3.983969590e-01</ixx>
-          <ixy>1.171961458e-06</ixy>
-          <ixz>2.749539088e-06</ixz>
-          <iyy>7.426666580e-01</iyy>
-          <iyz>3.706897912e-03</iyz>
-          <izz>3.925590894e-01</izz>
+          <ixx>3.993602428e-01</ixx>
+          <ixy>2.092340000e-05</ixy>
+          <ixz>1.099317000e-05</ixz>
+          <iyy>7.891516666e-01</iyy>
+          <iyz>4.086532080e-03</iyz>
+          <izz>4.349741182e-01</izz>
         </inertia>
       </inertial>
 
+      <!-- Collision is the bounding box.  The convex hull is 85% of the box
+           volume, so the envelope is a close approximation of the outer shape
+           and is far more stable for the wedge insertion than a concave mesh.
+           The real part is a thin-walled housing (10.9% fill), so this is a
+           conservative envelope: replace it with a decomposition only if the
+           slot contact must resolve the actual wall thickness. -->
       <collision name="envelope">
         <pose>-0.208500 0.043503 -0.007500 0 0 0</pose>
         <geometry>

@@ -62,13 +62,31 @@ cs625_task_scene:
       seated_pose_world: [0.768045, 0.208500, 0.270789, -0.104719755, 0.0, 1.570796327]
 
     # --- payload budget ----------------------------------------------------
-    # CS625 rated payload is 25 kg.  19.0 kg of module plus gripper and camera
-    # leaves very little margin; the URDF gripper masses are placeholders and
-    # must be replaced with the real tool mass before execution is enabled.
+    # CS625 rated payload is 25 kg.  With the real tool mass the end effector
+    # chain reaches 23.64 kg, i.e. 94.6% of rating.  That is a hard constraint:
+    # the rating is a static figure at a specified centre-of-mass offset, and
+    # the force available falls away sharply near it.  Recheck before enabling
+    # real execution.
     payload:
       rated_kg: 25.0
       module_kg: 19.0
-      gripper_kg_placeholder: 0.33
+      # "夹持机构0228" as measured in SolidWorks: 4.580 kg, 1710866.064 mm^3
+      # (density 2.677 g/cm^3, consistent with aluminium).
+      gripper_kg: 4.580
+      gripper_model: "夹持机构0228"
       camera_kg_placeholder: 0.06
-      # Set once the real gripper is identified.
-      gripper_kg_actual: null
+      total_kg: 23.64
+      fraction_of_rating: 0.946
+
+    # --- grasp ------------------------------------------------------------
+    # The tool is an EXPANDING mechanism, not a parallel jaw: it opens and
+    # braces outward against the workpiece handle.  cs625_parallel_gripper.xacro
+    # in cs625_ap_description therefore does not describe this tool and must be
+    # replaced before planning is meaningful.
+    grasp:
+      style: expanding_brace
+      target_feature: handle
+      gripper_urdf: "not yet modelled"
+      note: >-
+        Contact is on the inside of the workpiece handle, so the grasp template
+        needs the handle's inner surfaces, not the module's outer faces.
