@@ -1,0 +1,74 @@
+# CS625 shielding-module insertion task: scene and task constants.
+#
+# Authority for the task geometry.  The matching Gazebo scene is
+# cs625_simulation/worlds/cs625_insertion_scene.sdf, whose <include> poses must
+# stay equal to `fixture.pose_world` and `module.home_pose_world` below.
+#
+# Provenance: measured from the SolidWorks export `屏蔽片模块插槽和弹仓装配.STL`.
+# The seated module pose is an exact rigid transform between the part frame and
+# the assembly frame, recovered by matching triangle signatures and confirmed to
+# 0.03 µm at every vertex.  See docs/cs625_task_models.md.
+#
+# Lengths are metres, angles are radians unless a key says otherwise.
+
+cs625_task_scene:
+  ros__parameters:
+    # --- frames ---------------------------------------------------------
+    # The fixture model and the measured seated pose share the SolidWorks
+    # assembly frame, so this single transform places both.
+    assembly_origin_world: [0.620, 0.000, 0.2851]
+    assembly_rpy_world: [0.0, 0.0, 0.0]
+
+    # --- fixture (static) ------------------------------------------------
+    fixture:
+      model_uri: "model://cs625_task/slot_fixture"
+      pose_world: [0.620, 0.000, 0.2851, 0.0, 0.0, 0.0]
+      mass_kg: 12.965
+      slot_is_wedge: true
+      # Measured clearance from the module faces to the wall, along the
+      # insertion axis: 1.008 mm at the narrow end rising to 14.28 mm.  The
+      # narrow-end value sets how much pose error the entry can absorb; it is
+      # NOT the 2 mm nominal, which the mesh undershoots by about 2%.
+      measured_clearance_m: [0.001008, 0.014280]
+
+    # --- module -----------------------------------------------------------
+    module:
+      model_uri: "model://cs625_task/shielding_module"
+      mass_kg: 19.0
+      # Mesh-frame bounding box and centre of mass, for cross-checks.
+      bbox_min_m: [-0.4358, -0.0220, -0.2400]
+      bbox_max_m: [ 0.0188,  0.1090,  0.2250]
+      centre_of_mass_m: [-0.208502, 0.063361, -0.018444]
+      # SolidWorks reports 3.084430e-3 m^3; the decimated mesh measures
+      # 3.0181e-3 m^3, i.e. 2.2% low because the tessellation is inscribed.
+      solidworks_volume_m3: 3.084430e-3
+      # Initial pose: upright on the work surface, clear of the fixture.
+      home_pose_world: [0.700, -0.550, 0.240, 0.0, 0.0, 0.0]
+
+    # --- insertion ---------------------------------------------------------
+    insertion:
+      # Module own +Z in the world, taken from the measured seated orientation.
+      axis_world: [-0.104528465, 0.0, 0.994521895]
+      # Measured: when seated the module spans assembly Z [-0.26439, 0.20601]
+      # and the fixture [-0.24510, 0.26071], so the module top sits 61.2 mm
+      # below the fixture top and the two overlap over 437.3 mm.
+      module_axial_length_m: 0.465
+      axial_overlap_when_seated_m: 0.4373
+      top_recess_when_seated_m: 0.0612
+      # Full travel for a vertical insertion that starts with the module clear
+      # of the fixture: length + recess + approach clearance.
+      travel_m: 0.546
+      approach_clearance_m: 0.020
+      seated_pose_world: [0.768045, 0.208500, 0.270789, -0.104719755, 0.0, 1.570796327]
+
+    # --- payload budget ----------------------------------------------------
+    # CS625 rated payload is 25 kg.  19.0 kg of module plus gripper and camera
+    # leaves very little margin; the URDF gripper masses are placeholders and
+    # must be replaced with the real tool mass before execution is enabled.
+    payload:
+      rated_kg: 25.0
+      module_kg: 19.0
+      gripper_kg_placeholder: 0.33
+      camera_kg_placeholder: 0.06
+      # Set once the real gripper is identified.
+      gripper_kg_actual: null

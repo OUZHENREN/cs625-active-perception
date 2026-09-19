@@ -1,0 +1,77 @@
+<?xml version="1.0"?>
+<!--
+  CS625 shielding-module insertion scene.
+
+  The fixture model is expressed in the SolidWorks ASSEMBLY frame, and the
+  seated module pose was measured in that same frame, so the assembly frame is
+  placed here once and both parts keep their exported coordinates.
+
+  Assembly origin at world (0.620, 0.000, 0.2851) m, identity rotation:
+    - the slot opens toward the robot base, which is at the world origin
+    - the fixture bottom lands 40 mm above the ground, leaving room for the
+      module, which protrudes 19.3 mm below the fixture when seated
+    - fixture  world X [0.590, 0.823]  Y [-0.373, 0.373]  Z [0.040, 0.546] m
+    - module   world X [0.636, 0.806]  Y [ 0.148, 0.148] plus 0.455 along Y
+      Z [0.021, 0.491] m when seated
+
+  The module starts on the work surface as a separate upright body.  Both poses
+  are recorded in cs625_bringup/config/cs625_task_scene.yaml, which is the
+  authority for the task; keep the two in step when either changes.
+-->
+<sdf version="1.9">
+  <world name="cs625_insertion_scene">
+    <physics name="cs625_task_physics" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="ignition-gazebo-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="ignition-gazebo-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="ignition-gazebo-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="ignition-gazebo-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
+
+    <light type="directional" name="sun">
+      <pose>0 0 5 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <model name="ground_plane">
+      <static>true</static>
+      <pose>0 0 -0.05 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>10 10 0.1</size></box></geometry>
+        </collision>
+        <sensor name="task_ground_contact" type="contact">
+          <contact><collision>collision</collision></contact>
+          <always_on>true</always_on>
+          <update_rate>100</update_rate>
+          <topic>/cs625_task/contacts/ground</topic>
+        </sensor>
+        <visual name="visual">
+          <geometry><box><size>10 10 0.1</size></box></geometry>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Wedge slot fixture, static, in the SolidWorks assembly frame. -->
+    <include>
+      <uri>model://cs625_task/slot_fixture</uri>
+      <name>slot_fixture</name>
+      <static>true</static>
+      <pose>0.620 0.000 0.2851 0 0 0</pose>
+    </include>
+
+    <!-- Shielding module, initial pose: upright on the work surface. -->
+    <include>
+      <uri>model://cs625_task/shielding_module</uri>
+      <name>shielding_module</name>
+      <pose>0.700 -0.550 0.240 0 0 0</pose>
+    </include>
+  </world>
+</sdf>

@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<!--
+  Wedge slot fixture (插槽架子) for the CS625 insertion task.
+
+  Frame: the SolidWorks ASSEMBLY frame, which is the frame the seated module pose
+  is expressed in.  Bounding box (-0.0295, -0.3725, -0.2451) to
+  (0.2025, 0.3725, 0.2607) m; the part is NOT centred on its origin.
+
+  Static: the fixture never moves, so no <inertial> is declared.  Its measured
+  mass is 12.97 kg at aluminium 6061 (4804 cm^3).
+
+  Collision uses the decimated mesh rather than primitives.  The convex hull is
+  only 57% of the bounding box, and the slot is a wedge whose walls are the
+  contact surface for the insertion, so a box decomposition would be both loose
+  and wrong.  Being static, a mesh collision costs nothing at runtime.  Verify
+  in Gazebo that dartsim loads it (it does not decompose concave meshes): if the
+  slot behaves as a convex hull, replace this with explicit wedge slabs.
+-->
+<sdf version="1.9">
+  <model name="slot_fixture">
+    <static>true</static>
+    <link name="slot_fixture_link">
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://cs625_task/slot_fixture/meshes/slot_fixture.stl</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <friction>
+            <ode><mu>0.4</mu><mu2>0.4</mu2></ode>
+          </friction>
+        </surface>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cs625_task/slot_fixture/meshes/slot_fixture.stl</uri>
+          </mesh>
+        </geometry>
+      </visual>
+    </link>
+  </model>
+</sdf>
