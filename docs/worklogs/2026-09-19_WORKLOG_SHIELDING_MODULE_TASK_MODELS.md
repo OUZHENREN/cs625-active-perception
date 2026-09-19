@@ -443,3 +443,102 @@ L 取负后逐项同号同量级。
 现有 xacro 的 tool0_to_gripper_base xyz="0.085 0 0" 是占位值，
 不足以把真实夹爪挂到机械臂上。
 ```
+
+---
+
+## 十三、补充：MoveIt 镜像、launch 接入、契约断言
+
+### 13.1 变更文件
+
+```text
+新增  src/cs625_bringup/scripts/apply_task_scene.py         (安装，launch 可调)
+新增  src/cs625_bringup/launch/sim_task_scene.launch.py
+新增  test/test_task_scene_applier.py                       (5 项)
+修改  src/cs625_bringup/config/cs625_task_scene.yaml        (补原始正张量数据)
+修改  test/contract_checks.py                               (新增 check_cs625_task_scene)
+修改  docs/simulation.md                                    (新增第 6 节)
+```
+
+### 13.2 MoveIt 镜像
+
+夹具**必须用网格**做碰撞体：凸包只占包围盒 57%，且楔形槽壁就是插入的接触面，
+用长方体拼会又松又错；静态体用网格在运行时零成本。
+
+规划坐标系确认为 `world`（SRDF 虚拟关节 `world → base_link` 固定，
+`sim_moveit.launch.py` 设 `octomap_frame: world`）。
+
+脚本装在 `cs625_bringup/scripts/` 而**不是 test/**，因为 launch 需要通过
+`FindPackageShare` 调用它。路径解析同时支持源码树与安装树：
+
+```text
+源码树:  向上找 src/cs625_simulation/assets/cs625_task 存在则用之
+安装树:  找不到则退回 ament share
+```
+
+脚本刻意不 import `test/` 下任何东西。
+
+实测输出（dry-run）：
+
+```text
+cs625_task_slot_fixture:          frame=world position=(0.6200, 0.0000, 0.2851)
+                                  quaternion=(0,0,0,1)  vertices=4445 triangles=9006
+cs625_task_shielding_module_seated: frame=world position=(0.7680, 0.2085, 0.2708)
+                                  quaternion=(-0.037007,-0.037007,0.706138,0.706138)
+                                  vertices=5947 triangles=12644
+```
+
+### 13.3 契约断言抓到一个真错
+
+`check_cs625_task_scene()` 第一次运行就失败：
+
+```text
+AssertionError: grasp preload_per_side_m does not sum to preload_total_m
+```
+
+原因是我把单边预紧 **1.285 mm** 四舍五入写成了 **1.29**，于是 `1.29×2=2.58 ≠ 2.57`。
+已改为 0.001285。**这正是断言存在的意义**——写在注释里的一句话不会被检查，
+写成断言才会。
+
+四项断言：
+
+```text
+1. 世界 <include> 位姿 == 配置 pose_world / home_pose_world
+2. 惯量非对角 == -(记录的 SolidWorks 正张量 Lxy/Lxz/Lyz) × scale
+   （由原始数据推导期望值，而不是把结论写死；有人"修"符号就会失败）
+3. 负载合计 <= 额定，且与记录的 total_kg 一致
+4. 预紧自洽：arm_span_open - handle_inner_span == preload_total
+              preload_per_side × 2 == preload_total
+              arm_span_at_contact == handle_inner_span
+              接触面跨距 == handle_inner_span
+              扶手中跨距/外跨距 与 handle_x_ranges 自洽
+```
+
+### 13.4 RPY 约定的独立验证
+
+`test_task_scene_applier.py` 里最要紧的一条：把 `roll=-6°, yaw=90°` 转成四元数
+再转回矩阵，与**解析构造**的 `Rz(90°)·Rx(-6°)` 比对（不是照抄实现）。
+
+```
+解析值 sin6° = 0.10452846326765347
+解位姿得到的 float32 值 = 0.104528465
+两者吻合到 1e-8  ->  两条独立路径互相印证
+```
+
+### 13.5 通过 / 失败
+
+```text
+test/test_task_scene_applier.py                 5 passed
+test/test_p7_fixture_grasp_scene.py             3 passed（回归未被破坏）
+python3 test/contract_checks.py                 PASS（且抓到上述 1.29/1.285 错误）
+sim_task_scene.launch.py 构造                    PASS（6 个参数全部暴露）
+launch 内实际启动                               NOT VERIFIED（沙箱禁写 ~/.ros）
+Gazebo 加载与楔形槽碰撞行为                     NOT VERIFIED
+```
+
+### 13.6 限制
+
+- 沙箱禁写 `~/.ros/log`，`ros2 launch` 无法在沙箱内实跑；已改用
+  `importlib` 直接构造 `LaunchDescription` 验证参数与实体，并另设
+  `ROS_LOG_DIR` 到工作区内验证过一次。
+- 夹具凹网格是否被 dartsim 退化为凸包，**仍未验证**，这是用户本机第一次运行
+  必须看的事情。
