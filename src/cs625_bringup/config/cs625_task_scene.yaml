@@ -118,10 +118,44 @@ cs625_task_scene:
       # the arms have that much room to enter before reaching the body.
       handle_protrusion_m: 0.0340
       approach_axis: "-Y"
-      # The gripper opens to 246.57 mm, which is 2.57 mm wider than the gap it
-      # presses into.  Either the handles are elastic enough to take that as
-      # preload, or the two CAD assemblies disagree slightly, or 246.57 is an
-      # intermediate state.  Resolve before modelling contact force.
-      interference_fit: unknown
-      gripper_urdf: "cs625_parallel_gripper.xacro (kinematics reused, scale wrong)"
-      gripper_geometry: "not yet received"
+      # The gripper opens to 246.57 mm, 2.57 mm wider than the 244.00 mm gap it
+      # presses into.  Confirmed by the task owner as PRELOAD, not CAD mismatch:
+      # the arms deflect the handles outward by 1.29 mm per side and the grip
+      # force is therefore stiffness-driven, with no force setpoint.
+      #
+      # Simulation consequence, and it matters: a preloaded interference fit
+      # cannot be honestly reproduced by rigid-body contact.  The options are
+      #   (a) place the arms at exactly 244.00 mm and accept that the normal
+      #       force then comes only from the solver, i.e. approximately zero;
+      #   (b) represent the closed grasp with an attachment joint, which the
+      #       repository already has in cs625_task_orchestrator, and label it as
+      #       a mechanism diagnostic rather than physical grasping;
+      #   (c) model the arms compliantly.
+      # Decide before any episode depends on grip force.
+      interference_fit: preload
+      preload_per_side_m: 0.00129
+      preload_total_m: 0.00257
+      arm_span_open_m: 0.24657
+      arm_span_at_contact_m: 0.24400
+      gripper_urdf: "cs625_parallel_gripper.xacro (kinematics reused, geometry and scale wrong)"
+      # Measured from 夹持机构0228.STL, which the tool owner exported in metres.
+      # My enclosed volume agrees with SolidWorks to 0.007% (1710.978 against
+      # 1710.866 cm^3), so the mesh is the right part.  Its part frame is offset:
+      # the body sits at Y 766.5..980.5, Z -1158.8..-1073.8 mm.
+      gripper:
+        stl_extents_m: [0.29457, 0.21400, 0.08500]
+        stl_bounds_min_m: [-0.138274, 0.766503, -1.158772]
+        stl_bounds_max_m: [ 0.156297, 0.980503, -1.073772]
+        mass_kg: 4.580
+        solidworks_volume_m3: 1.710866064e-3
+        centre_of_mass_m: [0.008910, 0.863944, -1.109692]
+        # Identified arm bodies in the mesh, for the split into moving parts.
+        # Both span Y [823.5, 969.5] and Z [-1132.8, -1074.8] mm, i.e. they are
+        # the pair of support arms; the right one (comp 140) is the cleaner
+        # single arm at X [122.3, 156.3].
+        arm_body_negative_x: { x_mm: [-138.3, -18.3], volume_cm3: 160.571 }
+        arm_body_positive_x: { x_mm: [ 122.3, 156.3], volume_cm3:  83.951 }
+        # NOT YET KNOWN, and it blocks mounting the tool on the arm: the
+        # transform from this part frame to tool0.  The existing xacro uses
+        # xyz="0.085 0 0" on tool0, which is a placeholder.
+        flange_to_part_frame: unknown
