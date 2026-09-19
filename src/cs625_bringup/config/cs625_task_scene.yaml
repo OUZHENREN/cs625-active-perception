@@ -84,14 +84,44 @@ cs625_task_scene:
       fraction_of_rating: 0.946
 
     # --- grasp ------------------------------------------------------------
-    # The tool is an EXPANDING mechanism, not a parallel jaw: it opens and
-    # braces outward against the workpiece handle.  cs625_parallel_gripper.xacro
-    # in cs625_ap_description therefore does not describe this tool and must be
-    # replaced before planning is meaningful.
+    # The tool is an expanding brace, not an external parallel grip: the two
+    # support arms go BETWEEN the module's two handles and open outward to press
+    # on their inner faces.  cs625_parallel_gripper.xacro already has the right
+    # kinematics (finger axes 0 -1 0 and 0 1 0 move apart); what is wrong there is
+    # the scale -- 0.33 kg against the measured 4.580 kg for 夹持机构0228.
+    #
+    # Geometry cross-check, module frame, millimetres.  The module carries two
+    # identical handles (61.583 cm^3 each, 26.0 x 55.0 x 146.0), symmetric about
+    # the body centre:
+    #   left   handle X [-356.5, -330.5]
+    #   right  handle X [ -86.5,  -60.5]
+    # giving inner-face span 244.00, outer-face span 296.00, centre span 270.00.
+    # SolidWorks measures the gripper's support arms at 246.57 between their
+    # parallel faces, which matches the INNER span to 2.57 mm total (1.29 mm per
+    # side) and misses the other two candidates by 23 and 49 mm.
     grasp:
       style: expanding_brace
-      target_feature: handle
-      gripper_urdf: "not yet modelled"
-      note: >-
-        Contact is on the inside of the workpiece handle, so the grasp template
-        needs the handle's inner surfaces, not the module's outer faces.
+      measured_arm_span_m: 0.24657
+      handle_pair: [left, right]
+      handle_inner_span_m: 0.24400
+      handle_outer_span_m: 0.29600
+      handle_centre_span_m: 0.27000
+      span_mismatch_m: 0.00257
+      # Contact happens on the inner faces, so these are the surfaces the grasp
+      # template must use, not the module's outer faces.
+      contact_face_x_m: [-0.3305, -0.0865]
+      handle_x_ranges_m: [[-0.3565, -0.3305], [-0.0865, -0.0605]]
+      handle_y_range_m: [-0.0220, 0.0330]
+      handle_z_range_m: [-0.1720, -0.0260]
+      contact_centre_z_m: -0.0990
+      # The body face starts at Y = +12 mm, so the handles stand 34 mm proud and
+      # the arms have that much room to enter before reaching the body.
+      handle_protrusion_m: 0.0340
+      approach_axis: "-Y"
+      # The gripper opens to 246.57 mm, which is 2.57 mm wider than the gap it
+      # presses into.  Either the handles are elastic enough to take that as
+      # preload, or the two CAD assemblies disagree slightly, or 246.57 is an
+      # intermediate state.  Resolve before modelling contact force.
+      interference_fit: unknown
+      gripper_urdf: "cs625_parallel_gripper.xacro (kinematics reused, scale wrong)"
+      gripper_geometry: "not yet received"
