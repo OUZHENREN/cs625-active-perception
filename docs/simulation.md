@@ -235,3 +235,71 @@ The exact command output, exit code and known limitations must be recorded in a 
 ## 5. Reference checked for the fixture
 
 The fixture uses the `rgbd_camera` sensor shape and is exercised in the accepted Jazzy/Harmonic overlay. The official Harmonic documentation and the installed `gz_ros2_control_demos` examples remain the reference for future regression checks.
+
+## 6. Task scene: shielding module and wedge slot fixture
+
+`worlds/cs625_insertion_scene.sdf` is the first world that models the actual task
+rather than an occlusion study. It places two models from
+`assets/cs625_task/`, both derived from the SolidWorks export:
+
+| Model | Static | Triangles | Mass | Notes |
+|---|---|---:|---:|---|
+| `slot_fixture` | yes | 9 006 | 12.965 kg | wedge slot, mesh collision |
+| `shielding_module` | no | 12 644 | 19.0 kg | measured inertia, box collision |
+
+Run it with:
+
+```bash
+ros2 launch cs625_bringup sim_task_scene.launch.py
+```
+
+That composes `sim_base.launch.py` with `launch_fixture_world:=false` (the
+generic RGB-D fixture world is a second Gazebo session and serves no purpose
+here) and, 20 s later, mirrors the static fixture into MoveIt's planning scene so
+the planner cannot route the arm through it.
+
+### 6.1 Geometry is owned by one file
+
+`config/cs625_task_scene.yaml` is the authority. The world file, the model SDFs
+and the planning-scene mirror all consume it, and `test/contract_checks.py`
+asserts that the world `<include>` poses still equal the config. Change a
+dimension in one place only and the contract fails.
+
+### 6.2 Why the fixture collides as a mesh
+
+The repository's other static objects use primitive collisions. This fixture
+cannot: its convex hull is 57% of its bounding box, and the slot is a wedge whose
+walls are the contact surface for the insertion, so a primitive decomposition
+would be both loose and wrong. Being static it costs nothing at runtime.
+
+**Verify on first run** that dartsim has not degenerated the concave mesh into
+its convex hull; if it has, the slot becomes a solid block and the fixture has to
+be rebuilt from explicit wedge slabs.
+
+### 6.3 Why the module collides as a box
+
+Its convex hull is 85% of its bounding box, so the envelope is a close
+approximation of the outer shape and is far more stable for a wedge insertion
+than a concave mesh. The part is a thin-walled housing (10.9% fill), so this is a
+conservative envelope, not the real wall thickness.
+
+### 6.4 Placement and the insertion axis
+
+See §6 of the task scene config. The fixture sits at world
+`(0.620, 0.000, 0.2851)` so that the slot opens toward the robot base and the
+module, which protrudes 19.3 mm below the fixture when seated, clears the ground.
+The module starts upright on the work surface at `(0.700, -0.550, 0.240)`.
+
+The seated pose is an exact rigid transform in the assembly frame, not a
+hand-placed guess: it was solved by matching triangle signatures between the
+assembly export and the part export, and every vertex then lands within 0.03 um.
+It includes a real 6 degree roll, because the slot is a wedge.
+
+### 6.5 Known limitations
+
+- Nothing in this section has been run in Gazebo from the agent side; the sandbox
+  cannot write `/dev/shm` or `~/.ros`, so `gz_ros2_control` never activates.
+- The module's mass is user-overridden in SolidWorks, so its derived density is
+  not a material property.
+- The grasp is a preloaded interference fit, and the gripper geometry is still
+  the placeholder parallel gripper. See `docs/real_hardware_readiness.md`.

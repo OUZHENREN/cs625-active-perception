@@ -9,6 +9,11 @@ import pathlib
 import sys
 import xml.etree.ElementTree as ET
 
+try:
+    import yaml
+except ImportError:  # pragma: no cover - reported by check_cs625_task_scene
+    yaml = None
+
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 EXPECTED_PACKAGES = {
@@ -192,8 +197,153 @@ def check_environment_contract() -> None:
         )
 
 
+TASK_SCENE_CONFIG = pathlib.Path("src/cs625_bringup/config/cs625_task_scene.yaml")
+TASK_SCENE_WORLD = pathlib.Path("src/cs625_simulation/worlds/cs625_insertion_scene.sdf")
+TASK_MODULE_SDF = pathlib.Path(
+    "src/cs625_simulation/assets/cs625_task/shielding_module/model.sdf"
+)
+TASK_MODEL_DIR = pathlib.Path("src/cs625_simulation/assets/cs625_task")
+
+
+def _load_task_parameters() -> dict:
+    if yaml is None:
+        fail(
+            "PyYAML is required to validate the CS625 task scene; install "
+            "python3-yaml"
+        )
+    return yaml.safe_load(
+        (ROOT / TASK_SCENE_CONFIG).read_text(encoding="utf-8")
+    )["cs625_task_scene"]["ros__parameters"]
+
+
+def check_cs625_task_scene() -> None:
+    """Cross-check the insertion task scene against itself.
+
+    The world file, the model SDF and the scene config each carry part of the
+    same geometry, which is the repository's existing pattern for P7 fixtures.
+    These checks make the duplication safe: a value changed in one place and not
+    the other fails here rather than silently producing a scene that does not
+    match the planning scene.
+    """
+
+    for relative in (TASK_SCENE_CONFIG, TASK_SCENE_WORLD, TASK_MODULE_SDF):
+        if not (ROOT / relative).is_file():
+            fail(f"CS625 task scene file is missing: {relative}")
+
+    parameters = _load_task_parameters()
+
+    # 1) Every <include> pose in the world must equal the config pose.
+    world = ET.parse(ROOT / TASK_SCENE_WORLD).getroot().find("world")
+    poses = {
+        element.findtext("name"): element.findtext("pose").split()
+        for element in world.findall("include")
+    }
+    for model_name, section, key in (
+        ("slot_fixture", "fixture", "pose_world"),
+        ("shielding_module", "module", "home_pose_world"),
+    ):
+        if model_name not in poses:
+            fail(f"task world does not include {model_name!r}")
+        expected = [float(value) for value in parameters[section][key]]
+        observed = [float(value) for value in poses[model_name]]
+        if len(expected) != len(observed) or any(
+            abs(a - b) > 1e-9 for a, b in zip(expected, observed)
+        ):
+            fail(
+                f"{model_name}: world pose {observed} disagrees with "
+                f"{TASK_SCENE_CONFIG.name} {key} {expected}"
+            )
+
+    # 2) Inertia sign convention, driven by the recorded raw tensor.
+    #
+    # SolidWorks emits "positive tensor notation" (Lxy = integral(x*y) dm), so
+    # the SDF off-diagonal must be the NEGATED value.  Storing the raw numbers
+    # and deriving the expectation here means a future "fix" that flips the
+    # signs fails the contract instead of quietly inverting every product of
+    # inertia.
+    inertia = ET.parse(ROOT / TASK_MODULE_SDF).getroot().find(".//inertial/inertia")
+    if inertia is None:
+        fail("shielding_module model.sdf has no <inertial>/<inertia>")
+    tensor = parameters["module"]["solidworks_positive_tensor"]
+    scale = float(tensor["scale"])
+    for attribute, key, negate in (
+        ("ixx", "Lxx", False),
+        ("iyy", "Lyy", False),
+        ("izz", "Lzz", False),
+        ("ixy", "Lxy", True),
+        ("ixz", "Lxz", True),
+        ("iyz", "Lyz", True),
+    ):
+        expected = (-1.0 if negate else 1.0) * float(tensor[key]) * scale
+        observed = float(inertia.findtext(attribute))
+        if abs(observed - expected) > max(1e-12, abs(expected) * 1e-6):
+            fail(
+                f"shielding_module {attribute} is {observed!r} but the recorded "
+                f"positive-tensor {key} implies {expected!r}; the off-diagonal "
+                "sign convention may have been inverted"
+            )
+
+    # 3) Payload must stay inside the rated payload with the real tool mass.
+    payload = parameters["payload"]
+    total = (
+        float(payload["module_kg"])
+        + float(payload["gripper_kg"])
+        + float(payload["camera_kg_placeholder"])
+    )
+    if total > float(payload["rated_kg"]):
+        fail(
+            f"end-effector chain {total:.2f} kg exceeds the rated "
+            f"{payload['rated_kg']} kg"
+        )
+    if abs(total - float(payload["total_kg"])) > 0.005:
+        fail(
+            f"payload.total_kg is {payload['total_kg']} but the parts sum to "
+            f"{total:.2f}; update the record"
+        )
+
+    # 4) Grasp geometry must be internally consistent.
+    grasp = parameters["grasp"]
+    inner = float(grasp["handle_inner_span_m"])
+    open_span = float(grasp["arm_span_open_m"])
+    preload = float(grasp["preload_total_m"])
+    if abs((open_span - inner) - preload) > 1e-9:
+        fail(
+            f"grasp preload does not reconcile: open span {open_span} minus "
+            f"inner span {inner} is {open_span - inner}, not {preload}"
+        )
+    if abs(float(grasp["preload_per_side_m"]) * 2.0 - preload) > 1e-9:
+        fail("grasp preload_per_side_m does not sum to preload_total_m")
+    if abs(float(grasp["arm_span_at_contact_m"]) - inner) > 1e-9:
+        fail("grasp arm_span_at_contact_m must equal handle_inner_span_m")
+    faces = [float(value) for value in grasp["contact_face_x_m"]]
+    if abs(abs(faces[1] - faces[0]) - inner) > 1e-9:
+        fail("grasp contact faces do not span handle_inner_span_m")
+    ranges = [[float(value) for value in pair] for pair in grasp["handle_x_ranges_m"]]
+    centre_span = abs(sum(ranges[0]) / 2.0 - sum(ranges[1]) / 2.0)
+    if abs(centre_span - float(grasp["handle_centre_span_m"])) > 1e-9:
+        fail("grasp handle_centre_span_m disagrees with handle_x_ranges_m")
+    outer_span = abs(ranges[0][0] - ranges[1][1])
+    if abs(outer_span - float(grasp["handle_outer_span_m"])) > 1e-9:
+        fail("grasp handle_outer_span_m disagrees with handle_x_ranges_m")
+
+    # 5) Every declared model must have its config, SDF and mesh on disk.
+    for model_name, section in (
+        ("slot_fixture", "fixture"),
+        ("shielding_module", "module"),
+    ):
+        directory = ROOT / TASK_MODEL_DIR / model_name
+        for required in ("model.config", "model.sdf"):
+            if not (directory / required).is_file():
+                fail(f"{model_name} is missing {required}")
+        if not (directory / "meshes").is_dir():
+            fail(f"{model_name} has no meshes directory")
+        if parameters[section].get("model_uri") != f"model://cs625_task/{model_name}":
+            fail(f"{model_name} model_uri does not match its directory")
+
+
 def main() -> int:
     check_environment_contract()
+    check_cs625_task_scene()
 
     src = ROOT / "src"
     package_dirs = {
@@ -227,6 +377,18 @@ def main() -> int:
         src / "cs625_bringup" / "config" / "sim_gz_bridge.yaml",
         src / "cs625_bringup" / "config" / "moveit_sensors_3d.yaml",
         src / "cs625_bringup" / "config" / "cs625_moveit.rviz",
+        src / "cs625_bringup" / "config" / "cs625_task_scene.yaml",
+        src / "cs625_bringup" / "scripts" / "apply_task_scene.py",
+        src / "cs625_bringup" / "launch" / "sim_task_scene.launch.py",
+        src / "cs625_simulation" / "worlds" / "cs625_insertion_scene.sdf",
+        src / "cs625_simulation" / "assets" / "cs625_task" / "shielding_module" / "model.sdf",
+        src / "cs625_simulation" / "assets" / "cs625_task" / "shielding_module" / "model.config",
+        src / "cs625_simulation" / "assets" / "cs625_task" / "shielding_module" / "meshes" / "shielding_module.stl",
+        src / "cs625_simulation" / "assets" / "cs625_task" / "slot_fixture" / "model.sdf",
+        src / "cs625_simulation" / "assets" / "cs625_task" / "slot_fixture" / "model.config",
+        src / "cs625_simulation" / "assets" / "cs625_task" / "slot_fixture" / "meshes" / "slot_fixture.stl",
+        ROOT / "test" / "inspect_stl_mass_properties.py",
+        ROOT / "test" / "test_task_scene_applier.py",
         src / "cs625_bringup" / "config" / "sim_controllers.yaml",
         src / "cs625_ap_description" / "urdf" / "cs625_parallel_gripper.xacro",
         ROOT / "scripts" / "bootstrap_humble.sh",

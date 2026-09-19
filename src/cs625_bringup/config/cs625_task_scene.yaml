@@ -47,6 +47,16 @@ cs625_task_scene:
       # matches the geometry.  The mass is user-overridden, so the derived
       # density (5568 kg/m^3) is not a material property.
       solidworks_volume_m3: 3.41209164e-3
+      # Raw SolidWorks output, kept so the sign convention stays machine-checked
+      # rather than being asserted in prose.  SolidWorks reports "positive tensor
+      # notation", Lxy = integral(x*y) dm, so the SDF inertia off-diagonal is
+      # MINUS this value.  Units g*mm^2, so the scale to kg*m^2 is 1e-9.
+      # Verified twice against the parallel-axis theorem; see the work log.
+      solidworks_positive_tensor: {
+        unit: "g*mm^2", scale: 1.0e-9,
+        Lxx: 399360242.75, Lxy: -20923.40,    Lxz: -10993.17,
+        Lyy: 789151666.61, Lyz: -4086532.08,  Lzz: 434974118.21,
+      }
       # Initial pose: upright on the work surface, clear of the fixture.
       home_pose_world: [0.700, -0.550, 0.240, 0.0, 0.0, 0.0]
 
@@ -120,7 +130,7 @@ cs625_task_scene:
       approach_axis: "-Y"
       # The gripper opens to 246.57 mm, 2.57 mm wider than the 244.00 mm gap it
       # presses into.  Confirmed by the task owner as PRELOAD, not CAD mismatch:
-      # the arms deflect the handles outward by 1.29 mm per side and the grip
+      # the arms deflect the handles outward by 1.285 mm per side and the grip
       # force is therefore stiffness-driven, with no force setpoint.
       #
       # Simulation consequence, and it matters: a preloaded interference fit
@@ -133,7 +143,7 @@ cs625_task_scene:
       #   (c) model the arms compliantly.
       # Decide before any episode depends on grip force.
       interference_fit: preload
-      preload_per_side_m: 0.00129
+      preload_per_side_m: 0.001285
       preload_total_m: 0.00257
       arm_span_open_m: 0.24657
       arm_span_at_contact_m: 0.24400
@@ -149,6 +159,13 @@ cs625_task_scene:
         mass_kg: 4.580
         solidworks_volume_m3: 1.710866064e-3
         centre_of_mass_m: [0.008910, 0.863944, -1.109692]
+        # Raw SolidWorks tensor, same convention note as the module: the SDF
+        # off-diagonal is minus this.  Units kg*mm^2, so the scale is 1e-6.
+        solidworks_positive_tensor: {
+          unit: "kg*mm^2", scale: 1.0e-6,
+          Lxx: 16561.263, Lxy: 47.184,   Lxz: -0.450,
+          Lyy: 20907.398, Lyz: -652.147, Lzz: 34121.009,
+        }
         # Identified arm bodies in the mesh, for the split into moving parts.
         # Both span Y [823.5, 969.5] and Z [-1132.8, -1074.8] mm, i.e. they are
         # the pair of support arms; the right one (comp 140) is the cleaner
