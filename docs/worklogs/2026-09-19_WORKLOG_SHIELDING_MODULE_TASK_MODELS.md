@@ -995,3 +995,52 @@ test_sync_task_world.py                     5 passed
 python3 test/contract_checks.py             PASS
 test_sync_task_world + test_task_scene_applier  10 passed
 ```
+
+---
+
+## 二十一、补充：应用用户的场景摆放
+
+用户从 Gazebo 的 Pose 面板读出数值（面板标的是 **(rad)**）：
+
+```text
+slot_fixture      X  1.03   Y  0.57   Z 0.29   Roll  3.11   Pitch 0.08   Yaw -0.43
+shielding_module  X -0.74   Y -0.97   Z 0.23   Roll -3.14   Pitch 0.00   Yaw -0.94
+```
+
+`sync_task_world.py` 增加 **`--rpy-rad`**（Gazebo 就是显示弧度，不该逼用户换算）。
+
+写入后的世界包围盒：
+
+```text
+夹具   X[ 0.858, 1.348]  Y[ 0.148, 0.909]  Z[0.017, 0.542]  离地 16.63 mm
+弹仓   X[-1.081,-0.734]  Y[-1.044,-0.627]  Z[0.005, 0.470]  离地  4.83 mm
+```
+
+### 21.1 两个需要知道的后果
+
+```text
+1. 两个物体都距基座约 1.22 m —— 接近 1.37 m 水平伸展极限，
+   而且对 19 kg 的弹仓是很大的力臂。负载余量需要复核。
+2. 夹具悬空 16.63 mm（弹仓 4.83 mm）。夹具 Z 可由 0.29 减到约 0.2734 落地。
+```
+
+### 21.2 测试改为断言不变量
+
+`test_recorded_poses_are_the_levelled_placement` 在场景合法移动后**立刻失败**——
+它硬编码了旧坐标，管错了东西。改为从网格 + 当前记录的位姿计算：
+
+```text
+两个物体都落在地面（或几毫米内）
+弹仓自身 +Z 偏离世界 +Z < 2°
+夹具与弹仓包围盒不重叠
+```
+
+这样无论摆放怎么改都能通过，而真正错误（悬空穿地、倾倒、互相插进去）会失败。
+
+### 21.3 通过 / 失败
+
+```text
+python3 test/contract_checks.py                  PASS
+test_sync_task_world + test_task_scene_applier   10 passed
+实际 Gazebo 渲染                                PENDING（待用户确认）
+```
