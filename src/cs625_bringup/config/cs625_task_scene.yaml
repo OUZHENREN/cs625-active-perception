@@ -20,13 +20,13 @@ cs625_task_scene:
     # checks say so: the module's handles map to assembly +X and must face the
     # robot, and assembly +Z points down, so without the turn the seated module
     # protrudes 19.3 mm BELOW the fixture, i.e. through the floor.
-    assembly_origin_world: [0.720, 0.000, 0.260709]
-    assembly_rpy_world: [0.0, 3.14159265358979, 0.0]
+    assembly_origin_world: [-0.720000000, 0.000000000, 0.277737000]
+    assembly_rpy_world: [0.000000000, -0.087336276, 0.000000000]
 
     # --- fixture (static) ------------------------------------------------
     fixture:
       model_uri: "model://cs625_task/slot_fixture"
-      pose_world: [0.720, 0.000, 0.260709, 0.0, 3.14159265358979, 0.0]
+      pose_world: [-0.720000000, 0.000000000, 0.277737000, 0.000000000, -0.087336276, 0.000000000]
       mass_kg: 12.965
       slot_is_wedge: true
       # Measured clearance from the module faces to the wall, along the
@@ -62,7 +62,7 @@ cs625_task_scene:
         Lyy: 789151666.61, Lyz: -4086532.08,  Lzz: 434974118.21,
       }
       # Initial pose: upright on the work surface, clear of the fixture.
-      home_pose_world: [0.550, -0.450, 0.225, 3.14159265358979, 0.0, 1.57079632679490]
+      home_pose_world: [0.450000000, 0.450000000, 0.248593000, -0.087336276, -0.000000000, 1.570796327]
 
     # --- insertion ---------------------------------------------------------
     insertion:
@@ -78,7 +78,7 @@ cs625_task_scene:
       # of the fixture: length + recess + approach clearance.
       travel_m: 0.546
       approach_clearance_m: 0.020
-      seated_pose_world: [0.571955, 0.208500, 0.275020, 3.03687289847013, 0.0, 1.57079632679490]
+      seated_pose_world: [-0.571270706, 0.208500000, 0.276393416, -0.192056030, -0.000000002, 1.570796323]
 
     # --- payload budget ----------------------------------------------------
     # CS625 rated payload is 25 kg.  With the real tool mass the end effector

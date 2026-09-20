@@ -6,24 +6,34 @@
   seated module pose was measured in that same frame, so the assembly frame is
   placed here once and both parts keep their exported coordinates.
 
-  Orientation matters and cost one iteration to get right.  The assembly frame is
-  rotated 180 degrees about world Y, which does two things at once:
+  Two placement facts were established from the geometry rather than guessed:
 
-    - the module's handles sit on its own -Y face, which maps to assembly +X, so
-      without the turn they faced away from the robot.  After Ry(180) assembly +X
-      points to world -X and the fixture opens toward the base at the origin.
-    - assembly +Z points down.  Before the turn the module protruded 19.3 mm below
-      the fixture, i.e. through the floor; after it, the module protrudes 19.3 mm
-      above the fixture top, which is what an inserted module does.
+    - The arm's zero pose reaches along -X, so the task belongs at -X.  With the
+      assembly frame nearly aligned to the world, the module's handles, which sit
+      on assembly +X, then face the robot.  An earlier attempt put the fixture at
+      +X and turned it 180 degrees about Y; that pointed the handles away and
+      stood the fixture on its head.
+    - The fixture as modelled is rotated 5.004 degrees about its own Y axis.  Its
+      two 1878 cm^2 side faces are exactly normal to Y, so this is a rigid tilt of
+      the whole part, not a modelling error, and the largest horizontal plate
+      (947 cm^2) is what measures it.  Ry(-5.004 deg) levels that plate.  Some
+      smaller faces stay off-axis, which is expected of a welded assembly.
 
-  Assembly origin at world (0.720, 0.000, 0.260709):
-    fixture  world X [0.5175, 0.7495]  Y [-0.3725, 0.3725]  Z [0.0000, 0.5058] m
-    module   world X [0.5250, 0.7039]  Y [-0.2273, 0.2273]  Z [0.0490, 0.5251] m
-             when seated, i.e. 19.3 mm proud of the fixture top
+  Assembly origin at world (-0.720, 0.000, 0.277737), RPY (0, -5.004 deg, 0):
+    fixture  world X [-0.7382, -0.5382]  Y [-0.3725, 0.3725]  Z [0.0321, 0.5398] m
+    module   world X [-0.7212, -0.5209]  Y [-0.2273, 0.2273]  Z [0.0200, 0.4910] m
+             when seated
 
-  The module starts as a separate free body resting on the work surface.  Both
-  poses are recorded in cs625_bringup/config/cs625_task_scene.yaml, which is the
-  authority for the task; keep the two in step when either changes.
+  The 32.1 mm stand-off is not decorative: when seated the module reaches 12.1 mm
+  BELOW the fixture's mounting plane, so with the fixture flush on the floor the
+  module would pass through it.  The stand-off leaves the module 20 mm clear.  If
+  the real installation instead has a clearance hole in the bench, set the
+  assembly origin Z to 0.245640 and say so.
+
+  The module starts as a separate free body resting on the work surface, on the
+  far side of the base from the fixture so the arm can pick it up and carry it
+  across.  Both poses are recorded in cs625_bringup/config/cs625_task_scene.yaml,
+  which is the authority for the task; keep the two in step when either changes.
 -->
 <sdf version="1.9">
   <world name="cs625_insertion_scene">
@@ -72,14 +82,14 @@
       <uri>model://cs625_task/slot_fixture</uri>
       <name>slot_fixture</name>
       <static>true</static>
-      <pose>0.720 0.000 0.260709 0 3.14159265358979 0</pose>
+      <pose>-0.720000000 0.000000000 0.277737000 0.000000000 -0.087336276 0.000000000</pose>
     </include>
 
     <!-- Shielding module, initial pose: resting on the work surface. -->
     <include>
       <uri>model://cs625_task/shielding_module</uri>
       <name>shielding_module</name>
-      <pose>0.550 -0.450 0.225 3.14159265358979 0 1.57079632679490</pose>
+      <pose>0.450000000 0.450000000 0.248593000 -0.087336276 -0.000000000 1.570796327</pose>
     </include>
   </world>
 </sdf>
