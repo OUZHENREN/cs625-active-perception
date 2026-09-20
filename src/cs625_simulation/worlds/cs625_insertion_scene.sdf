@@ -6,16 +6,23 @@
   seated module pose was measured in that same frame, so the assembly frame is
   placed here once and both parts keep their exported coordinates.
 
-  Assembly origin at world (0.620, 0.000, 0.2851) m, identity rotation:
-    - the slot opens toward the robot base, which is at the world origin
-    - the fixture bottom lands 40 mm above the ground, leaving room for the
-      module, which protrudes 19.3 mm below the fixture when seated
-    - fixture  world X [0.590, 0.823]  Y [-0.373, 0.373]  Z [0.040, 0.546] m
-    - module   world X [0.636, 0.806]  Y [ 0.148, 0.148] plus 0.455 along Y
-      Z [0.021, 0.491] m when seated
+  Orientation matters and cost one iteration to get right.  The assembly frame is
+  rotated 180 degrees about world Y, which does two things at once:
 
-  The module starts on the work surface as a separate upright body.  Both poses
-  are recorded in cs625_bringup/config/cs625_task_scene.yaml, which is the
+    - the module's handles sit on its own -Y face, which maps to assembly +X, so
+      without the turn they faced away from the robot.  After Ry(180) assembly +X
+      points to world -X and the fixture opens toward the base at the origin.
+    - assembly +Z points down.  Before the turn the module protruded 19.3 mm below
+      the fixture, i.e. through the floor; after it, the module protrudes 19.3 mm
+      above the fixture top, which is what an inserted module does.
+
+  Assembly origin at world (0.720, 0.000, 0.260709):
+    fixture  world X [0.5175, 0.7495]  Y [-0.3725, 0.3725]  Z [0.0000, 0.5058] m
+    module   world X [0.5250, 0.7039]  Y [-0.2273, 0.2273]  Z [0.0490, 0.5251] m
+             when seated, i.e. 19.3 mm proud of the fixture top
+
+  The module starts as a separate free body resting on the work surface.  Both
+  poses are recorded in cs625_bringup/config/cs625_task_scene.yaml, which is the
   authority for the task; keep the two in step when either changes.
 -->
 <sdf version="1.9">
@@ -35,8 +42,8 @@
 
     <light type="directional" name="sun">
       <pose>0 0 5 0 0 0</pose>
-      <diffuse>0.8 0.8 0.8 1</diffuse>
-      <specular>0.2 0.2 0.2 1</specular>
+      <diffuse>1.0 1.0 1.0 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
       <direction>-0.5 0.1 -0.9</direction>
     </light>
 
@@ -55,6 +62,7 @@
         </sensor>
         <visual name="visual">
           <geometry><box><size>10 10 0.1</size></box></geometry>
+          <material><ambient>0.25 0.25 0.27 1</ambient><diffuse>0.35 0.35 0.38 1</diffuse></material>
         </visual>
       </link>
     </model>
@@ -64,14 +72,14 @@
       <uri>model://cs625_task/slot_fixture</uri>
       <name>slot_fixture</name>
       <static>true</static>
-      <pose>0.620 0.000 0.2851 0 0 0</pose>
+      <pose>0.720 0.000 0.260709 0 3.14159265358979 0</pose>
     </include>
 
-    <!-- Shielding module, initial pose: upright on the work surface. -->
+    <!-- Shielding module, initial pose: resting on the work surface. -->
     <include>
       <uri>model://cs625_task/shielding_module</uri>
       <name>shielding_module</name>
-      <pose>0.700 -0.550 0.240 0 0 0</pose>
+      <pose>0.550 -0.450 0.225 3.14159265358979 0 1.57079632679490</pose>
     </include>
   </world>
 </sdf>

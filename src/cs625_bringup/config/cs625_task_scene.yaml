@@ -16,13 +16,17 @@ cs625_task_scene:
     # --- frames ---------------------------------------------------------
     # The fixture model and the measured seated pose share the SolidWorks
     # assembly frame, so this single transform places both.
-    assembly_origin_world: [0.620, 0.000, 0.2851]
-    assembly_rpy_world: [0.0, 0.0, 0.0]
+    # The assembly frame is turned 180 deg about world Y.  Two independent
+    # checks say so: the module's handles map to assembly +X and must face the
+    # robot, and assembly +Z points down, so without the turn the seated module
+    # protrudes 19.3 mm BELOW the fixture, i.e. through the floor.
+    assembly_origin_world: [0.720, 0.000, 0.260709]
+    assembly_rpy_world: [0.0, 3.14159265358979, 0.0]
 
     # --- fixture (static) ------------------------------------------------
     fixture:
       model_uri: "model://cs625_task/slot_fixture"
-      pose_world: [0.620, 0.000, 0.2851, 0.0, 0.0, 0.0]
+      pose_world: [0.720, 0.000, 0.260709, 0.0, 3.14159265358979, 0.0]
       mass_kg: 12.965
       slot_is_wedge: true
       # Measured clearance from the module faces to the wall, along the
@@ -58,7 +62,7 @@ cs625_task_scene:
         Lyy: 789151666.61, Lyz: -4086532.08,  Lzz: 434974118.21,
       }
       # Initial pose: upright on the work surface, clear of the fixture.
-      home_pose_world: [0.700, -0.550, 0.240, 0.0, 0.0, 0.0]
+      home_pose_world: [0.550, -0.450, 0.225, 3.14159265358979, 0.0, 1.57079632679490]
 
     # --- insertion ---------------------------------------------------------
     insertion:
@@ -74,7 +78,7 @@ cs625_task_scene:
       # of the fixture: length + recess + approach clearance.
       travel_m: 0.546
       approach_clearance_m: 0.020
-      seated_pose_world: [0.768045, 0.208500, 0.270789, -0.104719755, 0.0, 1.570796327]
+      seated_pose_world: [0.571955, 0.208500, 0.275020, 3.03687289847013, 0.0, 1.57079632679490]
 
     # --- payload budget ----------------------------------------------------
     # CS625 rated payload is 25 kg.  With the real tool mass the end effector

@@ -1,15 +1,25 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <!--
-    Simulation-only parallel gripper.  This is an application extension: it
-    never edits the Elite CS625 underlay.  The right finger is commanded by
-    gz_ros2_control and the left finger is a URDF mimic joint.
+    Simulation-only gripper.  This is an application extension: it never edits
+    the Elite CS625 underlay.  The right finger is commanded by gz_ros2_control
+    and the left finger is a URDF mimic joint.
+
+    The kinematics are right and are reused: both finger axes point away from the
+    tool axis, so the fingers move APART, which is the expanding brace the task
+    uses.  The scale is NOT right.  The real tool is 夹持机构0228, measured at
+    4.580 kg with a support-arm span of 246.57 mm, against a placeholder here of
+    0.33 kg whose fingers reach only +/-58 mm.  Masses and inertias below are set
+    from the measured tool; the link geometry stays a placeholder until the
+    transform from the tool's part frame to tool0 is known.  See
+    docs/real_hardware_readiness.md and config/cs625_task_scene.yaml.
   -->
   <xacro:macro name="cs625_parallel_gripper" params="parent prefix">
     <link name="${prefix}gripper_base_link">
       <visual><geometry><box size="0.080 0.090 0.050"/></geometry><material name="gripper_dark"><color rgba="0.18 0.18 0.18 1"/></material></visual>
       <collision><geometry><box size="0.080 0.090 0.050"/></geometry></collision>
-      <inertial><mass value="0.25"/><inertia ixx="0.00020" ixy="0" ixz="0" iyy="0.00017" iyz="0" izz="0.00028"/></inertial>
+      <inertial><mass value="4.20"/><inertia ixx="0.00336" ixy="0" ixz="0" iyy="0.00286" iyz="0" izz="0.00470"/></inertial>
+      <!-- 4.20 + 2 x 0.19 = 4.580 kg, the measured 夹持机构0228 mass. -->
     </link>
     <joint name="${prefix}tool0_to_gripper_base" type="fixed">
       <parent link="${parent}"/><child link="${prefix}gripper_base_link"/>
@@ -19,7 +29,7 @@
     <link name="${prefix}gripper_right_finger_link">
       <visual><origin xyz="0.045 0 0"/><geometry><box size="0.090 0.014 0.070"/></geometry><material name="gripper_finger"><color rgba="0.32 0.32 0.32 1"/></material></visual>
       <collision><origin xyz="0.045 0 0"/><geometry><box size="0.090 0.014 0.070"/></geometry></collision>
-      <inertial><origin xyz="0.045 0 0"/><mass value="0.04"/><inertia ixx="0.00002" ixy="0" ixz="0" iyy="0.00003" iyz="0" izz="0.00003"/></inertial>
+      <inertial><origin xyz="0.045 0 0"/><mass value="0.19"/><inertia ixx="0.000095" ixy="0" ixz="0" iyy="0.0001425" iyz="0" izz="0.0001425"/></inertial>
     </link>
     <joint name="${prefix}gripper_right_finger_joint" type="prismatic">
       <parent link="${prefix}gripper_base_link"/><child link="${prefix}gripper_right_finger_link"/>
@@ -30,7 +40,7 @@
     <link name="${prefix}gripper_left_finger_link">
       <visual><origin xyz="0.045 0 0"/><geometry><box size="0.090 0.014 0.070"/></geometry><material name="gripper_finger_left"><color rgba="0.32 0.32 0.32 1"/></material></visual>
       <collision><origin xyz="0.045 0 0"/><geometry><box size="0.090 0.014 0.070"/></geometry></collision>
-      <inertial><origin xyz="0.045 0 0"/><mass value="0.04"/><inertia ixx="0.00002" ixy="0" ixz="0" iyy="0.00003" iyz="0" izz="0.00003"/></inertial>
+      <inertial><origin xyz="0.045 0 0"/><mass value="0.19"/><inertia ixx="0.000095" ixy="0" ixz="0" iyy="0.0001425" iyz="0" izz="0.0001425"/></inertial>
     </link>
     <joint name="${prefix}gripper_left_finger_joint" type="prismatic">
       <parent link="${prefix}gripper_base_link"/><child link="${prefix}gripper_left_finger_link"/>
