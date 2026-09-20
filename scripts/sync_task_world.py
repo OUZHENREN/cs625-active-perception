@@ -37,7 +37,9 @@ import pathlib
 import re
 import sys
 
+import numpy as np
 import yaml
+from scipy.spatial.transform import Rotation
 
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -93,6 +95,39 @@ def rpy_from_quaternion(q: tuple[float, float, float, float]) -> tuple[float, fl
     return roll, pitch, yaw
 
 
+def compose(parent: list[float], child: list[float]) -> list[float]:
+    """World pose of a child given in the parent's frame.
+
+    Both arguments are six-element SDF poses; the result is the child expressed in
+    the parent's parent.  Used to carry the module's measured seated pose, which
+    lives in the assembly frame, into the world through the fixture placement.
+    """
+
+    rotation = Rotation.from_euler("xyz", parent[3:6]).as_matrix()
+    child_rotation = Rotation.from_euler("xyz", child[3:6]).as_matrix()
+    position = rotation @ np.array(child[:3]) + np.array(parent[:3])
+    return [float(v) for v in position] + list(rpy_from_matrix(rotation @ child_rotation))
+
+
+def rpy_from_matrix(matrix) -> tuple[float, float, float]:
+    """SDF roll/pitch/yaw from a rotation matrix: R = Rz(yaw) Ry(pitch) Rx(roll)."""
+
+    pitch = -math.asin(max(-1.0, min(1.0, float(matrix[2, 0]))))
+    roll = math.atan2(float(matrix[2, 1]), float(matrix[2, 2]))
+    yaw = math.atan2(float(matrix[1, 0]), float(matrix[0, 0]))
+    return roll, pitch, yaw
+
+
+def derive_seated_pose(parameters: dict) -> list[float]:
+    """World pose of the seated module, from the fixture placement."""
+
+    insertion = parameters["insertion"]
+    assembly = list(insertion["assembly_seated_position_m"]) + list(
+        insertion["assembly_seated_rpy_rad"]
+    )
+    return compose(parameters["fixture"]["pose_world"], assembly)
+
+
 def format_pose(pose: list[float]) -> str:
     return " ".join(f"{float(value):.9f}" for value in pose)
 
@@ -146,6 +181,23 @@ def include_block(world_text: str, model_name: str) -> re.Match | None:
 
 
 def sync_world(parameters: dict, check_only: bool) -> int:
+    # The seated pose is derived, so refresh it before anything is compared.
+    expected_seated = derive_seated_pose(parameters)
+    recorded_seated = parameters["insertion"]["seated_pose_world"]
+    seated_stale = any(
+        abs(a - b) > 1e-9 for a, b in zip(expected_seated, recorded_seated)
+    )
+    if seated_stale:
+        if not check_only:
+            write_pose(parameters, "insertion", "seated_pose_world", expected_seated)
+            print("recomputed insertion.seated_pose_world from the fixture placement:")
+            print(f"  was {describe_pose(recorded_seated)}")
+            print(f"  now {describe_pose(expected_seated)}")
+        else:
+            print("insertion.seated_pose_world is stale:")
+            print(f"  recorded {describe_pose(recorded_seated)}")
+            print(f"  derived  {describe_pose(expected_seated)}")
+
     world_text = WORLD.read_text(encoding="utf-8")
     updated = world_text
     drift = []
@@ -161,6 +213,9 @@ def sync_world(parameters: dict, check_only: bool) -> int:
             updated = updated[: match.start(1)] + expected + updated[match.end(1) :]
 
     if not drift:
+        if seated_stale and check_only:
+            print("\nseated pose needs recomputing; run without --check to fix")
+            return 1
         print("task world poses already match the config")
         return 0
 
@@ -230,8 +285,11 @@ def main() -> int:
         ):
             print(f"{model}  ({section}.{key})")
             print(f"  {describe_pose(parameters[section][key])}")
-        print("\ninsertion.seated_pose_world is measured from the SolidWorks assembly")
-        print("and is not a placement; it is not settable here.")
+        print("\ninsertion.seated_pose_world  (derived: fixture.pose_world x assembly pose)")
+        print(f"  {describe_pose(derive_seated_pose(parameters))}")
+        recorded = parameters["insertion"]["seated_pose_world"]
+        if any(abs(a - b) > 1e-9 for a, b in zip(derive_seated_pose(parameters), recorded)):
+            print("  WARNING: the recorded value is stale; run without --print to fix")
         return 0
 
     if arguments.target:

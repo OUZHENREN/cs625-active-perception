@@ -79,7 +79,19 @@ cs625_task_scene:
       # of the fixture: length + recess + approach clearance.
       travel_m: 0.546
       approach_clearance_m: 0.020
-      seated_pose_world: [-0.571270706, -0.208500000, 0.263406559, 2.949536623, 0.000000002, -1.570796323]
+      # The MEASURED invariant: the module's seated pose in the SolidWorks
+      # assembly frame, which is also the fixture model's own frame.  Recovered by
+      # matching triangle signatures against the export and confirmed to 0.03 um
+      # at every vertex, so it is data, not a choice.
+      #
+      # seated_pose_world below is DERIVED from this and the fixture pose, because
+      # moving the fixture moves the seating with it.  sync_task_world.py
+      # recomputes it on every run; do not hand-edit the derived value.
+      assembly_seated_position_m: [0.148045200, 0.208500000, -0.014311400]
+      assembly_seated_rpy_rad: [-0.104720000, 0.0, 1.570796327]
+      # Derived: fixture.pose_world composed with the assembly pose above.
+      # DERIVED - do not hand-edit; sync_task_world.py recomputes it.
+      seated_pose_world: [1.078969349, 0.318771844, 0.298992431, 2.956832883, -0.031491578, -1.998270775]
 
     # --- payload budget ----------------------------------------------------
     # CS625 rated payload is 25 kg.  With the real tool mass the end effector

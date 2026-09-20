@@ -150,3 +150,35 @@ def test_describe_pose_reports_both_notations():
 
 def test_world_and_config_agree_today():
     assert sync_task_world.sync_world(sync_task_world.load_parameters(), check_only=True) == 0
+
+
+def test_seated_pose_is_derived_from_the_fixture_placement():
+    """Moving the fixture must move the seating with it.
+
+    The seated pose was recorded once for a fixture at (-0.72, 0, 0.262) and then
+    stayed frozen when the fixture was dragged, which is a 1.7 m error: the module
+    would be planned into a fixture that is no longer there.  This pins the
+    derivation so it cannot go stale again.
+    """
+
+    parameters = sync_task_world.load_parameters()
+    derived = sync_task_world.derive_seated_pose(parameters)
+    recorded = parameters["insertion"]["seated_pose_world"]
+    for expected, observed in zip(derived, recorded):
+        assert observed == pytest.approx(expected, abs=1e-9)
+
+    # The derivation must actually respond to the fixture pose.
+    moved = sync_task_world.load_parameters()
+    moved["fixture"]["pose_world"][0] += 0.25
+    shifted = sync_task_world.derive_seated_pose(moved)
+    assert shifted[0] - derived[0] == pytest.approx(0.25, abs=1e-9)
+
+    # And composition is associative against a hand-built transform: with the
+    # fixture at identity the seated pose is the assembly pose itself.
+    identity = sync_task_world.load_parameters()
+    identity["fixture"]["pose_world"] = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    assert sync_task_world.derive_seated_pose(identity) == pytest.approx(
+        list(identity["insertion"]["assembly_seated_position_m"])
+        + list(identity["insertion"]["assembly_seated_rpy_rad"]),
+        abs=1e-9,
+    )
