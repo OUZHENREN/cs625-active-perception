@@ -808,3 +808,64 @@ flange_to_eef_joint 的 0.353 m 偏移    师兄那套工具的安装长度，�
 camera_mount_xyz / rpy                 相机外参占位值
 指关节行程 0..0.040 m                  实物是 0.00257 m 预紧撑紧
 ```
+
+---
+
+## 十八、补充：真实夹爪挂到法兰上（B 方案完成）
+
+用户导出了 `夹持机构0920.STL`——与 `夹持机构0228.STL` **同一个刚体**，
+但坐标系直接定义在**法兰系**。这解掉了自"夹爪第一次测量"以来一直悬着的阻塞项。
+
+### 18.1 坐标系确认（不是假设，是量出来的）
+
+```text
+X ∈ [-147.285,  147.285] mm   对称到 0.000 mm
+Y ∈ [  -35.000,  50.000] mm
+Z ∈ [   -7.000, 207.000] mm   0 是安装面；-7 是定位凸台，+207 是工具前端
+```
+
+**ICP 与 0228 对齐的结果**：中位 0.035 µm、最大 0.068 µm、**全部样本 < 1 µm**
+——两者是精确刚体变换下的同一物体，所以新坐标系可信。
+
+### 18.2 撤掉的 353 mm 偏移：属于师兄的工具
+
+`tool0_vision.STL` 与真实夹爪**不是同一个物体**：
+
+| | tool0_vision.STL（师兄） | 夹持机构0920（你的） |
+|---|---|---|
+| 尺寸 | 177 × 240 × 214 mm | **294.6 × 85 × 214 mm** |
+| 格式 | **ASCII，50 MB** | 二进制，1.4 MB |
+| 三角形 | 183 373 | 185 896 → 减面后 27 883 |
+| 自身 Z 范围 | −360 ~ −146 mm（远离原点） | −7 ~ +207 mm（原点即安装面） |
+
+师兄网格自身偏离原点 146~360 mm，**这正是 `-0.046 0 0.353` 那个偏移的来源**。
+
+### 18.3 改动
+
+```text
+my_end_effector_link  visual/collision  -> cs625_ap_description/meshes/tool/gripper_0920.stl
+my_end_effector_link  inertial          -> mass 4.580 kg, CoM (-0.0001, 0.0141, 0.1096) m
+                                          惯量由零件系旋转到法兰系
+flange_to_eef_joint   origin            -> 0 0 0   （改前 -0.046 0 0.353）
+占位夹爪 link 质量                       -> 4.20/0.19/0.19 kg 改为各 1 g（避免重复计入）
+CMakeLists                              -> install(DIRECTORY urdf meshes ...)
+```
+
+**FK 验证**：`flange -> my_end_effector_link` 距离由 **356.0 mm 变为 0.000 mm**。
+
+**未受影响**：SRDF 的 tip（仍是 `my_end_effector_link`）、P7 契约、`ros2_control`
+条目、两个指关节——只改了网格和一处固定关节原点。
+
+减面：185 896 → 27 883 面，**体积偏差 0.0000%**。
+
+### 18.4 通过 / 失败
+
+```text
+ICP 对齐（0.035 µm 中位，100% < 1 µm）      PASS
+xacro 展开                                 PASS（22 links / 21 joints）
+flange -> eef = 0.000 mm                   PASS
+python3 test/contract_checks.py            PASS
+test_task_scene_applier                    5 passed
+Gazebo 里真实夹爪的目视确认                PENDING
+相机传感器位置                             PENDING（仍是占位外参）
+```
