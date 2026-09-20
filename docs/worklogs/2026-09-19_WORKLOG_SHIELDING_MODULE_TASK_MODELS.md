@@ -946,3 +946,52 @@ python3 test/contract_checks.py   PASS
 test_task_scene_applier           5 passed
 相机真机对应件                    未知（用户需查找），传感器仍是占位外参
 ```
+
+---
+
+## 二十、补充：场景摆放的读取与保存工具
+
+用户问"如何保存当前位置信息"。Gazebo **不会把拖动写回 SDF 文件**，所以"保存"
+必然是两步：**从界面读出位姿 → 写进配置**。`scripts/sync_task_world.py` 现在
+两半都管。
+
+### 20.1 用法
+
+```bash
+# 看当前记录的位姿（RPY 与四元数都给）
+python3 scripts/sync_task_world.py --print
+
+# 把从 Gazebo 右侧 Pose 面板读到的数写进配置，并同步世界
+python3 scripts/sync_task_world.py --set fixture \
+    --position -0.720 0.000 0.262063 --rpy-deg 180 5.004 0
+python3 scripts/sync_task_world.py --set module \
+    --position 0.450 0.450 0.221264 --quat 0.70385 -0.70385 -0.06780 0.06780
+
+# 两者必须一致，契约检查会强制
+python3 scripts/sync_task_world.py            # 世界跟上配置
+python3 scripts/sync_task_world.py --check    # 只报告不一致
+python3 test/contract_checks.py               # 应通过
+```
+
+`--set` 同时接受 `--rpy-deg`（度）和 `--quat`（四元数），因为 Gazebo 的 Pose
+面板两种记法都可能显示；`--print` 两种都打印，方便对照。
+
+`insertion.seated_pose_world` **刻意不可设置**——它是从 SolidWorks 装配体量出来的，
+是夹具变换的推论而非选择。
+
+### 20.2 Gazebo 侧怎么读数
+
+Entity Tree 里点模型 → 右侧面板展开 `Pose`。位置显示在父坐标系下，
+这两个模型的父坐标系就是 `world`，所以数字可以直接抄。
+
+### 20.3 验证
+
+```text
+test_sync_task_world.py                     5 passed
+  - RPY 约定对着解析构造的 Rz(yaw)Ry(pitch)Rx(roll) 验证（不是照抄实现）
+  - 四元数往返（三个单轴 + 一个混合）
+  - 记录的夹具/弹仓位姿仍是校平后的值
+端到端：--set 改值 -> --check 报一致 -> 还原 -> 全链通过
+python3 test/contract_checks.py             PASS
+test_sync_task_world + test_task_scene_applier  10 passed
+```
