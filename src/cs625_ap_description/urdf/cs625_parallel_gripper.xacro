@@ -17,15 +17,18 @@
       - the payload budget counts this mass.
     Removing the links would break all four, so only the geometry is gone.
 
-    Mass 4.20 + 2 x 0.19 = 4.580 kg matches the measured 夹持机构0228.  The
-    finger stroke below (0..0.040 m) is still a placeholder; the real tool braces
-    its handles with 0.00257 m of preload.  See config/cs625_task_scene.yaml.
+    Masses here are 1 g placeholders.  The measured 4.580 kg of 夹持机构0228 now
+    lives on my_end_effector_link, where the real mesh is; leaving it here as well
+    would count the tool twice.  The finger stroke below (0..0.040 m) is still a
+    placeholder: the real tool braces its handles with 0.00257 m of preload.  See
+    config/cs625_task_scene.yaml.
   -->
   <xacro:macro name="cs625_parallel_gripper" params="parent prefix">
     <link name="${prefix}gripper_base_link">
       <!-- placeholder box removed: 0.080 0.090 0.050 m -->
-      <inertial><mass value="4.20"/><inertia ixx="0.00336" ixy="0" ixz="0" iyy="0.00286" iyz="0" izz="0.00470"/></inertial>
-      <!-- 4.20 + 2 x 0.19 = 4.580 kg, the measured 夹持机构0228 mass. -->
+      <inertial><mass value="0.001"/><inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/></inertial>
+      <!-- Massless placeholder: the real 4.580 kg now sits on my_end_effector_link,
+           where the real mesh is.  Keeping it here too would double-count it. -->
     </link>
     <joint name="${prefix}tool0_to_gripper_base" type="fixed">
       <parent link="${parent}"/><child link="${prefix}gripper_base_link"/>
@@ -34,7 +37,7 @@
 
     <link name="${prefix}gripper_right_finger_link">
       <!-- placeholder box removed: 0.090 0.014 0.070 m -->
-      <inertial><origin xyz="0.045 0 0"/><mass value="0.19"/><inertia ixx="0.000095" ixy="0" ixz="0" iyy="0.0001425" iyz="0" izz="0.0001425"/></inertial>
+      <inertial><origin xyz="0.045 0 0"/><mass value="0.001"/><inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/></inertial>
     </link>
     <joint name="${prefix}gripper_right_finger_joint" type="prismatic">
       <parent link="${prefix}gripper_base_link"/><child link="${prefix}gripper_right_finger_link"/>
@@ -44,7 +47,7 @@
 
     <link name="${prefix}gripper_left_finger_link">
       <!-- placeholder box removed: 0.090 0.014 0.070 m -->
-      <inertial><origin xyz="0.045 0 0"/><mass value="0.19"/><inertia ixx="0.000095" ixy="0" ixz="0" iyy="0.0001425" iyz="0" izz="0.0001425"/></inertial>
+      <inertial><origin xyz="0.045 0 0"/><mass value="0.001"/><inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/></inertial>
     </link>
     <joint name="${prefix}gripper_left_finger_joint" type="prismatic">
       <parent link="${prefix}gripper_base_link"/><child link="${prefix}gripper_left_finger_link"/>

@@ -177,7 +177,20 @@ cs625_task_scene:
         # single arm at X [122.3, 156.3].
         arm_body_negative_x: { x_mm: [-138.3, -18.3], volume_cm3: 160.571 }
         arm_body_positive_x: { x_mm: [ 122.3, 156.3], volume_cm3:  83.951 }
-        # NOT YET KNOWN, and it blocks mounting the tool on the arm: the
-        # transform from this part frame to tool0.  The existing xacro uses
-        # xyz="0.085 0 0" on tool0, which is a placeholder.
-        flange_to_part_frame: unknown
+        # RESOLVED.  The tool is now mounted from a second export,
+        # 夹持机构0920.STL, which SolidWorks wrote directly in the flange frame:
+        # X symmetric to 0.000 mm (-147.285..+147.285), Z from -7.0 (locating
+        # boss behind the face) to +207.0 (tool tip).  So my_end_effector_link
+        # carries the mesh with flange_to_eef_joint at identity, and the old
+        # -0.046 0 0.353 offset, which belonged to the senior's different tool,
+        # is gone.  The mesh lives in cs625_ap_description/meshes/tool/.
+        flange_frame_mesh: "cs625_ap_description/meshes/tool/gripper_0920.stl"
+        flange_frame_bounds_mm:
+          x: [-147.285, 147.285]
+          y: [-35.0, 50.0]
+          z: [-7.0, 207.0]
+        flange_frame_com_m: [-0.0001013, 0.0140800, 0.1095589]
+        # Mass now sits on my_end_effector_link; the placeholder gripper links
+        # were reduced to 1 g so the tool is not counted twice.
+        mass_on_link: my_end_effector_link
+        part_frame_mesh_retained: "cs625_simulation/assets/cs625_task/gripper_0228/meshes/gripper_0228.stl"

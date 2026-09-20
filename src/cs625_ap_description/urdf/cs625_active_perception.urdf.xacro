@@ -178,27 +178,46 @@
     <gazebo reference="$(arg prefix)gripper_right_finger_link"><gravity>false</gravity></gazebo>
   </xacro:if>
 
-  <!-- Preserved from the senior CS625 description so the existing MoveIt
-       SRDF group (tip=my_end_effector_link) remains usable. -->
+  <!-- The real tool, exported from SolidWorks in the FLANGE frame: the origin is
+       the mounting face, X is the gripper's symmetry axis, and +Z runs out along
+       the tool.  Two independent checks say so: X is symmetric to 0.000 mm
+       (-147.285 .. +147.285), and Z runs -7.0 mm (a locating boss behind the face)
+       to +207.0 mm.  The mesh is already in metres, so no scale attribute.
+
+       This replaces the senior's tool0_vision.STL, which was a DIFFERENT object
+       (177 x 240 x 214 mm against 294.6 x 85 x 214 mm), was an ASCII mesh of
+       50 MB with 183373 triangles, and sat 146..360 mm off its own origin, which
+       is where the old -0.046 0 0.353 joint offset came from.  The joint below is
+       therefore identity: the tool's own frame is the flange frame.
+
+       Inertia is the SolidWorks positive-tensor output, converted at 1e-6 and
+       rotated from the part frame into this one; the mass is the measured
+       4.580 kg.  The centre of mass X is -0.10 mm, which the symmetry check above
+       predicts.  The SRDF tip stays my_end_effector_link, so the group, the P7
+       contracts and the MoveIt configuration are untouched. -->
   <link name="$(arg prefix)my_end_effector_link">
     <visual>
       <geometry>
-        <mesh filename="file://$(find eli_cs_robot_description)/meshes/visual/tool0_vision.STL"
-              scale="0.001 0.001 0.001"/>
+        <mesh filename="file://$(find cs625_ap_description)/meshes/tool/gripper_0920.stl"/>
       </geometry>
       <material name="eef_color"><color rgba="0.75 0.75 0.75 1.0"/></material>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="file://$(find eli_cs_robot_description)/meshes/visual/tool0_collision.STL"
-              scale="0.001 0.001 0.001"/>
+        <mesh filename="file://$(find cs625_ap_description)/meshes/tool/gripper_0920.stl"/>
       </geometry>
     </collision>
+    <inertial>
+      <origin xyz="-0.0001013 0.0140800 0.1095589" rpy="0 0 0"/>
+      <mass value="4.580"/>
+      <inertia ixx="1.656126300e-02" ixy="4.500000000e-07" ixz="4.718400000e-05"
+               iyy="3.412100900e-02" iyz="-6.521470000e-04" izz="2.090739800e-02"/>
+    </inertial>
   </link>
   <joint name="$(arg prefix)flange_to_eef_joint" type="fixed">
     <parent link="$(arg prefix)flange"/>
     <child link="$(arg prefix)my_end_effector_link"/>
-    <origin xyz="-0.046 0 0.353" rpy="0 0 0"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
   <!-- Stable application frame used by the active-perception contract. -->

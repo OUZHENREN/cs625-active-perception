@@ -391,6 +391,7 @@ def main() -> int:
         ROOT / "test" / "test_task_scene_applier.py",
         src / "cs625_bringup" / "config" / "sim_controllers.yaml",
         src / "cs625_ap_description" / "urdf" / "cs625_parallel_gripper.xacro",
+        src / "cs625_ap_description" / "meshes" / "tool" / "gripper_0920.stl",
         ROOT / "scripts" / "bootstrap_humble.sh",
         ROOT / "scripts" / "build.sh",
         ROOT / "scripts" / "test.sh",
