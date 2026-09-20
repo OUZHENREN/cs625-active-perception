@@ -1257,3 +1257,73 @@ MoveIt 镜像脚本就绪，可随时运行
 相机真机对应件与安装外参   —— 待用户查找后补齐（RGB-D 整条契约挂在它上面）
 抓取模板                  —— 依赖上一条
 ```
+
+---
+
+## 二十六、补充：快捷启动更新 + 修正一条不可能工作的命令
+
+### 26.1 VS Code 任务从 9 个扩到 13 个
+
+`.vscode/tasks.json`（**被 .gitignore 忽略，不随仓库分发**）原有的 9 个任务里
+**没有任务场景的入口**。新增三个并重排：
+
+```text
+ 0  环境校验
+ 1  构建 overlay
+ 2  契约检查 + 单元测试（补入任务场景的两项测试）
+ 3  仿真底座（无头 + RViz）
+ 4  仿真底座（Gazebo GUI + 网格 + RViz）
+ 5  任务场景（插槽夹具 + 弹仓 + RViz）★主入口        ← 新增
+ 6  任务场景 - 摆放查看 / 一致性校验                  ← 新增
+ 7  任务场景 - MoveIt 场景镜像                        ← 新增
+ 8  任务场景 - 镜像干跑（只打印）                     ← 新增
+ 9  仿真主动感知流水线
+10  真机底座 - fake hardware
+11  真机底座 - 真驱动
+12  启动 DSH Harness
+```
+
+任务 5 在 launch 前先跑 `sync_task_world.py --check`：配置与世界不一致时**直接
+不启动**，避免起来一个错的场景。
+
+### 26.2 修正：`ros2 run` 找不到这个脚本
+
+```text
+错的: ros2 run cs625_bringup apply_task_scene.py --seated-module
+      -> "No executable found"
+
+对的: python3 src/cs625_bringup/scripts/apply_task_scene.py --seated-module
+```
+
+`apply_task_scene.py` 装在 **`share/cs625_bringup/scripts/`**，而 `ros2 run` 只认
+**`lib/<pkg>/`** 里的 ROS 可执行文件。launch 文件一直是对的
+（`FindExecutable("python3")` + share 路径），错的是**脚本文档和两个 VS Code 任务**。
+三处都已改正，并在脚本文档里写明了原因。
+
+### 26.3 README 补上任务场景（仓库内入口）
+
+`.vscode/` 不随仓库分发，所以 README 才是新克隆能看到的入口。新增一节：
+
+```text
+任务场景（插槽夹具 + 弹仓）
+  · ros2 launch cs625_bringup sim_task_scene.launch.py 及其行为
+  · 为什么强制 launch_fixture_world:=false
+  · 场景几何的唯一权威是 config/cs625_task_scene.yaml
+  · --print / --check / --set 的用法
+  · Pose 面板 2 位小数的精度警告
+  · seated_pose_world 是派生量、不可直接设置
+  · 为什么用 python3 而不是 ros2 run
+```
+
+README 内部链接已逐个校验，**全部解析通过**。
+
+### 26.4 通过 / 失败
+
+```text
+tasks.json JSON 合法（13 个任务）                     PASS
+任务里引用的 10 个文件全部存在                        PASS
+非 launch 命令逐条实跑                                PASS
+README 内部链接逐个解析                               PASS
+python3 test/contract_checks.py                       PASS
+test_task_scene_applier                              6 passed
+```
