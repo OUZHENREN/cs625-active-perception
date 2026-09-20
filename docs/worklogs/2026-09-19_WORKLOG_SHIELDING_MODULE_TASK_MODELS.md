@@ -755,3 +755,56 @@ test_task_scene_applier               5 passed
 夹具/弹仓最终朝向                     PENDING（待用户目视）
 摆放位置（用户箭头所指）              PENDING（需用户给出世界坐标）
 ```
+
+---
+
+## 十七、补充：删除幽灵夹爪与相机方块
+
+### 17.1 定位过程（两次猜错，第三次才问对）
+
+上一轮我把 Entity Tree 里的 `*_fixed_joint_jump__*` 名字当成层级错误，
+推断"353 mm 遗留偏移是师兄的工具、应当删除"。用户指出图里那块
+（`tool0_vision.STL`）**就是他自己的夹爪和相机**，所以那个推断是反的。
+
+**判据**：`tool0_vision.STL` / `tool0_collision.STL` 是 `my_end_effector_link`
+的网格，其中同时包含夹爪和相机；而 `cs625_parallel_gripper.xacro` 里的
+80×90×50 本体 + 90×14×70 手指，和 `cs625_camera_extension.xacro` 里的
+30×50×20 相机方块，**都是本仓库自己建的占位体**，于是在真实工具旁边画出了
+第二个幽灵工具。
+
+**教训**：`*_fixed_joint_jump__*` 是 Gazebo 固定关节合并的正常命名，不是错误。
+判断"哪个是真实工具"要问用户，不能从名字或偏移量推断。
+
+### 17.2 改法：只删几何，保留 link
+
+直接删 link 会打断四处引用：
+
+```text
+cs625_active_perception.srdf      disable_collisions 里点名这些 link
+sim_controllers.yaml              驱动 gripper_right_finger_joint
+test/apply_task_fixture_scene.py  FINGER_LINKS 按名字取
+config/cs625_task_scene.yaml      payload 预算计入这些质量
+```
+
+所以保留 link、关节、inertial、ros2_control 条目和 `rgbd_camera` 传感器
+（整条 RGB-D 契约都挂在 `camera_link` 及其光学坐标系上），**只删除
+`<visual>` 与 `<collision>` 的 box 几何**。
+
+### 17.3 验证
+
+```text
+xacro 展开                    OK，仍是 22 links / 21 joints
+带几何的 link                 仅 7 个臂网格 + my_end_effector_link
+夹爪/相机/p7 link             全部保留
+指关节 + ros2_control 接口     全部保留
+python3 test/contract_checks.py   PASS
+test_task_scene_applier + p7_fixture_grasp_scene   8 passed
+```
+
+### 17.4 仍是占位、且对本任务不正确（记录而非隐藏）
+
+```text
+flange_to_eef_joint 的 0.353 m 偏移    师兄那套工具的安装长度，未核实
+camera_mount_xyz / rpy                 相机外参占位值
+指关节行程 0..0.040 m                  实物是 0.00257 m 预紧撑紧
+```
