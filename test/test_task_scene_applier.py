@@ -18,6 +18,8 @@ sys.path.insert(
 )
 from apply_task_scene import (  # noqa: E402
     FIXTURE_OBJECT_ID,
+    derive_seated_pose,
+    seated_pose_is_stale,
     MODULE_SEATED_OBJECT_ID,
     PLANNING_FRAME,
     describe,
@@ -129,3 +131,25 @@ def test_describe_reports_one_line_per_collision_object():
     assert len(lines) == 2
     assert any(FIXTURE_OBJECT_ID in line for line in lines)
     assert any(MODULE_SEATED_OBJECT_ID in line for line in lines)
+
+
+def test_derived_seated_pose_matches_the_sync_tool():
+    """The applier and sync_task_world.py must compose poses identically.
+
+    The two derive the world seated pose independently -- the applier cannot
+    import from the repository's scripts/ directory once installed -- so the
+    duplication is asserted rather than trusted.
+    """
+
+    import importlib.util
+
+    script = pathlib.Path(__file__).resolve().parents[1] / "scripts/sync_task_world.py"
+    spec = importlib.util.spec_from_file_location("sync_task_world", script)
+    sync_task_world = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sync_task_world)
+
+    parameters = load_task_parameters()
+    assert derive_seated_pose(parameters) == pytest.approx(
+        sync_task_world.derive_seated_pose(parameters), abs=1e-12
+    )
+    assert not seated_pose_is_stale(parameters)[0]

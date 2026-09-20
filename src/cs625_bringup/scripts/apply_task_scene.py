@@ -29,6 +29,7 @@ import sys
 import time
 
 import numpy as np
+from scipy.spatial.transform import Rotation
 
 import rclpy
 import yaml
@@ -115,6 +116,43 @@ def read_binary_stl(path: pathlib.Path) -> np.ndarray:
         )
     records = np.frombuffer(body, dtype=np.dtype([("d", "<12f4"), ("attr", "<u2")]))
     return records["d"][:, 3:12].reshape(-1, 3, 3).astype(np.float64)
+
+
+def compose(parent: list[float], child: list[float]) -> list[float]:
+    """World pose of a child given in the parent's frame; both are SDF poses.
+
+    Kept in step with scripts/sync_task_world.py, which derives the seated pose the
+    same way.  test_task_scene_applier.py asserts the two agree, so the duplication
+    cannot drift.
+    """
+
+    rotation = Rotation.from_euler("xyz", parent[3:6]).as_matrix()
+    child_rotation = Rotation.from_euler("xyz", child[3:6]).as_matrix()
+    product = rotation @ child_rotation
+    pitch = -math.asin(max(-1.0, min(1.0, float(product[2, 0]))))
+    rpy = (
+        math.atan2(float(product[2, 1]), float(product[2, 2])),
+        pitch,
+        math.atan2(float(product[1, 0]), float(product[0, 0])),
+    )
+    return [float(v) for v in rotation @ np.array(child[:3]) + np.array(parent[:3])] + list(rpy)
+
+
+def derive_seated_pose(parameters: dict) -> list[float]:
+    insertion = parameters["insertion"]
+    assembly = list(insertion["assembly_seated_position_m"]) + list(
+        insertion["assembly_seated_rpy_rad"]
+    )
+    return compose(parameters["fixture"]["pose_world"], assembly)
+
+
+def seated_pose_is_stale(parameters: dict) -> tuple[bool, list[float]]:
+    expected = derive_seated_pose(parameters)
+    recorded = parameters["insertion"]["seated_pose_world"]
+    return (
+        any(abs(a - b) > 1e-9 for a, b in zip(expected, recorded)),
+        expected,
+    )
 
 
 def load_task_parameters(config_path: pathlib.Path | None = None) -> dict:
@@ -277,11 +315,31 @@ def main() -> int:
         help="also add the module at its seated pose as a collision object",
     )
     parser.add_argument("--timeout-sec", type=float, default=10.0)
+    parser.add_argument(
+        "--allow-stale-seated",
+        action="store_true",
+        help="publish even if insertion.seated_pose_world is out of date",
+    )
     arguments = parser.parse_args()
 
     parameters = load_task_parameters(
         pathlib.Path(arguments.task_scene_config) if arguments.task_scene_config else None
     )
+
+    if arguments.seated_module:
+        stale, expected = seated_pose_is_stale(parameters)
+        if stale and not arguments.allow_stale_seated:
+            print(
+                "REFUSING to publish a stale seated pose.\n"
+                "  config insertion.seated_pose_world is out of date with the\n"
+                "  fixture placement, so the module would be collided against a\n"
+                "  fixture that is no longer where it was.\n"
+                "  fix: python3 scripts/sync_task_world.py\n"
+                "  or pass --allow-stale-seated if that is genuinely intended.",
+                file=sys.stderr,
+            )
+            return 2
+
     if arguments.dry_run:
         for line in describe(parameters, arguments.seated_module):
             print(line)
