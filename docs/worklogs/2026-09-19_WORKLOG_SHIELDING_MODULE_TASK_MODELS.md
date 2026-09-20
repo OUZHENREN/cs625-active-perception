@@ -1327,3 +1327,80 @@ README 内部链接逐个解析                               PASS
 python3 test/contract_checks.py                       PASS
 test_task_scene_applier                              6 passed
 ```
+
+---
+
+## 二十七、补充：首次 RViz 目视后的三个修正
+
+用户报告：RViz 里只有架子没有光学元件、末端夹爪是红色的、底部有
+`DetachableJoint.cc:348 Child Link target_link could not be found` 警告。
+
+### 27.1 红色 = 假自碰撞（真问题）
+
+```
+my_end_effector_link  碰撞体 = 真实工具网格（294 x 85 x 214 mm，含支撑臂）
+gripper_left/right_finger_link  碰撞体 = 55 x 58 x 146 mm 的平板
+  -> 平板完全落在工具网格包围盒内（重叠 55 x 58 x 146 mm）
+  -> SRDF 的 14 条豁免里没有这一对
+  -> MoveIt 判定自碰撞 -> 所有视图把工具画成红色
+```
+
+先排除了 `Collision Enabled`（RViz 配置里是 `false`），也确认 SRDF **已有**
+`my_end_effector_link ↔ wrist_3_link` 豁免，所以不是法兰那处。
+
+补三条豁免（手指在任何关节值下都在工具体内，故 `reason="Never"`）：
+
+```xml
+my_end_effector_link <-> gripper_base_link         Adjacent
+my_end_effector_link <-> gripper_left_finger_link  Never
+my_end_effector_link <-> gripper_right_finger_link Never
+```
+
+SRDF 豁免从 14 条增到 **17 条**。
+
+### 27.2 RViz 没有光学元件 = 默认没镜像坐到底弹仓
+
+`task_scene_seated_module` 原来默认 `false`（我当时的理由是"那是规划目标不是固定
+世界几何"）。但对插入任务来说，坐到底位置**就是**要达到的目标，应该在 RViz 里
+看得见、也应该挡住穿模规划。**默认改为 `true`**。
+
+### 27.3 修正一次无效且会泄漏的 launch 参数
+
+关闭 P7 attachment 插件的第一次尝试是**错的**：
+
+```text
+我做的：  sim_task_scene 里传 launch_arguments={"p7_attachment_enabled": "false"}
+问题 1：  sim_base 并不声明这个参数 -> 传进去不生效（no-op）
+问题 2：  IncludeLaunchDescription 会把未声明的参数写成【全局】launch 配置
+          —— 正是 sim_base.launch.py 里已经记录过的那类泄漏
+实际机制：sim_control.launch.py 从【环境变量】CS625_P7_ATTACHMENT_ENABLED 读取
+```
+
+改为在 shell 层设置环境变量，并在 README 与 VS Code 任务里写明原因。
+**并且加了契约检查**：`sim_task_scene.launch.py` 里出现 `p7_attachment_enabled`
+就直接失败（已实测：加回去会报错，移除后通过）。
+
+### 27.4 通过 / 失败
+
+```text
+SRDF 合法，17 条 disable_collisions                     PASS
+契约检查（含新增的无效参数禁令）                        PASS
+  实测：把参数加回去 -> AssertionError；移除 -> PASS
+test_sync_task_world + test_task_scene_applier          12 passed
+README 内部链接                                         无断链
+实际 RViz 渲染（红色是否消失、弹仓是否出现）            PENDING（待用户确认）
+```
+
+### 27.5 一个仍未解决的建模问题
+
+手指平板**整体落在真实工具网格内部**，这意味着：
+
+```text
+· 真实接触几何来自【工具网格】，不是手指平板
+· 手指平板作为碰撞体是冗余的，作为可见几何也被网格挡住
+· 所以"手指张出"目前是【运动学占位】，不是物理接触模型
+```
+
+这与"零过盈"的决定一致——**抓取可靠性本来就不由本模型验证**。但若要让张开
+动作在视觉上可信，需要把支撑臂从工具网格里**分离出来**单独做 link。
+待用户决定是否值得做。
