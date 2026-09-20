@@ -16,7 +16,10 @@ import sys
 import pytest
 
 
-SCRIPT = pathlib.Path(__file__).resolve().parents[1] / "scripts/sync_task_world.py"
+HERE = pathlib.Path(__file__).resolve().parent
+SCRIPT = HERE.parent / "scripts/sync_task_world.py"
+sys.path.insert(0, str(HERE))
+from inspect_stl_mass_properties import read_binary_stl  # noqa: E402
 spec = importlib.util.spec_from_file_location("sync_task_world", SCRIPT)
 sync_task_world = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(sync_task_world)
@@ -83,21 +86,54 @@ def test_quaternion_round_trip_covers_all_axes():
             assert observed == pytest.approx(expected, abs=1e-9)
 
 
-def test_recorded_poses_are_the_levelled_placement():
+def world_bounds(model: str) -> tuple:
+    """Transformed AABB of a task model's mesh, from the recorded pose."""
+
+    import numpy as np
+    from scipy.spatial.transform import Rotation
+
     parameters = sync_task_world.load_parameters()
-    fixture = parameters["fixture"]["pose_world"]
-    module = parameters["module"]["home_pose_world"]
+    section, key = ("fixture", "pose_world") if model == "slot_fixture" else (
+        "module", "home_pose_world"
+    )
+    pose = parameters[section][key]
+    root = pathlib.Path(__file__).resolve().parents[1]
+    mesh = (
+        root / "src/cs625_simulation/assets/cs625_task" / model / "meshes" / f"{model}.stl"
+    )
+    triangles = read_binary_stl(mesh).reshape(-1, 3)
+    rotation = Rotation.from_euler("xyz", pose[3:6]).as_matrix()
+    points = (rotation @ triangles.T).T + np.array(pose[:3])
+    return points.min(0), points.max(0), rotation
 
-    # The fixture's base is down and its handles face the robot: R = Rx(180) . Ry(5.004).
-    assert fixture[0:3] == pytest.approx([-0.720, 0.0, 0.262063], abs=1e-5)
-    assert fixture[5] == pytest.approx(0.0)
-    assert fixture[4] == pytest.approx(math.radians(5.004), abs=1e-6)
-    assert fixture[3] == pytest.approx(math.pi, abs=1e-6)
 
-    # The module rests on the work surface, on the far side of the base.
-    assert module[0] == pytest.approx(0.450)
-    assert module[1] == pytest.approx(0.450)
-    assert module[2] == pytest.approx(0.221264, abs=1e-5)
+def test_recorded_placement_is_geometrically_sane():
+    """The placement is data the operator chooses, so pin invariants, not numbers.
+
+    Whatever pose is recorded, the two bodies must rest on the work surface, the
+    module must stand along its own axis, and the fixture and module must not
+    intersect.  Pinning the exact coordinates instead would fail every time the
+    scene is moved, which is a normal thing to do.
+    """
+
+    fixture_low, fixture_high, _ = world_bounds("slot_fixture")
+    module_low, module_high, module_rotation = world_bounds("shielding_module")
+
+    # On the work surface, or a few millimetres above it.
+    assert -0.005 <= fixture_low[2] <= 0.050
+    assert -0.005 <= module_low[2] <= 0.050
+
+    # The module stands upright: its own +Z within 2 degrees of world +Z.
+    upright = module_rotation @ [0.0, 0.0, 1.0]
+    assert math.degrees(math.acos(min(1.0, abs(upright[2])))) < 2.0
+
+    # The two bodies do not overlap.
+    overlap = [
+        min(fixture_high[axis], module_high[axis])
+        - max(fixture_low[axis], module_low[axis])
+        for axis in range(3)
+    ]
+    assert min(overlap) <= 0.0, f"fixture and module intersect: {overlap}"
 
 
 def test_describe_pose_reports_both_notations():

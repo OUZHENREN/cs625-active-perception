@@ -10,7 +10,7 @@ script owns both halves.
 
     # record a pose read from Gazebo's right-hand Pose panel, then sync the world
     python3 scripts/sync_task_world.py --set fixture \
-        --position -0.720 0.000 0.262063 --rpy-deg 180 5.004 0
+        --position -0.720 0.000 0.262063 --rpy-rad 3.141593 0.087336 0
     python3 scripts/sync_task_world.py --set module \
         --position 0.450 0.450 0.221264 --quat 0.70385 -0.70385 -0.06780 0.06780
 
@@ -187,7 +187,11 @@ def build_pose(arguments: argparse.Namespace) -> list[float]:
         raise SystemExit("ERROR: --position takes exactly three numbers")
     position = [float(value) for value in arguments.position]
 
-    if arguments.rpy_deg is not None:
+    if arguments.rpy_rad is not None:
+        if len(arguments.rpy_rad) != 3:
+            raise SystemExit("ERROR: --rpy-rad takes exactly three numbers")
+        rpy = [float(value) for value in arguments.rpy_rad]
+    elif arguments.rpy_deg is not None:
         if len(arguments.rpy_deg) != 3:
             raise SystemExit("ERROR: --rpy-deg takes exactly three numbers")
         rpy = [math.radians(float(value)) for value in arguments.rpy_deg]
@@ -196,7 +200,7 @@ def build_pose(arguments: argparse.Namespace) -> list[float]:
             raise SystemExit("ERROR: --quat takes exactly four numbers")
         rpy = list(rpy_from_quaternion(tuple(float(v) for v in arguments.quat)))
     else:
-        raise SystemExit("ERROR: --set requires --rpy-deg or --quat")
+        raise SystemExit("ERROR: --set requires --rpy-rad, --rpy-deg or --quat")
     return position + rpy
 
 
@@ -209,6 +213,8 @@ def main() -> int:
     parser.add_argument("--set", dest="target", choices=sorted(SETTABLE),
                         help="which placement to overwrite")
     parser.add_argument("--position", nargs=3, metavar=("X", "Y", "Z"))
+    parser.add_argument("--rpy-rad", nargs=3, metavar=("R", "P", "Y"),
+                        help="orientation as roll/pitch/yaw in radians, as Gazebo shows it")
     parser.add_argument("--rpy-deg", nargs=3, metavar=("R", "P", "Y"),
                         help="orientation as roll/pitch/yaw in degrees")
     parser.add_argument("--quat", nargs=4, metavar=("QX", "QY", "QZ", "QW"),
