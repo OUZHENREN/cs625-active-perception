@@ -133,26 +133,25 @@ cs625_task_scene:
       # the arms have that much room to enter before reaching the body.
       handle_protrusion_m: 0.0340
       approach_axis: "-Y"
-      # The gripper opens to 246.57 mm, 2.57 mm wider than the 244.00 mm gap it
-      # presses into.  Confirmed by the task owner as PRELOAD, not CAD mismatch:
-      # the arms deflect the handles outward by 1.285 mm per side and the grip
-      # force is therefore stiffness-driven, with no force setpoint.
+      # ZERO INTERFERENCE, chosen by the task owner.  The real tool closes with
+      # 2.57 mm of preload, which a rigid-body contact cannot reproduce honestly:
+      # it would either explode or leave the normal force to the solver.  The arms
+      # are therefore placed to close on exactly the handle inner span and the
+      # grip force is a known unknown, not a modelled quantity.
       #
-      # Simulation consequence, and it matters: a preloaded interference fit
-      # cannot be honestly reproduced by rigid-body contact.  The options are
-      #   (a) place the arms at exactly 244.00 mm and accept that the normal
-      #       force then comes only from the solver, i.e. approximately zero;
-      #   (b) represent the closed grasp with an attachment joint, which the
-      #       repository already has in cs625_task_orchestrator, and label it as
-      #       a mechanism diagnostic rather than physical grasping;
-      #   (c) model the arms compliantly.
-      # Decide before any episode depends on grip force.
-      interference_fit: preload
-      preload_per_side_m: 0.001285
-      preload_total_m: 0.00257
-      arm_span_open_m: 0.24657
+      # Consequence to state in any write-up: with no preload the simulated grasp
+      # holds by friction alone, so a 19 kg module may drop in simulation where the
+      # real preloaded brace would not.  Grasp reliability is therefore NOT
+      # validated by this model.
+      arm_travel_m: 0.020
+      arm_retracted_span_m: 0.204
+      arm_closed_span_m: 0.24400
+      interference_fit: none_zero_preload
+      preload_per_side_m: 0.0
+      preload_total_m: 0.0
+      arm_span_open_m: 0.24400
       arm_span_at_contact_m: 0.24400
-      gripper_urdf: "cs625_parallel_gripper.xacro (kinematics reused, geometry and scale wrong)"
+      gripper_urdf: "cs625_parallel_gripper.xacro (contact plane, travel axis and cross-section measured; linkage simplified)"
       # Measured from 夹持机构0228.STL, which the tool owner exported in metres.
       # My enclosed volume agrees with SolidWorks to 0.007% (1710.978 against
       # 1710.866 cm^3), so the mesh is the right part.  Its part frame is offset:

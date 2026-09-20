@@ -1,66 +1,109 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
   <!--
-    Application gripper FRAMES only.  This is an application extension: it never
-    edits the Elite CS625 underlay.
+    Two support arms that open OUTWARD along the tool's X axis, which is how the
+    real 夹持机构0228 braces the module's handles.
 
-    The box geometry that used to live here was a placeholder: a 0.080 x 0.090 x
-    0.050 palm with two 0.090 x 0.014 x 0.070 fingers.  It is not the real tool.
-    The real tool is the mesh on my_end_effector_link (tool0_vision.STL /
-    tool0_collision.STL), which carries both the gripper and the camera, so the
-    boxes were deleted to stop a phantom gripper floating next to the real one.
+    Geometry is measured, not invented.  In the flange frame the real arms are:
 
-    The links, the prismatic finger joints and the masses are KEPT on purpose:
+      left   arm  X [-147.31, -27.31]  Y [-9.03, 48.97]  Z [  4.0, 150.0] mm
+      right  arm  X [ 113.29, 147.29]  Y [-9.03, 48.97]  Z [  4.0, 150.0] mm
+
+    each 58 mm deep and 146 mm tall.  What matters for the grasp is the INNER
+    face: the module's handle inner span is 244.00 mm, so with zero interference
+    the arms close on +/-122.00 mm.  Each arm therefore starts retracted at
+    +/-102.00 mm and travels 20 mm outward to the contact plane.
+
+    These are NOT a model of the real linkage.  They are the real contact plane,
+    travel direction and cross-section carried by a simplified slab, so the
+    opening motion and the contact geometry are honest while the link and joint
+    names that four other files depend on survive:
+
       - cs625_active_perception.srdf names these links in disable_collisions,
       - sim_controllers.yaml drives gripper_right_finger_joint,
-      - test/apply_task_fixture_scene.py uses FINGER_LINKS by name,
-      - the payload budget counts this mass.
-    Removing the links would break all four, so only the geometry is gone.
+      - test/apply_task_fixture_scene.py uses FINGER_LINKS by name.
 
-    Masses here are 1 g placeholders.  The measured 4.580 kg of 夹持机构0228 now
-    lives on my_end_effector_link, where the real mesh is; leaving it here as well
-    would count the tool twice.  The finger stroke below (0..0.040 m) is still a
-    placeholder: the real tool braces its handles with 0.00257 m of preload.  See
-    config/cs625_task_scene.yaml.
+    Masses stay at 1 g: the measured 4.580 kg of the tool, mesh included, sits on
+    my_end_effector_link, and these links are its children, so counting them again
+    would double the tool.
+
+    ZERO INTERFERENCE was chosen deliberately.  The real tool closes with 2.57 mm
+    of preload, which a rigid-body contact cannot reproduce honestly: it would
+    either explode or, with the arms placed exactly at contact, leave the normal
+    force to the solver.  The second is what is modelled, and it is recorded as a
+    known limitation in config/cs625_task_scene.yaml rather than hidden.
   -->
   <xacro:macro name="cs625_parallel_gripper" params="parent prefix">
+    <!-- Frame at the tool mounting face.  Kept so the joint name survives. -->
     <link name="${prefix}gripper_base_link">
-      <!-- placeholder box removed: 0.080 0.090 0.050 m -->
-      <inertial><mass value="0.001"/><inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/></inertial>
-      <!-- Massless placeholder: the real 4.580 kg now sits on my_end_effector_link,
-           where the real mesh is.  Keeping it here too would double-count it. -->
+      <inertial>
+        <mass value="0.001"/>
+        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+      </inertial>
     </link>
     <joint name="${prefix}tool0_to_gripper_base" type="fixed">
-      <parent link="${parent}"/><child link="${prefix}gripper_base_link"/>
-      <origin xyz="0.085 0 0" rpy="0 0 0"/>
+      <parent link="${parent}"/>
+      <child link="${prefix}gripper_base_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
 
+    <!-- Right arm: outer face at joint x = 0, so the slab extends in -X. -->
     <link name="${prefix}gripper_right_finger_link">
-      <!-- placeholder box removed: 0.090 0.014 0.070 m -->
-      <inertial><origin xyz="0.045 0 0"/><mass value="0.001"/><inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/></inertial>
+      <visual>
+        <origin xyz="-0.0275 0 0"/>
+        <geometry><box size="0.055 0.058 0.146"/></geometry>
+        <material name="gripper_arm"><color rgba="0.55 0.55 0.58 1"/></material>
+      </visual>
+      <collision>
+        <origin xyz="-0.0275 0 0"/>
+        <geometry><box size="0.055 0.058 0.146"/></geometry>
+      </collision>
+      <inertial>
+        <origin xyz="-0.0275 0 0"/>
+        <mass value="0.001"/>
+        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+      </inertial>
     </link>
     <joint name="${prefix}gripper_right_finger_joint" type="prismatic">
-      <parent link="${prefix}gripper_base_link"/><child link="${prefix}gripper_right_finger_link"/>
-      <origin xyz="0.005 -0.018 0" rpy="0 0 0"/><axis xyz="0 -1 0"/>
-      <limit lower="0.0" upper="0.040" effort="80" velocity="0.10"/>
+      <parent link="${prefix}gripper_base_link"/>
+      <child link="${prefix}gripper_right_finger_link"/>
+      <!-- Retracted at 102.0 mm; 0.020 m of travel reaches 122.0 mm. -->
+      <origin xyz="0.102 0 0.077" rpy="0 0 0"/>
+      <axis xyz="1 0 0"/>
+      <limit lower="0.0" upper="0.020" effort="80" velocity="0.02"/>
     </joint>
 
+    <!-- Left arm: mirrored; outer face at joint x = 0, slab extends in +X. -->
     <link name="${prefix}gripper_left_finger_link">
-      <!-- placeholder box removed: 0.090 0.014 0.070 m -->
-      <inertial><origin xyz="0.045 0 0"/><mass value="0.001"/><inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/></inertial>
+      <visual>
+        <origin xyz="0.0275 0 0"/>
+        <geometry><box size="0.055 0.058 0.146"/></geometry>
+        <material name="gripper_arm_left"><color rgba="0.55 0.55 0.58 1"/></material>
+      </visual>
+      <collision>
+        <origin xyz="0.0275 0 0"/>
+        <geometry><box size="0.055 0.058 0.146"/></geometry>
+      </collision>
+      <inertial>
+        <origin xyz="0.0275 0 0"/>
+        <mass value="0.001"/>
+        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+      </inertial>
     </link>
     <joint name="${prefix}gripper_left_finger_joint" type="prismatic">
-      <parent link="${prefix}gripper_base_link"/><child link="${prefix}gripper_left_finger_link"/>
-      <origin xyz="0.005 0.018 0" rpy="0 0 0"/><axis xyz="0 1 0"/>
+      <parent link="${prefix}gripper_base_link"/>
+      <child link="${prefix}gripper_left_finger_link"/>
+      <origin xyz="-0.102 0 0.077" rpy="0 0 0"/>
+      <axis xyz="-1 0 0"/>
       <mimic joint="${prefix}gripper_right_finger_joint" multiplier="1.0" offset="0.0"/>
-      <limit lower="0.0" upper="0.040" effort="80" velocity="0.10"/>
+      <limit lower="0.0" upper="0.020" effort="80" velocity="0.02"/>
     </joint>
 
     <ros2_control name="${prefix}cs625_parallel_gripper" type="system">
       <hardware><plugin>gz_ros2_control/GazeboSimSystem</plugin></hardware>
       <joint name="${prefix}gripper_right_finger_joint">
         <command_interface name="position"/>
-        <state_interface name="position"><param name="initial_value">0.030</param></state_interface>
+        <state_interface name="position"><param name="initial_value">0.0</param></state_interface>
         <state_interface name="velocity"/><state_interface name="effort"/>
       </joint>
       <joint name="${prefix}gripper_left_finger_joint">

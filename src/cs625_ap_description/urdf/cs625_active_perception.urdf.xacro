@@ -230,18 +230,16 @@
 
   <xacro:cs625_parallel_gripper parent="$(arg prefix)tool0" prefix="$(arg prefix)"/>
 
-  <!-- Nominal cylindrical-object grasp centre between the two finger pads.
-       The pad volumes span x=0.005..0.095 m from gripper_base_link, while the
-       palm collision ends at x=0.040 m.  Placing the reference at x=0.080 m
-       leaves 6 mm clearance behind the 34 mm-radius tomato-can proxy; the old
-       pad-volume midpoint at x=0.050 m overlapped the palm and pushed the can.
-       The link is massless and collision-free and remains centred laterally
-       while the two prismatic fingers move symmetrically. -->
+  <!-- Grasp centre between the two support arms.  Massless and collision-free.
+       The arms are 146 mm tall centred on Z = 77 mm, so this frame sits at the
+       middle of the contact area on the tool axis. -->
   <link name="$(arg prefix)p7_grasp_center_link"/>
   <joint name="$(arg prefix)gripper_base_to_p7_grasp_center" type="fixed">
     <parent link="$(arg prefix)gripper_base_link"/>
     <child link="$(arg prefix)p7_grasp_center_link"/>
-    <origin xyz="0.080 0 0" rpy="0 0 0"/>
+    <!-- Between the two support arms, on the tool axis.  The old 0.080 m along X
+         was the placeholder jaw's pad centre and pointed along the wrong axis. -->
+    <origin xyz="0 0 0.077" rpy="0 0 0"/>
   </joint>
 
   <xacro:cs625_eye_in_hand_camera
