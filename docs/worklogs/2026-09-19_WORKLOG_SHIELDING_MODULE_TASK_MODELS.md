@@ -1109,3 +1109,47 @@ test_sync_task_world                            6 passed
 test_sync_task_world + test_task_scene_applier   11 passed
 --check 在位姿陈旧时退出 1                        PASS
 ```
+
+---
+
+## 二十三、补充：把同一类错误堵在 MoveIt 镜像那一侧
+
+第 22 节修的是**配置里的**陈旧坐到底位姿。但同一类错误在**运行时**仍然可达：
+`apply_task_scene.py` 直接信任 `insertion.seated_pose_world`，所以"改了夹具但忘了跑
+同步"就会把弹仓的坐到底碰撞体发到**夹具原来所在的位置**，MoveIt 于是在一个
+不存在的场景上做规划。
+
+### 23.1 修法
+
+```text
+--seated-module 时先重算：assembly 不变量 × 夹具位姿
+与配置记录值不一致 -> 打印原因并以 exit 2 拒绝发布
+--allow-stale-seated 可显式覆盖
+```
+
+实测：
+
+```text
+正常:              发布派生位姿 (1.079, 0.3188, 0.299) m，exit 0
+人为制造陈旧位姿:  exit 2，不发布，打印修复命令
+恢复后:            exit 0
+```
+
+### 23.2 关于重复实现
+
+`apply_task_scene.py` 装进 `cs625_bringup` 后**无法 import 仓库的 `scripts/`**，
+所以位姿复合逻辑在两处存在。**用测试管住重复**：
+
+```text
+test_task_scene_applier.py:
+  两份实现的结果一致到 1e-12
+  配置里的坐到底位姿不是陈旧值
+```
+
+### 23.3 通过 / 失败
+
+```text
+python3 test/contract_checks.py                        PASS
+test_task_scene_applier + test_sync_task_world         12 passed
+陈旧位姿防护                                           实测拦得住（exit 2）
+```
