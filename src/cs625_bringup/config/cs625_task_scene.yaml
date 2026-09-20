@@ -16,17 +16,18 @@ cs625_task_scene:
     # --- frames ---------------------------------------------------------
     # The fixture model and the measured seated pose share the SolidWorks
     # assembly frame, so this single transform places both.
-    # The assembly frame is turned 180 deg about world Y.  Two independent
-    # checks say so: the module's handles map to assembly +X and must face the
-    # robot, and assembly +Z points down, so without the turn the seated module
-    # protrudes 19.3 mm BELOW the fixture, i.e. through the floor.
-    assembly_origin_world: [-0.720000000, 0.000000000, 0.277737000]
-    assembly_rpy_world: [0.000000000, -0.087336276, 0.000000000]
+    # Assembly -> world is Rx(180 deg) * Ry(+5.004 deg).  Three measured facts
+    # pin it down: the arm's zero pose reaches -X so the task is at -X; the
+    # module's handles are on assembly +X and must face the robot; and the
+    # fixture's wide end, its base, is at assembly +Z and must point down.
+    # The Ry term levels a real 5.004 deg tilt of the whole fixture about its
+    # own Y axis.  See the world file header for the measurements.
+    assembly_rpy_world: [3.141592654, 0.087336276, 0.000000000]
 
     # --- fixture (static) ------------------------------------------------
     fixture:
       model_uri: "model://cs625_task/slot_fixture"
-      pose_world: [-0.720000000, 0.000000000, 0.277737000, 0.000000000, -0.087336276, 0.000000000]
+      pose_world: [-0.720000000, 0.000000000, 0.262062974, 3.141592654, 0.087336276, 0.000000000]
       mass_kg: 12.965
       slot_is_wedge: true
       # Measured clearance from the module faces to the wall, along the
@@ -62,7 +63,7 @@ cs625_task_scene:
         Lyy: 789151666.61, Lyz: -4086532.08,  Lzz: 434974118.21,
       }
       # Initial pose: upright on the work surface, clear of the fixture.
-      home_pose_world: [0.450000000, 0.450000000, 0.248593000, -0.087336276, -0.000000000, 1.570796327]
+      home_pose_world: [0.450000000, 0.450000000, 0.221263997, 3.054256378, -0.000000000, -1.570796327]
 
     # --- insertion ---------------------------------------------------------
     insertion:
@@ -78,7 +79,7 @@ cs625_task_scene:
       # of the fixture: length + recess + approach clearance.
       travel_m: 0.546
       approach_clearance_m: 0.020
-      seated_pose_world: [-0.571270706, 0.208500000, 0.276393416, -0.192056030, -0.000000002, 1.570796323]
+      seated_pose_world: [-0.571270706, -0.208500000, 0.263406559, 2.949536623, 0.000000002, -1.570796323]
 
     # --- payload budget ----------------------------------------------------
     # CS625 rated payload is 25 kg.  With the real tool mass the end effector
