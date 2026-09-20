@@ -197,6 +197,11 @@ def check_environment_contract() -> None:
         )
 
 
+# sim_control reads the P7 attachment switch from the environment, so passing it
+# as an include argument would be a no-op that IncludeLaunchDescription also turns
+# into a global launch configuration -- the leak documented in sim_base.launch.py.
+TASK_SCENE_FORBIDDEN_ARGS = ("p7_attachment_enabled",)
+
 TASK_SCENE_CONFIG = pathlib.Path("src/cs625_bringup/config/cs625_task_scene.yaml")
 TASK_SCENE_WORLD = pathlib.Path("src/cs625_simulation/worlds/cs625_insertion_scene.sdf")
 TASK_MODULE_SDF = pathlib.Path(
@@ -325,6 +330,18 @@ def check_cs625_task_scene() -> None:
     outer_span = abs(ranges[0][0] - ranges[1][1])
     if abs(outer_span - float(grasp["handle_outer_span_m"])) > 1e-9:
         fail("grasp handle_outer_span_m disagrees with handle_x_ranges_m")
+
+    # 4b) The task launch must not pass arguments sim_base does not declare.
+    launch_text = (
+        ROOT / "src/cs625_bringup/launch/sim_task_scene.launch.py"
+    ).read_text(encoding="utf-8")
+    for forbidden in TASK_SCENE_FORBIDDEN_ARGS:
+        if f'"{forbidden}"' in launch_text:
+            fail(
+                f"sim_task_scene.launch.py passes {forbidden!r}, which sim_base does "
+                "not declare: the include would ignore it and leak it globally. "
+                "Use the environment variable instead."
+            )
 
     # 5) Every declared model must have its config, SDF and mesh on disk.
     for model_name, section in (

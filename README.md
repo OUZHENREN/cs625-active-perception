@@ -74,11 +74,20 @@ Gazebo 实体默认由**无网格**模型生成，因此 Gazebo 窗口里看不�
 
 ```bash
 source scripts/source_dev_env.sh
-ros2 launch cs625_bringup sim_task_scene.launch.py
+CS625_P7_ATTACHMENT_ENABLED=false \
+  ros2 launch cs625_bringup sim_task_scene.launch.py
 ```
 
 它组合 `sim_base`，把世界换成 `cs625_insertion_scene.sdf`，并强制
 `launch_fixture_world:=false`（那个通用 RGB-D 夹具世界是第二个 Gazebo 实例）。
+
+> `CS625_P7_ATTACHMENT_ENABLED=false` 关掉 P7 的 attachment 插件。它挂在
+> `wrist_3_link` 上、去找名叫 `target_object`/`target_link` 的模型，而本任务世界
+> 里叫 `shielding_module`，所以插件只会打一条 `DetachableJoint ... could not be
+> found` 的警告。**这个开关必须用环境变量给**——`sim_control.launch.py` 是从
+> 环境读的，而 `sim_base` 并不声明这个 launch 参数；当成 include 参数传进去既不
+> 生效、又会被 `IncludeLaunchDescription` 泄漏成全局配置。
+> `test/contract_checks.py` 现在会拦截这种写法。
 启动约 20 秒后会自动把静态夹具和“坐到底”的弹仓镜像进 MoveIt 的 planning
 scene——不做这一步，规划器会把机械臂直接穿过夹具。
 

@@ -36,4 +36,13 @@
   <disable_collisions link1="gripper_base_link" link2="gripper_left_finger_link" reason="Adjacent"/>
   <disable_collisions link1="gripper_base_link" link2="gripper_right_finger_link" reason="Adjacent"/>
   <disable_collisions link1="gripper_left_finger_link" link2="gripper_right_finger_link" reason="Never"/>
+  <!-- my_end_effector_link carries the REAL tool mesh, which already contains the
+       support arms.  The two finger links are kinematic placeholders that sit
+       inside that mesh, so without these pairs MoveIt reports a self-collision and
+       every view of the robot draws the tool in red.  They can never legitimately
+       collide: the slabs span +/-102..147 mm and the mesh spans +/-147 mm, so the
+       fingers stay inside the body at any joint value. -->
+  <disable_collisions link1="my_end_effector_link" link2="gripper_base_link" reason="Adjacent"/>
+  <disable_collisions link1="my_end_effector_link" link2="gripper_left_finger_link" reason="Never"/>
+  <disable_collisions link1="my_end_effector_link" link2="gripper_right_finger_link" reason="Never"/>
 </robot>

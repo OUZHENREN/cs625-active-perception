@@ -12,7 +12,7 @@ Relevant overrides:
     task_world:=<path>              SDF world (default cs625_insertion_scene.sdf)
     task_scene_config:=<path>       cs625_task_scene.yaml, the geometry authority
     apply_task_scene:=false         skip the planning-scene mirror
-    task_scene_seated_module:=false only mirror the fixture, not the seated module
+    task_scene_seated_module:=true  also mirror the seated module (default on)
     gazebo_visuals:=true            draw the arm meshes in the Gazebo GUI
 """
 
@@ -95,6 +95,11 @@ def generate_launch_description() -> LaunchDescription:
             actions.append(
                 LogInfo(
                     msg=(
+                        "note: sim_control reads the P7 attachment switch from the "
+                        "environment, not from a launch argument.  This world has no "
+                        "target_object/target_link, so DetachableJoint logs a warning "
+                        "and stays inert; silence it with "
+                        "CS625_P7_ATTACHMENT_ENABLED=false before launching.\n"
                         "task scene mirror scheduled in "
                         f"{FIXTURE_SCENE_DELAY_SEC:.0f} s: {' '.join(str(part) for part in command)}"
                     )
@@ -134,10 +139,12 @@ def generate_launch_description() -> LaunchDescription:
             ),
             DeclareLaunchArgument(
                 "task_scene_seated_module",
-                default_value="false",
+                default_value="true",
                 description=(
-                    "Also mirror the module at its seated pose.  Off by default "
-                    "because that body is a planning goal, not fixed world geometry."
+                    "Also mirror the module at its seated pose, which is what the "
+                    "insert has to reach.  On by default so the goal is visible in "
+                    "RViz and cannot be planned through; turn it off if the module "
+                    "should only exist as a free body in Gazebo."
                 ),
             ),
             DeclareLaunchArgument(
