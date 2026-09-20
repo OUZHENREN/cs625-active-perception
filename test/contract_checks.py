@@ -388,6 +388,8 @@ def main() -> int:
         src / "cs625_simulation" / "assets" / "cs625_task" / "slot_fixture" / "model.config",
         src / "cs625_simulation" / "assets" / "cs625_task" / "slot_fixture" / "meshes" / "slot_fixture.stl",
         ROOT / "test" / "inspect_stl_mass_properties.py",
+        ROOT / "scripts" / "sync_task_world.py",
+        ROOT / "test" / "test_sync_task_world.py",
         ROOT / "test" / "test_task_scene_applier.py",
         src / "cs625_bringup" / "config" / "sim_controllers.yaml",
         src / "cs625_ap_description" / "urdf" / "cs625_parallel_gripper.xacro",
