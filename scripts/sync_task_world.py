@@ -27,6 +27,12 @@ the right panel.  The position is in the model's parent frame, which for these
 models is the world, so the numbers transfer directly.  The orientation may be
 shown as a quaternion or as roll/pitch/yaw; both forms are accepted here, and
 --print shows both so they can be compared.
+
+PRECISION WARNING: the panel rounds position to two decimals and the angles to
+two as well, so a value copied straight across can be centimetres or degrees off.
+A fixture recorded at Z 0.27 instead of its true 0.27337 sinks 3.4 mm into the
+floor.  Where a number matters, prefer the values already in the config and move
+only what you meant to move, or read the exact pose back with --print.
 """
 
 from __future__ import annotations
