@@ -15,8 +15,13 @@ Poses come from ``cs625_bringup/config/cs625_task_scene.yaml``, which
 ``test/contract_checks.py`` also cross-checks against the Gazebo world.  Nothing
 here restates a dimension that already lives in the config.
 
-    ros2 run cs625_bringup apply_task_scene.py --dry-run
-    ros2 run cs625_bringup apply_task_scene.py --seated-module
+    python3 src/cs625_bringup/scripts/apply_task_scene.py --dry-run
+    python3 src/cs625_bringup/scripts/apply_task_scene.py --seated-module
+
+This is installed to share/cs625_bringup/scripts/, not to lib/, so it is started
+with python3 rather than `ros2 run`: only lib/ holds ROS executables.  The launch
+file does the same thing through FindExecutable("python3").  From an installed
+tree use "$(ros2 pkg prefix cs625_bringup)/share/cs625_bringup/scripts/".
 """
 
 from __future__ import annotations

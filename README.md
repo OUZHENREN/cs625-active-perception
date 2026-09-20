@@ -67,6 +67,57 @@ Gazebo 实体默认由**无网格**模型生成，因此 Gazebo 窗口里看不�
 为了避开 WSL2 软件渲染路径下的卡死；`gazebo_visuals:=true` 才保留网格。
 细节见 [`docs/simulation.md`](docs/simulation.md) 的 “Visualization and manual run”。
 
+### 任务场景（插槽夹具 + 弹仓）
+
+这是本课题的正式任务场景：真实的楔形插槽夹具与屏蔽片模块。它替代前面的遮挡
+研究世界，是后续定位、抓取、插入实验的底座。
+
+```bash
+source scripts/source_dev_env.sh
+ros2 launch cs625_bringup sim_task_scene.launch.py
+```
+
+它组合 `sim_base`，把世界换成 `cs625_insertion_scene.sdf`，并强制
+`launch_fixture_world:=false`（那个通用 RGB-D 夹具世界是第二个 Gazebo 实例）。
+启动约 20 秒后会自动把静态夹具和“坐到底”的弹仓镜像进 MoveIt 的 planning
+scene——不做这一步，规划器会把机械臂直接穿过夹具。
+
+场景几何只有一个权威来源：`src/cs625_bringup/config/cs625_task_scene.yaml`。
+世界文件与配置必须一致，`test/contract_checks.py` 会强制这一点。
+
+摆放与查看：
+
+```bash
+# 看当前记录的三组位姿（RPY 与四元数都打印）
+python3 scripts/sync_task_world.py --print
+
+# 校验配置 <-> 世界是否一致
+python3 scripts/sync_task_world.py --check
+
+# 从 Gazebo 的 Pose 面板读到数后写进去（面板角度标的是弧度）
+python3 scripts/sync_task_world.py --set fixture \
+  --position -0.85 0.49 0.27337 --rpy-rad 3.11 0.08 -0.43
+```
+
+> **Gazebo 的 Pose 面板只显示 2 位小数**，位置和角度都是，直接从面板抄数据可能
+> 差厘米级：曾经把夹具 Z 的 `0.27337` 抄成 `0.27`，结果陷进地面 3.4 mm。重要的
+> 数请用 `--print` 读回精确值，或只改你确实想改的那一项。
+
+`insertion.seated_pose_world` **不可直接设置**：它是从夹具位姿**派生**的
+（装配体坐标系下的实测值 × 夹具位姿），每次运行 `sync_task_world.py` 自动重算，
+所以移动夹具不需要手改它。
+
+手动镜像（需要 move_group 已在运行）：
+
+```bash
+python3 src/cs625_bringup/scripts/apply_task_scene.py --seated-module
+```
+
+该脚本装在 `share/cs625_bringup/scripts/` 下而不是 `lib/`，因此用 `python3`
+调用而不是 `ros2 run`——`ros2 run` 只认 `lib/` 里的 ROS 可执行文件。几何来源、
+夹具为何用网格做碰撞、以及已知限制见
+[`docs/simulation.md`](docs/simulation.md) 第 6 节。
+
 ### 主动感知流水线
 
 ```bash
@@ -101,10 +152,11 @@ ros2 launch cs625_bringup real_base.launch.py launch_driver:=true \
 
 ### 可选：VS Code 一键任务
 
-本机 `.vscode/tasks.json` 把上面的命令（以及构建、契约检查、启动 agent harness）
-做成了任务，`Ctrl+Shift+P` → **Tasks: Run Task** 即可选择。注意 **`.vscode/` 被
-`.gitignore` 忽略，不随仓库分发**，新克隆的仓库里没有这个文件，请直接用上面的
-终端命令。
+本机 `.vscode/tasks.json` 把上面的命令（以及构建、契约检查、任务场景的启动与
+镜像、启动 agent harness）做成了 13 个任务，`Ctrl+Shift+P` → **Tasks: Run Task**
+即可选择。注意 **`.vscode/` 被 `.gitignore` 忽略，不随仓库分发**，新克隆的仓库里
+没有这个文件，请直接用上面的终端命令——本节与下面的“快速复现”是等效的仓库内
+入口。
 
 ## 快速复现
 
