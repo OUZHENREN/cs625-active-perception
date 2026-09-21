@@ -303,3 +303,95 @@ It includes a real 6 degree roll, because the slot is a wedge.
   not a material property.
 - The grasp is a preloaded interference fit, and the gripper geometry is still
   the placeholder parallel gripper. See `docs/real_hardware_readiness.md`.
+
+## 7. Eye-in-hand camera extrinsics
+
+The simulated camera pose is no longer a tuned guess.  It is the real hand-eye
+calibration produced by RobotVisionSuite for the physical camera, expressed in the
+flange frame, and the Arm FK reproduces it to the last digit.
+
+```text
+src/cs625_bringup/config/camera_extrinsics_sim.yaml   the authority
+scripts/camera_extrinsics.py                          regenerates it from RVS output
+```
+
+### 7.1 Why the values live in a config
+
+`AGENTS.md` forbids hardcoding hand-eye transforms in the description.
+`sim_control.launch.py` reads the YAML and passes all five arguments to xacro, and
+it refuses to start when the file is missing rather than silently falling back to
+an uncalibrated pose.  The xacro carries the same numbers as defaults so a bare
+`xacro` invocation is still correct, and `test/contract_checks.py` compares the two
+numerically and fails on drift.
+
+To regenerate against a local RVS install (the path is machine-local and is never
+stored in the repository):
+
+```bash
+python3 scripts/camera_extrinsics.py --rvs-dir "<RVS>/runtime"
+python3 scripts/camera_extrinsics.py --rvs-dir "<RVS>/runtime" --check
+```
+
+`CS625_RVS_RUNTIME_DIR` can be used instead of `--rvs-dir`.  Both encodings RVS
+writes are parsed — `HandEyeTool.ini` in mm and degrees, `ColorToRobotTCP.txt` in
+metres and radians — and cross-checked, so a silent unit change aborts.
+
+### 7.2 Two frame decisions that make the numbers meaningful
+
+**Reference frame is the flange.** The tool owner measured the camera at about
+98 mm from the flange, which matches the raw values, so the controller's
+`(-46, 0, 353)` mm TCP offset must **not** be composed on top.  That offset is real
+— it was verified independently against the recorded `tool_data` CSV to 0.0 mm —
+but applying it here would put the camera 450 mm out, in mid-air past the tool's
+207 mm tip.
+
+**The recorded pose is the optical frame.** Its `+Z` comes out along the flange
+`+Z`, which is what an eye-in-hand camera looking down the tool must do.
+`camera_link` is therefore the optical pose with the standard body→optical rotation
+removed, and the composition is asserted to reproduce the eye to `1e-12`.
+
+### 7.3 The real camera is a stereo pair
+
+Two eyes, 24.411 mm apart and 0.788 degrees from parallel, calibrated separately.
+`camera_link` anchors on the **depth** eye, because Gazebo's `rgbd_camera` is
+attached to `camera_link` and looks along that link's `+X`, while the point-cloud
+contract names `camera_depth_optical_frame`.  Anchoring there makes the simulated
+sensor and the declared optical frame coincide exactly — verified as 0.0000 mm and
+0.0000 degrees — and the colour eye carries the offset instead.  An RGB-D registers
+its colour image to the depth frame anyway, so this is also the honest way round.
+
+```text
+depth optical frame in the flange   (96.754, 17.803, 97.328) mm
+colour optical frame in the flange  (96.950, 42.212, 97.540) mm
+stereo baseline                     24.411 mm
+```
+
+### 7.4 Consequence: P7.1's sensor evidence is no longer current
+
+P7.1's sensor-visibility gate was passed with the previous placeholder pose
+`(0.03, 0, 0.15)` tilted 45 degrees, which was tuned so the marker stayed out of
+the old gripper palm's shadow.  The real camera looks straight down the tool axis.
+**That gate must be re-run**, against an isolated partition and a fresh evidence
+directory:
+
+```bash
+test/run_p7_1_sensor_sim.sh
+CS625_P7_1_SENSOR_GATE=1 CS625_P7_SIMULATION_EXECUTION=1 \
+  test/run_p7_1_sensor_gate_capture.sh <new-evidence-directory>
+```
+
+Until that passes, treat the RGB-D input chain as `NOT ACCEPTED` at this pose and
+do not build active-perception results on top of it.  See
+[`p7_five_gate_protocol.md`](p7_five_gate_protocol.md).
+
+### 7.5 Known limitations
+
+- The calibration is relative to the FLANGE as measured on 2026-04-01.  If the
+  camera bracket is moved, or the controller's TCP is redefined and the camera
+  calibration is redone against that TCP instead, these numbers become wrong and
+  `scripts/camera_extrinsics.py` must be re-run.
+- Gazebo simulates one RGB-D camera, not a stereo pair.  The colour eye exists as a
+  TF frame and as the calibrated offset, but the simulated image comes from the
+  depth eye's position.
+- `camera_mount_xyz` is a flange-frame pose; the insertion scene and the camera
+  calibration are independent, so moving the fixture does not affect it.

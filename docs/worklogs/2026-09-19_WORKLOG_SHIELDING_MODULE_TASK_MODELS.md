@@ -1507,3 +1507,93 @@ URDF 实际接入                                    PENDING（待用户决定�
 
 真实的标定是**沿工具轴正看**，姿态差别很大。换默认值会**使 P7.1 已验收的证据失效**，
 按 AGENTS.md 的门禁规则必须显式决定，不能顺手改。
+
+---
+
+## 二十九、真实相机接入 URDF（A 方案）
+
+用户选择 **A：换成真实标定，并重跑 P7.1 传感器门**。
+
+### 29.1 一个更好的结构：锚在深度眼
+
+Gazebo 的 `rgbd_camera` 挂在 `camera_link` 上、沿该 link 的 **+X** 看，而点云契约
+用的是 `camera_depth_optical_frame`。所以让 **`camera_link` 落在深度眼**：
+
+```text
+传感器(camera_link) 与深度光学帧位置差 = 0.0000 mm
+传感器视轴 vs 深度光轴偏差            = 0.0000 deg
+```
+
+**完全重合**。彩色眼作为 24.411 mm 偏移的那个——而且这也更诚实：RGB-D 的彩色图
+本来就配准到深度帧。
+
+### 29.2 展开后的 FK 与标定逐位对照
+
+```text
+深度光学帧在法兰系 = ( 96.754, 17.803, 97.328) mm   标定 96.754, 17.803, 97.328  ✓
+彩色光学帧在法兰系 = ( 96.950, 42.212, 97.540) mm   标定 96.950, 42.212, 97.540  ✓
+两眼光心间距       = 24.411 mm
+```
+
+### 29.3 配置是运行时权威，不只是文档
+
+```text
+config/camera_extrinsics_sim.yaml   权威来源（含出处与日期）
+sim_control.launch.py               启动时读取并传 5 个参数给 xacro；
+                                    文件缺失则拒绝启动，而不是退回未标定的位姿
+xacro 默认值                          同样的数，供裸调用
+test/contract_checks.py              数值比较两者，漂移即失败
+```
+
+**实测防漂移**：把默认值改回旧占位 `(0.03, 0, 0.15)`，契约检查立刻报
+`defaults camera_mount_xyz to [0.03, 0.0, 0.15], but the calibration ... says
+[0.096754, 0.017803, 0.097328]` ✓
+
+### 29.4 测试确实起了作用
+
+改锚点后 `test_camera_extrinsics.py` **立刻失败**（彩色眼断言不成立）——说明测试
+在管真东西。两处已更新为深度眼参考：
+
+```text
+test_derived_body_frame_reproduces_the_depth_optical_frame
+  （并断言本体 +X == 深度光学 +Z，即 Gazebo 视轴与深度光轴一致）
+test_camera_sits_near_the_tool_not_past_it
+```
+
+`test_p7_capture_tools.py` 断言了旧占位字符串，也必须改；现在断言标定值，
+**仍能拦住"悄悄改回调参位姿"**。
+
+### 29.5 通过 / 失败
+
+```text
+FK 与标定逐位一致（深度眼、彩色眼）              PASS
+传感器与深度光学帧重合（0.0000 mm / 0.0000 deg）  PASS
+契约检查（含新增的相机防漂移）                    PASS
+  实测改回旧值 -> 报错；改回标定 -> PASS
+test_camera_extrinsics + sync_task_world + applier   19 passed
+test_p7_capture_tools                                11 passed
+camera_extrinsics --check                            与标定一致
+docs/simulation.md 内部链接                          无断链
+P7.1 传感器门重跑                                    PENDING（需用户在 Gazebo 跑）
+```
+
+### 29.6 关键链路状态更新
+
+```text
+base_link -> camera optical TF   NOT ACCEPTED
+  几何与 TF 已按真实标定接好、FK 逐位验证通过，
+  但 P7.1 传感器可见性证据属于旧占位相机，必须重跑才算验收。
+  重跑命令（见 docs/simulation.md §7.4）：
+    test/run_p7_1_sensor_sim.sh
+    CS625_P7_1_SENSOR_GATE=1 CS625_P7_SIMULATION_EXECUTION=1 \
+      test/run_p7_1_sensor_gate_capture.sh <new-evidence-directory>
+  在此之前不得在其上构建主动感知结果。
+```
+
+### 29.7 已知限制
+
+```text
+· 标定相对【法兰】，日期 2026-04-01。若相机支架移动、或控制器 TCP 重定义后
+  按新 TCP 重新标定，这些数就失效，必须重跑 scripts/camera_extrinsics.py。
+· Gazebo 只仿真【一个】RGB-D，不是双目。彩色眼只作为 TF 帧与标定偏移存在。
+```
