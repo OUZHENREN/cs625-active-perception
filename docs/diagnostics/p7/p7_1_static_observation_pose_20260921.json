@@ -1,0 +1,84 @@
+{
+  "acceptance_effect": "none",
+  "artifacts": {
+    "initial_positions": "src/cs625_bringup/config/p7_1_observation_initial_positions.yaml",
+    "urdf_sha256": "d3bd5aff0d942bdeb45fa55dea01280f9e0f0f3716b7d66cdfc91d8487ce4124"
+  },
+  "candidate": {
+    "camera_position_world_m": [
+      -1.143419402,
+      -0.129024744,
+      0.42260722
+    ],
+    "gazebo_called_for_solve": false,
+    "joint_positions_rad": {
+      "elbow_joint": 0.0,
+      "shoulder_lift_joint": -0.35,
+      "shoulder_pan_joint": 0.0,
+      "wrist_1_joint": 0.056945119,
+      "wrist_2_joint": -1.689988597,
+      "wrist_3_joint": -1.594572224
+    },
+    "method": "offline versioned-URDF forward kinematics plus scipy least_squares look-at solve",
+    "minimum_distal_link_origin_z_m": 0.4226072203209112,
+    "moveit_called": false,
+    "occlusion_audit_by_repository": {
+      "gripper_points_in_front": 16757,
+      "gripper_points_inside_image": 2440,
+      "gripper_points_within_20px_of_target": 0,
+      "gripper_range_from_camera_m": [
+        0.053,
+        0.228
+      ],
+      "method": "transfer the real gripper mesh into the camera optical frame and project it",
+      "occludes_target": false,
+      "target_range_from_camera_m": 1.903
+    },
+    "projection": {
+      "camera_xyz_m": [
+        0.01789605468459162,
+        -0.17470935225702172,
+        1.894976353423394
+      ],
+      "height": 240,
+      "horizontal_fov_rad": 1.047,
+      "inside_image": true,
+      "u_px": 162.6177802501184,
+      "v_px": 94.44404926616672,
+      "width": 320
+    },
+    "proximal_joints_locked": true,
+    "seed_source": "src/cs625_bringup/config/p7_safe_initial_positions.yaml",
+    "solver": {
+      "converged": true,
+      "cost": 5.945827517273438,
+      "max_abs_scaled_residual": 3.249165344266922,
+      "max_seed_delta_rad": 1.6899885971940043,
+      "message": "`ftol` termination condition is satisfied."
+    },
+    "trajectory_executed": false
+  },
+  "capture_schema": "p7_1_static_observation_pose_diagnostic_v2",
+  "claim_boundary": "offline kinematic seed only; collision, Gazebo stability and P7.1 runtime acceptance remain unverified",
+  "evidence_class": "DIAGNOSTIC_ONLY",
+  "reason": "the eye-in-hand camera was replaced with the real RVS calibration, so the pose solved for the placeholder camera no longer points at the target",
+  "solved_at_utc": "2026-09-21T07:20:53.552295+00:00",
+  "superseded": {
+    "observed_finite_point_count": 0,
+    "observed_target_in_camera_m": [
+      0.00336236599339284,
+      1.5213281910813763,
+      -1.2137960034937465
+    ],
+    "previous_pose_source": "docs/diagnostics/p7/p7_1_static_observation_pose_20260901.json",
+    "runtimes_failed_with": [
+      "P7_1_TARGET_OUTSIDE_CAMERA_FOV",
+      "P7_1_TARGET_NOT_OBSERVED_IN_POINT_CLOUD",
+      "P7_1_TARGET_RGB_ROI_UNAVAILABLE",
+      "P7_1_TIMESTAMP_EXACT_TF_UNAVAILABLE"
+    ]
+  },
+  "tool_fixes_before_next_runtime": [
+    "p7_1_observation_settled_positions.yaml still holds the settle offsets measured for the previous command; the next preflight reports the new observed joints and it must be updated from that measurement before the gate can pass"
+  ]
+}

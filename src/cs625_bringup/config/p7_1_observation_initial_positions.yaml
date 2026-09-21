@@ -1,13 +1,34 @@
 # P7.1 simulation-only observation pose.
 #
+# Re-solved on 2026-09-21 because the eye-in-hand camera was replaced with the real
+# RVS hand-eye calibration.  The previous pose was solved for the placeholder
+# camera at (0.03, 0, 0.15) tilted 45 degrees; with the real camera, which looks
+# straight down the tool axis from about 97 mm, that same joint configuration put
+# the target 1.21 m BEHIND the camera and produced an empty point cloud.  P7.1
+# reported P7_1_TARGET_OUTSIDE_CAMERA_FOV and
+# P7_1_TARGET_NOT_OBSERVED_IN_POINT_CLOUD on all five windows.
+#
 # A source-versioned offline URDF FK/look-at solve starts from the Gazebo-stable
-# P7 safe initial state and points the revised, palm-clearing eye-in-hand
-# optical axis at the versioned YCB target. No MoveIt request or trajectory is
-# used. Runtime stability and rendered visibility remain P7.1 gates.
-# Diagnostic: docs/diagnostics/p7/p7_1_static_observation_pose_20260901.json
-shoulder_pan_joint: 0.434425123
-shoulder_lift_joint: -0.468793309
-elbow_joint: 1.269496637
-wrist_1_joint: -1.820428866
-wrist_2_joint: 1.585136685
-wrist_3_joint: 1.547477498
+# P7 safe initial state and points the eye-in-hand optical axis at the versioned
+# YCB target.  No MoveIt request or trajectory is used.  Run with
+# --lock-proximal so only the wrist moves and the arm stays at the safe seed:
+#
+#   test/p7_solve_static_observation_pose.py \
+#     --urdf <expanded-urdf> \
+#     --seed-joints src/cs625_bringup/config/p7_safe_initial_positions.yaml \
+#     --target-pose <gazebo-target-pose.json> --lock-proximal
+#
+# Offline checks on the result: the target lands at (0.018, -0.175, 1.895) m in the
+# optical frame, inside the 320x240 image at pixel (162.6, 94.4), which is 94 px
+# clear of the nearest border; the real gripper occupies 2440 image pixels but none
+# within 20 px of the target, so it does NOT occlude it; and every joint keeps at
+# least 3.14 rad of limit margin.
+#
+# Diagnostic: docs/diagnostics/p7/p7_1_static_observation_pose_20260921.json
+# Runtime stability and rendered visibility remain P7.1 gates.
+shoulder_pan_joint: 0.000000000
+shoulder_lift_joint: -0.350000000
+elbow_joint: 0.000000000
+wrist_1_joint: 0.056945119
+wrist_2_joint: -1.689988597
+wrist_3_joint: -1.594572224

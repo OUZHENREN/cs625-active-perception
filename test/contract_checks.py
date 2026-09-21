@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import ast
+import hashlib
+import json
 import os
 import pathlib
 import re
@@ -210,6 +212,15 @@ TASK_SCENE_FORBIDDEN_ARGS = ("p7_attachment_enabled",)
 DOCUMENTED_SCRIPT_ROOTS = ("docs", ".")
 DOCUMENTED_NON_EXECUTABLE = "test/"
 
+# P7.1's observation pose is solved offline against a specific camera pose and a
+# specific URDF.  When the camera extrinsics changed to the real RVS calibration,
+# nothing noticed that the pose solved for the placeholder camera now pointed
+# 1.2 m behind the target, and P7.1 failed on all five windows with an empty point
+# cloud.  This record is what ties the two together.
+P7_1_OBSERVATION_DIAGNOSTIC = pathlib.Path(
+    "docs/diagnostics/p7/p7_1_static_observation_pose_20260921.json"
+)
+
 CAMERA_EXTRINSICS_CONFIG = (
     pathlib.Path("src/cs625_bringup/config/camera_extrinsics_sim.yaml")
 )
@@ -386,6 +397,44 @@ def check_cs625_task_scene() -> None:
                     "command, but no test/*.sh is executable; write "
                     f"\"bash {match.group(1)}\""
                 )
+
+    # 3c) The P7.1 observation pose must still have been solved against the URDF
+    # that is on disk.  A stale solve is invisible until a full Gazebo run reports
+    # an empty point cloud, so it is checked here instead.
+    diagnostic = json.loads(
+        (ROOT / P7_1_OBSERVATION_DIAGNOSTIC).read_text(encoding="utf-8")
+    )
+    recorded_urdf = diagnostic["artifacts"]["urdf_sha256"]
+    live_urdf = hashlib.sha256(
+        (ROOT / CAMERA_DESCRIPTION).read_bytes()
+    ).hexdigest()
+    if recorded_urdf != live_urdf:
+        fail(
+            f"{P7_1_OBSERVATION_DIAGNOSTIC.name} was solved against a different "
+            "cs625_active_perception.urdf.xacro; re-solve the P7.1 observation pose "
+            "with test/p7_solve_static_observation_pose.py and refresh the diagnostic"
+        )
+    candidate = diagnostic["candidate"]
+    projection = candidate["projection"]
+    if projection["camera_xyz_m"][2] <= 0.0:
+        fail("the recorded P7.1 observation pose puts the target behind the camera")
+    if not projection["inside_image"]:
+        fail("the recorded P7.1 observation pose puts the target outside the image")
+    if not candidate["proximal_joints_locked"]:
+        fail("the recorded P7.1 observation pose was not solved with --lock-proximal")
+    if candidate["occlusion_audit_by_repository"]["occludes_target"]:
+        fail("the real gripper occludes the target from the recorded P7.1 pose")
+    # The solver seeds from the safe state and must not wander far from it.
+    initial = yaml.safe_load(
+        (ROOT / "src/cs625_bringup/config/p7_1_observation_initial_positions.yaml")
+        .read_text(encoding="utf-8")
+    )
+    for joint, value in candidate["joint_positions_rad"].items():
+        if abs(float(initial[joint]) - float(value)) > 1e-6:
+            fail(
+                f"the P7.1 initial-position file does not match the solved pose for "
+                f"{joint}: {initial[joint]} against {value}"
+            )
 
     # 4a) The camera extrinsics must not drift between the config and the URDF.
     # The config is the authority: scripts/camera_extrinsics.py derives it from the
