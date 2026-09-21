@@ -1,0 +1,50 @@
+cs625_camera_extrinsics:
+  ros__parameters:
+    source: RobotVisionSuite hand-eye calibration, eye-in-hand
+    source_files:
+    - /mnt/d/Program Files (x86)/RobotVisionSuite/runtime/HandEyeTool.ini
+    - /mnt/d/Program Files (x86)/RobotVisionSuite/runtime/ColorToRobotTCP.txt
+    - /mnt/d/Program Files (x86)/RobotVisionSuite/runtime/DepthToRobotTCP.txt
+    source_encoding: mm and degrees in the .ini, metres and radians in the .txt
+    reference_frame: flange; the tool owner measured the camera at ~98 mm from the
+      flange, matching the raw numbers, so no controller-TCP offset applies
+    calibration_frame: 'the camera OPTICAL frame: its +Z is the optical axis and comes
+      out along the flange +Z'
+    note: CameraToRobotTCP is stored as camera_link in the body convention; camera_depth_*
+      is the second stereo eye relative to camera_link. Regenerate with scripts/camera_extrinsics.py;
+      do not hand-edit.
+    camera_mount_xyz:
+    - 0.09695
+    - 0.042212
+    - 0.09754
+    camera_mount_rpy:
+    - 1.519565756096
+    - -1.557075670595
+    - -1.532437268706
+    camera_optical_rpy:
+    - -1.570796326795
+    - 0.0
+    - -1.570796326795
+    camera_depth_xyz:
+    - 0.000122567459
+    - -0.024410113525
+    - -0.000118219731
+    camera_depth_rpy:
+    - -1.567671812206
+    - 0.003280527625
+    - -1.557314019799
+    stereo_baseline_m: 0.024410707507
+    color_optical_in_flange:
+    - 0.09695
+    - 0.042212
+    - 0.09754
+    - -0.00070265359
+    - 0.01370265359
+    - -1.58367265359
+    depth_optical_in_flange:
+    - 0.096754
+    - 0.017803
+    - 0.097328
+    - 0.00242265359
+    - 0.00022265359
+    - -1.58038265359
