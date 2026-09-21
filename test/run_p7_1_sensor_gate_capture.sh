@@ -93,6 +93,29 @@ python3 test/p7_capture_preflight.py \
   --initial-positions-file "$initial_positions" \
   --expected-positions-file "$expected_positions" \
   --output "$output_dir/preflight.json"
+# gz model talks over gz-transport, which is partition-scoped, and it returns 0
+# even when the service call times out -- the only signal is the text.  Left
+# unchecked that surfaced as "Gazebo output does not identify model
+# 'target_object'", a parser error that says nothing about the real cause, which is
+# that this shell is looking at a different partition than the running simulator.
+gz_probe="$(timeout 8 gz model --list 2>&1 || true)"
+if grep -Eq "timed out|Command failed|No such file" <<<"$gz_probe"; then
+  echo "Cannot reach a running simulation through gz-transport." >&2
+  echo "  IGN_PARTITION=${IGN_PARTITION:-<unset>}  GZ_PARTITION=${GZ_PARTITION:-<unset>}" >&2
+  echo "  gz model said: $(tr -s ' \n' ' ' <<<"$gz_probe")" >&2
+  echo "  A simulator started before this check existed does not record its" >&2
+  echo "  partition, so restart it (run_p7_1_sensor_sim.sh now writes" >&2
+  echo "  ${P7_1_PARTITION_FILE:-/tmp/cs625_p7_1_partition}), or export the" >&2
+  echo "  partition printed in its P7_1_SIM_READY line." >&2
+  exit 4
+fi
+if ! grep -qw "target_object" <<<"$gz_probe"; then
+  echo "The running simulation has no model named target_object; gz model listed:" >&2
+  tr -s ' \n' ' ' <<<"$gz_probe" >&2
+  echo >&2
+  exit 4
+fi
+
 python3 test/p7_capture_gazebo_model_pose.py \
   --model target_object --output "$output_dir/target_ground_truth.json"
 
