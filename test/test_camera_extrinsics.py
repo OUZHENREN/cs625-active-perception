@@ -80,17 +80,32 @@ def test_a_unit_mismatch_between_the_two_encodings_aborts(rvs_tree):
         camera_extrinsics.cross_check(ini, txt)
 
 
-def test_derived_body_frame_reproduces_the_colour_optical_frame(rvs_tree):
+def test_derived_body_frame_reproduces_the_depth_optical_frame(rvs_tree):
+    """camera_link anchors on the depth eye, so that is the identity that must hold.
+
+    Gazebo's rgbd_camera hangs off camera_link and looks along that link's +X, and
+    the point-cloud contract names camera_depth_optical_frame, so anchoring on the
+    depth eye is what makes the simulated sensor and the declared optical frame
+    coincide.  The colour eye then carries the stereo offset.
+    """
+
     values = camera_extrinsics.load(rvs_tree)
     body = np.eye(4)
     body[:3, :3] = camera_extrinsics.rotation(values["camera_mount_rpy"])
     body[:3, 3] = values["camera_mount_xyz"]
-    optical = body @ np.eye(4)
+    optical = np.eye(4)
     optical[:3, :3] = body[:3, :3] @ camera_extrinsics.rotation(
         camera_extrinsics.BODY_TO_OPTICAL_RPY
     )
+    optical[:3, 3] = body[:3, 3]
     assert camera_extrinsics.to_pose(optical) == pytest.approx(
-        values["color_optical_in_flange"], abs=1e-12
+        values["depth_optical_in_flange"], abs=1e-12
+    )
+    # The body's +X, which is where Gazebo points the sensor, must be the depth
+    # eye's optical +Z.
+    assert (body[:3, :3] @ [1.0, 0.0, 0.0]) == pytest.approx(
+        camera_extrinsics.rotation(values["depth_optical_in_flange"][3:6]) @ [0.0, 0.0, 1.0],
+        abs=1e-12,
     )
 
 
@@ -128,7 +143,12 @@ def test_camera_sits_near_the_tool_not_past_it(rvs_tree):
     assert 0.05 < along_tool < 0.30, (
         "camera is not near the tool; check whether a TCP offset was applied"
     )
-    assert values["camera_mount_xyz"][0] == pytest.approx(0.09695)
+    # camera_link is the depth eye, so the depth X is the one at the flange frame.
+    assert values["camera_mount_xyz"][0] == pytest.approx(0.096754)
+    # The colour eye is the mirrored one, 24.4 mm away along +Y.
+    assert values["camera_color_xyz"] == pytest.approx(
+        [0.000207, 0.024410, 0.000037], abs=1e-6
+    )
 
 
 def test_check_mode_detects_a_drifted_config(rvs_tree, monkeypatch, tmp_path, capsys):

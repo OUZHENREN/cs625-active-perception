@@ -10,29 +10,30 @@ cs625_camera_extrinsics:
       flange, matching the raw numbers, so no controller-TCP offset applies
     calibration_frame: 'the camera OPTICAL frame: its +Z is the optical axis and comes
       out along the flange +Z'
-    note: CameraToRobotTCP is stored as camera_link in the body convention; camera_depth_*
+    note: camera_link is the DEPTH eye in the ROS body convention, so the Gazebo rgbd_camera
+      on camera_link coincides exactly with camera_depth_optical_frame; camera_color_*
       is the second stereo eye relative to camera_link. Regenerate with scripts/camera_extrinsics.py;
       do not hand-edit.
     camera_mount_xyz:
-    - 0.09695
-    - 0.042212
-    - 0.09754
+    - 0.096754
+    - 0.017803
+    - 0.097328
     camera_mount_rpy:
-    - 1.519565756096
-    - -1.557075670595
-    - -1.532437268706
+    - 3.049945177808
+    - -1.568363463268
+    - -3.059531774309
     camera_optical_rpy:
     - -1.570796326795
     - 0.0
     - -1.570796326795
-    camera_depth_xyz:
-    - 0.000122567459
-    - -0.024410113525
-    - -0.000118219731
-    camera_depth_rpy:
-    - -1.567671812206
-    - 0.003280527625
-    - -1.557314019799
+    camera_color_xyz:
+    - 0.000206656525
+    - 0.024409803932
+    - 3.7497526e-05
+    camera_color_rpy:
+    - -1.573876346752
+    - -0.003322338011
+    - -1.584268392311
     stereo_baseline_m: 0.024410707507
     color_optical_in_flange:
     - 0.09695

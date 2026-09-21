@@ -152,30 +152,36 @@ def derive(optical: dict) -> dict:
         matrix[:3, 3] = optical[eye][0:3]
         flange_optical[eye] = matrix
 
-    # camera_link body frame sits at the colour eye so that the colour optical
-    # frame is exactly the calibrated one after the standard body->optical turn.
+    # camera_link sits on the DEPTH eye, not the colour one.  Gazebo's rgbd_camera
+    # is attached to camera_link and looks along that link's +X, and the point-cloud
+    # contract names camera_depth_optical_frame, so anchoring on the depth eye makes
+    # the simulated sensor and the declared optical frame coincide exactly.  The
+    # colour eye then carries the 24 mm stereo offset, which is the honest way round:
+    # an RGB-D registers its colour image to the depth frame anyway.
     body = np.eye(4)
-    body[:3, :3] = flange_optical["color"][:3, :3] @ rotation(BODY_TO_OPTICAL_RPY).T
-    body[:3, 3] = flange_optical["color"][:3, 3]
+    body[:3, :3] = flange_optical["depth"][:3, :3] @ rotation(BODY_TO_OPTICAL_RPY).T
+    body[:3, 3] = flange_optical["depth"][:3, 3]
 
+    # The depth optical frame must come back exactly, which is the whole point of
+    # anchoring there.
     check = np.eye(4)
     check[:3, :3] = body[:3, :3] @ rotation(BODY_TO_OPTICAL_RPY)
     check[:3, 3] = body[:3, 3]
-    if np.abs(check - flange_optical["color"]).max() > 1e-12:
-        raise SystemExit("ERROR: body/optical composition does not reproduce the colour eye")
+    if np.abs(check - flange_optical["depth"]).max() > 1e-12:
+        raise SystemExit("ERROR: body/optical composition does not reproduce the depth eye")
 
-    depth = np.linalg.inv(body) @ flange_optical["depth"]
+    colour = np.linalg.inv(body) @ flange_optical["color"]
     return {
         "camera_mount_xyz": [float(v) for v in body[:3, 3]],
         "camera_mount_rpy": list(
             Rotation.from_matrix(body[:3, :3]).as_euler("xyz")
         ),
         "camera_optical_rpy": list(BODY_TO_OPTICAL_RPY),
-        "camera_depth_xyz": [float(v) for v in depth[:3, 3]],
-        "camera_depth_rpy": list(
-            Rotation.from_matrix(depth[:3, :3]).as_euler("xyz")
+        "camera_color_xyz": [float(v) for v in colour[:3, 3]],
+        "camera_color_rpy": list(
+            Rotation.from_matrix(colour[:3, :3]).as_euler("xyz")
         ),
-        "baseline_m": float(np.linalg.norm(depth[:3, 3])),
+        "baseline_m": float(np.linalg.norm(colour[:3, 3])),
         "color_optical_in_flange": to_pose(flange_optical["color"]),
         "depth_optical_in_flange": to_pose(flange_optical["depth"]),
     }
@@ -208,15 +214,17 @@ def as_yaml(values: dict, rvs_dir: pathlib.Path) -> str:
                     "along the flange +Z"
                 ),
                 "note": (
-                    "CameraToRobotTCP is stored as camera_link in the body convention; "
-                    "camera_depth_* is the second stereo eye relative to camera_link. "
-                    "Regenerate with scripts/camera_extrinsics.py; do not hand-edit."
+                    "camera_link is the DEPTH eye in the ROS body convention, so the "
+                    "Gazebo rgbd_camera on camera_link coincides exactly with "
+                    "camera_depth_optical_frame; camera_color_* is the second stereo "
+                    "eye relative to camera_link. Regenerate with "
+                    "scripts/camera_extrinsics.py; do not hand-edit."
                 ),
                 "camera_mount_xyz": [clean(v) for v in values["camera_mount_xyz"]],
                 "camera_mount_rpy": [clean(v) for v in values["camera_mount_rpy"]],
                 "camera_optical_rpy": [clean(v) for v in values["camera_optical_rpy"]],
-                "camera_depth_xyz": [clean(v) for v in values["camera_depth_xyz"]],
-                "camera_depth_rpy": [clean(v) for v in values["camera_depth_rpy"]],
+                "camera_color_xyz": [clean(v) for v in values["camera_color_xyz"]],
+                "camera_color_rpy": [clean(v) for v in values["camera_color_rpy"]],
                 "stereo_baseline_m": clean(values["baseline_m"]),
                 "color_optical_in_flange": [clean(v) for v in values["color_optical_in_flange"]],
                 "depth_optical_in_flange": [clean(v) for v in values["depth_optical_in_flange"]],
@@ -251,7 +259,7 @@ def main() -> int:
 
     print(f"camera_mount_xyz  = {[round(float(v), 6) for v in values['camera_mount_xyz']]}")
     print(f"camera_mount_rpy  = {[round(float(v), 9) for v in values['camera_mount_rpy']]}")
-    print(f"camera_depth_xyz  = {[round(float(v), 6) for v in values['camera_depth_xyz']]}")
+    print(f"camera_color_xyz  = {[round(float(v), 6) for v in values['camera_color_xyz']]}")
     print(f"stereo baseline   = {values['baseline_m'] * 1000:.3f} mm")
 
     if arguments.check:

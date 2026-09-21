@@ -8,6 +8,9 @@ after entity creation succeeds.
 """
 
 import os
+import pathlib
+
+import yaml
 
 from launch import LaunchDescription
 from launch.actions import (
@@ -347,6 +350,46 @@ def _compose(context):
         start_trajectory_after_joint_state,
         prepare_gazebo_model,
     ]
+
+
+# The calibrated eye-in-hand pose.  AGENTS.md forbids hardcoding hand-eye
+# transforms in the description, so the launch reads them here and passes them to
+# xacro explicitly; the xacro defaults carry the same numbers for bare
+# invocations, and test/contract_checks.py fails when the two drift apart.
+CAMERA_EXTRINSICS = (
+    pathlib.Path(__file__).resolve().parent.parent
+    / "config"
+    / "camera_extrinsics_sim.yaml"
+)
+CAMERA_EXTRINSIC_ARGUMENTS = (
+    "camera_mount_xyz",
+    "camera_mount_rpy",
+    "camera_optical_rpy",
+    "camera_color_xyz",
+    "camera_color_rpy",
+)
+
+
+def camera_extrinsic_arguments() -> list:
+    """xacro arguments for the real camera pose, from the calibration config."""
+
+    if not CAMERA_EXTRINSICS.is_file():
+        raise RuntimeError(
+            f"{CAMERA_EXTRINSICS} is missing; regenerate it with "
+            "scripts/camera_extrinsics.py rather than letting the description "
+            "fall back to an uncalibrated camera pose"
+        )
+    parameters = yaml.safe_load(CAMERA_EXTRINSICS.read_text(encoding="utf-8"))[
+        "cs625_camera_extrinsics"
+    ]["ros__parameters"]
+    arguments: list = []
+    for name in CAMERA_EXTRINSIC_ARGUMENTS:
+        arguments += [
+            f"{name}=",
+            " ".join(str(value) for value in parameters[name]),
+            " ",
+        ]
+    return arguments
 
 
 def generate_launch_description():

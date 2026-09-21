@@ -57,16 +57,29 @@
   <xacro:arg name="tool_stop_bits" default="1"/>
   <xacro:arg name="tool_tcp_port" default="54321"/>
 
-  <!-- Mount the eye-in-hand camera above and slightly behind the gripper.
-       The old (0.05, 0, 0.05) pose placed the gripper palm about 60 mm along
-       the optical ray; P7.1 d1 proved that even a 160 mm marker at the target
-       was invisible.  At (0.03, 0, 0.15), the 45-degree centre ray clears the
-       palm's z=0.025 m upper face by at least 30 mm over its full x extent. -->
-  <xacro:arg name="camera_mount_xyz" default="0.03 0 0.15"/>
-  <xacro:arg name="camera_mount_rpy" default="0 0.785398163397 0"/>
+  <!-- Real eye-in-hand calibration, not a tuned guess.  These are what
+       RobotVisionSuite's hand-eye calibration produced, expressed in the FLANGE
+       frame.  src/cs625_bringup/config/camera_extrinsics_sim.yaml carries the same
+       numbers with their provenance and is the authority; test/contract_checks.py
+       fails when the two drift apart.  Regenerate with scripts/camera_extrinsics.py
+       rather than editing by hand.
+
+       What changed and why.  The previous default was (0.03, 0, 0.15) tilted 45
+       degrees, tuned against the placeholder gripper so that P7.1's marker stayed
+       out of the palm's shadow.  The real camera looks straight down the tool axis
+       from about 97 mm out.  P7.1's sensor gate was therefore re-run against this
+       pose; its earlier evidence belonged to the placeholder and is not current.
+
+       camera_link anchors on the DEPTH eye so that the Gazebo rgbd_camera, which
+       looks along camera_link +X, coincides exactly with
+       camera_depth_optical_frame.  The colour eye sits 24.411 mm away. -->
+  <xacro:arg name="camera_mount_xyz" default="0.096754 0.017803 0.097328"/>
+  <xacro:arg name="camera_mount_rpy" default="3.049945177808 -1.568363463268 -3.059531774309"/>
   <!-- camera_link uses the usual body convention; optical is x-right,
-       y-down, z-forward. The calibration profile may override this. -->
+       y-down, z-forward. -->
   <xacro:arg name="camera_optical_rpy" default="-1.570796326795 0 -1.570796326795"/>
+  <xacro:arg name="camera_color_xyz" default="0.000206656525 0.024409803932 0.000037497526"/>
+  <xacro:arg name="camera_color_rpy" default="-1.573876346752 -0.003322338011 -1.584268392311"/>
 
   <xacro:property name="initial_positions_file" value="$(arg initial_positions_file)"/>
 
@@ -248,6 +261,8 @@
     xyz="$(arg camera_mount_xyz)"
     rpy="$(arg camera_mount_rpy)"
     optical_rpy="$(arg camera_optical_rpy)"
+    color_xyz="$(arg camera_color_xyz)"
+    color_rpy="$(arg camera_color_rpy)"
     sim_ignition="$(arg sim_ignition)"
     camera_sensor_topic="$(arg camera_sensor_topic)"
     camera_image_width="$(arg camera_image_width)"

@@ -254,7 +254,11 @@ def test_p7_1_capture_has_no_motion_or_planning_command_surface():
         / "urdf"
         / "cs625_active_perception.urdf.xacro"
     ).read_text(encoding="utf-8")
-    assert 'camera_mount_xyz" default="0.03 0 0.15"' in description
+    # The camera pose is now the real RVS hand-eye calibration rather than the
+    # (0.03, 0, 0.15) pose that was tuned for the placeholder gripper.  Asserting
+    # the calibrated value here as well as in the contract check keeps this test
+    # meaningful: it still fails if the mount silently reverts to a tuned guess.
+    assert 'camera_mount_xyz" default="0.096754 0.017803 0.097328"' in description
 
     launcher = (root / "test" / "run_p7_1_sensor_sim.sh").read_text(
         encoding="utf-8"

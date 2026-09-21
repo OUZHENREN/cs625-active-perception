@@ -6,6 +6,7 @@
   -->
   <xacro:macro name="cs625_eye_in_hand_camera"
                params="parent prefix xyz rpy optical_rpy
+                       color_xyz:='0 0 0' color_rpy:=''
                        sim_ignition:=false camera_sensor_topic:=/camera
                        camera_image_width:=320 camera_image_height:=240
                        camera_update_rate:=10.0 camera_enabled:=true">
@@ -54,14 +55,16 @@
       <origin xyz="0 0 0" rpy="${optical_rpy}"/>
     </joint>
 
-    <!-- RGB-D consumers need a color optical frame as well as the depth
-         optical frame. Both are fixed descendants of the reusable camera
-         body frame, matching the senior eye-in-hand layout. -->
+    <!-- The real device is a stereo camera: two eyes 24.4 mm apart, calibrated
+         independently.  camera_link anchors on the DEPTH eye, so the depth optical
+         frame below is exactly where the Gazebo rgbd_camera sits, and the colour eye
+         carries the offset instead.  color_xyz / color_rpy default to zero, which
+         reproduces the old coincident placeholder for callers that do not care. -->
     <link name="${prefix}camera_color_optical_frame"/>
     <joint name="${prefix}camera_to_color_optical" type="fixed">
       <parent link="${prefix}camera_link"/>
       <child link="${prefix}camera_color_optical_frame"/>
-      <origin xyz="0 0 0" rpy="${optical_rpy}"/>
+      <origin xyz="${color_xyz}" rpy="${optical_rpy if color_rpy == '' else color_rpy}"/>
     </joint>
 
     <!-- Reused from the senior CS625 simulation description. Gazebo keeps its

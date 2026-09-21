@@ -6,6 +6,7 @@ from __future__ import annotations
 import ast
 import os
 import pathlib
+import re
 import sys
 import xml.etree.ElementTree as ET
 
@@ -202,6 +203,13 @@ def check_environment_contract() -> None:
 # into a global launch configuration -- the leak documented in sim_base.launch.py.
 TASK_SCENE_FORBIDDEN_ARGS = ("p7_attachment_enabled",)
 
+CAMERA_EXTRINSICS_CONFIG = (
+    pathlib.Path("src/cs625_bringup/config/camera_extrinsics_sim.yaml")
+)
+CAMERA_DESCRIPTION = pathlib.Path(
+    "src/cs625_ap_description/urdf/cs625_active_perception.urdf.xacro"
+)
+
 TASK_SCENE_CONFIG = pathlib.Path("src/cs625_bringup/config/cs625_task_scene.yaml")
 TASK_SCENE_WORLD = pathlib.Path("src/cs625_simulation/worlds/cs625_insertion_scene.sdf")
 TASK_MODULE_SDF = pathlib.Path(
@@ -330,6 +338,45 @@ def check_cs625_task_scene() -> None:
     outer_span = abs(ranges[0][0] - ranges[1][1])
     if abs(outer_span - float(grasp["handle_outer_span_m"])) > 1e-9:
         fail("grasp handle_outer_span_m disagrees with handle_x_ranges_m")
+
+    # 4a) The camera extrinsics must not drift between the config and the URDF.
+    # The config is the authority: scripts/camera_extrinsics.py derives it from the
+    # RVS calibration, and the xacro defaults are what a bare xacro invocation uses.
+    camera_config = yaml.safe_load(
+        (ROOT / CAMERA_EXTRINSICS_CONFIG).read_text(encoding="utf-8")
+    )["cs625_camera_extrinsics"]["ros__parameters"]
+    description_text = (ROOT / CAMERA_DESCRIPTION).read_text(encoding="utf-8")
+    for argument in (
+        "camera_mount_xyz",
+        "camera_mount_rpy",
+        "camera_optical_rpy",
+        "camera_color_xyz",
+        "camera_color_rpy",
+    ):
+        # Compare numerically: the config holds YAML floats, the xacro holds decimal
+        # strings, and 3.7497526e-05 versus 0.000037497526 is the same number.
+        match = re.search(
+            rf'{argument}"\s+default="([^"]*)"', description_text
+        )
+        if match is None:
+            fail(f"{CAMERA_DESCRIPTION.name} declares no default for {argument}")
+        observed = [float(value) for value in match.group(1).split()]
+        expected = [float(value) for value in camera_config[argument]]
+        if len(observed) != len(expected) or any(
+            abs(a - b) > 1e-12 for a, b in zip(observed, expected)
+        ):
+            fail(
+                f"{CAMERA_DESCRIPTION.name} defaults {argument} to {observed}, but the "
+                f"calibration in {CAMERA_EXTRINSICS_CONFIG.name} says {expected}; "
+                "regenerate with scripts/camera_extrinsics.py"
+            )
+
+    # The calibrated pose must sit near the tool, not past it.  Composing the
+    # controller's (-46, 0, 353) mm TCP offset on top would put the camera 450 mm
+    # out, which is 243 mm beyond the real gripper's 207 mm tip.
+    along_tool = camera_config["camera_mount_xyz"][2]
+    if not 0.05 < along_tool < 0.30:
+        fail(f"camera sits {along_tool} m along the tool axis, which is not near the tool")
 
     # 4b) The task launch must not pass arguments sim_base does not declare.
     launch_text = (
