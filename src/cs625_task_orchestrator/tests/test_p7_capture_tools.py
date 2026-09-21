@@ -355,3 +355,33 @@ def test_p7_2_estimator_cannot_read_ground_truth_and_reports_unobservable_yaw():
     assert "--ground-truth" in evaluator
     assert "evaluation_only_after_estimates_were_immutable" in evaluator
     assert '"add_s_m"' in evaluator
+
+
+def test_preflight_deadline_covers_the_settle_window():
+    """The settle window is simulation time; the deadline is wall clock.
+
+    Raising --settle-sim-sec from 5 s to 20 s while leaving --timeout-sec at 20 s
+    made the deadline expire exactly when settling finished, which skipped the
+    controller query and the stability window and reported CONTROLLERS_NOT_ACTIVE
+    and SETTLE_SIM_TIME_INCOMPLETE.  Those two codes describe the harness, not the
+    robot, so the floor that prevents them is pinned here.
+    """
+
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[3]
+    spec = importlib.util.spec_from_file_location(
+        "p7_capture_preflight", root / "test" / "p7_capture_preflight.py"
+    )
+    preflight = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(preflight)
+
+    # The default combination must leave room for everything after settling.
+    assert preflight.effective_timeout(20.0, 2.0, 20.0) > 20.0 + 2.0
+    # A generous explicit timeout is honoured unchanged.
+    assert preflight.effective_timeout(20.0, 2.0, 300.0) == 300.0
+    # A zero settle window still leaves the stability window and the margin.
+    assert preflight.effective_timeout(0.0, 2.0, 20.0) >= 32.0
+    # Never returns less than the settle window itself.
+    for settle in (0.0, 5.0, 20.0, 60.0):
+        assert preflight.effective_timeout(settle, 2.0, 1.0) > settle

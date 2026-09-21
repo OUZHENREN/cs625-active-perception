@@ -25,6 +25,32 @@ REQUIRED_CONTROLLERS = {
 }
 
 
+# Wall-clock seconds the deadline must additionally cover beyond the settle window:
+# the controller query, the stability window and the sensor observations all run
+# after settling, and renderer load makes wall time outrun simulation time.
+DEADLINE_MARGIN_SEC = 30.0
+
+
+def effective_timeout(settle_sim_sec: float, stability_window_sec: float,
+                      requested_timeout_sec: float) -> float:
+    """Raise the deadline so it cannot expire before the settle window ends.
+
+    ``--settle-sim-sec`` is measured in SIMULATION seconds through /clock while the
+    deadline is wall clock, and on this software renderer wall time outruns
+    simulation time.  A timeout that merely equals the settle window therefore
+    expires the moment settling finishes, which skips the controller query and the
+    stability window entirely and reports CONTROLLERS_NOT_ACTIVE plus
+    SETTLE_SIM_TIME_INCOMPLETE -- failures that describe the harness rather than
+    the robot.  That is exactly what raising the settle window from 5 s to 20 s
+    without touching this deadline produced.
+    """
+
+    return max(
+        requested_timeout_sec,
+        settle_sim_sec + stability_window_sec + DEADLINE_MARGIN_SEC,
+    )
+
+
 def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--initial-positions-file", required=True, type=Path)
@@ -43,6 +69,11 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--stability-window-sec", type=float, default=2.0)
     parser.add_argument("--timeout-sec", type=float, default=20.0)
     arguments = parser.parse_args()
+    arguments.timeout_sec = effective_timeout(
+        arguments.settle_sim_sec,
+        arguments.stability_window_sec,
+        arguments.timeout_sec,
+    )
     if (
         arguments.joint_tolerance_rad <= 0.0
         or arguments.settle_sim_sec < 0.0
