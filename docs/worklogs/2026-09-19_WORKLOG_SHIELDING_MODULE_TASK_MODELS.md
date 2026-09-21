@@ -2114,3 +2114,104 @@ test_p7_capture_tools                            12 passed
 preflight（下一次运行）                           待验证 —— 预期 PASS
 P7.1 sensor gate                                 待验证 —— 真正的重点
 ```
+
+---
+
+## 三十七、✅ P7.1 传感器门通过（关键链路里程碑）
+
+### 37.1 结果
+
+```text
+gate                      P7.1_PERCEPTION_INPUT
+gate_pass                 true
+windows                   5 / 5 全部 window_pass
+failure_codes             []
+record_status             complete
+trajectory_commands_sent  0        （仅传感器输入，无运动）
+real_hardware_connected   false
+evidence（本地归档）        ~/p7_1_sensor_gate/20260921_152724
+```
+
+按 AGENTS.md 的规定，原始证据留在**本地归档**（含 5 个窗口的 CDR、PPM、npy、
+metadata、`manifest.json`、`checksums.sha256`），**未提交进仓库**。
+
+### 37.2 离线预测被 Gazebo 逐位复现
+
+这是本次最有价值的一点——**离线几何与仿真实现在数值上一致**：
+
+| | 离线求解 | Gazebo 实测 | 差 |
+|---|---|---|---|
+| 目标在相机系 (m) | (0.0179, −0.1747, 1.8950) | (0.017896054, −0.174709352, 1.894976353) | 逐位 |
+| 投影像素 | (162.6, 94.4) | (162.6178, 94.4440) | 逐位 |
+| 相机世界位置 (m) | (−1.143419401970, −0.129024743842, 0.422607220321) | (−1.143419401890, −0.129024743913, 0.422607220350) | **1e-10** |
+
+**这一次性验证了四件事**：手眼标定、坐标系约定（深度眼锚点）、URDF 外参传递、
+以及离线求解器本身。
+
+### 37.3 独立复核（不采信 gate 自己的结论）
+
+从 `raw/window_01/points_xyz_m.npy` 原始点云重新计算：
+
+```text
+有效点 57418 / 76800                    与 gate 记录 57418 一致 ✓
+落在目标碰撞代理内 150 点                gate 记 151（差 1 点来自我用的 ±5mm 容差）
+  这些点世界范围 X[0.678,0.742] Y[0.049,0.117] Z[0.0045,0.106]
+  -> 正是半径 0.034 / 高 0.102、中心 (0.711,0.084,0.051) 的圆柱
+独立投影目标中心 -> 像素 (162.6178, 94.4440)
+gate 记录          -> 像素 (162.6178, 94.4440)       差 2.8e-14 px
+```
+
+**目标确实在点云里**，不是 gate 自说自话。
+
+### 37.4 一个悬了很久的担忧，现在有证据了
+
+第 28 节我担心过："真实相机沿工具轴正看，视野中心会不会就是夹爪？"
+
+**答案：不会。** 真实夹爪占据画面 **2440 px**，但**目标像素 ±20 px 内一个夹爪点都没有**。
+眼在手上 + 沿工具轴正看**并不天然遮挡**——只要观测位姿是按该相机重解的。
+
+### 37.5 关键链路状态更新
+
+```text
+base_link -> camera optical TF       NOT ACCEPTED  ->  PASS
+```
+
+### 37.6 Capability layer 现状
+
+```text
+environment and dependencies          PASS  统一入口，契约检查通过
+robot model and simulation            PASS  真实夹爪 + 真实相机外参，FK 逐位验证
+kinematics, control and planning      PASS  控制器 active，关节误差 1e-7~1e-8
+vision, hand-eye calibration, TF      PASS  P7.1 通过，外参被仿真复现到 1e-10
+active perception / NBV               NOT STARTED  前置层刚通过，尚未开始
+real-hardware integration and safety  NOT STARTED  仅 fake hardware 冒烟
+```
+
+### 37.7 Critical chain
+
+```text
+URDF -> Gazebo entity                 PASS
+ros2_control -> joint_states          PASS
+base_link -> camera optical TF        PASS   ← 本轮
+RGB-D -> normalized sensor topics     PASS   四路话题类型 + 5 窗口 layout_valid
+point cloud -> MoveIt planning scene  NOT ACCEPTED  夹具/坐到底弹仓已镜像，但未与 P7.x 联合验证
+NBV decision -> robot execution       NOT STARTED
+```
+
+### 37.8 通过 / 失败
+
+```text
+P7.1 gate（5/5 窗口）                    PASS
+独立点云复核                              PASS
+契约检查                                  PASS
+docs/simulation.md §7.4 更新              PASS（无断链）
+```
+
+### 37.9 下一步（按门禁顺序）
+
+```text
+1. P7.2 位姿估计门   —— 输入必须来自本次冻结的 P7.1 原始观测
+2. 插槽任务场景      —— 夹具/弹仓几何与摆放已就绪，MoveIt 镜像脚本就绪
+3. 抓取模板          —— 外参已定，可开始
+注意：P7.1 刚通过，未经 P7.2/P7.3/P7.4 不得跳到 NBV
+```

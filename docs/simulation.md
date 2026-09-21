@@ -366,13 +366,41 @@ colour optical frame in the flange  (96.950, 42.212, 97.540) mm
 stereo baseline                     24.411 mm
 ```
 
-### 7.4 Consequence: P7.1's sensor evidence is no longer current
+### 7.4 P7.1 was re-run against the calibrated camera, and passed
 
-P7.1's sensor-visibility gate was passed with the previous placeholder pose
-`(0.03, 0, 0.15)` tilted 45 degrees, which was tuned so the marker stayed out of
-the old gripper palm's shadow.  The real camera looks straight down the tool axis.
-**That gate must be re-run**, against an isolated partition and a fresh evidence
-directory:
+The previous P7.1 evidence belonged to the placeholder camera, so the gate had to
+be re-run.  Doing that also exposed that the observation pose itself was stale: it
+was solved for the placeholder, and with the real camera it pointed 1.21 m behind
+the target and produced an empty point cloud.  Re-solving it offline (see section
+7.5) and re-recording the measured settled state produced a passing run on
+2026-09-21:
+
+```text
+gate                      P7.1_PERCEPTION_INPUT
+gate_pass                 true
+windows                   5 / 5
+failure_codes             []
+evidence (local archive)  ~/p7_1_sensor_gate/20260921_152724
+target_point_count        151   (minimum 12)
+finite_point_count        57418
+target pixel              (162.6178, 94.4440) in 320x240
+```
+
+The raw point cloud was re-checked independently of the gate's own summary: 150
+points land inside the target's collision proxy, spanning the proxy's cylinder, and
+re-projecting the target centre from the recorded TF reproduces the reported pixel
+to 2.8e-14 px.  The offline solve had predicted (0.0179, -0.1747, 1.8950) m and
+pixel (162.6, 94.4); Gazebo measured (0.017896054, -0.174709352, 1.894976353) m and
+(162.6178, 94.4440), and the predicted camera position matched the simulated one to
+1e-10 m.  That agreement validates the hand-eye calibration, the frame conventions,
+the depth-eye anchoring and the offline solver at once.
+
+One earlier worry is now settled with evidence rather than argument: an eye-in-hand
+camera looking straight down the tool axis does NOT inherently have the gripper in
+the way.  The real gripper occupies 2440 pixels of the frame but none within 20 px
+of the target.
+
+To re-run the gate, against an isolated partition and a fresh evidence directory:
 
 ```bash
 # 终端 1：起仿真。test/*.sh 在仓库里没有可执行位（这是仓库约定，不是缺陷），
