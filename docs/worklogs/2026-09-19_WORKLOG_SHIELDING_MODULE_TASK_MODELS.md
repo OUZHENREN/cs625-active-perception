@@ -1598,3 +1598,69 @@ base_link -> camera optical TF   NOT ACCEPTED
   按新 TCP 重新标定，这些数就失效，必须重跑 scripts/camera_extrinsics.py。
 · Gazebo 只仿真【一个】RGB-D，不是双目。彩色眼只作为 TF 帧与标定偏移存在。
 ```
+
+---
+
+## 三十、修 P7 门禁脚本的 install 布局假设（阻塞 P7.1 重跑）
+
+用户跑 P7.1 时先撞到**文档错误**（`Permission denied`、`<占位符>` 被当重定向），
+修完后撞到**真正的阻塞**：
+
+```text
+P7.1 initial-position profile is not installed:
+  .../install/share/cs625_bringup/config/p7_1_observation_initial_positions.yaml
+```
+
+### 30.1 根因
+
+```text
+7 处（6 个脚本）都按 $CS625_APP_INSTALL/share/cs625_bringup/... 拼路径
+  -> 那是 --merge-install 工作空间的布局
+本仓库用 --symlink-install（默认隔离布局）
+  -> 真实路径 $CS625_APP_INSTALL/cs625_bringup/share/cs625_bringup/...
+  -> 所以这些脚本【一个都跑不起来】，在加载配置时就退出
+```
+
+### 30.2 修法
+
+不手工拼布局，改为问环境：
+
+```bash
+cs625_bringup_prefix="$(ros2 pkg prefix cs625_bringup)"
+cs625_bringup_share="$cs625_bringup_prefix/share/cs625_bringup"
+```
+
+**两种布局都对**，并且加了明确的错误信息（包不在环境里 / config 目录缺失）。
+落到 6 个脚本：
+
+```text
+run_p7_1_sensor_sim.sh              run_p7_1_sensor_gate_capture.sh
+run_p7_adapter.sh                   run_p7_planning_probe.sh
+run_p7_static_episode_capture.sh    run_p7_tipfix_sim.sh
+```
+
+### 30.3 验证
+
+```text
+6 个脚本 bash -n 全通过
+5 个所需配置全部解析到（initial/settled/static_grasp/safe_initial/view_planning）
+P7.1 启动脚本越过了原来卡死的那道门
+  （沙箱起不了 Gazebo，停在 "launch exited before readiness"，属预期）
+```
+
+### 30.4 加检查防复发
+
+`contract_checks.py` 拒绝任何 shell 脚本**可执行行**里出现
+`$CS625_APP_INSTALL/share/` 或 `cs625_app_install/share/`（注释里允许，因为
+修复说明本身要提到这个坏写法）。
+
+**实测**：写一个带旧路径的探针脚本 -> 检查以文件名报错；删掉 -> PASS ✓
+
+### 30.5 通过 / 失败
+
+```text
+契约检查（含文档命令检查 + install 布局检查）     PASS
+两处检查都实测能触发                               PASS
+test_camera_extrinsics + sync_task_world + applier 19 passed
+P7.1 传感器门重跑                                  PENDING（沙箱无法跑 Gazebo）
+```
