@@ -26,6 +26,20 @@ fi
 # Harmonic discovery uses GZ_PARTITION, so restore the isolated session's
 # matching value after all setup scripts are sourced.  This is essential for
 # the read-only target-pose audit and does not create a new simulator session.
+# The capture runs from a second terminal, while run_p7_1_sensor_sim.sh holds the
+# simulator open in the first.  Gazebo isolates sessions by partition and the
+# ground-truth audit below calls `gz model`, which is partition-sensitive, so the
+# value has to cross the terminal boundary.  run_p7_1_sensor_sim.sh writes it here;
+# taking it automatically is what stops a forgotten export from turning into an
+# empty target pose.
+if [[ -z "${IGN_PARTITION:-}" ]]; then
+  partition_file="${P7_1_PARTITION_FILE:-/tmp/cs625_p7_1_partition}"
+  if [[ -f "$partition_file" ]]; then
+    IGN_PARTITION="$(<"$partition_file")"
+    export IGN_PARTITION
+    echo "using the running P7.1 session partition: $IGN_PARTITION"
+  fi
+fi
 if [[ -z "${GZ_PARTITION:-}" && -n "${IGN_PARTITION:-}" ]]; then
   export GZ_PARTITION="$IGN_PARTITION"
 fi

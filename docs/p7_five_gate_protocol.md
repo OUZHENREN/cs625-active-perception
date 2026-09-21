@@ -42,14 +42,42 @@ P7.1 感知输入
 复现入口：
 
 ```bash
-# 终端 1（test/*.sh 无可执行位，用 bash 调）
+# 终端 1：起仿真。test/*.sh 在仓库里没有可执行位（这是仓库约定，不是缺陷），
+# 所以用 bash 调用，不要直接 ./ 。
 bash test/run_p7_1_sensor_sim.sh
+```
 
-# 终端 2：证据目录必须是【新的】，脚本拒绝复用
+启动脚本会在四路归一化传感器话题和两个控制器都就绪后打印：
+
+```text
+P7_1_SIM_READY partition=<partition> ros_domain_id=<...>
+  this terminal now holds the simulator open on purpose; leave it running.
+```
+
+**这行 READY 本身就是一次接口检查**：它只在
+`/sensors/camera/color/image`、`/sensors/camera/depth/image`、
+`/sensors/camera/depth/camera_info`、`/sensors/camera/points` 四路话题类型正确、
+且 `joint_state_broadcaster` 与 `joint_trajectory_controller` 都 active 时才打印。
+
+> **这一行之后脚本会一直停着，这不是卡住。** 末尾的 `wait` 是故意的前台持有，
+> 用来让仿真保持存活；仿真跑在第一个终端里，不要去关它，也不要 Ctrl-C。
+
+等仿真就绪后，**另开一个终端**抓证据：
+
+```bash
+# 终端 2（需要先 source 过环境）
 export P7_1_EVIDENCE_DIR="$HOME/p7_1_sensor_gate/$(date +%Y%m%d_%H%M%S)"
 CS625_P7_1_SENSOR_GATE=1 CS625_P7_SIMULATION_EXECUTION=1 \
   bash test/run_p7_1_sensor_gate_capture.sh "$P7_1_EVIDENCE_DIR"
 ```
+
+证据目录必须是**全新的**——脚本会拒绝复用已有目录，所以上面的路径带时间戳。
+两个环境变量是前置门，缺一个脚本会以 exit 2 拒绝。
+
+> Gazebo 用 partition 隔离会话，而抓取脚本要跑 `gz model` 读目标真值位姿，
+> 那是 gz-transport、**依赖 partition**。所以启动脚本会把 partition 写进
+> `/tmp/cs625_p7_1_partition`，抓取脚本未显式给出 `IGN_PARTITION` 时自动读取，
+> 避免"忘了导出 -> 真值位姿为空"这种静默失败。
 
 ## 3. P7.2 位姿估计 Gate
 

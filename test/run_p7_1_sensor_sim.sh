@@ -105,5 +105,18 @@ if [[ "$ready" != true ]]; then
   exit 4
 fi
 
+# Hand the partition to the capture step.  This script stays in the foreground to
+# hold the simulator open -- `wait` below is deliberate, not a hang -- so the
+# capture always runs from a second terminal, and it runs `gz model` for ground
+# truth, which is gz-transport and therefore partition-sensitive.  Writing the
+# value here removes the copy-paste step that silently breaks that audit.
+partition_file="${P7_1_PARTITION_FILE:-/tmp/cs625_p7_1_partition}"
+printf '%s\n' "$IGN_PARTITION" >"$partition_file"
+
 echo "P7_1_SIM_READY partition=$IGN_PARTITION ros_domain_id=${ROS_DOMAIN_ID:-default}"
+echo "  this terminal now holds the simulator open on purpose; leave it running."
+echo "  in a second terminal run:"
+echo "    CS625_P7_1_SENSOR_GATE=1 CS625_P7_SIMULATION_EXECUTION=1 \\"
+echo "      bash test/run_p7_1_sensor_gate_capture.sh <new-evidence-directory>"
+echo "  the partition is already recorded in $partition_file"
 wait "$launch_pid"
