@@ -1664,3 +1664,68 @@ P7.1 启动脚本越过了原来卡死的那道门
 test_camera_extrinsics + sync_task_world + applier 19 passed
 P7.1 传感器门重跑                                  PENDING（沙箱无法跑 Gazebo）
 ```
+
+---
+
+## 三十一、P7.1 起来了：新相机位姿下 RGB-D 契约是活的
+
+修完 install 布局后，`bash test/run_p7_1_sensor_sim.sh` 打印：
+
+```text
+P7_1_SIM_READY partition=p7_1_sensor_20260921_150358_1112997 ros_domain_id=default
+```
+
+用户以为"又卡住了"。**其实不是**——脚本末尾是 `wait "$launch_pid"`，故意在前台持有
+仿真，不退出。
+
+### 31.1 这行 READY 本身就是接口证据
+
+它只在以下全部成立时打印：
+
+```text
+joint_state_broadcaster        active
+joint_trajectory_controller    active
+/sensors/camera/color/image         sensor_msgs/msg/Image
+/sensors/camera/depth/image         sensor_msgs/msg/Image
+/sensors/camera/depth/camera_info   sensor_msgs/msg/CameraInfo
+/sensors/camera/points              sensor_msgs/msg/PointCloud2
+```
+
+**所以换成真实标定后的相机位姿，整条四路归一化 RGB-D 契约仍然成立** ✓
+（P7.1 的**接口**部分通过；目标可见性要靠 capture 才判定。）
+
+### 31.2 又发现一个静默失败点：Gazebo partition
+
+抓取脚本会跑 `gz model -m target_object --pose` 读目标真值位姿——**gz-transport
+命令，依赖 partition**。而 partition 是在第一终端进程内生成的，第二终端没有。
+
+**忘了导出不会报错，只会让真值位姿为空**——典型的静默失败。修法：
+
+```text
+run_p7_1_sensor_sim.sh     READY 时把 partition 写进 /tmp/cs625_p7_1_partition
+                          并在 READY 横幅里提示"本终端是故意持有的，另开终端"
+run_p7_1_sensor_gate_capture.sh
+                           未显式给出 IGN_PARTITION 时自动读取该文件
+                           显式给定优先（已隔离验证两种情形）
+```
+
+### 31.3 文档同步
+
+`docs/simulation.md` §7.4 与 `docs/p7_five_gate_protocol.md` 都补上：
+
+```text
+· READY 之后停住【不是卡住】，是故意的（不要 Ctrl-C）
+· READY 行本身证明了什么（四路话题 + 两个控制器）
+· partition 的跨终端传递机制
+· 证据目录必须全新（脚本拒绝复用）
+```
+
+### 31.4 通过 / 失败
+
+```text
+P7.1 仿真启动 + 四路传感器 + 两控制器        PASS（用户实测 READY）
+partition 跨终端传递（自动取用 / 显式优先）    PASS（隔离验证）
+契约检查                                      PASS
+文档内部链接                                  无断链
+P7.1 目标可见性 capture                       PENDING（待用户跑第二终端）
+```
