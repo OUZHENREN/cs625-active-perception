@@ -1404,3 +1404,106 @@ README 内部链接                                         无断链
 这与"零过盈"的决定一致——**抓取可靠性本来就不由本模型验证**。但若要让张开
 动作在视觉上可信，需要把支撑臂从工具网格里**分离出来**单独做 link。
 待用户决定是否值得做。
+
+---
+
+## 二十八、补充：找到并验证真实手眼标定（来自 RVS）
+
+用户问"能不能从 `E:\Desktop\Record\20260608_Ubuntu 24.04` 那个 ROS 环境读 URDF"。
+
+### 28.1 VM 本身读不了，但不需要读
+
+那是 **VMware 虚拟机**（3 个快照增量 + 父盘、2 GB 分段稀疏盘、62 GB）。本机
+**没有** `qemu-img`/`7z`/`libguestfs`/`vmware-mount`，无法直接读。三条路：启动 VM
+拷出 / VMware 映射虚拟磁盘 / 自写读取器（父盘在、935 GB 空闲，SparseExtentHeader
+已解析通，可行约 1~2 小时）。
+
+**但那个 VM 的共享目录就在本机**：`D:\Program Files (x86)\RobotVisionSuite\runtime\`。
+
+### 28.2 相机手眼标定（关键发现）
+
+```ini
+# HandEyeTool.ini
+Eye In Hand = true          ← 正是本课题需要的
+[colorToRobot]  x=96.95  y=42.212  z=97.54    rx=179.96  ry=179.215 rz=89.262
+[depthToRobot]  x=96.754 y=17.803  z=97.328   rx=-179.861 ry=179.987 rz=89.451
+```
+
+单位：`.ini` 是 **mm + 度**，`ColorToRobotTCP.txt`/`DepthToRobotTCP.txt` 是
+**m + 弧度**；两者换算最大差 **4.5e-06**，交叉验证通过。
+
+### 28.3 控制器 TCP 已独立验证
+
+`tool_data_actual.csv` 同时含 TCP 位姿与 `tcp_offset`：
+
+```text
+tcp_offset = (-46.0, 0.0, 353.0, 0, 0, 0) mm
+```
+
+用关节角 + 我们的 URDF 做 FK 加该偏移：
+
+```text
+推算 TCP (mm): [963.3, 649.0, -57.4]     CSV: [963.3, 649.0, -57.4]
+推算姿态(deg): [179.44, 0.48, -128.30]   CSV: [179.44, 0.48, -128.30]
+距离 0.0 mm，姿态一致
+```
+
+**更正**：那个 `flange_to_eef_joint xyz="-0.046 0 0.353"` 我当初当成"师兄工具的
+遗留长度"删掉了——**它其实是控制器上的 TCP 偏移**，同一个数。工具网格的改动仍然
+正确（真实夹爪网格坐标系就是法兰系、该挂 0 偏移），但我们一直缺 TCP 这个坐标系。
+
+### 28.4 两个坐标系问题必须先定，数值才有意义
+
+```text
+参考坐标系：相机实测距法兰约 98 mm，与原始数值吻合
+            -> 标定在【法兰系】下，不能叠加 TCP 偏移
+            -> 叠加会把相机放到 450 mm（越过 207 mm 的夹爪前端 243 mm，悬空）
+
+标定帧：    +Z 沿法兰 +Z（沿工具轴看出去）——眼在手上的相机必须如此
+            -> 记录的是【光学坐标系】
+            -> camera_link 需去掉标准本体->光学旋转
+            -> 复合结果与彩色眼一致到 1e-12（已断言）
+```
+
+两眼光心间距 **24.411 mm**，夹角 **0.79°**（真实双目失配），与"双目相机"吻合。
+
+### 28.5 产出
+
+```text
+scripts/camera_extrinsics.py                  从 RVS 输出推导，含单位交叉验证
+test/test_camera_extrinsics.py                7 passed
+src/cs625_bringup/config/camera_extrinsics_sim.yaml   推导结果 + 来源与日期
+```
+
+RVS 安装路径是机器本地的，**不写进仓库**，由 `--rvs-dir` 或
+`CS625_RVS_RUNTIME_DIR` 提供（符合 AGENTS.md 的"不硬编码绝对用户路径"）。
+
+推导值（相机在法兰系）：
+
+```text
+camera_mount_xyz  = [0.096950, 0.042212, 0.097540]
+camera_mount_rpy  = [1.519565756, -1.557075671, -1.532437269]
+camera_depth_xyz  = [0.000123, -0.024410, -0.000118]
+stereo_baseline_m = 0.024411
+```
+
+### 28.6 通过 / 失败
+
+```text
+RVS 输出解析（.ini 与 .txt 双路交叉验证）        PASS
+TCP 偏移 FK 验证（0.0 mm）                       PASS
+光学轴沿工具轴（<2°，实测 0.79°）                PASS
+camera_mount 往返一致性                          PASS
+python3 test/contract_checks.py                  PASS
+test_camera_extrinsics                           7 passed
+URDF 实际接入                                    PENDING（待用户决定，见下）
+```
+
+### 28.7 未做，以及为什么
+
+**没有把标定值接进 URDF 默认值。** 现有默认 `camera_mount_xyz = (0.03, 0, 0.15)`
+配 45° 倾斜是**为旧占位夹爪调的**，而 **P7.1 的传感器可见性证据就是用它验收的**
+（`src/cs625_task_orchestrator/tests/test_p7_capture_tools.py` 还断言了这个字符串）。
+
+真实的标定是**沿工具轴正看**，姿态差别很大。换默认值会**使 P7.1 已验收的证据失效**，
+按 AGENTS.md 的门禁规则必须显式决定，不能顺手改。
