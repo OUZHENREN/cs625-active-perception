@@ -1729,3 +1729,83 @@ partition 跨终端传递（自动取用 / 显式优先）    PASS（隔离验�
 文档内部链接                                  无断链
 P7.1 目标可见性 capture                       PENDING（待用户跑第二终端）
 ```
+
+---
+
+## 三十二、P7.1 capture：preflight 通过，卡在 gz-transport partition
+
+### 32.1 好消息：preflight 全绿
+
+```json
+"success": true
+"controllers": joint_state_broadcaster / joint_trajectory_controller / gripper_controller  全 active
+"joint_errors_rad": 1e-7 ~ 2e-6   （容差 2e-3）
+"joint_spreads_rad": 全部 0.0     （稳定窗口内无漂移）
+"settle_sim_completed": true, "settle_sim_sec": 5.0
+"clock_regression_count": 0
+```
+
+**所以 P7.1 的控制器、关节定位、时钟同步、稳定窗口都通过了**——而且这是在
+**新的真实相机位姿**下。四个归一化传感器话题也确认存在：
+
+```text
+/sensors/camera/color/image          sensor_msgs/msg/Image
+/sensors/camera/depth/image          sensor_msgs/msg/Image
+/sensors/camera/depth/camera_info    sensor_msgs/msg/CameraInfo
+/sensors/camera/points               sensor_msgs/msg/PointCloud2
+```
+
+### 32.2 卡点：`gz model` 找不到模型
+
+```text
+ValueError: Gazebo output does not identify model 'target_object'
+manifest 里 "gz_partition": ""  <- 空的
+```
+
+**两个都排查过了**：
+
+```text
+target_object 是正确模型名     ✓  p7_ycb_tomato_light.sdf 第 23 行 <model name="target_object">
+capture 脚本语法正常           ✓  bash -n 通过（那条 "line 130" 报错是更早一次运行留下的）
+```
+
+**根因是 partition 不匹配**：仿真脚本自己生成了 partition
+（`p7_1_sensor_<时间戳>_<pid>`），而抓取脚本一个都没有。用户当时运行的仿真
+**是在"写 partition 文件"这个补丁之前启动的**，所以 `/tmp/cs625_p7_1_partition`
+不存在。
+
+### 32.3 顺带发现：`gz model` 失败时返回 0
+
+```text
+$ gz model -m target_object --pose
+Service call to [/gazebo/worlds] timed out
+Command failed when trying to get the world name of the running simulation.
+$ echo $?
+0
+```
+
+**失败也返回 0**，只有输出文本能判断。所以 capture 才会一路走到 parser 才炸，
+报出一个指向"模型名错了"的假线索（而模型名是对的）。
+
+已加前置检查：先探 `gz model --list`，命中 `timed out|Command failed` 就
+**exit 4** 并打印两个 partition 值、gz 的原话、以及两条修法；再加一条检查确认
+运行中的世界**确实**有 `target_object`（这样模型名真错时仍会如实报出）。
+
+**实测（无仿真时）**：
+
+```text
+Cannot reach a running simulation through gz-transport.
+  IGN_PARTITION=<unset>  GZ_PARTITION=<unset>
+  gz model said:  Service call to [/gazebo/worlds] timed out ...
+exit=4
+```
+
+### 32.4 通过 / 失败
+
+```text
+P7.1 preflight（控制器 / 关节 / 时钟 / 稳定窗口）   PASS
+四路归一化传感器话题存在                            PASS
+gz-transport 前置检查（含 target_object 存在性）     PASS（实测 exit 4 + 可操作提示）
+契约检查                                            PASS
+目标真值位姿捕获                                    BLOCKED（需重启仿真以写出 partition）
+```
