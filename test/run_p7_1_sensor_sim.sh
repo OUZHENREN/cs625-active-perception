@@ -7,13 +7,28 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/source_dev_env.sh
 source "$repo_root/scripts/source_dev_env.sh" --full
 cs625_app_install="$CS625_APP_INSTALL"
+# Resolve the package share directory through the installed environment rather
+# than concatenating a workspace layout by hand.  These scripts used to assume
+# "$CS625_APP_INSTALL/share/cs625_bringup", which only holds for a --merge-install
+# workspace; this repository builds with the default isolated layout, where the
+# path is "$CS625_APP_INSTALL/cs625_bringup/share/cs625_bringup".  `ros2 pkg
+# prefix` answers correctly for both.
+if ! cs625_bringup_prefix="$(ros2 pkg prefix cs625_bringup 2>/dev/null)"; then
+  echo "cs625_bringup is not on the environment; source scripts/source_dev_env.sh first" >&2
+  exit 2
+fi
+cs625_bringup_share="$cs625_bringup_prefix/share/cs625_bringup"
+if [[ ! -d "$cs625_bringup_share/config" ]]; then
+  echo "cs625_bringup config directory is missing: $cs625_bringup_share/config" >&2
+  exit 2
+fi
 export IGN_PARTITION="${IGN_PARTITION:-p7_1_sensor_$(date +%Y%m%d_%H%M%S)_$$}"
 export GZ_PARTITION="${GZ_PARTITION:-$IGN_PARTITION}"
 export CS625_GZ_PARTITION="$IGN_PARTITION"
 export ROS2CLI_NO_DAEMON=1
 export CS625_P7_ATTACHMENT_ENABLED="${CS625_P7_ATTACHMENT_ENABLED:-false}"
 launch_log="${P7_1_LAUNCH_LOG:-/tmp/p7_1_sensor_launch.log}"
-initial_positions="${P7_OBSERVATION_INITIAL_POSITIONS:-$cs625_app_install/share/cs625_bringup/config/p7_1_observation_initial_positions.yaml}"
+initial_positions="${P7_OBSERVATION_INITIAL_POSITIONS:-$cs625_bringup_share/config/p7_1_observation_initial_positions.yaml}"
 camera_image_width="${P7_CAMERA_IMAGE_WIDTH:-320}"
 camera_image_height="${P7_CAMERA_IMAGE_HEIGHT:-240}"
 if [[ ! -f "$initial_positions" ]]; then

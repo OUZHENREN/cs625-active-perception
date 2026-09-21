@@ -346,6 +346,29 @@ def check_cs625_task_scene() -> None:
     if abs(outer_span - float(grasp["handle_outer_span_m"])) > 1e-9:
         fail("grasp handle_outer_span_m disagrees with handle_x_ranges_m")
 
+    # 3a) Shell scripts must not assume a --merge-install workspace.  This
+    # repository builds with the default isolated layout, where a package's share
+    # directory is "$CS625_APP_INSTALL/<pkg>/share/<pkg>" and not
+    # "$CS625_APP_INSTALL/share/<pkg>".  Six P7 gate scripts made that assumption,
+    # which made every one of them fail before doing anything.  `ros2 pkg prefix`
+    # answers for both layouts.
+    for script in sorted((ROOT / "test").glob("*.sh")) + sorted(
+        (ROOT / "scripts").glob("*.sh")
+    ):
+        # Comments are allowed to describe the broken pattern; only executable
+        # lines matter, and the fix's own explanation mentions it by name.
+        code = "\n".join(
+            line
+            for line in script.read_text(encoding="utf-8").splitlines()
+            if not line.lstrip().startswith("#")
+        )
+        if re.search(r"\$\{?CS625_APP_INSTALL\}?/share/|cs625_app_install/share/", code):
+            fail(
+                f"{script.relative_to(ROOT)} builds a share path from "
+                "CS625_APP_INSTALL, which only works under --merge-install; use "
+                "\"$(ros2 pkg prefix <pkg>)/share/<pkg>\" instead"
+            )
+
     # 3b) No document may present a test/*.sh script as a directly runnable command.
     for document in sorted((ROOT / "docs").rglob("*.md")) + [ROOT / "README.md"]:
         if not document.is_file():

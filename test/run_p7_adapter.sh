@@ -7,7 +7,22 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/source_dev_env.sh
 source "$repo_root/scripts/source_dev_env.sh" --full
 cs625_app_install="$CS625_APP_INSTALL"
-p7_params_file="${P7_PARAMS_FILE:-$cs625_app_install/share/cs625_bringup/config/p7_static_grasp_sim.yaml}"
+# Resolve the package share directory through the installed environment rather
+# than concatenating a workspace layout by hand.  These scripts used to assume
+# "$CS625_APP_INSTALL/share/cs625_bringup", which only holds for a --merge-install
+# workspace; this repository builds with the default isolated layout, where the
+# path is "$CS625_APP_INSTALL/cs625_bringup/share/cs625_bringup".  `ros2 pkg
+# prefix` answers correctly for both.
+if ! cs625_bringup_prefix="$(ros2 pkg prefix cs625_bringup 2>/dev/null)"; then
+  echo "cs625_bringup is not on the environment; source scripts/source_dev_env.sh first" >&2
+  exit 2
+fi
+cs625_bringup_share="$cs625_bringup_prefix/share/cs625_bringup"
+if [[ ! -d "$cs625_bringup_share/config" ]]; then
+  echo "cs625_bringup config directory is missing: $cs625_bringup_share/config" >&2
+  exit 2
+fi
+p7_params_file="${P7_PARAMS_FILE:-$cs625_bringup_share/config/p7_static_grasp_sim.yaml}"
 
 case "${1:?expected arm, gripper, or attachment}" in
   arm)

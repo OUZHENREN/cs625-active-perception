@@ -7,6 +7,21 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/source_dev_env.sh
 source "$repo_root/scripts/source_dev_env.sh" --full
 cs625_app_install="$CS625_APP_INSTALL"
+# Resolve the package share directory through the installed environment rather
+# than concatenating a workspace layout by hand.  These scripts used to assume
+# "$CS625_APP_INSTALL/share/cs625_bringup", which only holds for a --merge-install
+# workspace; this repository builds with the default isolated layout, where the
+# path is "$CS625_APP_INSTALL/cs625_bringup/share/cs625_bringup".  `ros2 pkg
+# prefix` answers correctly for both.
+if ! cs625_bringup_prefix="$(ros2 pkg prefix cs625_bringup 2>/dev/null)"; then
+  echo "cs625_bringup is not on the environment; source scripts/source_dev_env.sh first" >&2
+  exit 2
+fi
+cs625_bringup_share="$cs625_bringup_prefix/share/cs625_bringup"
+if [[ ! -d "$cs625_bringup_share/config" ]]; then
+  echo "cs625_bringup config directory is missing: $cs625_bringup_share/config" >&2
+  exit 2
+fi
 # The installed overlays can clear GZ_PARTITION while leaving IGN_PARTITION.
 # Harmonic discovery uses GZ_PARTITION, so restore the isolated session's
 # matching value after all setup scripts are sourced.  This is essential for
@@ -30,8 +45,8 @@ if [[ -e "$output_dir" ]]; then
 fi
 mkdir -p "$output_dir"
 cd "$repo_root"
-initial_positions="${P7_OBSERVATION_INITIAL_POSITIONS:-$cs625_app_install/share/cs625_bringup/config/p7_1_observation_initial_positions.yaml}"
-expected_positions="${P7_OBSERVATION_EXPECTED_POSITIONS:-$cs625_app_install/share/cs625_bringup/config/p7_1_observation_settled_positions.yaml}"
+initial_positions="${P7_OBSERVATION_INITIAL_POSITIONS:-$cs625_bringup_share/config/p7_1_observation_initial_positions.yaml}"
+expected_positions="${P7_OBSERVATION_EXPECTED_POSITIONS:-$cs625_bringup_share/config/p7_1_observation_settled_positions.yaml}"
 discard_initial_windows="${P7_DISCARD_INITIAL_WINDOWS:-0}"
 
 finalized=false
