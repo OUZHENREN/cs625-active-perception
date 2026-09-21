@@ -1900,3 +1900,70 @@ P7.1 完整 capture                                 PENDING（重跑，settle �
 这不是本次改动引入的（d3/d4 就有了，且稳定文件已记录），但它本身不平凡：
 位置控制 + 无重力 + 无接触，理论上应该精确到位。这条留作待查项，
 当前靠"请求值/稳定值分开记录"绕开。
+
+---
+
+## 三十四、我上一个提交引入的缺陷：settle 提到 20 s，但 timeout 还是 20 s
+
+### 34.1 现象
+
+```json
+"controllers": {},                     ← 空的，ListControllers 没返回
+"failure_codes": ["CONTROLLERS_NOT_ACTIVE", "SETTLE_SIM_TIME_INCOMPLETE"],
+"settle_sim_completed": false,
+"settle_sim_sec": 20.0,
+"joint_sample_counts": 全 0,
+"joint_errors_rad": shoulder_lift = 1.15e-08   ← 关节其实完美
+```
+
+### 34.2 好消息：settle 诊断被证实
+
+`shoulder_lift` 误差 **1.15e-08** —— **关节确实收敛到 -0.490043**。第三十三节的诊断
+（之前读的是收敛中的瞬态）**成立**。
+
+### 34.3 坏消息：这是我自己引入的缺陷
+
+```text
+--settle-sim-sec      用【仿真秒】（/clock 计）
+--timeout-sec         用【墙钟】，默认 20 s 没跟着改
+软件渲染下墙钟比仿真时间跑得快
+  -> 20 s 仿真 settle 走完时，20 s 墙钟 deadline 同时到期
+  -> 控制器查询与稳定窗口被整体跳过
+  -> 报出 CONTROLLERS_NOT_ACTIVE + SETTLE_SIM_TIME_INCOMPLETE
+```
+
+**这两个失败码描述的是测试脚手架，不是机器人。** 是我把 settle 从 5 提到 20 时
+漏了 deadline。
+
+### 34.4 修法
+
+```python
+def effective_timeout(settle_sim_sec, stability_window_sec, requested_timeout_sec):
+    return max(requested_timeout_sec,
+               settle_sim_sec + stability_window_sec + DEADLINE_MARGIN_SEC)   # 30 s
+```
+
+```text
+settle=20 stability=2 requested=20  -> 52.0 s 墙钟
+settle=20 stability=2 requested=300 -> 300 s（显式宽裕值不被改动）
+settle=60 stability=2 requested=20  -> 92.0 s
+```
+
+**0.002 rad 判据依旧没动**——这是上一提交的我的缺陷，不是机器人的问题。
+
+### 34.5 顺带清理一个我误建的重复文件
+
+我把回归测试追加到了 **`test/test_p7_capture_tools.py`**，而现有测试文件在
+**`src/cs625_task_orchestrator/tests/test_p7_capture_tools.py`** —— 建出了一个
+重复文件（AGENTS.md 明确禁止）。已并入真文件并删除误建文件，同时修掉
+`pathlib.Path`（真文件用的是 `from pathlib import Path`）与 repo root 层数。
+
+### 34.6 通过 / 失败
+
+```text
+effective_timeout 边界（4 组）                    PASS
+test_p7_capture_tools                            12 passed
+契约检查                                          PASS
+误建的重复文件清理                                PASS
+P7.1 完整 capture                                 PENDING（重跑，deadline 已修正）
+```
