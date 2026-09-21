@@ -1967,3 +1967,107 @@ test_p7_capture_tools                            12 passed
 误建的重复文件清理                                PASS
 P7.1 完整 capture                                 PENDING（重跑，deadline 已修正）
 ```
+
+---
+
+## 三十五、P7.1 跑通了全流程：gate 失败的真因不是遮挡，是相机指向
+
+这一轮 capture **完整跑完**（前几轮都卡在工具链上）。
+
+### 35.1 工具链全部通过
+
+```text
+preflight               "success": true（控制器 active、关节 1e-8、spread 0.0、settle 完成）
+目标真值                  gz model 读到 target_object @ (0.72, 0, -7.9e-05)
+五窗口                  全部采集成功，CDR + 派生文件齐全，四路校验 layout_valid=true
+gate_pass               false
+```
+
+### 35.2 失败原因：目标在相机背后
+
+```json
+"camera_xyz_m": [0.0034, 1.5213, -1.2138]   ← z 为负 = 在相机背后
+"in_front": false,  "inside_image": false
+"finite_point_count": 0                     ← 整个点云 0 个有效点
+```
+
+光学系是 **(x 右, y 下, z 前)**。目标在 `z = −1.214 m`。
+
+**根因**：`p7_1_observation_initial_positions.yaml` 是**为旧占位相机解的**
+（45° 斜看、装在 (0.03,0,0.15)）。换成真实相机（沿工具轴正看）后，同样的关节角
+把相机指向了完全不同的方向——**连地面都看不到**（所以点云全空）。
+
+**这是一个"改了 A 没检查 B"的典型**：换相机时没有任何检查验证观测位姿还能看见目标。
+
+### 35.3 用仓库自己的求解器重解（不是手调）
+
+`test/p7_solve_static_observation_pose.py` 本来就是干这个的，而且它用的正是
+**`camera_depth_optical_frame`** —— 我们改锚点的那个 frame，所以自动用上新外参。
+
+```bash
+--urdf <展开的URDF> --seed-joints p7_safe_initial_positions.yaml \
+  --target-pose <gazebo目标位姿> --lock-proximal
+```
+
+`--lock-proximal` 让**只有腕部运动**、前三个关节留在安全种子：
+
+```text
+shoulder_pan 0.0   shoulder_lift -0.35   elbow 0.0
+wrist_1 +0.056945  wrist_2 -1.689989     wrist_3 -1.594572
+```
+
+### 35.4 离线验证（旧位姿从来没有过这一步）
+
+```text
+目标在光学系 (0.018, -0.175, 1.895) m，距离 1.903 m          ✓ 在相机前方
+像素 (162.6, 94.4)，距最近图像边缘 94 px                      ✓ 居中
+真实夹爪：前方 16757 点，图像内 2440 点，距相机 0.053~0.228 m
+目标像素 ±20px 内的夹爪点 = 0                                 ✓ 不遮挡
+所有关节限位裕度 ≥ 3.14 rad                                   ✓
+最低 distal link 原点离地 0.423 m                             ✓
+```
+
+### 35.5 顺带解决一个悬了很久的担忧
+
+第三节我担心过："真实相机沿工具轴正看，视野中心会不会就是夹爪？"
+
+**答案是：不会。** 只要观测位姿是按该相机重解的，夹爪虽然占据画面
+（2440 px，u[2,284]、v[1,221]），但**绕开了目标**。眼在手上 + 沿工具轴正看
+并不天然遮挡。
+
+### 35.6 加了正是这次缺失的检查
+
+`contract_checks.py` 现在会在以下任一情况失败：
+
+```text
+观测位姿诊断所用的 URDF 哈希与当前 xacro 不一致   ← 这次就是栽在这里
+目标在相机背后 / 不在图像内
+求解时没有 --lock-proximal
+夹爪遮挡目标
+记录的位姿与 initial_positions 文件不一致
+```
+
+**实测**：伪造 URDF 哈希 -> 立刻报错并给出重解命令 ✓
+
+### 35.7 通过 / 失败
+
+```text
+工具链（partition / settle / deadline）           PASS
+preflight                                        PASS
+五窗口采集                                        PASS
+相机指向重解 + 离线遮挡验证                        PASS
+契约检查（含新增的观测位姿检查）                    PASS（实测能触发）
+test_sync_task_world + applier + camera_extrinsics  19 passed
+P7.1 gate 本身                                    PENDING —— 见 35.8
+```
+
+### 35.8 还差一步才能过 gate
+
+```text
+p7_1_observation_settled_positions.yaml 里存的还是【上一条命令】测出的稳定偏移
+新位姿下肩关节的偏移会不同，必须重新测量
+下次 preflight 会报 INITIAL_JOINT_MISMATCH 并在 observed_joint_positions_rad
+里给出新的实测值；用它更新该文件后，gate 才能过
+```
+
+这条已写进诊断的 `tool_fixes_before_next_runtime`。
