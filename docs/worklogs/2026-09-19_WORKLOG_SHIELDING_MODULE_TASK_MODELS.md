@@ -2071,3 +2071,46 @@ p7_1_observation_settled_positions.yaml 里存的还是【上一条命令】测�
 ```
 
 这条已写进诊断的 `tool_fixes_before_next_runtime`。
+
+---
+
+## 三十六、P7.1 新位姿实测：**零稳定偏移**
+
+用户重启仿真（新的 initial positions 生效）后跑 capture，preflight 报
+`INITIAL_JOINT_MISMATCH`——**这是预期的**，因为稳定位姿文件还是旧位姿测的。
+
+但关键数据是：
+
+```json
+"observed_joint_positions_rad": {
+  "shoulder_pan_joint": 0.0,        "shoulder_lift_joint": -0.35,   "elbow_joint": 0.0,
+  "wrist_1_joint": 0.056945119,     "wrist_2_joint": -1.689988597,  "wrist_3_joint": -1.594572224
+},
+"joint_spreads_rad": { 全部 0.0 },
+"settle_sim_completed": true, "settle_sim_sec": 20.0
+```
+
+**实测值 = 命令值，逐位一致；200 采样 / 2.0 s 内漂移全部为 0。**
+
+### 36.1 新位姿没有稳定偏移
+
+旧位姿有 `shoulder_lift` 的 **−0.021250 rad（1.218°）** 偏移，需要单独记录稳定值。
+新位姿（肘关节在 0、手臂折叠）**精确停在命令位置**，所以：
+
+```text
+p7_1_observation_settled_positions.yaml := 实测值 = initial 值
+```
+
+这是**测量结果**，不是简化——文件注释里写明了这一点，并且明确说明"为什么一个构型
+会偏离命令值而另一个不会，仍未解释"（对应第 33.7 节的待查项），
+**要求以后重解后必须重新测量，不能假定。**
+
+### 36.2 通过 / 失败
+
+```text
+initial 与 settled 逐位一致                       PASS
+契约检查                                          PASS
+test_p7_capture_tools                            12 passed
+preflight（下一次运行）                           待验证 —— 预期 PASS
+P7.1 sensor gate                                 待验证 —— 真正的重点
+```
