@@ -90,6 +90,8 @@ if [[ -n "${P7_1_WORLD_SOURCE:-}" ]]; then
 fi
 python3 test/p7_capture_manifest.py "${manifest_arguments[@]}"
 python3 test/p7_capture_preflight.py \
+  --settle-sim-sec "${P7_SETTLE_SIM_SEC:-20}" \
+  --stability-window-sec "${P7_STABILITY_WINDOW_SEC:-2}" \
   --initial-positions-file "$initial_positions" \
   --expected-positions-file "$expected_positions" \
   --output "$output_dir/preflight.json"

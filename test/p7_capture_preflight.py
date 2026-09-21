@@ -31,7 +31,15 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--expected-positions-file", type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--joint-tolerance-rad", type=float, default=0.002)
-    parser.add_argument("--settle-sim-sec", type=float, default=5.0)
+    # 20 s, not 5 s.  shoulder_lift_joint is commanded to -0.468793 and converges
+    # slowly to its recorded settled value of -0.490043, a 0.0213 rad offset that
+    # two earlier isolated runs already characterised.  At 5 s of simulation time
+    # that joint is still partway there, so whether the gate passed depended on how
+    # long the simulator happened to have been running before the capture: a long
+    # lived session read 1e-8, a freshly restarted one read 2.6e-3 and failed.
+    # Waiting longer is the honest fix; loosening --joint-tolerance-rad would not
+    # be, and it stays at 0.002.
+    parser.add_argument("--settle-sim-sec", type=float, default=20.0)
     parser.add_argument("--stability-window-sec", type=float, default=2.0)
     parser.add_argument("--timeout-sec", type=float, default=20.0)
     arguments = parser.parse_args()

@@ -55,6 +55,8 @@ qw=0.0961499
 python3 test/p7_capture_manifest.py \
   --repo-root "$repo_root" --output "$output_dir/manifest.json"
 python3 test/p7_capture_preflight.py \
+  --settle-sim-sec "${P7_SETTLE_SIM_SEC:-20}" \
+  --stability-window-sec "${P7_STABILITY_WINDOW_SEC:-2}" \
   --initial-positions-file "$initial_positions" \
   --output "$output_dir/preflight.json"
 python3 test/p7_capture_episode_marker.py \
