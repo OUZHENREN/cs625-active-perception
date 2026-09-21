@@ -1,14 +1,22 @@
 # P7.1 Gazebo-settled observation state, simulation only.
 #
-# The model is requested at p7_1_observation_initial_positions.yaml. Two
-# isolated runs (d3 and d4) independently converged to the same shoulder-lift
-# offset; d4 then held all six joints with zero observed peak-to-peak spread
-# across 200 samples / 2.0 s.  Keeping requested and settled states separate
-# avoids weakening the 0.002 rad gate or pretending the requested state was
-# reached.  This file is not a real-robot calibration.
-shoulder_pan_joint: 0.434425123365
-shoulder_lift_joint: -0.490042812931
-elbow_joint: 1.269496979085
-wrist_1_joint: -1.820428502278
-wrist_2_joint: 1.585136678126
-wrist_3_joint: 1.547476778725
+# Re-measured on 2026-09-21 for the re-solved observation pose, in the same
+# isolated session that produced the measurement below.  The model is requested at
+# p7_1_observation_initial_positions.yaml.
+#
+# Unlike the previous pose, this one has NO settle offset: the preflight observed
+# the six joints exactly at their commanded values with zero peak-to-peak spread
+# across 200 samples / 2.0 s, so requested and settled coincide and there is
+# nothing to compensate.  That is a measurement, not a simplification -- the
+# earlier pose carried a -0.021250 rad shoulder-lift offset, and why one
+# configuration settles off its command while this one does not is still open
+# (see the work log for 2026-09-19, section 33.7).  Do not assume a future
+# re-solve will also land exactly; measure it.
+#
+# This file is not a real-robot calibration.
+shoulder_pan_joint: 0.000000000
+shoulder_lift_joint: -0.350000000
+elbow_joint: 0.000000000
+wrist_1_joint: 0.056945119
+wrist_2_joint: -1.689988597
+wrist_3_joint: -1.594572224
