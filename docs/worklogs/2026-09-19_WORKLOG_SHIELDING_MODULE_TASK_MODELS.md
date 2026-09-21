@@ -1583,10 +1583,11 @@ P7.1 传感器门重跑                                    PENDING（需用户�
 base_link -> camera optical TF   NOT ACCEPTED
   几何与 TF 已按真实标定接好、FK 逐位验证通过，
   但 P7.1 传感器可见性证据属于旧占位相机，必须重跑才算验收。
-  重跑命令（见 docs/simulation.md §7.4）：
-    test/run_p7_1_sensor_sim.sh
+  重跑命令（见 docs/simulation.md §7.4；test/*.sh 无可执行位，须用 bash 调）：
+    bash test/run_p7_1_sensor_sim.sh
+    export P7_1_EVIDENCE_DIR="$HOME/p7_1_sensor_gate/$(date +%Y%m%d_%H%M%S)"
     CS625_P7_1_SENSOR_GATE=1 CS625_P7_SIMULATION_EXECUTION=1 \
-      test/run_p7_1_sensor_gate_capture.sh <new-evidence-directory>
+      bash test/run_p7_1_sensor_gate_capture.sh "$P7_1_EVIDENCE_DIR"
   在此之前不得在其上构建主动感知结果。
 ```
 

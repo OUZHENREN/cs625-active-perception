@@ -203,6 +203,13 @@ def check_environment_contract() -> None:
 # into a global launch configuration -- the leak documented in sim_base.launch.py.
 TASK_SCENE_FORBIDDEN_ARGS = ("p7_attachment_enabled",)
 
+# Documented commands must be copy-pasteable.  No test/*.sh carries an executable
+# bit -- that is the repository's convention, and scripts/*.sh is where executables
+# live -- so a doc that shows "test/foo.sh" as a command hands the reader a
+# permission error.  This was wrong in two documents at once and is now checked.
+DOCUMENTED_SCRIPT_ROOTS = ("docs", ".")
+DOCUMENTED_NON_EXECUTABLE = "test/"
+
 CAMERA_EXTRINSICS_CONFIG = (
     pathlib.Path("src/cs625_bringup/config/camera_extrinsics_sim.yaml")
 )
@@ -338,6 +345,24 @@ def check_cs625_task_scene() -> None:
     outer_span = abs(ranges[0][0] - ranges[1][1])
     if abs(outer_span - float(grasp["handle_outer_span_m"])) > 1e-9:
         fail("grasp handle_outer_span_m disagrees with handle_x_ranges_m")
+
+    # 3b) No document may present a test/*.sh script as a directly runnable command.
+    for document in sorted((ROOT / "docs").rglob("*.md")) + [ROOT / "README.md"]:
+        if not document.is_file():
+            continue
+        for number, line in enumerate(
+            document.read_text(encoding="utf-8").splitlines(), start=1
+        ):
+            stripped = line.strip()
+            if stripped.startswith(("bash ", "./", "#", "-", "*", "|")):
+                continue
+            match = re.match(r"^(test/[A-Za-z0-9_.\-]+\.sh)\b", stripped)
+            if match:
+                fail(
+                    f"{document.relative_to(ROOT)}:{number} shows {match.group(1)} as a "
+                    "command, but no test/*.sh is executable; write "
+                    f"\"bash {match.group(1)}\""
+                )
 
     # 4a) The camera extrinsics must not drift between the config and the URDF.
     # The config is the authority: scripts/camera_extrinsics.py derives it from the

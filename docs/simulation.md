@@ -375,9 +375,19 @@ the old gripper palm's shadow.  The real camera looks straight down the tool axi
 directory:
 
 ```bash
-test/run_p7_1_sensor_sim.sh
+# 终端 1：起仿真。test/*.sh 在仓库里没有可执行位（这是仓库约定，不是缺陷），
+# 所以用 bash 调用，不要直接 ./ 。
+bash test/run_p7_1_sensor_sim.sh
+```
+
+等仿真就绪后，另开一个终端抓证据。证据目录必须是**全新的**——脚本会拒绝复用
+已有目录，所以用带时间戳的路径：
+
+```bash
+# 终端 2（需要先 source 过环境）
+export P7_1_EVIDENCE_DIR="$HOME/p7_1_sensor_gate/$(date +%Y%m%d_%H%M%S)"
 CS625_P7_1_SENSOR_GATE=1 CS625_P7_SIMULATION_EXECUTION=1 \
-  test/run_p7_1_sensor_gate_capture.sh <new-evidence-directory>
+  bash test/run_p7_1_sensor_gate_capture.sh "$P7_1_EVIDENCE_DIR"
 ```
 
 Until that passes, treat the RGB-D input chain as `NOT ACCEPTED` at this pose and

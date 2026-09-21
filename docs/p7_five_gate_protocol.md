@@ -42,8 +42,13 @@ P7.1 感知输入
 复现入口：
 
 ```bash
-test/run_p7_1_sensor_sim.sh
-test/run_p7_1_sensor_gate_capture.sh <new-evidence-directory>
+# 终端 1（test/*.sh 无可执行位，用 bash 调）
+bash test/run_p7_1_sensor_sim.sh
+
+# 终端 2：证据目录必须是【新的】，脚本拒绝复用
+export P7_1_EVIDENCE_DIR="$HOME/p7_1_sensor_gate/$(date +%Y%m%d_%H%M%S)"
+CS625_P7_1_SENSOR_GATE=1 CS625_P7_SIMULATION_EXECUTION=1 \
+  bash test/run_p7_1_sensor_gate_capture.sh "$P7_1_EVIDENCE_DIR"
 ```
 
 ## 3. P7.2 位姿估计 Gate
