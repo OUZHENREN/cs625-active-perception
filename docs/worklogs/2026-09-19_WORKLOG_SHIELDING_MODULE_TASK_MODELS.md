@@ -1809,3 +1809,94 @@ gz-transport 前置检查（含 target_object 存在性）     PASS（实测 exi
 契约检查                                            PASS
 目标真值位姿捕获                                    BLOCKED（需重启仿真以写出 partition）
 ```
+
+---
+
+## 三十三、P7.1 capture：partition 修好，preflight 抓到"读的是瞬态"
+
+### 33.1 partition 传递生效
+
+```text
+using the running P7.1 session partition: p7_1_sensor_20260921_151131_1116644
+manifest: "gz_partition": "p7_1_sensor_20260921_151131_1116644"
+```
+
+前一节的修复确认有效 ✓
+
+### 33.2 新失败：`INITIAL_JOINT_MISMATCH`（只有肩关节）
+
+```json
+"failure_codes": ["INITIAL_JOINT_MISMATCH"]
+"joint_errors_rad":  shoulder_lift = 0.002627   > 容差 0.002
+                     其余 5 个关节  ~1e-7
+"joint_spreads_rad": shoulder_lift = 0.001646   （仍在动）
+                     其余          ~1e-14
+expected  shoulder_lift = -0.490042812931
+observed  shoulder_lift = -0.487415764311944
+```
+
+### 33.3 排查过程（三个假设，两个被数据否掉）
+
+```text
+假设 1：真实夹爪变重导致重力下垂
+        否 —— 所有机器人 link 的 <gravity>false</gravity> 均生效（含 my_end_effector_link）
+
+假设 2：更大的真实夹爪撞到了世界里的物体
+        否 —— 用记录的关节角做 FK：工具世界系 X[-1.286,-0.996]，
+              最低点 Z=0.1335（未穿地），与遮挡板(X 0.55~0.65)相距 1.6 m
+
+假设 3：读的是收敛过程中的瞬态
+        成立 ✓
+```
+
+**关键证据**：同一配置**在 07:08 通过（1e-8）、在 07:12 失败（2.6e-3）**。
+差别是前者抓的是一个已运行很久的仿真，后者抓的是刚重启的。
+
+再看两个位姿配置文件的差异——**只有肩关节**：
+
+```text
+初始(命令值) -0.468793    稳定(期望值) -0.490043    差 -0.021250 rad (-1.218°)
+```
+
+而且 `p7_1_observation_settled_positions.yaml` 的注释**本来就写着**这个偏移来自
+更早的 d3/d4 两次独立运行，并说明"把请求值与稳定值分开记录，是为了不削弱
+0.002 rad 的判据、也不假装请求值已经达到"。
+
+### 33.4 定量确认
+
+```text
+5 s 仿真时间已走完 87.7% 的行程
+  -> 一阶拟合 tau = 2.39 s
+  -> 预测 2 s 窗口内位移 0.00148 rad
+  -> 实测 0.00165 rad        ✓ 吻合
+  -> 20 s 后残差 < 1e-5 rad  远超 0.002 判据
+```
+
+### 33.5 修法：给时间，不动判据
+
+```text
+--settle-sim-sec        默认 5 -> 20 秒（仿真时间）
+两个 capture 脚本        暴露 P7_SETTLE_SIM_SEC / P7_STABILITY_WINDOW_SEC
+--joint-tolerance-rad   保持 0.002【故意不动】
+```
+
+> **这是时序缺陷，不是模型缺陷。** 放宽 0.002 会把问题藏起来，所以没动。
+
+### 33.6 通过 / 失败
+
+```text
+partition 跨终端传递                              PASS
+"没有接触"结论（FK + 包围盒）                      PASS
+一阶收敛模型与实测吻合（0.00148 vs 0.00165）        PASS
+契约检查                                          PASS
+test_p7_capture_tools                             11 passed
+两个 capture 脚本 bash -n                          PASS
+P7.1 完整 capture                                 PENDING（重跑，settle 已提到 20 s）
+```
+
+### 33.7 一个值得记录的遗留问题
+
+**位置接口控制、且重力关闭的关节，为什么会从命令值偏离 1.218°？**
+这不是本次改动引入的（d3/d4 就有了，且稳定文件已记录），但它本身不平凡：
+位置控制 + 无重力 + 无接触，理论上应该精确到位。这条留作待查项，
+当前靠"请求值/稳定值分开记录"绕开。
