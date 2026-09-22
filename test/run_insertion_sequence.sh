@@ -23,6 +23,18 @@ cs625_bringup_share="$cs625_bringup_prefix/share/cs625_bringup"
 # real copies, not symlinks, so a config added since the last build is absent from the
 # install tree -- and this script is run from the checkout, where the committed file is
 # the authority anyway.  The installed copy is the fallback rather than the default.
+# Every execution-side script in this repository refuses to command motion unless the
+# operator acknowledges it, and that acknowledgement is deliberately not something this
+# script can give on their behalf.  Checked here, before anything is derived or
+# recorded, so a missing flag costs one line instead of one traceback per leg.
+if [[ "${CS625_P7_SIMULATION_EXECUTION:-}" != "1" ]]; then
+  echo "This script commands the arm. Re-run it as:" >&2
+  echo "  CS625_P7_SIMULATION_EXECUTION=1 bash test/run_insertion_sequence.sh" >&2
+  echo "The flag is the project's acknowledgement that motion is intended in the" >&2
+  echo "isolated simulation; it is not set here so that it stays an operator choice." >&2
+  exit 2
+fi
+
 sequence_config="$repo_root/src/cs625_bringup/config/cs625_insertion_sequence.yaml"
 if [[ ! -f "$sequence_config" ]]; then
   sequence_config="$cs625_bringup_share/config/cs625_insertion_sequence.yaml"
