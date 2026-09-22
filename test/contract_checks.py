@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import ast
 import hashlib
+
+import numpy as np
 import json
 import os
 import pathlib
@@ -217,6 +219,10 @@ DOCUMENTED_NON_EXECUTABLE = "test/"
 # nothing noticed that the pose solved for the placeholder camera now pointed
 # 1.2 m behind the target, and P7.1 failed on all five windows with an empty point
 # cloud.  This record is what ties the two together.
+GRASP_TEMPLATE_CONFIG = pathlib.Path(
+    "src/cs625_bringup/config/cs625_grasp_template.yaml"
+)
+
 P7_1_OBSERVATION_DIAGNOSTIC = pathlib.Path(
     "docs/diagnostics/p7/p7_1_static_observation_pose_20260921.json"
 )
@@ -436,6 +442,43 @@ def check_cs625_task_scene() -> None:
                 f"{joint}: {initial[joint]} against {value}"
             )
 
+    # 3d) The grasp template must describe a grasp that is actually graspable.
+    # scripts/grasp_template.py does the mesh work; these are the cheap invariants
+    # that catch a hand-edit or a stale derivation without loading any mesh.
+    template = yaml.safe_load(
+        (ROOT / GRASP_TEMPLATE_CONFIG).read_text(encoding="utf-8")
+    )["cs625_grasp_template"]["ros__parameters"]
+    scene = _load_task_parameters()
+    rotation = np.array(template["rotation_gripper_to_module"], dtype=float)
+    if abs(np.linalg.det(rotation) - 1.0) > 1e-9:
+        fail("the grasp rotation is not a proper rotation")
+    # The arms run along the gripper +Z and must point along the module +Y, since
+    # the gripper enters from the module's -Y side.
+    if np.abs(rotation @ [0.0, 0.0, 1.0] - [0.0, 1.0, 0.0]).max() > 1e-9:
+        fail("the grasp rotation does not point the tool axis along the module +Y")
+    if np.abs(rotation @ [1.0, 0.0, 0.0] - [1.0, 0.0, 0.0]).max() > 1e-9:
+        fail("the grasp rotation does not align the arm axis with the module X")
+    arm = template["arm"]
+    if arm["contact_span_m"] != scene["grasp"]["handle_inner_span_m"]:
+        fail(
+            "the grasp contact span does not equal the handle inner span, so the "
+            "grasp is not the zero-interference fit that was chosen"
+        )
+    if abs(
+        arm["contact_command_m"] - (arm["contact_span_m"] - arm["retracted_span_m"]) / 2.0
+    ) > 1e-9:
+        fail("the grasp arm command is not half the arm travel")
+    if template["clearance_summary"]["grasp_minimum_m"] <= 0.0005:
+        fail("the grasp pose penetrates the module")
+    # The y placement must centre the arms on the handles rather than being tuned.
+    extremes = template["extremes_m"]
+    handle_low, handle_high = scene["grasp"]["handle_y_range_m"]
+    expected_y = (handle_low + handle_high) / 2.0 - (
+        extremes["arm_low"] + extremes["arm_high"]
+    ) / 2.0
+    if abs(template["translation_module_m"][1] - expected_y) > 1e-6:
+        fail("the grasp depth no longer centres the arms on the handles")
+
     # 4a) The camera extrinsics must not drift between the config and the URDF.
     # The config is the authority: scripts/camera_extrinsics.py derives it from the
     # RVS calibration, and the xacro defaults are what a bare xacro invocation uses.
@@ -551,6 +594,9 @@ def main() -> int:
         ROOT / "test" / "inspect_stl_mass_properties.py",
         ROOT / "scripts" / "sync_task_world.py",
         ROOT / "scripts" / "camera_extrinsics.py",
+        ROOT / "scripts" / "grasp_template.py",
+        ROOT / "test" / "test_grasp_template.py",
+        ROOT / "src" / "cs625_bringup" / "config" / "cs625_grasp_template.yaml",
         ROOT / "test" / "test_camera_extrinsics.py",
         ROOT / "src" / "cs625_bringup" / "config" / "camera_extrinsics_sim.yaml",
         ROOT / "test" / "test_sync_task_world.py",

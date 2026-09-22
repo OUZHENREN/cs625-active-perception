@@ -1,0 +1,123 @@
+cs625_grasp_template:
+  ros__parameters:
+    rotation_gripper_to_module:
+    - - 1.0
+      - 0.0
+      - 0.0
+    - - 0.0
+      - 0.0
+      - 1.0
+    - - 0.0
+      - -1.0
+      - 0.0
+    translation_module_m:
+    - -0.20850000000000002
+    - -0.10000275072455406
+    - -0.099
+    arm:
+      retracted_command_m: 0.0
+      contact_command_m: 0.02
+      retracted_span_m: 0.204
+      contact_span_m: 0.244
+    approach:
+      axis_module:
+      - 0.0
+      - -1.0
+      - 0.0
+      standoff_m: 0.12
+      note: arms retracted for the whole approach; they expand to the contact span
+        only once the grasp transform is reached
+    lift:
+      axis_world:
+      - 0.0
+      - 0.0
+      - 1.0
+      lift_m: 0.08
+    extremes_m:
+      arm_low: 0.004005499184131622
+      arm_high: 0.2070000022649765
+      contact_low: -0.3305
+      contact_high: -0.0865
+      handle_x_ranges:
+      - - -0.3565
+        - -0.3305
+      - - -0.0865
+        - -0.0605
+      tool_span_m: 0.2945704460144043
+    clearance_profile:
+    - standoff_m: 0.0
+      minimum_clearance_m: 0.002270484
+    - standoff_m: 0.01
+      minimum_clearance_m: 0.001599526
+    - standoff_m: 0.02
+      minimum_clearance_m: 0.00113305
+    - standoff_m: 0.03
+      minimum_clearance_m: 0.000482586
+    - standoff_m: 0.04
+      minimum_clearance_m: 0.002098043
+    - standoff_m: 0.05
+      minimum_clearance_m: 0.002214563
+    - standoff_m: 0.06
+      minimum_clearance_m: 0.001678083
+    - standoff_m: 0.07
+      minimum_clearance_m: 0.00380927
+    - standoff_m: 0.08
+      minimum_clearance_m: 0.011762753
+    - standoff_m: 0.09
+      minimum_clearance_m: 0.020723906
+    - standoff_m: 0.1
+      minimum_clearance_m: 0.030039433
+    - standoff_m: 0.11
+      minimum_clearance_m: 0.036282912
+    - standoff_m: 0.12
+      minimum_clearance_m: 0.036251198
+    - standoff_m: 0.13
+      minimum_clearance_m: 0.037723301
+    - standoff_m: 0.14
+      minimum_clearance_m: 0.041188977
+    - standoff_m: 0.15
+      minimum_clearance_m: 0.046214666
+    - standoff_m: 0.16
+      minimum_clearance_m: 0.052545522
+    poses_for_home_module:
+      pregrasp_world:
+      - -0.45543335490421477
+      - -0.511962306213167
+      - 0.324523262463603
+      - 1.57238898038469
+      - -0.0
+      - -0.94
+      grasp_world:
+      - -0.5523402040483847
+      - -0.5827367794554695
+      - 0.3243321441136246
+      - 1.57238898038469
+      - -0.0
+      - -0.94
+      lift_world:
+      - -0.5523402040483847
+      - -0.5827367794554695
+      - 0.4043321441136246
+      - 1.57238898038469
+      - -0.0
+      - -0.94
+      module_rotation_world:
+      - 0.5897880250310984
+      - -0.8075570762014154
+      - 0.0012861597638427682
+      - -0.8075581004051143
+      - -0.5897872770191886
+      - 0.0009393276181747852
+      - 0.0
+      - -0.0015926529164868284
+      - -0.9999987317275397
+      note: derived for module.home_pose_world; for an observed pose, compose the
+        module-frame transform with that pose instead of reusing these numbers
+    clearance_summary:
+      grasp_minimum_m: 0.002270484
+      worst_approach_m: 0.000482586
+      worst_approach_standoff_m: 0.03
+      measured_with: the real tool mesh in its single rigid state
+      caveat: the mesh cannot retract its arms, so the approach figure is pessimistic;
+        the real sequence approaches with the arms retracted, and confirming that
+        this removes the graze requires the simulator
