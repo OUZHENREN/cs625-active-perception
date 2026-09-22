@@ -2626,3 +2626,47 @@ test/run_insertion_sequence.sh 从未对活体仿真执行过
 
 **如果结果是 `PASS`**（位置控制居然穿过了 0.04 mm），那也是真实结果，
 而且会推翻"必须柔顺"的前提——同样值得记录。
+
+---
+
+## 四十三、第一次运行编排：**install 树缺新配置**（又是同一类问题）
+
+```text
+FileNotFoundError: .../install/cs625_bringup/share/cs625_bringup/config/cs625_insertion_sequence.yaml
+```
+
+`install/cs625_bringup/share/cs625_bringup/config/` 是**真实目录副本**，不是符号链接，
+所以**上次 build 之后新增的配置根本不在里面**。实测缺三个：
+
+```text
+camera_extrinsics_sim.yaml
+cs625_grasp_template.yaml
+cs625_insertion_sequence.yaml
+```
+
+### 43.1 为什么 P7.1 当时能读到相机外参
+
+因为 **launch 文件是符号链接**：`Path(__file__).resolve()` 落在**源码树**，
+`parent.parent/config/` 于是指向源码 ✓。**只有 `config/` 是真实副本。**
+
+### 43.2 修法与仓库既有做法一致
+
+```text
+先源码树  $repo_root/src/cs625_bringup/config/...
+再 install $cs625_bringup_share/config/...
+都没有 -> exit 2 并打印重新生成它的命令
+```
+
+这正是 `apply_task_scene.py` 已经在用的解析顺序。
+
+### 43.3 这一类的第三次
+
+```text
+第一次  6 个 P7 脚本用 $CS625_APP_INSTALL/share/<pkg>（merge-install 假设）-> 加了契约检查
+第二次  cs625_ap_description 的 meshes 目录没进 install（新增目录）-> 已记录
+第三次  新增的 config 文件没进 install（真实副本目录）-> 本次
+```
+
+**共同点**：`--symlink-install` 只对部分安装规则生效，**新增文件/目录不会自动出现**。
+已加的两条契约检查（文档命令、install 布局）覆盖不到这类；**这次的修法是"不依赖 install 树"**，
+比再加一条检查更根本。
