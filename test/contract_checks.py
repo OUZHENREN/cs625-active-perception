@@ -546,6 +546,25 @@ def check_cs625_task_scene() -> None:
             "tighter, so the conclusion about this being a real fit needs revisiting"
         )
 
+    # 3f) The insertion runner must actually drive every leg the sequence defines.
+    # A renamed waypoint would otherwise silently skip a leg and the episode would
+    # still assemble, with the missing leg recorded as LEG_NOT_RUN by the assembler
+    # rather than by anything that noticed a typo.
+    runner = (ROOT / "test" / "run_insertion_sequence.sh").read_text(encoding="utf-8")
+    mapped = set(re.findall(r"^\s*(\w+)\)\s+echo \w+ ;;", runner, flags=re.M))
+    called = set(re.findall(r"^run_leg (\w+)$", runner, flags=re.M))
+    expected = set(insertion["waypoints_world"])
+    if mapped != expected:
+        fail(
+            "the insertion runner maps a different set of legs than the sequence "
+            f"defines: {sorted(mapped ^ expected)}"
+        )
+    if called != expected:
+        fail(
+            "the insertion runner does not call every leg the sequence defines: "
+            f"{sorted(called ^ expected)}"
+        )
+
     # 4a) The camera extrinsics must not drift between the config and the URDF.
     # The config is the authority: scripts/camera_extrinsics.py derives it from the
     # RVS calibration, and the xacro defaults are what a bare xacro invocation uses.
@@ -663,6 +682,10 @@ def main() -> int:
         ROOT / "scripts" / "camera_extrinsics.py",
         ROOT / "scripts" / "grasp_template.py",
         ROOT / "scripts" / "insertion_sequence.py",
+        ROOT / "test" / "assemble_insertion_episode.py",
+        ROOT / "test" / "run_insertion_sequence.sh",
+        ROOT / "test" / "test_insertion_episode_contract.py",
+        ROOT / "src" / "cs625_task_orchestrator" / "cs625_task_orchestrator" / "insertion_episode_contract.py",
         ROOT / "test" / "test_task_insertion_sequence.py",
         ROOT / "src" / "cs625_task_orchestrator" / "cs625_task_orchestrator" / "task_insertion_sequence.py",
         ROOT / "src" / "cs625_bringup" / "config" / "cs625_insertion_sequence.yaml",
