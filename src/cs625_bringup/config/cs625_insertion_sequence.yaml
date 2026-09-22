@@ -1,0 +1,136 @@
+cs625_insertion_sequence:
+  ros__parameters:
+    grasp_pose_in_module:
+    - -0.20850000000000002
+    - -0.10000275072455406
+    - -0.099
+    - -1.5707963267948966
+    - 0.0
+    - 0.0
+    waypoints_world:
+      pregrasp_module:
+      - -0.5523402040483847
+      - -0.7027367794554695
+      - 0.3243321441136246
+      - 1.57238898038469
+      - -0.0
+      - -0.94
+      grasp_module:
+      - -0.5523402040483847
+      - -0.5827367794554695
+      - 0.3243321441136246
+      - 1.57238898038469
+      - -0.0
+      - -0.94
+      lift_module:
+      - -0.5523402040483847
+      - -0.5827367794554695
+      - 0.4043321441136246
+      - 1.57238898038469
+      - -0.0
+      - -0.94
+      insert_entry:
+      - -0.5608425312735722
+      - 0.3798853836932005
+      - 0.8978096715929117
+      - 1.3860365562051038
+      - -0.03149157799999999
+      - -1.998270775
+      insert_seated:
+      - -0.6075984067356833
+      - 0.38238510527699177
+      - 0.3547018961399463
+      - 1.3860365562051038
+      - -0.03149157799999999
+      - -1.998270775
+      release_retreat:
+      - -0.5608425312735722
+      - 0.3798853836932005
+      - 0.8978096715929117
+      - 1.3860365562051038
+      - -0.03149157799999999
+      - -1.998270775
+    arm_command_m:
+      pregrasp_module: 0.0
+      grasp_module: 0.0
+      close_arms: 0.02
+      lift_module: 0.02
+      insert_entry: 0.02
+      insert_seated: 0.02
+      open_arms: 0.0
+      release_retreat: 0.0
+    module_poses_world:
+      home:
+      - -0.51
+      - -0.81
+      - 0.225173
+      - -3.14
+      - 0.0
+      - -0.94
+      pregrasp:
+      - -0.51
+      - -0.93
+      - 0.225173
+      - -3.14
+      - 0.0
+      - -0.94
+      lift:
+      - -0.51
+      - -0.81
+      - 0.305173
+      - -3.14
+      - 0.0
+      - -0.94
+      insert_entry:
+      - -0.7542747755378889
+      - 0.2362721224162088
+      - 0.8254702064529654
+      - 2.956832883
+      - -0.031491578
+      - -1.998270775
+      seated:
+      - -0.801030651
+      - 0.238771844
+      - 0.282362431
+      - 2.956832883
+      - -0.031491578
+      - -1.998270775
+    order:
+    - pregrasp_module
+    - grasp_module
+    - close_arms
+    - lift_module
+    - TRANSFER_FREE_SPACE
+    - insert_entry
+    - insert_seated
+    - open_arms
+    - release_retreat
+    insertion_axis_world:
+    - 0.08577133616346488
+    - -0.0045856153512122445
+    - 0.9963042958978867
+    insertion_travel_m: 0.5451223864928807
+    insertion_measurement:
+      axis_assembly:
+      - 0.0
+      - 0.0
+      - -1.0
+      axis_world:
+      - 0.08577133616346488
+      - -0.0045856153512122445
+      - 0.9963042958978867
+      axis_name: Z
+      outward_sign: -1
+      proud_m: 0.019294363536032533
+      travel_m: 0.5251223864928807
+      module_extent_along_axis_m: 0.4703968396426493
+      method: the module protrudes at exactly one end of the fixture in the fixture's
+        own frame; that end is the opening, and the travel is where the module's extent
+        along the axis stops overlapping the fixture's
+    approach_margin_m: 0.02
+    insertion_line:
+      minimum_clearance_m: 0.000131074
+      minimum_at_offset_m: 0.258933
+      seated_clearance_m: 0.001197927
+      entry_clearance_m: 0.108156491
+      passes: false

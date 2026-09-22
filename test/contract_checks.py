@@ -219,6 +219,10 @@ DOCUMENTED_NON_EXECUTABLE = "test/"
 # nothing noticed that the pose solved for the placeholder camera now pointed
 # 1.2 m behind the target, and P7.1 failed on all five windows with an empty point
 # cloud.  This record is what ties the two together.
+INSERTION_SEQUENCE_CONFIG = pathlib.Path(
+    "src/cs625_bringup/config/cs625_insertion_sequence.yaml"
+)
+
 GRASP_TEMPLATE_CONFIG = pathlib.Path(
     "src/cs625_bringup/config/cs625_grasp_template.yaml"
 )
@@ -491,6 +495,47 @@ def check_cs625_task_scene() -> None:
     if abs(template["translation_module_m"][1] - expected_y) > 1e-6:
         fail("the grasp depth no longer centres the arms on the handles")
 
+    # 3e) The insertion sequence must stay a sequence.  The insertion line's own
+    # safety is NOT asserted here: it currently comes within 0.131 mm of the fixture,
+    # which is at the level of the mesh decimation error, so the config records that
+    # rather than claiming a pass.  What is asserted is that the structure a planner
+    # would drive has not silently changed.
+    insertion = yaml.safe_load(
+        (ROOT / INSERTION_SEQUENCE_CONFIG).read_text(encoding="utf-8")
+    )["cs625_insertion_sequence"]["ros__parameters"]
+    order = insertion["order"]
+    # The transfer leg is free space and must not be interpolated as a straight line.
+    if "TRANSFER_FREE_SPACE" not in order:
+        fail("the insertion sequence no longer marks the free-space transfer leg")
+    for before, after in (
+        ("pregrasp_module", "grasp_module"),
+        ("grasp_module", "close_arms"),
+        ("insert_entry", "insert_seated"),
+        ("insert_seated", "open_arms"),
+    ):
+        if order.index(before) >= order.index(after):
+            fail(f"the insertion sequence puts {before} after {after}")
+    # The module is lowered in from above, so the extraction axis points up.
+    if insertion["insertion_axis_world"][2] <= 0.9:
+        fail("the insertion axis does not point upward")
+    # Arms open for the approach, close to carry, and open again to release.
+    arms = insertion["arm_command_m"]
+    if not (
+        arms["pregrasp_module"] == arms["grasp_module"] == arms["release_retreat"] == 0.0
+    ):
+        fail("the insertion sequence does not approach and release with the arms open")
+    if not (arms["close_arms"] == arms["lift_module"] == arms["insert_seated"] > 0.0):
+        fail("the insertion sequence does not carry the module with the arms closed")
+    if insertion["insertion_travel_m"] <= insertion["insertion_measurement"]["travel_m"]:
+        fail("the insertion approach margin has been removed")
+    # And the recorded line must still admit what it is.
+    if insertion["insertion_line"]["passes"]:
+        fail(
+            "the insertion line is recorded as passing; that figure was at the level "
+            "of the mesh decimation error, so if it has changed the measurement "
+            "method changed too and this check needs revisiting"
+        )
+
     # 4a) The camera extrinsics must not drift between the config and the URDF.
     # The config is the authority: scripts/camera_extrinsics.py derives it from the
     # RVS calibration, and the xacro defaults are what a bare xacro invocation uses.
@@ -607,6 +652,10 @@ def main() -> int:
         ROOT / "scripts" / "sync_task_world.py",
         ROOT / "scripts" / "camera_extrinsics.py",
         ROOT / "scripts" / "grasp_template.py",
+        ROOT / "scripts" / "insertion_sequence.py",
+        ROOT / "test" / "test_task_insertion_sequence.py",
+        ROOT / "src" / "cs625_task_orchestrator" / "cs625_task_orchestrator" / "task_insertion_sequence.py",
+        ROOT / "src" / "cs625_bringup" / "config" / "cs625_insertion_sequence.yaml",
         ROOT / "test" / "test_grasp_template.py",
         ROOT / "src" / "cs625_bringup" / "config" / "cs625_grasp_template.yaml",
         ROOT / "test" / "test_camera_extrinsics.py",
