@@ -19,7 +19,20 @@ source "$repo_root/scripts/source_dev_env.sh" --full
 cs625_bringup_prefix="$(ros2 pkg prefix cs625_bringup)"
 cs625_bringup_share="$cs625_bringup_prefix/share/cs625_bringup"
 
-sequence_config="$cs625_bringup_share/config/cs625_insertion_sequence.yaml"
+# Resolve the sequence from the source checkout first.  package share directories are
+# real copies, not symlinks, so a config added since the last build is absent from the
+# install tree -- and this script is run from the checkout, where the committed file is
+# the authority anyway.  The installed copy is the fallback rather than the default.
+sequence_config="$repo_root/src/cs625_bringup/config/cs625_insertion_sequence.yaml"
+if [[ ! -f "$sequence_config" ]]; then
+  sequence_config="$cs625_bringup_share/config/cs625_insertion_sequence.yaml"
+fi
+if [[ ! -f "$sequence_config" ]]; then
+  echo "ERROR: cs625_insertion_sequence.yaml not found in the source tree or the" >&2
+  echo "       installed cs625_bringup share; regenerate it with" >&2
+  echo "       python3 scripts/insertion_sequence.py --write" >&2
+  exit 2
+fi
 episode_dir="${INSERTION_EPISODE_DIR:-$HOME/cs625_insertion_episodes/$(date +%Y%m%d_%H%M%S)}"
 if [[ -e "$episode_dir" ]]; then
   echo "Refusing to reuse an episode directory: $episode_dir" >&2
