@@ -2605,7 +2605,7 @@ test_grasp_template                          9 passed
 ### 42.5 ⚠️ 运行时验证：**未做**
 
 ```text
-test/run_insertion_sequence.sh 从未对活体仿真执行过
+bash test/run_insertion_sequence.sh 从未对活体仿真执行过
 它复用的每一件都经过验收，但【编排本身未经验证】
 脚本头部已如实写明
 ```
