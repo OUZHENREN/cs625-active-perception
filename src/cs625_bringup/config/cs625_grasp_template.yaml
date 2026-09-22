@@ -113,11 +113,52 @@ cs625_grasp_template:
       - -0.9999987317275397
       note: derived for module.home_pose_world; for an observed pose, compose the
         module-frame transform with that pose instead of reusing these numbers
+    clearance_profile_arms_retracted:
+    - standoff_m: 0.0
+      minimum_clearance_m: 0.001039489
+    - standoff_m: 0.01
+      minimum_clearance_m: 0.002154179
+    - standoff_m: 0.02
+      minimum_clearance_m: 0.001316794
+    - standoff_m: 0.03
+      minimum_clearance_m: 0.002015818
+    - standoff_m: 0.04
+      minimum_clearance_m: 0.001537074
+    - standoff_m: 0.05
+      minimum_clearance_m: 0.002243443
+    - standoff_m: 0.06
+      minimum_clearance_m: 0.003877941
+    - standoff_m: 0.07
+      minimum_clearance_m: 0.004290016
+    - standoff_m: 0.08
+      minimum_clearance_m: 0.014087556
+    - standoff_m: 0.09
+      minimum_clearance_m: 0.024052323
+    - standoff_m: 0.1
+      minimum_clearance_m: 0.034037762
+    - standoff_m: 0.11
+      minimum_clearance_m: 0.04402981
+    - standoff_m: 0.12
+      minimum_clearance_m: 0.054024802
+    - standoff_m: 0.13
+      minimum_clearance_m: 0.057168518
+    - standoff_m: 0.14
+      minimum_clearance_m: 0.059680561
+    - standoff_m: 0.15
+      minimum_clearance_m: 0.063486601
+    - standoff_m: 0.16
+      minimum_clearance_m: 0.068380168
     clearance_summary:
-      grasp_minimum_m: 0.002270484
-      worst_approach_m: 0.000482586
-      worst_approach_standoff_m: 0.03
-      measured_with: the real tool mesh in its single rigid state
-      caveat: the mesh cannot retract its arms, so the approach figure is pessimistic;
-        the real sequence approaches with the arms retracted, and confirming that
-        this removes the graze requires the simulator
+      grasp_minimum_m: 0.001039489
+      approach_minimum_m: 0.001039489
+      approach_minimum_standoff_m: 0.0
+      arms_extended_worst_m: 0.000482586
+      arms_extended_worst_standoff_m: 0.03
+      measured_with: the real tool mesh, with the arm regions slid inward by the arm
+        travel to approximate the retracted state the approach actually uses
+      finding: with the arms extended the gripper grazes the module at 0.483 mm, which
+        is what a rigid mesh must report; retracting them leaves nothing closer than
+        1.039 mm, so the graze was an artefact of the mesh's single state rather than
+        a real obstruction
+      remaining_risk: the retracted state is an approximation, and the contact itself
+        is not modelled because zero interference was chosen

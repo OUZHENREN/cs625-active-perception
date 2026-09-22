@@ -114,6 +114,20 @@ def test_grasp_pose_does_not_penetrate_and_the_approach_is_reported(assets):
     worst = min(entry["minimum_clearance_m"] for entry in profile)
     assert worst < 0.001, "the recorded graze should still be present to be reported"
 
+    # Retracting the arms along the tool X is what the real approach does, and it is
+    # what removes the graze.  If this ever stops holding, the approach is unsafe.
+    retracted = grasp_template.clearance_profile(
+        tree,
+        grasp_template.retract_arms(
+            gripper.reshape(-1, 3), template["arm"]["contact_command_m"]
+        ),
+        translation,
+        np.arange(0.0, 0.161, 0.010),
+    )
+    worst_retracted = min(entry["minimum_clearance_m"] for entry in retracted)
+    assert worst_retracted > 0.001, "the retracted approach still grazes"
+    assert worst_retracted > worst
+
 
 def test_read_stl_rejects_a_truncated_file(tmp_path):
     path = tmp_path / "truncated.stl"

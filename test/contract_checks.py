@@ -468,8 +468,20 @@ def check_cs625_task_scene() -> None:
         arm["contact_command_m"] - (arm["contact_span_m"] - arm["retracted_span_m"]) / 2.0
     ) > 1e-9:
         fail("the grasp arm command is not half the arm travel")
-    if template["clearance_summary"]["grasp_minimum_m"] <= 0.0005:
+    clearance = template["clearance_summary"]
+    if clearance["grasp_minimum_m"] <= 0.0005:
         fail("the grasp pose penetrates the module")
+    # The approach is made with the arms retracted, and that is what removes the
+    # graze a rigid mesh reports.  If the retracted figure stops being clear, the
+    # motion is unsafe; if the extended figure stops being worse, the retraction
+    # measurement has stopped doing anything.
+    if clearance["approach_minimum_m"] <= 0.0005:
+        fail("the retracted approach grazes the module")
+    if clearance["approach_minimum_m"] <= clearance["arms_extended_worst_m"]:
+        fail(
+            "retracting the arms no longer improves the approach clearance, so the "
+            "retraction measurement is not measuring anything"
+        )
     # The y placement must centre the arms on the handles rather than being tuned.
     extremes = template["extremes_m"]
     handle_low, handle_high = scene["grasp"]["handle_y_range_m"]
