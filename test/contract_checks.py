@@ -528,12 +528,22 @@ def check_cs625_task_scene() -> None:
         fail("the insertion sequence does not carry the module with the arms closed")
     if insertion["insertion_travel_m"] <= insertion["insertion_measurement"]["travel_m"]:
         fail("the insertion approach margin has been removed")
-    # And the recorded line must still admit what it is.
-    if insertion["insertion_line"]["passes"]:
+    # The line must not penetrate, and it must stay honest about being a precision
+    # fit.  Two separate questions: a clearance of 0.13 mm is no penetration and is
+    # simultaneously far too tight for position control, and reporting it as a pass
+    # or a failure would hide one of the two.
+    line = insertion["insertion_line"]
+    if line["penetrates"] or line["minimum_clearance_m"] <= 0.0:
+        fail("the insertion line penetrates the fixture")
+    if line["precision_fit"] and not line.get("advisory"):
+        fail("the insertion line is a precision fit but carries no advisory")
+    # The finer export is tighter, which is what makes the sub-millimetre figure a
+    # real fit rather than mesh error.  If that reverses, the conclusion changes.
+    reference = insertion["reference_mesh_comparison"]
+    if reference["minimum_clearance_m"] > reference["repository_asset_minimum_clearance_m"]:
         fail(
-            "the insertion line is recorded as passing; that figure was at the level "
-            "of the mesh decimation error, so if it has changed the measurement "
-            "method changed too and this check needs revisiting"
+            "the reference-mesh comparison no longer shows the finer mesh being "
+            "tighter, so the conclusion about this being a real fit needs revisiting"
         )
 
     # 4a) The camera extrinsics must not drift between the config and the URDF.

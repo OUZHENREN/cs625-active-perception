@@ -133,4 +133,19 @@ cs625_insertion_sequence:
       minimum_at_offset_m: 0.258933
       seated_clearance_m: 0.001197927
       entry_clearance_m: 0.108156491
-      passes: false
+      penetrates: false
+      precision_fit: true
+      precision_fit_threshold_m: 0.001
+      advisory: the clearance is below the precision-fit threshold, so a position-controlled
+        descent will jam; this leg needs force or compliance control
+    reference_mesh_comparison:
+      source: the tool owner's full-resolution exports, 2026-09-21
+      fixture_file: 插槽架子_装配导出.STL, 150114 triangles
+      module_file: 弹仓_装配导出.STL, 276642 triangles
+      seated_clearance_m: 0.0007
+      minimum_clearance_m: 4.0e-05
+      minimum_at_offset_m: 0.24
+      repository_asset_seated_clearance_m: 0.001198
+      repository_asset_minimum_clearance_m: 9.8e-05
+      finding: the full-resolution export clears by less than the decimated asset,
+        so the sub-millimetre figure is the real fit rather than mesh error

@@ -137,3 +137,45 @@ def test_measured_insertion_axis_points_out_of_the_fixture():
     assert measured["axis_assembly"] == pytest.approx([0.0, 0.0, -1.0])
     assert 0.0 < measured["proud_m"] < 0.05
     assert 0.40 < measured["travel_m"] < 0.60
+
+
+def test_insertion_line_separates_penetration_from_precision():
+    """No penetration and being executable are different questions.
+
+    The real fixture clears the module by 0.040 mm on the full-resolution export.  An
+    earlier version answered only \"does it pass a 0.5 mm threshold\" and reported
+    failure, which read as \"the geometry is wrong\" when the geometry is right and the
+    motion is simply not a position-controlled one.
+    """
+
+    import numpy as np
+
+    seated = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    axis = [0.0, 0.0, 1.0]
+    # A wall at x = 0.5 mm so the module's slab clears it by 0.5 mm less than its width.
+    fixture = np.array([[0.0005, -0.5, 0.0], [0.0005, 0.5, 0.0], [0.0005, 0.0, 1.0]])
+    module = np.array([[-0.05, -0.5, -0.01], [0.05, -0.5, 0.01], [0.0, 0.5, 0.0]])
+    wide = sequence.verify_insertion_line(
+        seated, axis, 0.1, module, fixture, precision_fit_threshold_m=0.001
+    )
+    assert not wide["penetrates"]
+    assert wide["precision_fit"]
+    assert wide["advisory"]
+
+    # Move the wall far away and the same line becomes an ordinary one.
+    far = fixture.copy()
+    far[:, 0] = 0.5
+    roomy = sequence.verify_insertion_line(
+        seated, axis, 0.1, module, far, precision_fit_threshold_m=0.001
+    )
+    assert not roomy["penetrates"]
+    assert not roomy["precision_fit"]
+    assert roomy["advisory"] == ""
+
+    # A wall the module overlaps is a penetration, which is a different verdict.
+    overlapping = fixture.copy()
+    overlapping[:, 0] = 0.0
+    hit = sequence.verify_insertion_line(
+        seated, axis, 0.1, module, overlapping, precision_fit_threshold_m=0.001
+    )
+    assert hit["penetrates"]

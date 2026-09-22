@@ -183,7 +183,7 @@ def verify_insertion_line(
     travel_m: float,
     module_points: np.ndarray,
     fixture_points: np.ndarray,
-    fixture_tolerance_m: float = 0.0005,
+    precision_fit_threshold_m: float = 0.001,
 ) -> dict[str, Any]:
     """Sample the insertion line and report the worst module-to-fixture clearance.
 
@@ -191,6 +191,12 @@ def verify_insertion_line(
     directly: the module is walked from the entry pose to the seated pose and the
     minimum distance to the fixture is recorded at every step.  The meshes are passed
     in because this module deliberately owns no files.
+
+    Two separate questions are answered, and conflating them hid the second one for a
+    while.  Whether the line PENETRATES is a yes or no.  Whether it is a precision fit
+    is a different matter: this one clears by 0.040 mm on the full-resolution export,
+    which is no penetration and simultaneously far too tight for position control, so
+    it is reported as its own flag rather than as a pass or a failure.
     """
 
     from scipy.spatial import cKDTree
@@ -212,11 +218,20 @@ def verify_insertion_line(
             }
         )
     worst = min(samples, key=lambda entry: entry["minimum_clearance_m"])
+    minimum = worst["minimum_clearance_m"]
     return {
         "samples": samples,
-        "minimum_clearance_m": worst["minimum_clearance_m"],
+        "minimum_clearance_m": minimum,
         "minimum_at_offset_m": worst["offset_from_seated_m"],
         "seated_clearance_m": samples[-1]["minimum_clearance_m"],
         "entry_clearance_m": samples[0]["minimum_clearance_m"],
-        "passes": worst["minimum_clearance_m"] > fixture_tolerance_m,
+        "penetrates": minimum <= 0.0,
+        "precision_fit": minimum < precision_fit_threshold_m,
+        "precision_fit_threshold_m": precision_fit_threshold_m,
+        "advisory": (
+            "the clearance is below the precision-fit threshold, so a position-"
+            "controlled descent will jam; this leg needs force or compliance control"
+            if minimum < precision_fit_threshold_m
+            else ""
+        ),
     }
