@@ -2537,3 +2537,92 @@ test_task_insertion_sequence                7 passed
 
 这是一个**任务设计决策**，需要用户定：加 admittance 控制？还是给插槽加导向倒角？
 还是接受仿真里"卡住"作为真实约束记录下来？
+
+---
+
+## 四十二、插槽任务执行编排 + 判定契约（C 方案）
+
+用户选 **C**：把 0.04 mm 精密配合当作**记录在案的真实约束**，让仿真如实呈现，
+把"精密插入需要柔顺"变成**论文结论**而不是要绕过的 bug。
+
+这需要两件东西：**能跑一遍**，以及**能把"预期中的卡死"和"其他失败"分开**。
+
+### 42.1 不重复造运动
+
+```text
+每一腿        test/p7_execute_pose_capture.py   （现有，已验收）
+夹爪          /p7/gripper_command              （P7 夹爪适配器）
+接触          test/p7_capture_gazebo_contacts.py（现有，gz-transport）
+```
+
+腿 → phase 的映射是**语义的**，不是凑的：
+
+```text
+pregrasp_module  -> pregrasp
+grasp_module     -> approach
+lift_module      -> lift
+insert_entry     -> pregrasp
+insert_seated    -> approach     ← approach 是唯一会规划【带碰撞检查的笛卡尔直线】
+                                   且【拒绝被截断路径】的 phase —— 正是插入段需要的，
+                                   也正是卡死会暴露出来的地方
+release_retreat  -> lift
+```
+
+### 42.2 判定分成三种，而不是通过/失败
+
+```text
+PASS                全部腿完成，模块坐到底
+PRECISION_FIT_JAM   下降段【在接触中】中止，而接近段与规划本身都干净
+OTHER_FAILURE       其他一切
+```
+
+**接触记录是必需项，这是关键**：没有任何东西接触的跟踪中止是**控制器问题**；
+把它叫作精密配合卡死，就是**从一份不支持该结论的证据里声称结论**。
+
+9 项测试里有 **5 项专门守这条线**：无接触、接触记录缺失、下降之前的腿失败、
+腿未记录、配合记录缺失——**全部返回 OTHER_FAILURE 而不是预期中的卡死**。
+
+### 42.3 又加一条契约检查
+
+```text
+编排脚本映射并调用的腿集合，必须与序列定义的完全一致
+```
+
+否则**改个名字就会静默跳过一条腿**，而 episode 仍能组装（缺失腿被记为
+`LEG_NOT_RUN`，但没有任何东西发现那是改名造成的）。实测：把 `lift_module` 改成
+`lift_modul` → 立刻报错 ✓
+
+### 42.4 通过 / 失败
+
+```text
+契约检查（含编排一致性）                        PASS，且实测能触发
+test_insertion_episode_contract              9 passed
+test_task_insertion_sequence                 7 passed
+test_grasp_template                          9 passed
+编排一致性（腿名/位姿/调用三方一致）            PASS
+```
+
+### 42.5 ⚠️ 运行时验证：**未做**
+
+```text
+test/run_insertion_sequence.sh 从未对活体仿真执行过
+它复用的每一件都经过验收，但【编排本身未经验证】
+脚本头部已如实写明
+```
+
+这是本项目里我**唯一交付了未经运行验证的代码**的地方，理由：它无法在沙箱里跑，
+而用户选 C 需要它。**请第一次运行时把 `episode_dir` 里的 `episode.json` 发我**，
+特别是 `verdict` 与 `failure_codes`——如果结果是 `OTHER_FAILURE`，
+`first_failed_leg` 会指出问题在哪一腿。
+
+### 42.6 预期结果
+
+```text
+按 C 的选择，预期是 PRECISION_FIT_JAM：
+  前四腿 + insert_entry 成功
+  insert_seated 在接触中中止
+  contacts.json 记录到模块与夹具的接触
+```
+
+**如果结果是 `PASS`**（位置控制居然穿过了 0.04 mm），那也是真实结果，
+而且会推翻"必须柔顺"的前提——同样值得记录。
