@@ -339,3 +339,25 @@ ros2 run tf2_ros tf2_echo gripper_right_finger_link gripper_left_finger_link
 # 6) 停：给 launch 进程发 SIGINT（不要 pkill 通配）
 kill -INT <launch_pid>
 ```
+
+### 8.10 本次验证时观测到的两个无关异常（供后续复查，未修）
+
+1. **`prepare_gazebo_model.py` 起不来**（2026-10-24 22:0x 的 `sim_cell.launch.py`）：
+
+```text
+xacro: error: expected exactly one input file as argument
+argv 里出现 'prefix:=safety_limits:=true'，说明 `cs_type:=` 与它的值被拼成了两个 argv 项
+```
+
+后果：Gazebo 实体用的是**上一次成功生成**的 `/tmp/cs625_active_perception_gazebo_model.urdf`，
+不是当次源码展开的结果。本次已核对那个文件里 `upper=0.021285`、mimic 都在，
+所以夹爪证据有效；但这是一个**实体落后于源码**的保真度风险，需要单独修。
+
+2. **`joint_trajectory_controller` 未激活**（同一次实例）：
+
+```text
+[spawner_joint_trajectory_controller]: Failed to activate controller : joint_trajectory_controller
+```
+
+夹爪控制器不受影响（本节的测量全部有效），但手臂轨迹执行在该实例里不可用。
+原因未查（可能与本机并发起了 3~4 个 Gazebo 实例有关），需要单独复查。

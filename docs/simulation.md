@@ -91,6 +91,19 @@ NO_COLLISION_CHECK_PHASES   = 上面这些 + d2b_entrance_tilted（哪些阶段�
 - `d2b` 进槽口时是空夹爪、已证明可用 0.03 m/s，所以它只关碰撞检查、不降速；
 - 这条策略必须写进报告：仿真里"插入可行"是**几何导向下**的可行，不是"规划和碰撞检查都通过"。
 
+## 4.2 一个真实踩过的坑：install 树里的资产会过期
+
+新世界的模型资产（`assets/cs625_real_cell/slot_fixture`）是 `src/` 里新增的，
+但如果 `install/` 里没有重新安装，Gazebo 会报 `model://cs625_real_cell/slot_fixture`
+找不到、**gz server 直接退出**（看起来像"世界文件坏了"）。
+
+```bash
+# 改了/新增了 assets 或 world 之后，必须重装这两个包
+colcon build --symlink-install --packages-select cs625_simulation cs625_bringup cs625_ap_description
+# 然后确认 install 里有资产
+ls install/cs625_simulation/share/cs625_simulation/assets/cs625_real_cell/slot_fixture/
+```
+
 ## 5. 已知差异与限制
 
 | 项目 | 现状 |
