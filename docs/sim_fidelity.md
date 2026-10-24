@@ -66,6 +66,34 @@ NO_COLLISION_CHECK_PHASES    = 上面这些 + d2b_entrance_tilted             �
 不证明夹具不挡路。** 需要严格碰撞验证时用 `scripts/verify_fixture_clearance.py`
 （`avoid_collisions=True` + `check_state_validity` 接触点）。
 
+### 3.1 实测结果：挡路的只有"工具在槽里"，机械臂本体是干净的
+
+2026-10-24 夜在隔离域（`ROS_DOMAIN_ID=65`、应用描述、夹具碰撞体已发布）跑了 5 个插入相关阶段：
+
+```text
+stage                  fraction  contact
+insert                 0.000     real_cell_slot_fixture <-> my_end_effector_link
+straighten             0.000     同上
+d2b_entrance_tilted    0.000     同上
+d2c_straighten         0.000     同上
+d4_tilt_for_removal    0.000     同上
+```
+
+**5 个阶段、5 对接触，全部是 `real_cell_slot_fixture ↔ my_end_effector_link`；
+没有一次是机械臂连杆（base_link / shoulder_* / elbow / wrist_*）碰到夹具。**
+
+也就是说：
+
+1. **机械臂本体的接近路径是干净的** —— 夹具不会在臂移动时挡住它；
+2. 被判"碰撞"的全部是**工具网格进入插槽**：真机那里单边间隙 1 mm，本来就靠槽壁导向、
+   物理上就是接触的。FCL 检查这个区域永远报碰撞，信息量为零；
+3. 所以 `NO_COLLISION_CHECK_PHASES` 是有实验依据的**正确设计**，不是偷懒。
+
+前提要说清：夹具几何来自**单视角扫描**（中位 4.95 mm），工具网格来自 CAD。
+"工具与槽壁在 5 mm 级内是否真的相交"，仿真给不出可信答案，只有真机能给。
+
+接触点位置（供以后核对）：低处 `z≈0.102 m`、高处 `z≈0.365 m`，都在槽口/槽道范围内。
+
 ## 4. 相机：已对齐的与未验证的
 
 | 项目 | 真机 | 仿真（当前代码） | 说明 |
