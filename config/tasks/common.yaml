@@ -107,3 +107,11 @@ observe:
     quat: [-0.16424, 0.8023, 0.12511, 0.56007]
     check: >-
       python3 scripts/model_environment.py --out runtime/environment --verify-only
+
+# ---- 夹爪几何（外撑式撑紧机构，真机 EFG80 驱动） --------------------------
+# 所有者确认：EFG 最大张开 50 mm。连杆把 0–50 mm 的行程换成两支撑臂的外撑跨距：
+# 全闭 204.00 mm、全张 246.57 mm（SolidWorks 实测）。仿真手指走跨距变化的一半。
+# 这条换算关系是 finger_position_m() 的唯一数据来源，不要在代码里另写一份。
+gripper_max_opening_mm: 50.0
+gripper_span_min_mm: 204.0
+gripper_span_max_mm: 246.57

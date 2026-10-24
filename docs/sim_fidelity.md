@@ -210,7 +210,7 @@ CAD 实测的 **246.57 mm 外撑跨距**，把 1 g 占位质量换成**明确标
 | 零预紧抓取跨距 | 244.00 mm（扶手内间距，故意不用 2.57 mm 预紧） | 关节 0.020 → **244.00 mm** | `handle_inner_span_m` + 主人决定 `none_zero_preload` | PASS |
 | 收拢（张开前）跨距 | **未实测** | 关节 0 → 204.00 mm | 204 = 244 − 2×20（推导值，不是量出来的） | UNKNOWN |
 | 单指行程 | 未实测（EFG80 上位命令 0..80 mm 是**驱动器坐标**） | 0 → 21.285 mm（跨距变化 42.57 mm） | SolidWorks 跨距 − 接触跨距 = 2.57 mm 预紧 | UNKNOWN（缺标定表） |
-| 抓取宽度 `50.0 mm` | `grip_width_mm: 50.0`、`grip_current: 0.1`（`config/tasks/common.yaml`） | **无法换算**（见 8.4） | `docs/agent_memory.md` §75/§76 | FAIL / 缺数据 |
+| 抓取宽度 `50.0 mm` | `grip_width_mm: 50.0` = EFG 最大张开（所有者确认） | 端点标定：50 mm → 246.57 mm 跨距；中间段按线性假设（见 8.4） | 所有者口径 + SolidWorks 跨距 | PARTIAL（端点） |
 | 质量（夹爪本体） | **4.580 kg 实测**（夹持机构0920 STL，SolidWorks） | 挂 `my_end_effector_link` 4.580 kg（未改） + 手指/基座 0.140 kg | 2026-09-19 §9.3 | PARTIAL（重复记账 3.1%，见 8.5） |
 | 质量（相机） | 无 datasheet | 0.010 + 0.050 = 0.060 kg（ESTIMATED） | 与 `camera_kg_placeholder: 0.06` 一致 | UNKNOWN |
 | 质心 | 夹爪本体实测 CoM (−0.10, 14.08, 109.56) mm；手指/相机未测 | 手指 CoM 在板中心、相机 CoM 在原点（ESTIMATED） | SolidWorks（本体）/ 假设（手指、相机） | PARTIAL |
@@ -256,7 +256,7 @@ TF 交叉验证（`tf2_echo gripper_right_finger_link gripper_left_finger_link`�
 即：**物理引擎不做 mimic 约束，但 gz_ros2_control 在接口层做了**，所以只给右手下发时
 左手确实跟随（上表两列相等就是实测结果）。这一点以前没有证据，本次补上。
 
-### 8.4 "50 mm 抓取值"自检：仿真给不出 50 mm（结论 FAIL/缺数据）
+### 8.4 "50 mm 抓取值"已可换算（所有者确认：EFG 最大张开 50 mm）
 
 - 配置要的是 `grip_width_mm: 50.0`（`config/tasks/common.yaml`），它进的是
   `hitbot_cmd.ps1 -Cmd grip -Value 50`，即 **EFG80 的驱动器坐标**。
@@ -266,8 +266,27 @@ TF 交叉验证（`tf2_echo gripper_right_finger_link gripper_left_finger_link`�
 - 因此**不存在** `position_mm → span_mm` 的映射。若硬把它当跨距代入 8.3 的反解：
   `j = (50 − 204)/2000 = −0.077 m`，比 `lower = 0` 还低，**URDF 不可达**；
   下发 0.050 m 时实测被截断在 0.021285（上表最后一行）。
-- 结论：**仿真的 50 mm 抓取 = 无法验证**。既不能说"仿真张开到 50 mm"，也不能说
-  "50 mm 对应 244 mm 跨距"——那两句话都会是编造。
+- **2026-10-24 所有者补充：EFG 最大张开 = 50 mm。** 结合 SolidWorks 的两臂跨距
+  （全闭 204.00 mm、全张 246.57 mm），两个端点都齐了，于是有确定的换算：
+
+```text
+span(width) = 204.00 + (246.57 - 204.00) * width / 50.0     [mm]
+finger_joint(width) = (span(width) - 204.00) / 2 / 1000    [m]
+                    = 0.0004257 * width
+50 mm  -> 21.285 mm/指 -> 跨距 246.57 mm
+25 mm  -> 10.643 mm/指
+ 0 mm  ->  0      mm   -> 跨距 204.00 mm
+```
+
+- 实现在 `scripts/run_pick_and_place.py::finger_position_m()`（纯函数，有 6 个单测），
+  数值唯一来源是 `config/tasks/common.yaml` 的 `gripper_max_opening_mm / gripper_span_min_mm /
+  gripper_span_max_mm`。
+- 仿真实测（`/gripper_controller/commands` → `/joint_states`）：0/25/50 mm 分别得到
+  `0 / 10.64 / 21.285 mm` 的手指关节，与上式一致 → **PASS**。
+- **仍然是假设的部分**：中间段按**线性**插值（内部楔形/连杆未必线性）。要把它变成事实，
+  需要 0/10/20/30/40/50 mm 六点卡尺实测的跨距表；在那之前这一项标 **PARTIAL（端点标定）**。
+- 同时消掉一个安全隐患：仿真运行时夹爪命令**不再走 PowerShell**（那会驱动真夹爪），
+  而是发 `/gripper_controller/commands`；真机才走 HIBTOT 桥。
 
 ### 8.5 几何一致性
 

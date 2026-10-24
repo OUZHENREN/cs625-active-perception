@@ -128,6 +128,9 @@ class Config:
     mode: str = "safe"
     scope: str = ""
     world: str = "real"
+    gripper_max_opening_mm: float = 50.0
+    gripper_span_min_mm: float = 204.0
+    gripper_span_max_mm: float = 246.57
     action: str = "/arm_controller/follow_joint_trajectory"
     observe: dict = field(default_factory=dict)
     process_images: bool = True
@@ -169,6 +172,9 @@ def load_config(path: str) -> Config:
         mode=str(raw.get("mode", "safe")),
         scope=str(raw.get("scope", "")),
         world=str(raw.get("world", "real")),
+        gripper_max_opening_mm=float(raw.get("gripper_max_opening_mm", 50.0)),
+        gripper_span_min_mm=float(raw.get("gripper_span_min_mm", 204.0)),
+        gripper_span_max_mm=float(raw.get("gripper_span_max_mm", 246.57)),
         action=str(raw.get("action", "/arm_controller/follow_joint_trajectory")),
         observe=dict(raw.get("observe", {}) or {}),
         process_images=bool(raw.get("process_images", True)),
@@ -295,6 +301,9 @@ class Runner(Node):
         # arm never moves, so the next phase has to be planned from where the
         # previous phase WOULD have ended.
         self.action_name: str = "/arm_controller/follow_joint_trajectory"
+        self.world: str = "real"
+        self.gripper_geometry: dict = {"max": 50.0, "min": 204.0, "max_span": 246.57}
+        self._gripper_pub = None
         self._fk = self.create_client(GetPositionFK, "/compute_fk")
         self.joint_limits: dict[str, tuple[float, float]] = {}
         self._load_joint_limits()
@@ -377,6 +386,14 @@ class Runner(Node):
 
     def gripper(self, command: str, value: float | None = None,
                 current: float | None = None) -> dict:
+        """Drive the gripper: the simulated controller in sim, the real bridge in real.
+
+        A simulation run must never reach the real HIBTOT bridge: on this cell the
+        bridge is a Windows PowerShell script, so a sim run would quietly actuate
+        the physical gripper while the arm moved in Gazebo.
+        """
+        if self.world == "sim":
+            return self._sim_gripper(command, value)
         args = ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass",
                 "-File", GRIPPER_PS1, "-Cmd", command]
         if value is not None:
@@ -397,6 +414,33 @@ class Runner(Node):
                     node = out  # keep the raw output for the error message
             time.sleep(1.0)
         raise RuntimeError(f"gripper {command} failed")
+
+    def _sim_gripper(self, command: str, value: float | None) -> dict:
+        """Simulated gripper: publish the mapped finger position, no hardware."""
+        if self._gripper_pub is None:
+            from std_msgs.msg import Float64MultiArray
+
+            self._gripper_pub = self.create_publisher(
+                Float64MultiArray, "/gripper_controller/commands", 10)
+        from std_msgs.msg import Float64MultiArray
+
+        if command == "grip" and value is not None:
+            position = finger_position_m(
+                value, self.gripper_geometry["max"], self.gripper_geometry["min"],
+                self.gripper_geometry["max_span"])
+        elif command == "open":
+            position = finger_position_m(
+                self.gripper_geometry["max"] * 0.8, self.gripper_geometry["max"],
+                self.gripper_geometry["min"], self.gripper_geometry["max_span"])
+        elif command == "close":
+            position = 0.0
+        else:  # init
+            return {"ok": True, "init": 5, "position_mm": None, "sim": True}
+        message = Float64MultiArray(data=[float(position)])
+        self._gripper_pub.publish(message)
+        self.get_logger().info(
+            f"[sim gripper] {command} value={value} -> finger {position * 1000:.2f} mm")
+        return {"ok": True, "init": 5, "position_mm": position * 1000.0, "sim": True}
 
     def ensure_gripper_initialized(self) -> bool:
         """Initialise only when the gripper is not already initialised.
@@ -1296,6 +1340,27 @@ def set_camera_mode(mode: str) -> None:
                    capture_output=True, timeout=180, check=False)
 
 
+def finger_position_m(width_mm: float, max_opening_mm: float = 50.0,
+                      span_min_mm: float = 204.0, span_max_mm: float = 246.57) -> float:
+    """Map the EFG opening command to the simulated finger joint position.
+
+    The real tool is an expanding brace on a HIBFOT EFG80: the driver's
+    ``position_mm`` is the jaw opening (0–50 mm, owner-confirmed maximum), and the
+    linkage converts it into the outward span between the two support arms
+    (204.00 mm fully closed, 246.57 mm fully open, SolidWorks).  The simulated
+    fingers travel half of that span change, so this is linear:
+
+        joint = (width / max_opening) * (span_max - span_min) / 2
+
+    Keeping it a pure function means the mapping is testable without ROS and the
+    numbers come from one place.
+    """
+    if max_opening_mm <= 0.0:
+        raise ValueError("max_opening_mm must be positive")
+    ratio = max(0.0, min(1.0, float(width_mm) / float(max_opening_mm)))
+    return ratio * (float(span_max_mm) - float(span_min_mm)) / 2.0 / 1000.0
+
+
 def notify_recorder(phase: str, boundary: str) -> None:
     """Tell the running experiment recorder which phase just started/ended.
 
@@ -1472,6 +1537,10 @@ def main() -> int:
     wanted = [p.strip() for p in args.phases.split(",") if p.strip()]
     node.goal_tolerance = cfg.goal_tolerance
     node.action_name = cfg.action
+    node.world = cfg.world
+    node.gripper_geometry = {"max": cfg.gripper_max_opening_mm,
+                             "min": cfg.gripper_span_min_mm,
+                             "max_span": cfg.gripper_span_max_mm}
     record: list[dict] = []
     plan_only = bool(args.plan_only)
 
