@@ -1,0 +1,201 @@
+{
+  "version": "2.0.0",
+  "presentation": {
+    "echo": true,
+    "reveal": "always",
+    "panel": "dedicated",
+    "clear": false
+  },
+  "inputs": [
+    { "id": "scope", "type": "pickString", "description": "任务范围", "options": ["load", "unload", "full"], "default": "load" },
+    { "id": "mode", "type": "pickString", "description": "速度模式", "options": ["safe", "efficient"], "default": "safe" },
+    { "id": "world", "type": "pickString", "description": "真机 / 仿真", "options": ["real", "sim"], "default": "sim" }
+  ],
+  "tasks": [
+    {
+      "label": "00 · 环境校验（必须最先跑）",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --verify",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "group": "build"
+    },
+    {
+      "label": "01 · 构建 overlay",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --no-overlay && bash scripts/build.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "02 · 全部单测",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 -m pytest test/ -q",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "group": { "kind": "test", "isDefault": true }
+    },
+    {
+      "label": "03 · 环境建模（重建 runtime/environment/latest）",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/model_environment.py --dataset ~/cs625_yolo_seg/datasets/2026-10-25_raw --out runtime/environment",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "04 · 环境门禁检查（不过就别动）",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/model_environment.py --out runtime/environment --verify-only",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "05 · 相机 → 精细模式 1280×960",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && source ~/cs625_camport_ws/install/setup.bash && python3 scripts/camera_mode.py modeling",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "06 · 相机 → 高帧率模式",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && source ~/cs625_camport_ws/install/setup.bash && python3 scripts/camera_mode.py fast",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "07 · 相机状态 / 实测帧率",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/camera_mode.py status",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+
+    { "label": "10 · 真机 装入 × 安全（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope load --mode safe --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+    { "label": "11 · 真机 装入 × 效率（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope load --mode efficient --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+    { "label": "12 · 真机 取出 × 安全（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope unload --mode safe --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+    { "label": "13 · 真机 取出 × 效率（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope unload --mode efficient --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+    { "label": "14 · 真机 全流程 × 安全（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope full --mode safe --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+    { "label": "15 · 真机 全流程 × 效率（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope full --mode efficient --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+
+    { "label": "20 · 仿真 装入 × 安全（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope load --mode safe --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+    { "label": "21 · 仿真 装入 × 效率（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope load --mode efficient --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+    { "label": "22 · 仿真 取出 × 安全（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope unload --mode safe --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+    { "label": "23 · 仿真 取出 × 效率（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope unload --mode efficient --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+    { "label": "24 · 仿真 全流程 × 安全（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope full --mode safe --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+    { "label": "25 · 仿真 全流程 × 效率（预演）", "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope full --mode efficient --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
+
+    {
+      "label": "30 · 只规划（选范围/模式/真机或仿真，不动臂）",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world ${input:world} --plan-only",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "31 · 真机执行（选范围/模式，会动臂）",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world real --confirm",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "32 · 仿真执行（Gazebo 里跑，不动真机）",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world sim --confirm",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "40 · 起仿真单元 + RViz（真机对齐世界）",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && ros2 launch cs625_bringup sim_cell.launch.py",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "41 · 打开 RViz（带任务按钮面板）",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && source install/setup.bash && rviz2 -d src/cs625_rviz_panel/config/cs625_task.rviz",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "42 · 启动 Qt 操作面板",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/cs625_ui.py",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+
+    {
+      "label": "50 · 真机底座 - 伪硬件冒烟（不接机器人）",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && ros2 launch cs625_bringup real_base.launch.py launch_driver:=true use_fake_hardware:=true description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro headless_mode:=true launch_moveit:=false launch_rviz:=false activate_joint_controller:=false execute:=false require_confirmation:=true",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "51 · 真机底座 - 真驱动（控制器保持 inactive）",
+      "type": "shell",
+      "command": "if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; source scripts/source_dev_env.sh --full && ros2 launch cs625_bringup real_base.launch.py launch_driver:=true robot_ip:=\"${CS625_ROBOT_IP}\" description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro headless_mode:=true launch_moveit:=false launch_rviz:=false activate_joint_controller:=false execute:=false require_confirmation:=true",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "52 · 真机 MoveIt",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && ros2 launch cs625_bringup real_moveit.launch.py description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro moveit_config_package:=elite_cs625_moveit_config semantic_package:=cs625_bringup semantic_file:=config/cs625_active_perception.srdf launch_rviz:=false",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "53 · 激活机械臂控制器",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && ros2 control switch_controllers --controller-manager /eli_ros2_control_node --activate arm_controller --strict",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "54 · 控制链健康检查",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/control_health.py",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "55 · 控制器恢复（超时/中止之后）",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && bash scripts/recover_control.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "56 · 实验数据：开始记录",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/experiment_recorder.py start --world ${input:world} --scope ${input:scope} --mode ${input:mode}",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "57 · 实验数据：停止 + 归档",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/experiment_recorder.py stop && LATEST=$(ls -td runtime/experiments/*/ 2>/dev/null | head -1) && python3 scripts/archive_experiment.py \"$LATEST\"",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}
