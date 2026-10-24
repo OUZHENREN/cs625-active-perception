@@ -71,6 +71,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--goal-tolerance", type=float, default=0.02)
     parser.add_argument("--max-start-offset", type=float, default=0.03,
                         help="refuse to execute if the trajectory start is far from the measured state")
+    parser.add_argument("--wait-scale", type=float, default=1.0,
+                        help="Multiply the wait budget. Gazebo on a CPU renderer "
+                             "advances slower than wall time, so a simulation run "
+                             "needs a larger budget or it gives up on a trajectory "
+                             "that is still executing.")
     parser.add_argument("--no-motion-window", type=float, default=10.0,
                         help="seconds to wait for the first real joint motion before "
                              "reporting NO_MOTION; only applies to a trajectory that "
@@ -197,7 +202,7 @@ def main() -> int:
         # window was duration + 20 s, so the client gave up while the server was
         # still running the goal and then queued the next chunk on top of it.
         duration = scaled_total
-        wait_budget = duration * 2.0 + 40.0
+        wait_budget = (duration * 2.0 + 40.0) * args.wait_scale
         expected_span = max(
             (abs(a - b) for a, b in zip(data["points"][-1]["q"], data["points"][0]["q"])),
             default=0.0,

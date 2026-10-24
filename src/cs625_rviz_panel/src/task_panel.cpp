@@ -721,7 +721,12 @@ void TaskPanel::startTask()
   if (action == QLatin1String("execute")) {
     QMessageBox box(this);
     box.setIcon(QMessageBox::Warning);
-    box.setWindowTitle(QString::fromUtf8("确认执行"));
+    // ASCII title on purpose: under WSLg the window manager (Weston, running
+    // in the separate system distro) draws the title bar with a CJK-less font
+    // set, so a Chinese title would only render as boxes.  The Chinese text
+    // stays in the dialog body, which Qt draws with the Ubuntu fonts.  Same
+    // rule as WINDOW_TITLE_MAIN in scripts/cs625_ui.py.
+    box.setWindowTitle(QString::fromUtf8("CS625 - Confirm execute"));
     box.setText(QString::fromUtf8("执行会真实驱动机械臂。"));
     box.setInformativeText(
       QString::fromUtf8(
@@ -1202,7 +1207,9 @@ void TaskPanel::activateController()
 
   QMessageBox box(this);
   box.setIcon(QMessageBox::Warning);
-  box.setWindowTitle(QString::fromUtf8("确认激活控制器"));
+  // ASCII title, Chinese body: see the comment in startTask() / the
+  // WINDOW_TITLE_* note in scripts/cs625_ui.py.
+  box.setWindowTitle(QString::fromUtf8("CS625 - Confirm controller activation"));
   box.setText(QString::fromUtf8("激活 arm_controller 会让机械臂进入可运动状态。"));
   box.setInformativeText(
     QString::fromUtf8(

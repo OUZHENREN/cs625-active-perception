@@ -699,7 +699,11 @@ def observe_streams(
         return result
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        # rclpy.shutdown() raises if the context was already shut down (a second
+        # call from a helper is easy to introduce); the measurement is already
+        # collected at this point, so a redundant shutdown must not crash the run.
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
 def run_spec(spec, duration=MEASURE_SECONDS, verbose=True):

@@ -347,7 +347,16 @@ def generate_launch_description():
         DeclareLaunchArgument("controllers_file", default_value="sim_controllers.yaml", description="Simulation controller YAML file using standard Humble ros2_controllers."),
         DeclareLaunchArgument("description_package", default_value="cs625_ap_description", description="Application description wrapper package."),
         DeclareLaunchArgument("description_file", default_value="cs625_active_perception.urdf.xacro", description="Application xacro wrapper file."),
-        DeclareLaunchArgument("initial_positions_file", default_value=PathJoinSubstitution([FindPackageShare("eli_cs_robot_description"), "config", "initial_positions.yaml"]), description="Joint positions used to initialize the Gazebo and MoveIt robot descriptions."),
+        DeclareLaunchArgument(
+            "initial_positions_file",
+            default_value=PathJoinSubstitution([
+                FindPackageShare("cs625_bringup"), "config", "sim_initial_positions.yaml"]),
+            description="Joint positions used to initialise Gazebo and MoveIt.  The "
+                        "default is the pose the real cell was in when the six-mode "
+                        "observations were recorded, not the vendor all-zero pose: "
+                        "starting elsewhere makes the simulated run take a different "
+                        "IK branch than the real one and the 2.6 rad branch guard then "
+                        "refuses the first observation."),
         DeclareLaunchArgument("initial_detach", default_value="false", description="Publish a one-shot Gazebo DetachableJoint detach command after robot spawn."),
         DeclareLaunchArgument("initial_detach_topic", default_value="/p7/attachment/detach", description="Absolute Gazebo transport detach topic used when initial_detach is true."),
         DeclareLaunchArgument("prefix", default_value="", description="Optional TF and joint-name prefix; must match the underlay controller configuration."),

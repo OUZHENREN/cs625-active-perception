@@ -147,6 +147,12 @@ class IcpPose(Node):
         self.create_subscription(CameraInfo, "/camera/color/camera_info", self.on_info, qos_profile_sensor_data)
         self.create_subscription(PoseStamped, "/tcp_pose_broadcaster/pose",
                                  self.on_tcp, 10)
+        # Gazebo has no tcp_pose_broadcaster (that controller belongs to the real
+        # driver), so the same pose comes from TF.  Without this the estimator sat
+        # on "waiting for one colour+depth frame pair" forever in simulation.
+        import tf2_ros as _tf2
+        self._tf_buffer = _tf2.Buffer()
+        self._tf_listener = _tf2.TransformListener(self._tf_buffer, self)
         self.pose_pub = self.create_publisher(PoseStamped, "/perception/target_pose", 10)
         self.quality_pub = self.create_publisher(
             Float32MultiArray, "/perception/pose_quality", 10)
@@ -445,6 +451,27 @@ class IcpPose(Node):
 
     def on_tcp(self, msg) -> None:
         self.tcp = msg
+
+    def tcp_from_tf(self):
+        """(PoseStamped or None) tool pose looked up through TF."""
+        import rclpy.duration
+        import rclpy.time
+
+        for frame in ("my_end_effector_link", "tool0"):
+            try:
+                tf = self._tf_buffer.lookup_transform(
+                    "base_link", frame, rclpy.time.Time(),
+                    timeout=rclpy.duration.Duration(seconds=0.5))
+            except Exception:  # noqa: BLE001 - try the next candidate
+                continue
+            msg = PoseStamped()
+            msg.header = tf.header
+            msg.pose.position.x = tf.transform.translation.x
+            msg.pose.position.y = tf.transform.translation.y
+            msg.pose.position.z = tf.transform.translation.z
+            msg.pose.orientation = tf.transform.rotation
+            return msg
+        return None
         if not self.done:
             self.solve()
 
@@ -463,6 +490,8 @@ class IcpPose(Node):
         started = _time.time()
         # The TCP pose is part of the chain now, so a frame pair alone is not
         # enough; wait for all four so the first arrival does not abort.
+        if self.tcp is None:
+            self.tcp = self.tcp_from_tf()
         if (self.color is None or self.depth is None or self.info is None
                 or self.tcp is None):
             return

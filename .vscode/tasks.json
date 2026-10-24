@@ -7,28 +7,91 @@
     "clear": false
   },
   "inputs": [
-    { "id": "scope", "type": "pickString", "description": "任务范围", "options": ["load", "unload", "full"], "default": "load" },
-    { "id": "mode", "type": "pickString", "description": "速度模式", "options": ["safe", "efficient"], "default": "safe" },
-    { "id": "world", "type": "pickString", "description": "真机 / 仿真", "options": ["real", "sim"], "default": "sim" }
+    {
+      "id": "scope",
+      "type": "pickString",
+      "description": "任务范围：load=抓取装入 / unload=取出放回 / full=装入+取出",
+      "options": ["load", "unload", "full"],
+      "default": "load"
+    },
+    {
+      "id": "mode",
+      "type": "pickString",
+      "description": "速度模式：safe=分段多+每段验收 / efficient=单段+巡航快（槽内仍 0.005 m/s）",
+      "options": ["safe", "efficient"],
+      "default": "safe"
+    },
+    {
+      "id": "world",
+      "type": "pickString",
+      "description": "目标世界：sim=Gazebo / real=真机（real 会动机械臂）",
+      "options": ["sim", "real"],
+      "default": "sim"
+    },
+    {
+      "id": "runAction",
+      "type": "pickString",
+      "description": "动作：dry-run=只看配置/门禁/阶段表 / plan-only=做可达性规划 / execute=真的执行（会动臂）",
+      "options": ["dry-run", "plan-only", "execute"],
+      "default": "dry-run"
+    },
+    {
+      "id": "modelAction",
+      "type": "pickString",
+      "description": "环境模型：rebuild=重新测量生成 model.json / verify=只跑门禁检查（不动测量数据）",
+      "options": ["rebuild", "verify"],
+      "default": "verify"
+    },
+    {
+      "id": "realStage",
+      "type": "pickString",
+      "description": "真机分步：base=底座+驱动（控制器 inactive）/ moveit=MoveIt / fake=伪硬件冒烟（不接机器人）",
+      "options": ["base", "moveit", "fake"],
+      "default": "base"
+    },
+    {
+      "id": "controllerAction",
+      "type": "pickString",
+      "description": "控制链：health=健康检查 / activate=激活 arm_controller / recover=超时或中止后恢复",
+      "options": ["health", "activate", "recover"],
+      "default": "health"
+    },
+    {
+      "id": "cameraMode",
+      "type": "pickString",
+      "description": "相机：modeling=精细 1280x960 / fast=高帧率 / status=当前分辨率与实测帧率",
+      "options": ["modeling", "fast", "status"],
+      "default": "status"
+    },
+    {
+      "id": "archiveAction",
+      "type": "pickString",
+      "description": "实验数据：latest=归档最近一次 runtime/experiments / stop-and-archive=先停记录再归档",
+      "options": ["latest", "stop-and-archive"],
+      "default": "latest"
+    }
   ],
   "tasks": [
     {
       "label": "00 · 环境校验（必须最先跑）",
+      "detail": "source scripts/source_dev_env.sh --full --verify：ROS Jazzy → 厂商 underlay → 本仓库 overlay，并断言三个包都可解析",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --verify",
+      "command": "source scripts/source_dev_env.sh --full --verify",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": [],
       "group": "build"
     },
     {
       "label": "01 · 构建 overlay",
+      "detail": "首次构建时 install/ 还不存在，--full 会失败，所以回退到 --no-overlay 再让 build.sh 自己加载环境",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --no-overlay && bash scripts/build.sh",
+      "command": "if ! source scripts/source_dev_env.sh --full; then echo '首次构建：overlay 还不存在，改用 --no-overlay'; source scripts/source_dev_env.sh --no-overlay; fi; bash scripts/build.sh",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
     {
       "label": "02 · 全部单测",
+      "detail": "离线 pytest：不启 ROS、不动机械臂，改完代码先跑这一条",
       "type": "shell",
       "command": "source scripts/source_dev_env.sh --full && python3 -m pytest test/ -q",
       "options": { "cwd": "${workspaceFolder}" },
@@ -36,166 +99,77 @@
       "group": { "kind": "test", "isDefault": true }
     },
     {
-      "label": "03 · 环境建模（重建 runtime/environment/latest）",
+      "label": "03 · 环境建模 + 门禁",
+      "detail": "picker 选 rebuild（scripts/model_environment.py 重新测量 → runtime/environment）或 verify（--verify-only，只判门禁）",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/model_environment.py --dataset ~/cs625_yolo_seg/datasets/2026-10-25_raw --out runtime/environment",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; case \"${input:modelAction}\" in rebuild) echo '[03] 重新测量环境并生成 runtime/environment/latest.json'; python3 scripts/model_environment.py --out runtime/environment ;; verify) echo '[03] 只跑门禁：槽/工件偏差、点数、模型年龄'; python3 scripts/model_environment.py --out runtime/environment --verify-only ;; *) echo \"未知 modelAction\"; exit 1 ;; esac",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
     {
-      "label": "04 · 环境门禁检查（不过就别动）",
+      "label": "10 · 运行任务（picker 选范围/模式/动作/世界）",
+      "detail": "一个任务折叠 12 条静态组合：scope × mode × world × 动作；只有动作显式选 execute 才加 --confirm，并留 3 秒 Ctrl+C 取消窗口",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/model_environment.py --out runtime/environment --verify-only",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; case \"${input:runAction}\" in dry-run) echo '[10] 预演：只打印配置合并、门禁判定和阶段表，不动臂'; python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world ${input:world} --dry-run ;; plan-only) echo '[10] 只规划：做可达性/碰撞规划，不发执行指令'; python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world ${input:world} --plan-only ;; execute) echo '[10] 动作=execute：目标世界 ${input:world}，范围 ${input:scope}/${input:mode}，3 秒内 Ctrl+C 可取消'; sleep 3; python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world ${input:world} --confirm ;; *) echo '未知 runAction'; exit 1 ;; esac",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
     {
-      "label": "05 · 相机 → 精细模式 1280×960",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && source ~/cs625_camport_ws/install/setup.bash && python3 scripts/camera_mode.py modeling",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "06 · 相机 → 高帧率模式",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && source ~/cs625_camport_ws/install/setup.bash && python3 scripts/camera_mode.py fast",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "07 · 相机状态 / 实测帧率",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/camera_mode.py status",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-
-    { "label": "10 · 真机 装入 × 安全（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope load --mode safe --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-    { "label": "11 · 真机 装入 × 效率（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope load --mode efficient --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-    { "label": "12 · 真机 取出 × 安全（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope unload --mode safe --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-    { "label": "13 · 真机 取出 × 效率（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope unload --mode efficient --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-    { "label": "14 · 真机 全流程 × 安全（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope full --mode safe --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-    { "label": "15 · 真机 全流程 × 效率（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope full --mode efficient --world real --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-
-    { "label": "20 · 仿真 装入 × 安全（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope load --mode safe --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-    { "label": "21 · 仿真 装入 × 效率（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope load --mode efficient --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-    { "label": "22 · 仿真 取出 × 安全（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope unload --mode safe --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-    { "label": "23 · 仿真 取出 × 效率（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope unload --mode efficient --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-    { "label": "24 · 仿真 全流程 × 安全（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope full --mode safe --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-    { "label": "25 · 仿真 全流程 × 效率（预演）", "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope full --mode efficient --world sim --dry-run", "options": { "cwd": "${workspaceFolder}" }, "problemMatcher": [] },
-
-    {
-      "label": "30 · 只规划（选范围/模式/真机或仿真，不动臂）",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world ${input:world} --plan-only",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "31 · 真机执行（选范围/模式，会动臂）",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world real --confirm",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "32 · 仿真执行（Gazebo 里跑，不动真机）",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world sim --confirm",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-
-    {
-      "label": "40 · 起仿真单元 + RViz（真机对齐世界）",
+      "label": "20 · 起仿真（Gazebo + RViz）",
+      "detail": "ros2 launch cs625_bringup sim_cell.launch.py：真机对齐世界的 Gazebo 单元，RViz 由该 launch 一起起",
       "type": "shell",
       "command": "source scripts/source_dev_env.sh --full && ros2 launch cs625_bringup sim_cell.launch.py",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
     {
-      "label": "41 · 打开 RViz（带任务按钮面板）",
+      "label": "21 · 起真机（底座 / MoveIt / 伪硬件）",
+      "detail": "按 README/AGENTS 顺序分两步：先 base（驱动 + ros2_control，arm_controller 保持 inactive），再 moveit；fake 是不接机器人的伪硬件冒烟。robot_ip 从 ~/.cs625_local.env 的 CS625_ROBOT_IP 来",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && source install/setup.bash && rviz2 -d src/cs625_rviz_panel/config/cs625_task.rviz",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; case \"${input:realStage}\" in base) if [ -z \"$CS625_ROBOT_IP\" ]; then echo 'CS625_ROBOT_IP 未设置，请在 ~/.cs625_local.env 里写 CS625_ROBOT_IP=<机器人地址>'; exit 1; fi; echo '[21] 第 1 步：真驱动底座（控制器保持 inactive，不会自己动）'; ros2 launch cs625_bringup real_base.launch.py launch_driver:=true robot_ip:=\"$CS625_ROBOT_IP\" description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro headless_mode:=true launch_moveit:=false launch_rviz:=false activate_joint_controller:=false execute:=false require_confirmation:=true ;; moveit) echo '[21] 第 2 步：MoveIt（底座必须已经在跑）'; ros2 launch cs625_bringup real_moveit.launch.py description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro moveit_config_package:=elite_cs625_moveit_config semantic_package:=cs625_bringup semantic_file:=config/cs625_active_perception.srdf launch_rviz:=false ;; fake) echo '[21] 伪硬件冒烟：不接真机，只验 URDF/ros2_control 链路'; ros2 launch cs625_bringup real_base.launch.py launch_driver:=true use_fake_hardware:=true description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro headless_mode:=true launch_moveit:=false launch_rviz:=false activate_joint_controller:=false execute:=false require_confirmation:=true ;; *) echo '未知 realStage'; exit 1 ;; esac",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
     {
-      "label": "42 · 启动 Qt 操作面板",
+      "label": "22 · 控制器（健康检查 / 激活 / 恢复）",
+      "detail": "动臂前必须四项全 True：safety_mode=1、robot_mode=7、arm_controller active、control_health.py 全 True。控制器名和 manager 名可用 CS625_ARM_CONTROLLER / CS625_CONTROLLER_MANAGER 覆盖",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; cm=\"$CS625_CONTROLLER_MANAGER\"; [ -n \"$cm\" ] || cm=/eli_ros2_control_node; ac=\"$CS625_ARM_CONTROLLER\"; [ -n \"$ac\" ] || ac=arm_controller; case \"${input:controllerAction}\" in health) echo '[22] 健康检查：socket / controller / joint_states 三项都应为 True'; python3 scripts/control_health.py ;; activate) echo \"[22] 激活 $ac（strict：失败直接报错，不回退）\"; ros2 control switch_controllers --controller-manager \"$cm\" --activate \"$ac\" --strict ;; recover) echo '[22] 恢复控制链：超时/中止/半死驱动之后跑这一条'; bash scripts/recover_control.sh ;; *) echo '未知 controllerAction'; exit 1 ;; esac",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "30 · Qt 操作面板",
+      "detail": "scripts/cs625_ui.py：六个任务模式按钮的 Qt 面板，和命令行入口等价",
       "type": "shell",
       "command": "source scripts/source_dev_env.sh --full && python3 scripts/cs625_ui.py",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
-
     {
-      "label": "50 · 真机底座 - 伪硬件冒烟（不接机器人）",
+      "label": "31 · 相机（精细 / 高帧率 / 状态）",
+      "detail": "scripts/camera_mode.py 自己会加载 camport 工作区（CS625_CAMPORT_WS）并读 ~/.cs625_local.env 的 CS625_CAMERA_IP，不动机械臂",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && ros2 launch cs625_bringup real_base.launch.py launch_driver:=true use_fake_hardware:=true description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro headless_mode:=true launch_moveit:=false launch_rviz:=false activate_joint_controller:=false execute:=false require_confirmation:=true",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; case \"${input:cameraMode}\" in modeling) echo '[31] 切回精细模式 1280x960（建模/标定用）'; python3 scripts/camera_mode.py modeling ;; fast) echo '[31] 切到第一个实测 >=10 fps 的高帧率候选'; python3 scripts/camera_mode.py fast ;; status) echo '[31] 打印当前分辨率、实测帧率与健康状态'; python3 scripts/camera_mode.py status ;; *) echo '未知 cameraMode'; exit 1 ;; esac",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
     {
-      "label": "51 · 真机底座 - 真驱动（控制器保持 inactive）",
+      "label": "40 · 实验归档",
+      "detail": "archive_experiment.py 需要 --run-dir：latest 取 runtime/experiments 里最新一次；stop-and-archive 先停记录器。归档到 $CS625_EXPERIMENT_ARCHIVE 或 ~/cs625_experiment_archive，并写 docs/evidence/experiment_index.md",
       "type": "shell",
-      "command": "if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; source scripts/source_dev_env.sh --full && ros2 launch cs625_bringup real_base.launch.py launch_driver:=true robot_ip:=\"${CS625_ROBOT_IP}\" description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro headless_mode:=true launch_moveit:=false launch_rviz:=false activate_joint_controller:=false execute:=false require_confirmation:=true",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; case \"${input:archiveAction}\" in latest) run=$(ls -td runtime/experiments/*/ 2>/dev/null | head -1); if [ -z \"$run\" ]; then echo '没有 runtime/experiments/* 可归档，先跑一次 --confirm 的执行'; exit 1; fi; echo \"[40] 归档 $run\"; python3 scripts/archive_experiment.py --run-dir \"$run\" ;; stop-and-archive) echo '[40] 先停记录器'; python3 scripts/experiment_recorder.py stop; run=$(ls -td runtime/experiments/*/ 2>/dev/null | head -1); if [ -z \"$run\" ]; then echo '没有 runtime/experiments/* 可归档'; exit 1; fi; echo \"[40] 归档 $run\"; python3 scripts/archive_experiment.py --run-dir \"$run\" ;; *) echo '未知 archiveAction'; exit 1 ;; esac",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
     {
-      "label": "52 · 真机 MoveIt",
+      "label": "99 · DSH Web 快速启动（已开就只开浏览器）",
+      "detail": "先探 127.0.0.1 的 3080/3081；已在监听就跳过启动，否则 setsid+nohup 后台起 dsh web --no-open --port 3080，等端口起来后从它的日志里取带 token 的 URL，最后交给浏览器打开；任务本身立刻返回，不阻塞终端",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && ros2 launch cs625_bringup real_moveit.launch.py description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro moveit_config_package:=elite_cs625_moveit_config semantic_package:=cs625_bringup semantic_file:=config/cs625_active_perception.srdf launch_rviz:=false",
+      "command": "bash -lc '\n# 99 · DSH Web 快速启动：① 探端口 → ② 需要时后台启动 → ③ 打开浏览器（后台进程不阻塞终端）\ncd \"${workspaceFolder}\" || exit 1\n\necho \"[99.0] 仓库约定：每条任务先加载 ROS 环境；DSH 本身不用 ROS，加载失败只提示、不阻断\"\nsource scripts/source_dev_env.sh --full >/dev/null 2>&1 || echo \"[99.0] 提示: ROS 环境未就绪（不影响打开 DSH Web）\"\n\nif [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi\nports=\"$CS625_DSH_PORT\"\n[ -n \"$ports\" ] || ports=\"3080 3081\"\nlog=\"runtime/logs/dsh_web.log\"\nmkdir -p runtime/logs\n\n# [99.1] 探测端口：bash 内建 /dev/tcp，不依赖 ss/netstat/curl\nlistening() { (exec 3<>\"/dev/tcp/127.0.0.1/$1\") 2>/dev/null; }\nactive=\"\"\nfor p in $ports; do\n  if listening \"$p\"; then active=\"$p\"; echo \"[99.1] 127.0.0.1:$p 已在监听，不需要再启动\"; break; fi\ndone\nif [ -z \"$active\" ]; then echo \"[99.1] 3080/3081 都没有监听，准备启动\"; fi\n\n# dsh web 每次启动生成新 token，带 token 的 URL 只出现在它自己的日志里\nurl_from_log() { if [ -f \"$log\" ]; then grep -o \"http://127.0.0.1:$1/[^ ]*token=[A-Za-z0-9_-]*\" \"$log\" | tail -1; fi; }\n\n# [99.3] 打开浏览器：本机没有 xdg-open/wslview，按可用性依次降级\nopen_url() {\n  if command -v xdg-open >/dev/null 2>&1; then xdg-open \"$1\"\n  elif command -v wslview >/dev/null 2>&1; then wslview \"$1\"\n  elif grep -qi microsoft /proc/version 2>/dev/null && command -v cmd.exe >/dev/null 2>&1; then cmd.exe /c start \"\" \"$1\" >/dev/null 2>&1\n  elif command -v sensible-browser >/dev/null 2>&1; then sensible-browser \"$1\" >/dev/null 2>&1 &\n  else echo \"[99.3] 没有可用的浏览器打开器，请手动打开: $1\"; return 1; fi\n}\n\nif [ -n \"$active\" ]; then\n  # [99.2] 已在运行：绝不重复启动（3081 可能是旧 relay，3080 上可能正是当前会话）\n  url=$(url_from_log \"$active\")\n  if [ -z \"$url\" ]; then\n    url=\"http://127.0.0.1:$active/\"\n    echo \"[99.2] 未找到该实例的带 token URL；若页面提示 authentication required，请用它启动终端里打印的那条 URL\"\n  fi\nelse\n  # [99.2] 后台启动：setsid 建新会话 + nohup 忽略 SIGHUP，任务结束或关终端都不影响它\n  if ! command -v dsh >/dev/null 2>&1; then echo \"[99.2] 找不到 dsh：确认 npm 全局 bin 在 PATH 里（command -v dsh）\"; exit 1; fi\n  : > \"$log\"\n  setsid nohup dsh web --no-open --port 3080 >>\"$log\" 2>&1 < /dev/null &\n  echo \"[99.2] 已后台启动: dsh web --no-open --port 3080 (pid $!)，日志 $log\"\n  for i in $(seq 1 40); do listening 3080 && break; sleep 0.25; done\n  if ! listening 3080; then echo \"[99.2] 启动超时，最后几行日志：\"; tail -5 \"$log\"; exit 1; fi\n  url=\"\"\n  for i in $(seq 1 40); do url=$(url_from_log 3080); [ -n \"$url\" ] && break; sleep 0.25; done\n  [ -n \"$url\" ] || url=\"http://127.0.0.1:3080/\"\n  echo \"[99.2] 已监听 3080（端口先开、URL 后打印，所以上面等一下日志）\"\nfi\n\necho \"[99.3] 打开浏览器: $url\"\nopen_url \"$url\"\n'",
       "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "53 · 激活机械臂控制器",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && ros2 control switch_controllers --controller-manager /eli_ros2_control_node --activate arm_controller --strict",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "54 · 控制链健康检查",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/control_health.py",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "55 · 控制器恢复（超时/中止之后）",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && bash scripts/recover_control.sh",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "56 · 实验数据：开始记录",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/experiment_recorder.py start --world ${input:world} --scope ${input:scope} --mode ${input:mode}",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "57 · 实验数据：停止 + 归档",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full && python3 scripts/experiment_recorder.py stop && LATEST=$(ls -td runtime/experiments/*/ 2>/dev/null | head -1) && python3 scripts/archive_experiment.py \"$LATEST\"",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     }
   ]
 }

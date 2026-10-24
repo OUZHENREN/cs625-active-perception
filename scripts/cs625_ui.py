@@ -9,7 +9,7 @@ The panel is the main operator surface for the six task modes:
     world  real / sim
 
 The live colour image no longer sits inside the main window.  It lives in its
-own :class:`CameraWindow` (title "CS625 相机视图", about 1280x960, freely
+own :class:`CameraWindow` (title "CS625 Camera View", about 1280x960, freely
 resizable), which reuses :class:`ZoomableImageView` -- aspect preserving fit,
 wheel zoom around the cursor, drag pan and double-click reset all survive.
 Closing that window only hides it; the main panel can reopen it at any time and
@@ -116,6 +116,34 @@ MAIN_MAX_WIDTH = 520
 IMAGE_WINDOW_SIZE = (1280, 960)
 LOG_VIEW_HEIGHT = 200
 STATE_REFRESH_MS = 500
+
+#: Top-level window titles must stay ASCII under WSLg.
+#:
+#: WSLg runs its Weston compositor in a *separate* system distro and draws the
+#: window frame there: ``xprop`` on the panel reports
+#: ``_NET_FRAME_EXTENTS(CARDINAL) = 38, 38, 59, 38``, i.e. the 59 px top frame
+#: with the title text is painted by Weston, not by Qt.  Weston renders that
+#: text with the system distro's own fonts, and that font set is DejaVu only
+#: (WSLGd logs ``FontMonitor: monitoring /mnt/wslg/distro/usr/share/fonts``).
+#: DejaVu has no CJK glyph at all, so every Chinese character in a title bar
+#: shows up as an empty box, while the ``·`` (U+00B7) in the same string still
+#: renders -- exactly the reported ``CS625 · 图□□□□...`` symptom.
+#:
+#: This is *not* a Qt encoding bug, so the obvious workarounds do not work:
+#:
+#: * the panel already publishes ``_NET_WM_NAME(UTF8_STRING)`` with the correct
+#:   text (verified with ``xprop -id <win> WM_NAME _NET_WM_NAME``), therefore
+#:   re-setting ``_NET_WM_NAME`` as UTF-8 through ``xdotool``/``xprop`` -- the
+#:   usual "UTF-8 title" recipe -- is a no-op; the bytes are identical;
+#: * installing WenQuanYi inside Ubuntu cannot help either: the compositor only
+#:   reads the system distro's font directory, never Ubuntu's fontconfig.
+#:
+#: Only ASCII titles are safe.  The Chinese product name stays *inside* the
+#: windows (header label "CS625 · 六类任务主控", camera status labels, ...),
+#: where the fonts come from Ubuntu and render correctly.
+WINDOW_TITLE_MAIN = "CS625 Task Console"
+WINDOW_TITLE_CAMERA = "CS625 Camera View"
+
 # One status row per subsystem, in the order the operator checks them.
 STATUS_ROWS = (
     ("robot", "机器人"),
@@ -845,7 +873,9 @@ class CameraWindow(QtWidgets.QDialog):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("CameraWindow")
-        self.setWindowTitle("CS625 相机视图")
+        # ASCII on purpose: see WINDOW_TITLE_MAIN/WINDOW_TITLE_CAMERA.  The
+        # Chinese name of the window lives in its status labels instead.
+        self.setWindowTitle(WINDOW_TITLE_CAMERA)
         self.setWindowFlags(
             QtCore.Qt.Window
             | QtCore.Qt.WindowCloseButtonHint
@@ -1054,7 +1084,10 @@ class Dashboard(QtWidgets.QMainWindow):
 
     # ------------------------------------------------------------------ UI
     def _build_ui(self) -> None:
-        self.setWindowTitle("CS625 · 六类任务主操作面板")
+        # ASCII on purpose: WSLg's Weston draws the title bar with a CJK-less
+        # font, so a Chinese title would only show boxes.  The Chinese name of
+        # the panel is the header label "CS625 · 六类任务主控" below.
+        self.setWindowTitle(WINDOW_TITLE_MAIN)
         self.setMinimumSize(MAIN_MIN_WIDTH, 700)
         self.resize(*MAIN_WINDOW_SIZE)
 
@@ -1635,7 +1668,7 @@ class Dashboard(QtWidgets.QMainWindow):
     def _confirm_execute_mode(self) -> bool:
         answer = QtWidgets.QMessageBox.warning(
             self,
-            "确认切换到“执行”模式",
+            "Confirm: switch to Execute",
             "“执行”模式会让 run_task.py 真正驱动机械臂做运动。\n\n"
             "确认切换吗？点击“开始任务”时还会再确认一次。",
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
@@ -1656,6 +1689,14 @@ class Dashboard(QtWidgets.QMainWindow):
     def _setup_task_process(self) -> None:
         self._process = QtCore.QProcess(self)
         self._process.setProcessChannelMode(QtCore.QProcess.MergedChannels)
+        # The log pane decodes child output as UTF-8.  Python chooses its stdout
+        # encoding from the locale, so a child started from a shell with
+        # LANG=C / LANG=zh_CN.GBK would emit non-UTF-8 bytes and turn into
+        # mojibake (or U+FFFD) in the log.  Pin the child to UTF-8 so the text
+        # is correct at the source instead of patching the decode side.
+        env = QtCore.QProcessEnvironment.systemEnvironment()
+        env.insert("PYTHONIOENCODING", "utf-8")
+        self._process.setProcessEnvironment(env)
         self._process.setWorkingDirectory(str(REPO))
         self._process.started.connect(self._on_task_started)
         self._process.readyReadStandardOutput.connect(self._drain_task_output)
@@ -1691,7 +1732,7 @@ class Dashboard(QtWidgets.QMainWindow):
         if self._action == "confirm":
             answer = QtWidgets.QMessageBox.question(
                 self,
-                "确认执行真实任务",
+                "Confirm: real task",
                 "即将以“执行”模式启动：\n\n"
                 f"{format_task_command(command)}\n\n"
                 "这会驱动机械臂做真实运动，确认继续？",
@@ -2117,7 +2158,7 @@ class Dashboard(QtWidgets.QMainWindow):
         else:
             text = "确认张开夹爪到 50 mm？"
         answer = QtWidgets.QMessageBox.question(
-            self, "夹爪动作确认", text,
+            self, "Confirm: gripper action", text,
             QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
             QtWidgets.QMessageBox.No,
         )
@@ -2130,7 +2171,8 @@ class Dashboard(QtWidgets.QMainWindow):
             )
             QtCore.QTimer.singleShot(700, lambda: self._refresh_gripper(force=True))
         except Exception as exc:
-            QtWidgets.QMessageBox.warning(self, "夹爪桥", f"命令失败: {exc}")
+            QtWidgets.QMessageBox.warning(self, "Gripper bridge",
+                                          f"命令失败: {exc}")
 
     # ---------------------------------------------------------------- image
     def _refresh_image(self) -> None:

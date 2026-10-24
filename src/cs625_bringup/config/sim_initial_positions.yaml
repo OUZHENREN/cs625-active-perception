@@ -1,0 +1,18 @@
+##### 安装到 cs625_bringup/share 的副本，launch 通过 FindPackageShare 引用 #####
+# Simulation start pose = the pose the REAL cell was in when the six-mode
+# observations were recorded (2026-10-22..24).  Starting anywhere else makes the
+# simulated run take a different IK branch than the real one (and the 2.6 rad
+# branch-jump guard then refuses the first observation), so this file is part of
+# the sim/real alignment, not a convenience.
+#
+# Source: recorded /joint_states at the start of the accepted real run.
+# Regenerate by reading /joint_states on the real cell before a run; do not
+# hand-tune it to make a simulation pass.
+shoulder_pan_joint: 0.559681835159803
+shoulder_lift_joint: -0.886110693244363
+elbow_joint: -2.6479421412927606
+wrist_1_joint: 0.004946539382850723
+wrist_2_joint: 1.8827091289653233
+wrist_3_joint: 1.4481534658974855
+gripper_right_finger_joint: 0.0
+gripper_left_finger_joint: 0.0

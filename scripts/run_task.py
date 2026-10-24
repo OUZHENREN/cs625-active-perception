@@ -312,7 +312,10 @@ def main() -> int:
     # After the environment model is accepted the camera can run in its fast
     # profile; every observation check switches back to the modeling profile
     # (depth is what the gate and the pose estimation need).
-    if args.confirm and not args.plan_only:
+    # Only the real profile owns a Percipio camera.  A sim run must never start or
+    # restart the camera driver: that would power the real device back on and put it
+    # in a different mode than the one the operator left it in.
+    if args.confirm and not args.plan_only and args.world == "real":
         camera_script = pathlib.Path(__file__).resolve().parent / "camera_mode.py"
         if camera_script.exists():
             subprocess.run([sys.executable, "-u", str(camera_script), "fast"],
@@ -377,7 +380,7 @@ def main() -> int:
                 summary["recorder"]["archived"] = run_dirs[0].name
                 _write_summary(summary, args.summary)
     camera_script = pathlib.Path(__file__).resolve().parent / "camera_mode.py"
-    if args.confirm and camera_script.exists():
+    if args.confirm and args.world == "real" and camera_script.exists():
         subprocess.run([sys.executable, "-u", str(camera_script), "modeling"],
                        check=False)
         print("camera: back to the modeling profile")
