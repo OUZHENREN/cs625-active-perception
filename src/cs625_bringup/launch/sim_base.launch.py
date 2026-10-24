@@ -218,11 +218,21 @@ def _compose(context):
                 executable="parameter_bridge",
                 name="cs625_sim_real_topic_alias",
                 output="screen",
+                # The Gazebo side is the sensor's own /camera contract; the ROS
+                # side is remapped to the real driver's names.  Naming the gz
+                # topic directly (e.g. /camera/color/image_raw@...) would make
+                # the bridge subscribe on Gazebo to a topic that does not exist
+                # and silently publish nothing.
                 arguments=[
-                    "/camera/color/image_raw@sensor_msgs/msg/Image[gz.msgs.Image",
-                    "/camera/depth/image_raw@sensor_msgs/msg/Image[gz.msgs.Image",
-                    "/camera/color/camera_info"
-                    "@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
+                    "/camera/image@sensor_msgs/msg/Image[gz.msgs.Image",
+                    "/camera/depth_image@sensor_msgs/msg/Image[gz.msgs.Image",
+                    "/camera/camera_info@sensor_msgs/msg/CameraInfo"
+                    "[gz.msgs.CameraInfo",
+                ],
+                remappings=[
+                    ("/camera/image", "/camera/color/image_raw"),
+                    ("/camera/depth_image", "/camera/depth/image_raw"),
+                    ("/camera/camera_info", "/camera/color/camera_info"),
                 ],
             )
         )

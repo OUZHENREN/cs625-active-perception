@@ -129,7 +129,7 @@ def _compose(context):
             attachment_enabled,
             " ",
         ]
-        + camera_arguments()
+        + camera_arguments(separators=True)
     )
     gazebo_model_path = LaunchConfiguration("gazebo_model_file")
     # gz_ros2_control is configured by the robot model to read
@@ -241,7 +241,7 @@ def _compose(context):
         LaunchConfiguration("initial_positions_file"),
         "p7_attachment_enabled:=",
         attachment_enabled,
-    ] + camera_arguments()
+    ] + camera_arguments(separators=False)
     prepare_gazebo_model = ExecuteProcess(
         cmd=prepare_gazebo_model_cmd,
         output="screen",

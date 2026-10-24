@@ -14,7 +14,7 @@
 | 相机内参 | 已改为真机 1280×960、水平 FOV 68.9°（由 fx 931.47 反算） | 代码已改，**运行时未复核**（本机 Gazebo 反复被终止） |
 | 相机帧率 | 已设 1 Hz（真机实测 0.79 fps） | 代码已改，运行时未复核 |
 | 相机安装位 | 用 RVS 手眼链：`camera_link` = 深度眼，`camera_color_xyz` = 彩色眼 24.4 mm 基线；传感器渲染在**彩色眼** | PARTIAL（见 §4） |
-| 夹爪行程/几何 | URDF 里质量是占位值（0.001 kg 等） | FAIL（未对齐） |
+| 夹爪行程/几何 | 行程已对齐到 CAD 实测的 246.57 mm 外撑跨距，质量改为**标注估算值**（不是实测） | PARTIAL（见 §8；`position_mm`↔跨距仍缺标定） |
 | 动力学/接触/力 | 无 F/T、无摩擦模型、无真实伺服 | NOT MODELED |
 | 槽内 1 mm 间隙 | 规划时**关闭碰撞检查**（几何导向） | 见 §3 的重要限制 |
 
@@ -114,10 +114,228 @@ ros2 topic hz /camera/color/image_raw                 # 期望 ≈1 Hz
 | 夹爪**行程**（mm）与手指几何 | URDF 关节限位 + 碰撞几何 | "夹住没夹住"在仿真里是否有意义 |
 | 真实套筒/夹具的**接触刚度**（可选） | 接触模型 | 插入时的力学行为 |
 
-## 7. 仍未解决的一个疑点（需要真机数据确认）
+## 7. TCP / 工具坐标系口径（已查明）
 
-夹具碰撞体发布后，严格碰撞检查下 `pre_insert` 会撞夹具顶梁（接触点 (1.2494, 0.0022, 0.3653)）。
-初步分析指向 **TCP/工具坐标系约定**：任务位姿是按"夹爪尖"给的，而 MoveIt 的
-`my_end_effector_link` 与 `tool0` 之间还有 0.353 m 的偏移（`T_FLANGE_TCP`）。
-真机上这些位姿跑通过，说明至少有一个环节的定义与仿真里假设的不同。
-**这个疑点没解决之前，不要声称"仿真里插入不可行"或"真机插入有问题"。**
+严格碰撞检查下 `pre_insert` 会撞夹具顶梁（接触点 (1.2494, 0.0022, 0.3653)），
+一度怀疑是"夹爪尖 vs 法兰"差了 207 mm。离线核算后的结论：
+
+```text
+工具网格 gripper_0920.stl   bbox  z ∈ [-0.007, +0.207]  m
+  → 网格原点在法兰，工具向 +z 伸出 207 mm；宽轴 x = 294.6 mm，窄轴 y = 85 mm
+URDF 链路  flange --(xyz=0)--> my_end_effector_link --(xyz=0)--> tool0 --> 夹爪
+  → my_end_effector_link == 法兰（不是夹爪尖）
+SRDF tip   my_end_effector_link
+/tcp_pose_broadcaster/pose 发布的就是 this link 的位姿
+  → 所有任务位姿（pre_grasp / insert / baseline …）都是【法兰位姿】
+```
+
+**所以不存在 207 mm 的换算错误**：任务位姿、MoveIt 规划、手眼外参三者的"TCP"是同一个
+（法兰）。把位姿"抬高 0.207 m"的尝试是把口径改错了，不能采纳。
+
+剩下两件事与夹具无关、属于机器人模型：
+
+1. **vendor 描述的 `camera_link` 占位盒**（3×5×2 cm）在 insert 路径上会撞夹具；
+   应用描述 `cs625_ap_description` 已删掉这个盒子。**真机 MoveIt 必须用应用描述**，
+   否则规划器会看到一只不存在的相机盒。
+2. `pre_insert` 处工具网格与夹具顶梁的接触，需要在"应用描述 + 单一份手眼"下重跑
+   `scripts/verify_fixture_clearance.py` 才能定性；在此之前不要下"插入不可行"的结论。
+
+---
+
+## 8. 夹爪与末端（2026-10-24 追加，只改描述文件，未动真机）
+
+### 8.1 一句话
+
+真夹爪是**外撑式撑紧机构**：两条支撑臂插进工件两扶手之间，向外顶住扶手**内壁**
+（`config` 里的 `grasp.style: expanding_brace`）；HITBOT EFG80 只是它的电动驱动。
+仿真是同一接触面、同一张开方向的**简化板**，不是真实连杆。本次把关节行程对齐到
+CAD 实测的 **246.57 mm 外撑跨距**，把 1 g 占位质量换成**明确标注 ESTIMATED 的估算值**，
+并量出了"关节值 → 外撑跨距"的换算。**仍然对不齐的是**：配置里 `grip_width_mm: 50.0`
+是 HITBOT 的驱动器坐标，没有任何数据能把它换算成物理跨距，所以 50 mm 在仿真里
+**不可表达**（换算出的关节值是 −0.077 m，超出下限 0）。
+
+### 8.2 项目对照表
+
+| 项目 | 真机 | 仿真（本次改后） | 依据 | 结论 |
+|---|---|---|---|---|
+| 机构类型 | 外撑式（两臂向外顶扶手内壁） | 两指沿 X 向外平移的简化板 | 工作日志 2026-09-19 §9.4；`cs625_task_scene.yaml` `grasp.style` | PARTIAL（机理对，连杆简化） |
+| 支撑臂截面 | 55 × 58 × 146 mm（CAD 量得） | `box 0.055 0.058 0.146` | SolidWorks 导出，2026-09-20 commit | PASS |
+| 接触面（外侧面）跨距 | **246.57 mm**（SolidWorks 两平行面） | 关节到上限 0.021285 m → **246.57 mm** | `measured_arm_span_m: 0.24657` | PASS（本次对齐） |
+| 零预紧抓取跨距 | 244.00 mm（扶手内间距，故意不用 2.57 mm 预紧） | 关节 0.020 → **244.00 mm** | `handle_inner_span_m` + 主人决定 `none_zero_preload` | PASS |
+| 收拢（张开前）跨距 | **未实测** | 关节 0 → 204.00 mm | 204 = 244 − 2×20（推导值，不是量出来的） | UNKNOWN |
+| 单指行程 | 未实测（EFG80 上位命令 0..80 mm 是**驱动器坐标**） | 0 → 21.285 mm（跨距变化 42.57 mm） | SolidWorks 跨距 − 接触跨距 = 2.57 mm 预紧 | UNKNOWN（缺标定表） |
+| 抓取宽度 `50.0 mm` | `grip_width_mm: 50.0`、`grip_current: 0.1`（`config/tasks/common.yaml`） | **无法换算**（见 8.4） | `docs/agent_memory.md` §75/§76 | FAIL / 缺数据 |
+| 质量（夹爪本体） | **4.580 kg 实测**（夹持机构0920 STL，SolidWorks） | 挂 `my_end_effector_link` 4.580 kg（未改） + 手指/基座 0.140 kg | 2026-09-19 §9.3 | PARTIAL（重复记账 3.1%，见 8.5） |
+| 质量（相机） | 无 datasheet | 0.010 + 0.050 = 0.060 kg（ESTIMATED） | 与 `camera_kg_placeholder: 0.06` 一致 | UNKNOWN |
+| 质心 | 夹爪本体实测 CoM (−0.10, 14.08, 109.56) mm；手指/相机未测 | 手指 CoM 在板中心、相机 CoM 在原点（ESTIMATED） | SolidWorks（本体）/ 假设（手指、相机） | PARTIAL |
+| 惯量 | 本体为 SolidWorks 真张量；其余未知 | 手指/基座/相机用实心长方体估算（ESTIMATED） | 无 CAD 分件质量属性 | UNKNOWN |
+| 夹持力 | 0.1 A 限流（未标定 N） | `effort="80"`（出厂假定，未验证） | 无测力数据 | UNKNOWN |
+| 闭合速度 | 未测 | `velocity="0.02" m/s`（未验证） | 无测速数据 | UNKNOWN |
+| 控制接口 | PowerShell `init/open/close/grip(width,current)` | `position` 关节 + `/gripper_controller/commands` | `scripts/run_pick_and_place.py` vs `sim_controllers.yaml` | PARTIAL（语义不同：宽度/电流 vs 位置） |
+| 两指同步 | 单驱动、机械同步（**未单独验证**） | URDF `<mimic>`，gz_ros2_control 实测两侧同步 | 见 8.3 实测 | PASS（仿真侧） |
+| MoveIt 规划组 | — | 手指关节**不在** `cs625_arm` 组 | SRDF `chain base_link → my_end_effector_link` | PASS |
+| attach `touch_links` | — | SRDF 里**没有** `<end_effector>`；运行时有等价机制 | 见 8.6 | PARTIAL |
+
+### 8.3 实测：仿真里的关节值 ↔ 毫米跨距
+
+换算关系（对这一简化板是精确的）：
+
+```text
+外侧面跨距 span_mm(j) = 204.0 + 2000.0 * j          (j 单位 m)
+反解         j(span_mm) = (span_mm - 204.0) / 2000.0
+两指内壁净开度 = span_mm - 110.0 mm                 (每臂 55 mm 厚)
+```
+
+在 `sim_cell.launch.py headless:=true` 起来后 90 s 读 `/joint_states`，再依次下发
+`/gripper_controller/commands`：
+
+| 下发命令 | `gripper_right_finger_joint` | `gripper_left_finger_joint` | 换算外撑跨距 | 说明 |
+|---|---:|---:|---:|---|
+| 无（初始） | 0.000 m = 0.000 mm | 0.000 m = 0.000 mm | **204.000 mm** | 收拢态 |
+| 0.020 m | 0.020 m = 20.000 mm | 0.020 m = 20.000 mm | **244.000 mm** | 零预紧抓取态 = 扶手内间距 |
+| 0.021285 m | 0.021285 m = 21.285 mm | 0.021285 m = 21.285 mm | **246.570 mm** | CAD 实测跨距（本次新上限） |
+| 0.050 m（字面 50 mm） | 0.021285（被上限截断） | 0.021285（被上限截断） | **246.570 mm** | 50 mm 无法到达，见 8.4 |
+
+TF 交叉验证（`tf2_echo gripper_right_finger_link gripper_left_finger_link`，0.021285 时）：
+`Translation: [-0.247, 0.000, 0.000]` → 两指坐标原点相距 246.57 mm（tf2_echo 只打印 3 位小数）。
+
+两指同步的证据（`gz_ros2_control` 日志）：
+
+```text
+[gz_ros2_control]: Joint 'gripper_left_finger_joint'is mimicking joint 'gripper_right_finger_joint' with multiplier: 1 and offset: 0
+[Err] [Physics.cc:1808] Attempting to create a mimic constraint for joint [gripper_left_finger_joint]
+      but the chosen physics engine does not support mimic constraints, so no constraint will be created.
+```
+
+即：**物理引擎不做 mimic 约束，但 gz_ros2_control 在接口层做了**，所以只给右手下发时
+左手确实跟随（上表两列相等就是实测结果）。这一点以前没有证据，本次补上。
+
+### 8.4 "50 mm 抓取值"自检：仿真给不出 50 mm（结论 FAIL/缺数据）
+
+- 配置要的是 `grip_width_mm: 50.0`（`config/tasks/common.yaml`），它进的是
+  `hitbot_cmd.ps1 -Cmd grip -Value 50`，即 **EFG80 的驱动器坐标**。
+- `docs/agent_memory.md` §76 明确记录：**"归零后有偏移误差，显示位置与实际开度不完全一致"**，
+  且寄存器 70 的电流反馈不可信。§75 的实测对照是 `52.0→52.0 state=0`、`52.5→卡在 52.231`、
+  `53.0→卡在 52.231`、`54.0→卡在 51.77`——全是**驱动器读数**，没有一条伴随物理跨距测量。
+- 因此**不存在** `position_mm → span_mm` 的映射。若硬把它当跨距代入 8.3 的反解：
+  `j = (50 − 204)/2000 = −0.077 m`，比 `lower = 0` 还低，**URDF 不可达**；
+  下发 0.050 m 时实测被截断在 0.021285（上表最后一行）。
+- 结论：**仿真的 50 mm 抓取 = 无法验证**。既不能说"仿真张开到 50 mm"，也不能说
+  "50 mm 对应 244 mm 跨距"——那两句话都会是编造。
+
+### 8.5 几何一致性
+
+- 手指碰撞/可视几何 = `box 0.055 × 0.058 × 0.146 m`，与 SolidWorks 量得的两条支撑臂截面一致
+  （`cs625_task_scene.yaml` 的 `measured_arm_span_m` 同源数据）。**比对：PASS（截面）**。
+- 但这只是**接触面 + 张开方向 + 截面**的承载板，**不是真实连杆**：真实机构由内部斜面/连杆把
+  EFG80 的直线行程变成两臂外撑，仿真用两根直动指代替。**PARALLEL：简化**。
+- 真机手指的**接触贴片/橡胶垫/倒角**没有照片与尺寸 → **未验证**（缺失清单 §8.7 第 5 条）。
+- 真机工具网格 `gripper_0920.stl` **本身已经包含这两条臂**，所以仿真里手指的碰撞盒在
+  `my_end_effector_link` 的网格内部；SRDF 因此把这几对 `disable_collisions` 关掉（见 8.6），
+  结果是**手指与工件的接触判定完全依赖 attach/ACM，不是碰撞几何**。这点必须在任何
+  "仿真抓取成功/失败"的说法里一起讲。
+
+### 8.6 已改的数值（可复核）
+
+```text
+src/cs625_ap_description/urdf/cs625_parallel_gripper.xacro
+  gripper_right_finger_joint  limit upper: 0.020    -> 0.021285   (改为 CAD 实测跨距)
+  gripper_left_finger_joint   limit upper: 0.020    -> 0.021285   (mimic 跟随，同步改)
+  gripper_base_link      mass: 0.001 -> 0.100 kg   inertia 1e-9 -> (8.83e-5, 8.83e-5, 1.35e-4)
+  gripper_{left,right}_finger_link mass: 0.001 -> 0.020 kg  inertia 1e-9 -> (4.11e-5, 4.06e-5, 1.07e-5)
+
+src/cs625_ap_description/urdf/cs625_camera_extension.xacro
+  camera_mount_link  mass: 0.01 -> 0.010 kg  inertia 1e-6 -> (3.33e-6, 6.00e-6, 3.33e-6)
+  camera_link        mass: 0.05 -> 0.050 kg  inertia 1e-5 -> (3.04e-5, 7.50e-6, 3.04e-5)
+```
+
+**这些质量/惯量全部是 ESTIMATED，不是实测**，文件里逐处写了 `ESTIMATED, needs CAD mass/CoG`。
+估算依据与"为什么故意取小"：
+
+| link | 值 | 依据 | 性质 |
+|---|---:|---|---|
+| `gripper_base_link` | 0.100 kg | 90×90×50 mm 安装座包络、实心长方体惯量 | 估算（记账用） |
+| 每根手指 | 0.020 kg | 同上包络 55×58×146 mm | 估算（记账用） |
+| `camera_mount_link` | 0.010 kg | 60×60×20 mm 支架板 | 估算 |
+| `camera_link` | 0.050 kg | 30×80×30 mm 深度模块 | 估算（偏低） |
+
+**为什么手指不是"看起来合理"的 1.2 kg**：整块 55×58×146 mm 的实心铝在实测密度
+2.677 g/cm³ 下是 **1.246 kg/臂**，但 `my_end_effector_link` 上的 **4.580 kg 实测质量已经包含这两条臂**。
+把它们按物理估算填进去会变成"7.4 kg 的末端"（实测 4.580 kg 的 1.6 倍），
+对重力补偿/加减速的伤害比 1 g 占位更大。所以这里选择"小值记账"，
+**代价是重复记账 0.140 kg（实测的 3.1%）**，并在注释里写明正确做法是等 CAD 分件质量属性
+把 4.580 kg 拆到各 link（那要改 `cs625_active_perception.urdf.xacro`，本次不在授权范围内）。
+
+相机同理：真机的相机是**工具网格的一部分**（`cs625_camera_extension.xacro` 注释），
+0.060 kg 与 `config/cs625_task_scene.yaml` 的 `camera_kg_placeholder: 0.06` 一致，
+但真实的 PS800-E1 应该更重 → **这份 0.06 kg 是下限，不是实测**。
+
+### 8.7 MoveIt 侧现状（`src/cs625_bringup/config/cs625_active_perception.srdf`）
+
+1. **夹爪关节不在规划组里**（这正是要的，避免规划时多自由度）：
+
+```xml
+<group name="cs625_arm">
+  <chain base_link="base_link" tip_link="my_end_effector_link"/>
+</group>
+```
+
+考点：chain 的 tip 是 `my_end_effector_link`，而 `tool0 → gripper_base_link → *_finger_link`
+都是它的子链，所以 `gripper_left_finger_joint` / `gripper_right_finger_joint` **不属于**
+`cs625_arm`。P7 的夹爪指令走 `/gripper_controller`，不经 MoveIt 规划器。
+
+2. **SRDF 里没有 `<end_effector>`，因此没有 `touch_links`**。夹爪相关的只有六条
+   `disable_collisions`：
+
+```xml
+<disable_collisions link1="gripper_base_link" link2="gripper_left_finger_link"  reason="Adjacent"/>
+<disable_collisions link1="gripper_base_link" link2="gripper_right_finger_link" reason="Adjacent"/>
+<disable_collisions link1="gripper_left_finger_link" link2="gripper_right_finger_link" reason="Never"/>
+<disable_collisions link1="my_end_effector_link" link2="gripper_base_link" reason="Adjacent"/>
+<disable_collisions link1="my_end_effector_link" link2="gripper_left_finger_link" reason="Never"/>
+<disable_collisions link1="my_end_effector_link" link2="gripper_right_finger_link" reason="Never"/>
+```
+
+3. **`touch_links` 在运行时补，覆盖了手指**：
+   - P7 抓取：`test/p7_apply_fixture_scene.py` 的 `attached_target_proxy()` 给出
+     `touch_links = [p7_grasp_center_link, gripper_left_finger_link, gripper_right_finger_link]`
+     → **两指都覆盖**。
+   - 六模式：`scripts/update_grasped_box.py` 不用 `touch_links`，而是把
+     `box_collision` 与 9 个机器人 link（含两根手指）的 ACM 全部置为允许 → 等价效果。
+   结论：**抓取后 attach 的"允许接触"是覆盖手指的**，但它是脚本里的运行时行为，
+   不是 SRDF 声明 → 换一个入口（例如纯 MoveIt 的 `AttachedCollisionObject` 手写）
+   就会漏。建议（不在本次授权内）在 SRDF 里补 `<end_effector>`。
+
+### 8.8 仍然缺失的真机数据（按重要性）
+
+| # | 缺什么 | 用来消掉哪条 UNKNOWN |
+|---|---|---|
+| 1 | **EFG80 `position_mm` ↔ 外撑跨距的标定表**（至少 0/10/20/30/40/50 mm 六点，用卡尺量两臂外侧面） | 50 mm 抓取值、单指行程、`lower` 上限 |
+| 2 | 收拢态跨距（回零后两臂外侧面距离） | 仿真 `lower = 0` 对应 204 mm 是否成立 |
+| 3 | 夹爪分件质量/质心（基座 + 单臂 + 驱动电机的 CAD 质量属性） | 0.140 kg 重复记账、手指 CoM |
+| 4 | PS800-E1 相机与支架的 datasheet 重量 | 0.060 kg 是否可信 |
+| 5 | 手指接触面照片 + 贴片厚度/材料 | 碰撞盒外的橡胶垫是否改变有效跨距 |
+| 6 | 0.1 A 下的实际夹持力（N，每臂） | URDF `effort=80` |
+| 7 | 闭合/张开速度（mm/s） | URDF `velocity=0.02` |
+| 8 | 两指是否机械强制同步（单电机还是双电机） | 仿真 mimic 是否合理 |
+
+### 8.9 复现命令（本次实际跑过的）
+
+```bash
+cd ~/projects/cs625-active-perception
+source scripts/source_dev_env.sh --full
+
+# 1) 改完描述包必须重建（symlink-install 也要跑，确保 install 里有新文件）
+colcon build --symlink-install --packages-select cs625_ap_description
+# 2) 起仿真（用独立 ROS_DOMAIN_ID，避免和真机/别的会话的 /joint_states 混在一起）
+ROS_DOMAIN_ID=79 ros2 launch cs625_bringup sim_cell.launch.py headless:=true launch_rviz:=false
+# 3) 等 90 s，读关节
+ros2 topic echo /joint_states --once          # 找 gripper_{left,right}_finger_joint
+# 4) 下发 20 mm / 21.285 mm / 50 mm 并复读
+ros2 topic pub --once /gripper_controller/commands \
+    std_msgs/msg/Float64MultiArray "{data: [0.02]}"
+# 5) 跨距交叉验证
+ros2 run tf2_ros tf2_echo gripper_right_finger_link gripper_left_finger_link
+# 6) 停：给 launch 进程发 SIGINT（不要 pkill 通配）
+kill -INT <launch_pid>
+```

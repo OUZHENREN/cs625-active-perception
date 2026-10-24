@@ -231,7 +231,7 @@ pre_insert IK ok；该状态 valid=False
 ```text
 pre_insert IK ok；valid=True
 [insert] FAIL fraction=0.1966
-  最后合法 TCP [1.0767, -0.0124, 0.5136]；第一个碰撞 TCP [1.0643, -0.0124, 0.4477]
+  最后合法 TCP [1.0767, -0.0124, 0.5136]；第一个碰撞 TCP [1.0767, -0.0124, 0.5135]
   接触 real_cell_slot_fixture <-> my_end_effector_link @ [1.2427, 0.0167, 0.409] (world)
 ```
 
