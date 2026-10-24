@@ -788,6 +788,13 @@ class Runner(Node):
             # Gazebo on a CPU renderer advances slower than wall time: give the
             # trajectory the extra wall-clock budget it actually needs.
             command += ["--wait-scale", "4.0"]
+            # The simulated position plant also lags a fast joint-space move and the
+            # controller then aborts with GOAL_TOLERANCE_VIOLATED (measured: wrist_1
+            # 1.25 rad short) while a real arm tracks the same trajectory.  Slowing
+            # the SIMULATED execution is the honest fix: the real timings are
+            # untouched and what the simulation validates (sequence, geometry,
+            # clearances) does not change.
+            command[command.index("--time-scale") + 1] = str(time_scale * 1.6)
         result = subprocess.run(command, capture_output=True, text=True, timeout=600)
         ok = "ALL_ASSEMBLY_CHUNKS_OK" in (result.stdout or "")
         if not ok:

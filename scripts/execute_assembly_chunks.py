@@ -241,6 +241,19 @@ def main() -> int:
             f"({TRAJECTORY_ERROR_NAMES.get(result.result.error_code, '?')})"
         )
         if result.status != 4:
+            # Name the joints that are actually off, not just the error code: a
+            # GOAL_TOLERANCE_VIOLATED with 0.001 rad is noise, with 1 rad it is a
+            # joint that never moved and the two need different fixes.
+            try:
+                target = data["points"][-1]["q"]
+                names = data["joint_names"]
+                worst = sorted(
+                    ((abs(q - latest.get(name, q)), name)
+                     for name, q in zip(names, target)), reverse=True)[:3]
+                print("terminal error (rad): "
+                      + ", ".join(f"{name}={err:.3f}" for err, name in worst))
+            except Exception as exc:  # noqa: BLE001 - diagnostics must not mask it
+                print(f"terminal error unavailable: {type(exc).__name__}: {exc}")
             return 6
         if args.dwell > 0:
             time.sleep(args.dwell)
