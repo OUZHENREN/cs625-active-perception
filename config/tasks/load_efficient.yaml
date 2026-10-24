@@ -1,0 +1,73 @@
+# 抓取 + 装入 / 效率模式（scope=load, mode=efficient）
+# 定位：效率只来自三件事——巡航段提到 0.12 m/s、取消分段（chunks 1）、取消 dwell（0.0）；
+#       槽内速度与安全模式完全一致，都是 0.005 m/s 均匀慢速。
+# 与另外三种 scope 的区别：只跑 load 一条流程；unload 用 unload_efficient，全流程用 full_efficient。
+# 关键安全点：insert/straighten 槽内单边间隙约 1 mm，任何模式都不得快于 0.005 m/s，
+#            也不许"快巡航 + 慢尾段"（槽内慢尾段会憋住），因此这两段不带 slow_tail_mm。
+# 数值来源：位姿全部来自 common.yaml；巡航提速与取消分段是效率新设（待真机验证），
+#           装配段与槽内速度一律不高于 2026-10-22 真机跑过的值。
+#
+# 预计各段耗时（距离 ÷ 速度，不含规划/通信开销；距离按 common.yaml 位姿量出）：
+#   pre_grasp   972 mm @ 0.03 = 32.4 s   grip         夹爪闭合+稳定 ≈ 3 s
+#   grasp       120 mm @ 0.02 =  6.0 s   gripper_init 夹爪初始化   ≈ 3 s
+#   lift        155 mm @ 0.03 =  5.2 s   transit      490 mm @ 0.12 =  4.1 s
+#   staging     479 mm @ 0.12 =  4.0 s   pre_insert   150 mm @ 0.02 =  7.5 s
+#   insert      350 mm @ 0.005 = 70.0 s  straighten   转角 ≈ 9.3°    ≈  3.5 s
+#   release     夹爪张开+初始化 ≈ 3 s    withdraw     150 mm @ 0.02 =  7.5 s
+#   baseline    553 mm @ 0.12 =  4.6 s
+#   动作合计 ≈ 154 s；加 MoveIt 规划/IK/动作服务开销（13 段 × 约 2 s ≈ 26 s）→ 约 3.0 min。
+#   注：≤180 s 的目标已几乎没有余量——槽内 insert 一段就要 70 s，这段速度不能拿时间换；
+#       要再压总时长只能动巡航段或减少阶段数。
+
+scope: load
+mode: efficient
+flow: pick_place
+
+# 阶段表：环境建模前缀 + 装入执行体 + 终点=插槽粗观测
+phases:
+  - observe:workpiece_coarse
+  - observe:workpiece_fine
+  - observe:tables
+  - observe:slot_coarse
+  - observe:slot_fine
+  - baseline
+  - pre_grasp
+  - gripper_init
+  - grip
+  - grasp
+  - lift
+  - transit
+  - staging
+  - pre_insert
+  - insert
+  - straighten
+  - release
+  - withdraw
+  - observe:slot_coarse
+
+# ---- 全局标定（效率新设，待真机验证；两项都在 runner 的模式上限之内） ----
+# velocity_scale 0.05：没有阶段档案时的兜底接近速度（<= safe 上限 0.08）。
+# assembly_velocity_scale 0.02：没有阶段档案时的兜底装配速度（<= 装配上限 0.03）。
+velocity_scale: 0.05
+assembly_velocity_scale: 0.02
+time_scale: 1.0
+dwell_sec: 0.0
+max_chunks: 1
+
+# ---- 单段直通计划：不分段、不停顿、不拉长时间 ----
+# 巡航段 transit/staging/baseline：0.12 m/s —— 效率的唯一提速来源。
+# 装配段 grasp/pre_insert/withdraw：0.02 m/s（<= 装配上限 0.03）；pre_grasp 0.03 m/s 属自由空间接近。
+# 槽内 insert/straighten：0.005 m/s 均匀慢速，与 load_safe.yaml 完全一致。
+# slow_band_mm=[0,80]：夹爪空载进出时，只在工件扶手区（座入位回退 0~80 mm 这一段）走
+# 慢速，其余段快速。数值为暂定值（由 CAD 与插入轴估算），待所有者确认真机实际扶手高度。
+phase_speeds:
+  pre_grasp:   {velocity: 0.03,  time_scale: 1.0, chunks: 1}
+  grasp:       {velocity: 0.02,  time_scale: 1.0, chunks: 1}
+  lift:        {velocity: 0.03,  time_scale: 1.0, chunks: 1}
+  transit:     {velocity: 0.12,  time_scale: 1.0, chunks: 1}
+  staging:     {velocity: 0.12,  time_scale: 1.0, chunks: 1}
+  pre_insert:  {velocity: 0.02,  time_scale: 1.0, chunks: 1}
+  insert:      {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  straighten:  {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  withdraw:    {velocity: 0.02,  time_scale: 1.0, chunks: 1, slow_band_mm: [0, 80]}
+  baseline:    {velocity: 0.12,  time_scale: 1.0, chunks: 1}

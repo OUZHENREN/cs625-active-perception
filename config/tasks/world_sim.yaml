@@ -1,0 +1,18 @@
+# 仿真覆盖层（最小差异集）
+# 本文件由 run_task.py 在 --world sim 时叠加在 common.yaml 之上（浅合并，本文件优先）；
+# --world real 或默认真机运行时不会读取本文件。
+# 这里只放“仿真与真机确实不同”的键，位姿、速度、阶段全部留在 common.yaml 与
+# <scope>_<mode>.yaml，避免同一数值出现两份、日后漂移。
+#
+# action: FollowJointTrajectory 动作名。真机控制器是
+#         /arm_controller/follow_joint_trajectory（execute_assembly_chunks.py 的默认值），
+#         仿真控制器见 cs625_bringup/config/sim_controllers.yaml：
+#         joint_trajectory_controller。
+# world:  仅作标记，供 run_task / 日志区分当前配置属于仿真；不参与运动学计算。
+#
+# 用法：
+#   python3 scripts/run_task.py --scope load --mode safe --world sim --dry-run
+#   python3 scripts/run_task.py --scope load --mode safe --world sim --confirm
+
+action: "/joint_trajectory_controller/follow_joint_trajectory"
+world: sim

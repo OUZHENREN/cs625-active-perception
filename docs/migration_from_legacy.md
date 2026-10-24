@@ -96,3 +96,20 @@ During Phase 0–1 only the five baseline packages remain in `src/`. The matrix
 is a migration plan and provenance record, not permission to add all future
 packages immediately. Algorithm migration begins only after the official
 CS625/Humble simulation baseline has a reproducible build and launch result.
+
+## 2026-10-20 update: the legacy automation stack has its own underlay
+
+The senior's ROS automation packages (state monitor, compliant placement, task
+manager, trajectory tools, kinematics, point-cloud environment, TCP/visual
+bridge) are **not** migrated into this repository's `src/`.  They are frozen as a
+separate WSL Jazzy underlay at `~/cs625_legacy_underlay_jazzy/`, sourced from the
+2026-04-14 backup archive (SHA-256 recorded in `docs/dependencies.md`) and kept
+with a restore snapshot at `~/cs625_legacy_snapshot_20261020/`.  All 14 packages
+built unmodified in Jazzy on 2026-10-20.
+
+Consequence for this document: the "Humble underlay" rows above describe the
+historical Phase-0 VM; the current mainline is WSL Ubuntu 24.04 + Jazzy, with the
+senior VM retained as a fallback reference only (see `ADR-004`).  The
+application-facing boundary is unchanged: this repository owns launch
+composition, the normalized sim/real contract, experiments and evidence; the
+legacy underlay provides reusable runtime nodes behind stable interfaces.

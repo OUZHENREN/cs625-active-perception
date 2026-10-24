@@ -115,3 +115,38 @@ The following remain planned for later phases:
 
 They will be added only after the corresponding simulated or physical gate is
 accepted.
+
+## 8. Task-level entry (six modes, 2026-10-24)
+
+The task layer is a script, not a ROS package: no new interface is added to the
+graph, and `cs625_ap_interfaces` is unchanged.
+
+```text
+config/tasks/common.yaml                   world constants + reusable poses (single source)
+config/tasks/<scope>_<mode>.yaml           6 independent mode files
+scripts/run_task.py                        --scope {load|unload|full} --mode {safe|efficient}
+scripts/run_pick_and_place.py              the phase runner, --flow pick_place|unload
+scripts/model_environment.py               offline environment model + gate
+runtime/environment/<ts>/model.json        the model every flow must load first
+```
+
+Data flow of one flow:
+
+```text
+run_task.py
+  ├─ merges common.yaml + <scope>_<mode>.yaml -> runtime/effective_<scope>_<mode>.yaml
+  ├─ loads runtime/environment/latest -> model.json, evaluates the gate
+  │    (slot >1 mm/0.5 deg, workpiece >3 mm/1 deg, <20k points, older than 2 h -> refuse)
+  └─ invokes run_pick_and_place.py --flow ... (--confirm | --plan-only)
+        -> MoveIt /plan_kinematic_path, /compute_ik, /compute_cartesian_path, /compute_fk
+        -> /arm_controller/follow_joint_trajectory
+```
+
+Deliberately **not** an action/service: `run_task.py` is a supervisor process.
+The runtime contract between the layers stays the existing topics and MoveIt
+services, so the simulator and the real cell keep using the same application
+interface.
+
+`--plan-only` plans every phase from a simulated state (chained through
+`start_state`) and never sends an action goal; with `--start-joints` it does not
+need the robot to be reachable at all.

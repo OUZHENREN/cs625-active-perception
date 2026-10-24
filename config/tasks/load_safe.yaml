@@ -1,0 +1,59 @@
+# 抓取 + 装入 / 安全模式（scope=load, mode=safe）——默认推荐的真机流程
+# 定位：低速、多分段（chunks 3~7）、每段后停顿 1 s；宁可慢也不触发 E-stop。
+# 与另外两种 scope 的区别：只跑 load（pick_place）一条流程，不做取出、不做全流程接力。
+# 关键安全点：insert/straighten 槽内单边间隙约 1 mm，必须保持 0.005 m/s 均匀慢速，
+#            禁止"快巡航 + 慢尾段"复合曲线（runner 也会被迫统一，见 TIGHT_CLEARANCE_PHASES）。
+# 数值来源：config/pick_place_real.yaml（2026-10-22 真机跑通），位姿来自 common.yaml。
+# 特例：pre_grasp/grasp 取实际执行值 0.02/0.01，因为旧 runner 忽略了它们的阶段档案
+#       （写死用全局 velocity_scale=0.02、assembly_velocity_scale=0.01），
+#       pick_place_real.yaml 里的 0.08/0.04 从未在真机上跑过，不能当作已验证速度。
+
+scope: load
+mode: safe
+flow: pick_place
+
+# 阶段表：环境建模前缀 + 装入执行体 + 终点=插槽粗观测
+phases:
+  - observe:workpiece_coarse
+  - observe:workpiece_fine
+  - observe:tables
+  - observe:slot_coarse
+  - observe:slot_fine
+  - baseline
+  - pre_grasp
+  - gripper_init
+  - grip
+  - grasp
+  - lift
+  - transit
+  - staging
+  - pre_insert
+  - insert
+  - straighten
+  - release
+  - withdraw
+  - observe:slot_coarse
+
+# ---- 全局保守标定（沿用 pick_place_real.yaml：0.02 / 0.01 / 2.0 / 1.0） ----
+velocity_scale: 0.02
+assembly_velocity_scale: 0.01
+time_scale: 2.0
+dwell_sec: 1.0
+max_chunks: 7
+
+# ---- 分段慢速计划（逐字沿用已验证配置；pre_grasp/grasp 改为实际执行值） ----
+# slow_band_mm=[0,80]：夹爪空载进出时，只在工件扶手区（座入位回退 0~80 mm 这一段）走
+# 慢速，其余段快速。数值为暂定值（由 CAD 与插入轴估算），待所有者确认真机实际扶手高度。
+phase_speeds:
+  # 2026-10-22 实跑：pre_grasp 走全局 velocity_scale=0.02（阶段档案被旧 runner 忽略）
+  pre_grasp:   {velocity: 0.02, time_scale: 1.0, chunks: 3}
+  # 2026-10-22 实跑：grasp 走 assembly_velocity_scale=0.01；尾段 30 mm 与该速度相同，等价匀速
+  grasp:       {velocity: 0.01, time_scale: 1.5, chunks: 3, slow_tail_mm: 30, slow_velocity: 0.010, slow_time_scale: 3.0}
+  lift:        {velocity: 0.03, time_scale: 1.5, chunks: 3}
+  transit:     {velocity: 0.08, time_scale: 1.0, chunks: 3}
+  staging:     {velocity: 0.05, time_scale: 1.5, chunks: 3}
+  pre_insert:  {velocity: 0.03, time_scale: 1.5, chunks: 4, slow_tail_mm: 60, slow_velocity: 0.010, slow_time_scale: 2.5}
+  insert:      {velocity: 0.005, time_scale: 3.0, chunks: 6}
+  straighten:  {velocity: 0.005, time_scale: 3.0, chunks: 2}
+  withdraw:    {velocity: 0.03, time_scale: 1.5, chunks: 3, slow_band_mm: [0, 80]}
+  baseline:    {velocity: 0.08, time_scale: 1.0, chunks: 3}

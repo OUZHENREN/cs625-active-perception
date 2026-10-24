@@ -24,6 +24,7 @@ setup(
             "real_preflight = cs625_motion_adapter.real_preflight:main",
             "real_readiness_monitor = cs625_motion_adapter.real_readiness_monitor:main",
             "real_view_executor = cs625_motion_adapter.real_view_executor:main",
+            "gripper_bridge = cs625_motion_adapter.gripper_bridge:main",
         ],
     },
 )

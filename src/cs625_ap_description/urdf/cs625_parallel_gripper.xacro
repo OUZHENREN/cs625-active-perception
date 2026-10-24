@@ -9,10 +9,11 @@
       left   arm  X [-147.31, -27.31]  Y [-9.03, 48.97]  Z [  4.0, 150.0] mm
       right  arm  X [ 113.29, 147.29]  Y [-9.03, 48.97]  Z [  4.0, 150.0] mm
 
-    each 58 mm deep and 146 mm tall.  What matters for the grasp is the INNER
-    face: the module's handle inner span is 244.00 mm, so with zero interference
-    the arms close on +/-122.00 mm.  Each arm therefore starts retracted at
-    +/-102.00 mm and travels 20 mm outward to the contact plane.
+    each 58 mm deep and 146 mm tall.  What matters for the grasp is the OUTER
+    face of each arm (the surface that presses on a handle's inner face): the
+    module's handle inner span is 244.00 mm, so with zero interference the arms
+    open to +/-122.00 mm.  Each arm therefore starts retracted at +/-102.00 mm
+    and travels outward to the contact plane.
 
     These are NOT a model of the real linkage.  They are the real contact plane,
     travel direction and cross-section carried by a simplified slab, so the
@@ -21,11 +22,67 @@
 
       - cs625_active_perception.srdf names these links in disable_collisions,
       - sim_controllers.yaml drives gripper_right_finger_joint,
-      - test/apply_task_fixture_scene.py uses FINGER_LINKS by name.
+      - test/p7_apply_fixture_scene.py uses FINGER_LINKS by name.
 
-    Masses stay at 1 g: the measured 4.580 kg of the tool, mesh included, sits on
-    my_end_effector_link, and these links are its children, so counting them again
-    would double the tool.
+    TRAVEL (aligned 2026-10-24).  Only two aperture numbers exist for this tool,
+    and both are CAD measurements made by the tool owner, not bench
+    measurements of the assembled gripper:
+
+      j = 0            outer-face span 204.000 mm   retracted.  NOT MEASURED:
+                                                    the retracted span is a
+                                                    derived value (contact span
+                                                    minus the 20 mm travel), so
+                                                    this end of the range is
+                                                    UNVERIFIED.
+      j = 0.020000     outer-face span 244.000 mm   = the module's measured
+                                                    handle inner span.  This is
+                                                    the zero-preload grasp pose
+                                                    chosen by the task owner
+                                                    (see config/cs625_task_scene.yaml,
+                                                    interference_fit: none_zero_preload).
+      j = 0.021285     outer-face span 246.570 mm   = SolidWorks measured span
+                                                    between the tool's two
+                                                    parallel arm faces
+                                                    (cs625_task_scene.yaml,
+                                                    measured_arm_span_m: 0.24657).
+
+    Aperture mapping used below, exact for this slab model:
+
+      span_outer_mm(j) = 204.0 + 2000.0 * j        (j in metres)
+      j(span_outer_mm) = (span_outer_mm - 204.0) / 2000.0
+
+    The upper limit was 0.020, which is the zero-preload contact, i.e. the model
+    stopped 2.57 mm short of the measured full aperture.  It is now 0.021285 so
+    the joint range reaches the measured span; the grasp itself still commands
+    0.020, and the extra 1.285 mm per side is exactly the real preload that a
+    rigid-body contact deliberately does not apply.
+
+    STILL NOT ALIGNED, because no number exists to align with: the HITBOT EFG80
+    drive coordinate that config/tasks/common.yaml calls grip_width_mm: 50.0.
+    The drive's position_mm (0..80 command range) is a serial/encoder coordinate,
+    and docs/agent_memory.md section 76 records that this displayed position does
+    NOT equal the physical opening ("归零后有偏移误差，显示位置与实际开度不完全
+    一致").  No log maps drive millimetres to a jaw span, so 50 mm CANNOT be
+    converted into a span here.  Any statement that "the simulator opens to
+    50 mm" would be an invention.  MISSING DATA: measured outer-face span at a
+    set of drive positions (calibration table), plus the retracted span.
+
+    MASS: ESTIMATED, needs CAD mass/CoG.  These are NOT measured values.
+    my_end_effector_link already carries the MEASURED 4.580 kg of the same rigid
+    body (SolidWorks export 夹持机构0920, see cs625_active_perception.urdf.xacro)
+    and these links sit inside that body, so every kilogram put here is counted
+    twice.  The values below are deliberately small bookkeeping estimates
+    (0.100 + 2 x 0.020 = 0.140 kg, a 3.1% duplicate) whose only job is to give
+    the tree physically sane inertials instead of 1e-9 placeholders.  The
+    physically plausible split still has to come from CAD: a SOLID arm slab of
+    0.055 x 0.058 x 0.146 m at the measured 2.677 g/cm^3 aluminium density would
+    be 1.246 kg (certainly hollow in reality), plus an unknown housing share of
+    the remaining 2.09 kg.  Do not quote the numbers below as the gripper mass;
+    the gripper mass is 4.580 kg and it lives on my_end_effector_link.
+
+    effort = 80 N and velocity = 0.02 m/s are also UNVERIFIED: the real gripper
+    is run current-limited at 0.1 A (config/tasks/common.yaml grip_current), and
+    no force or speed measurement exists in this repository.
 
     ZERO INTERFERENCE was chosen deliberately.  The real tool closes with 2.57 mm
     of preload, which a rigid-body contact cannot reproduce honestly: it would
@@ -37,8 +94,12 @@
     <!-- Frame at the tool mounting face.  Kept so the joint name survives. -->
     <link name="${prefix}gripper_base_link">
       <inertial>
-        <mass value="0.001"/>
-        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+        <!-- ESTIMATED, needs CAD mass/CoG.  Not measured.  Bookkeeping share of
+             the 4.580 kg body that already sits on my_end_effector_link; a
+             90 x 90 x 50 mm envelope with the CoM left at the mounting face.
+             Inertia is the solid-box value for 0.100 kg at that envelope. -->
+        <mass value="0.100"/>
+        <inertia ixx="8.83e-05" ixy="0" ixz="0" iyy="8.83e-05" iyz="0" izz="1.35e-04"/>
       </inertial>
     </link>
     <joint name="${prefix}tool0_to_gripper_base" type="fixed">
@@ -59,18 +120,24 @@
         <geometry><box size="0.055 0.058 0.146"/></geometry>
       </collision>
       <inertial>
+        <!-- ESTIMATED, needs CAD mass/CoG.  Not measured.  CoM at the slab
+             centre; inertia is the solid-box value for 0.020 kg over
+             0.055 x 0.058 x 0.146 m.  See the MASS note above: 0.020 kg is a
+             bookkeeping duplicate, not the arm's real mass (a solid slab of
+             this size would be 1.246 kg). -->
         <origin xyz="-0.0275 0 0"/>
-        <mass value="0.001"/>
-        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+        <mass value="0.020"/>
+        <inertia ixx="4.11e-05" ixy="0" ixz="0" iyy="4.06e-05" iyz="0" izz="1.07e-05"/>
       </inertial>
     </link>
     <joint name="${prefix}gripper_right_finger_joint" type="prismatic">
       <parent link="${prefix}gripper_base_link"/>
       <child link="${prefix}gripper_right_finger_link"/>
-      <!-- Retracted at 102.0 mm; 0.020 m of travel reaches 122.0 mm. -->
+      <!-- Retracted at 102.0 mm; 21.285 mm of travel reaches the measured
+           123.285 mm = 246.57 mm aperture.  0.020 is the zero-preload grasp. -->
       <origin xyz="0.102 0 0.077" rpy="0 0 0"/>
       <axis xyz="1 0 0"/>
-      <limit lower="0.0" upper="0.020" effort="80" velocity="0.02"/>
+      <limit lower="0.0" upper="0.021285" effort="80" velocity="0.02"/>
     </joint>
 
     <!-- Left arm: mirrored; outer face at joint x = 0, slab extends in +X. -->
@@ -85,9 +152,10 @@
         <geometry><box size="0.055 0.058 0.146"/></geometry>
       </collision>
       <inertial>
+        <!-- ESTIMATED, needs CAD mass/CoG.  Mirror of the right arm. -->
         <origin xyz="0.0275 0 0"/>
-        <mass value="0.001"/>
-        <inertia ixx="1e-9" ixy="0" ixz="0" iyy="1e-9" iyz="0" izz="1e-9"/>
+        <mass value="0.020"/>
+        <inertia ixx="4.11e-05" ixy="0" ixz="0" iyy="4.06e-05" iyz="0" izz="1.07e-05"/>
       </inertial>
     </link>
     <joint name="${prefix}gripper_left_finger_joint" type="prismatic">
@@ -96,7 +164,7 @@
       <origin xyz="-0.102 0 0.077" rpy="0 0 0"/>
       <axis xyz="-1 0 0"/>
       <mimic joint="${prefix}gripper_right_finger_joint" multiplier="1.0" offset="0.0"/>
-      <limit lower="0.0" upper="0.020" effort="80" velocity="0.02"/>
+      <limit lower="0.0" upper="0.021285" effort="80" velocity="0.02"/>
     </joint>
 
     <ros2_control name="${prefix}cs625_parallel_gripper" type="system">

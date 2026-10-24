@@ -33,6 +33,49 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
+def camera_arguments(separators: bool = False) -> list:
+    """xacro arguments for the measured Percipio PS800-E1 camera.
+
+    All twelve numbers describe the real camera (1280x960, fx 931.47, fy 931.60,
+    cx 648.70, cy 449.32, 68.98 deg horizontal FOV, 0.2-3.0 m clip, 3 mm depth
+    sigma).  ``sim_base.launch.py`` is the profile entry point and documents the
+    provenance of each one; this launch is also included directly by
+    ``sim_active_localization.launch.py``, so its defaults mirror sim_base.
+
+    ``separators=True`` inserts literal spaces between the ``name:=value``
+    pairs, which is required by launch's ``Command`` because it concatenates
+    substitutions without separators.  ``ExecuteProcess`` takes a real argv, so
+    it must NOT get those spaces: prepare_gazebo_model.py joins each
+    ``name:=`` with the next token, and a standalone ``" "`` token would reach
+    xacro as a positional file argument.
+    """
+
+    arguments: list = []
+    for name in (
+        "camera_image_width",
+        "camera_image_height",
+        "camera_horizontal_fov_deg",
+        "camera_fx",
+        "camera_fy",
+        "camera_cx",
+        "camera_cy",
+        "camera_clip_near",
+        "camera_clip_far",
+        "camera_noise_mean",
+        "camera_noise_stddev",
+        "camera_enabled",
+    ):
+        arguments += [f"{name}:=", LaunchConfiguration(name)]
+        if separators:
+            arguments.append(" ")
+    # The Gazebo sensor element still calls the rate camera_update_rate; the
+    # profile-facing launch argument is camera_rate_hz (1 Hz, real 0.79 fps).
+    arguments += ["camera_update_rate:=", LaunchConfiguration("camera_rate_hz")]
+    if separators:
+        arguments.append(" ")
+    return arguments
+
+
 def _compose(context):
     description_path = PathJoinSubstitution(
         [
@@ -82,21 +125,11 @@ def _compose(context):
             "initial_positions_file:=",
             LaunchConfiguration("initial_positions_file"),
             " ",
-            "camera_image_width:=",
-            LaunchConfiguration("camera_image_width"),
-            " ",
-            "camera_image_height:=",
-            LaunchConfiguration("camera_image_height"),
-            " ",
-            "camera_update_rate:=",
-            LaunchConfiguration("camera_update_rate"),
-            " ",
-            "camera_enabled:=",
-            LaunchConfiguration("camera_enabled"),
-            " ",
             "p7_attachment_enabled:=",
             attachment_enabled,
+            " ",
         ]
+        + camera_arguments()
     )
     gazebo_model_path = LaunchConfiguration("gazebo_model_file")
     # gz_ros2_control is configured by the robot model to read
@@ -206,17 +239,9 @@ def _compose(context):
         controllers_path,
         "initial_positions_file:=",
         LaunchConfiguration("initial_positions_file"),
-        "camera_image_width:=",
-        LaunchConfiguration("camera_image_width"),
-        "camera_image_height:=",
-        LaunchConfiguration("camera_image_height"),
-        "camera_update_rate:=",
-        LaunchConfiguration("camera_update_rate"),
-        "camera_enabled:=",
-        LaunchConfiguration("camera_enabled"),
         "p7_attachment_enabled:=",
         attachment_enabled,
-    ]
+    ] + camera_arguments()
     prepare_gazebo_model = ExecuteProcess(
         cmd=prepare_gazebo_model_cmd,
         output="screen",
@@ -429,19 +454,36 @@ def generate_launch_description():
             DeclareLaunchArgument("headless", default_value="true"),
             DeclareLaunchArgument(
                 "camera_image_width",
-                default_value="320",
-                description="Eye-in-hand RGB-D image width for the sim profile.",
+                default_value="1280",
+                description="Eye-in-hand RGB-D image width (real camera: 1280x960).",
             ),
             DeclareLaunchArgument(
                 "camera_image_height",
-                default_value="240",
-                description="Eye-in-hand RGB-D image height for the sim profile.",
+                default_value="960",
+                description="Eye-in-hand RGB-D image height (real camera: 1280x960).",
             ),
             DeclareLaunchArgument(
-                "camera_update_rate",
-                default_value="10.0",
-                description="Eye-in-hand RGB-D update rate in Hz for the sim profile.",
+                "camera_rate_hz",
+                default_value="1.0",
+                description=(
+                    "Eye-in-hand RGB-D update rate in Hz.  The real cell measures "
+                    "0.79 fps for colour+depth; 1 Hz reproduces the observation "
+                    "timing.  Passed to the xacro as camera_update_rate."
+                ),
             ),
+            DeclareLaunchArgument(
+                "camera_horizontal_fov_deg",
+                default_value="68.98",
+                description="Measured horizontal FOV: 2*atan(640/931.47).",
+            ),
+            DeclareLaunchArgument("camera_fx", default_value="931.47"),
+            DeclareLaunchArgument("camera_fy", default_value="931.60"),
+            DeclareLaunchArgument("camera_cx", default_value="648.70"),
+            DeclareLaunchArgument("camera_cy", default_value="449.32"),
+            DeclareLaunchArgument("camera_clip_near", default_value="0.2"),
+            DeclareLaunchArgument("camera_clip_far", default_value="3.0"),
+            DeclareLaunchArgument("camera_noise_mean", default_value="0.0"),
+            DeclareLaunchArgument("camera_noise_stddev", default_value="0.003"),
             DeclareLaunchArgument(
                 "camera_enabled",
                 default_value="true",

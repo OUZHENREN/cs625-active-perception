@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>cs625_rviz_panel</name>
+  <version>0.2.0</version>
+  <description>
+    RViz2 panel with one-click buttons for the six CS625 task modes
+    (load/unload/full x safe/efficient), a live /task_state flow/phase card,
+    and a control self-check. The panel only composes scripts/run_task.py and
+    queries control services; it owns no motion logic.
+  </description>
+  <maintainer email="cs625@example.invalid">CS625 Active Perception</maintainer>
+  <license>Apache-2.0</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>qtbase5-dev</build_depend>
+  <build_depend>rviz_common</build_depend>
+  <build_depend>pluginlib</build_depend>
+  <build_depend>rclcpp</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>controller_manager_msgs</build_depend>
+
+  <build_export_depend>qtbase5-dev</build_export_depend>
+  <build_export_depend>rviz_common</build_export_depend>
+  <build_export_depend>rclcpp</build_export_depend>
+  <build_export_depend>std_msgs</build_export_depend>
+  <build_export_depend>sensor_msgs</build_export_depend>
+  <build_export_depend>controller_manager_msgs</build_export_depend>
+
+  <exec_depend>rviz_common</exec_depend>
+  <exec_depend>rviz2</exec_depend>
+  <exec_depend>pluginlib</exec_depend>
+  <exec_depend>libqt5-widgets</exec_depend>
+  <exec_depend>python3</exec_depend>
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>controller_manager_msgs</exec_depend>
+  <!-- Elite driver messages; used for safety_mode/robot_mode when the underlay
+       provides them.  The panel also builds without this package. -->
+  <exec_depend>eli_common_interface</exec_depend>
+
+  <test_depend>ament_cmake_gtest</test_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -21,5 +21,6 @@ setup(
         "p7_episode_recorder = cs625_task_orchestrator.p7_episode_recorder:main",
         "p7_gripper_adapter = cs625_task_orchestrator.p7_gripper_adapter:main",
         "p7_attachment_adapter = cs625_task_orchestrator.p7_attachment_adapter:main",
+        "p4_decision_node = cs625_task_orchestrator.p4_decision_node:main",
     ]},
 )

@@ -8,14 +8,23 @@
                params="parent prefix xyz rpy optical_rpy
                        color_xyz:='0 0 0' color_rpy:=''
                        sim_ignition:=false camera_sensor_topic:=/camera
-                       camera_image_width:=320 camera_image_height:=240
-                       camera_update_rate:=10.0 camera_enabled:=true">
+                       camera_image_width:=1280 camera_image_height:=960
+                       camera_update_rate:=1.0 camera_enabled:=true
+                       camera_horizontal_fov_deg:=68.98
+                       camera_fx:=931.47 camera_fy:=931.60
+                       camera_cx:=648.70 camera_cy:=449.32
+                       camera_clip_near:=0.2 camera_clip_far:=3.0
+                       camera_noise_mean:=0.0 camera_noise_stddev:=0.003">
     <link name="${prefix}camera_mount_link">
       <inertial>
-        <mass value="0.01"/>
+        <!-- ESTIMATED, needs CAD mass/CoG.  Not measured.  No datasheet weight
+             exists in this repository, so 0.010 kg is a 60 x 60 x 20 mm
+             mounting-plate estimate; the inertia is the solid-box value at
+             that envelope and the CoM is left at the mounting point. -->
+        <mass value="0.010"/>
         <origin xyz="0 0 0" rpy="0 0 0"/>
-        <inertia ixx="0.000001" ixy="0" ixz="0"
-                 iyy="0.000001" iyz="0" izz="0.000001"/>
+        <inertia ixx="3.33e-06" ixy="0" ixz="0"
+                 iyy="6.00e-06" iyz="0" izz="3.33e-06"/>
       </inertial>
     </link>
 
@@ -37,9 +46,18 @@
          must be set from the real extrinsics before the sensor pose is trusted. -->
     <link name="${prefix}camera_link">
       <inertial>
-        <mass value="0.05"/>
-        <inertia ixx="0.00001" ixy="0" ixz="0"
-                 iyy="0.00001" iyz="0" izz="0.00001"/>
+        <!-- ESTIMATED, needs CAD mass/CoG.  Not measured.  The real depth eye is
+             part of the tool mesh on my_end_effector_link, so this mass is again
+             a bookkeeping duplicate, kept at 0.050 kg because that makes the
+             whole camera share 0.060 kg = camera_kg_placeholder in
+             config/cs625_task_scene.yaml.  No PS800-E1 datasheet weight exists
+             here, and a real GigE depth module is likely HEAVIER than this, so
+             treat 0.060 kg as a lower estimate, not a measurement.  Inertia is
+             the solid-box value for a 30 x 80 x 30 mm envelope; CoM assumed at
+             the lens centre, which is also unverified. -->
+        <mass value="0.050"/>
+        <inertia ixx="3.04e-05" ixy="0" ixz="0"
+                 iyy="7.50e-06" iyz="0" izz="3.04e-05"/>
       </inertial>
     </link>
     <joint name="${prefix}camera_mount_to_camera" type="fixed">
@@ -74,22 +92,66 @@
       <xacro:if value="${camera_enabled}">
         <gazebo reference="${prefix}camera_link">
           <sensor type="rgbd_camera" name="${prefix}camera_sensor">
-          <pose>0 0 0 0 0 0</pose>
+          <!-- Render where the real COLOUR eye is, not at camera_link (the depth
+               eye): the application back-projects with T_tcp_cam, which describes
+               the colour optical frame, and the real depth stream is registered to
+               the colour image (the driver runs depth_registration_enable:=true).
+               The 24.4 mm stereo baseline therefore stays in the geometry, not in
+               the render.
+
+               TRANSLATION ONLY.  Gazebo looks along the sensor frame +X, which is
+               camera_link +X (the tool axis).  color_rpy is the rotation of the
+               OPTICAL axes relative to camera_link, so using it here would point
+               the camera 90 deg sideways (its +X would become camera_link -Y).
+               The optical rotation belongs to the fixed joint below, not to the
+               sensor pose. -->
+          <pose>${color_xyz} 0 0 0</pose>
           <always_on>1</always_on>
           <update_rate>${camera_update_rate}</update_rate>
           <visualize>false</visualize>
           <camera>
-            <horizontal_fov>1.047</horizontal_fov>
+            <!-- 68.98 deg = 2*atan(640/931.47), the real horizontal FOV.  Kept for
+                 documentation and for readers of the SDF; the <lens><intrinsics>
+                 block below is what actually sets the projection matrix, so the
+                 simulated K is the measured K and not a number re-derived from a
+                 rounded FOV. -->
+            <horizontal_fov>${camera_horizontal_fov_deg * pi / 180.0}</horizontal_fov>
             <image>
               <width>${camera_image_width}</width>
               <height>${camera_image_height}</height>
               <format>R8G8B8</format>
             </image>
             <clip>
-              <near>0.05</near>
-              <far>5.0</far>
+              <!-- the real PS800-E1 is unusable closer than ~0.2 m and the task
+                   never looks further than 3 m -->
+              <near>${camera_clip_near}</near>
+              <far>${camera_clip_far}</far>
             </clip>
-            <optical_frame_id>${prefix}camera_depth_optical_frame</optical_frame_id>
+            <!-- Real depth is not synthetic-clean: metal parts come back with
+                 3-4 mm scatter and ~25 % holes.  3 mm Gaussian is the measured
+                 scatter; the holes are a rendering limitation we do not fake. -->
+            <noise>
+              <type>gaussian</type>
+              <mean>${camera_noise_mean}</mean>
+              <stddev>${camera_noise_stddev}</stddev>
+            </noise>
+            <!-- Measured Percipio PS800-E1 intrinsics at 1280x960; this is what
+                 Gazebo Harmonic copies into sensor_msgs/CameraInfo, so the bridge
+                 publishes the real K.  cx/cy are NOT the image centre: the real
+                 principal point sits 8.7 px right and 30.7 px above centre, and
+                 only an explicit intrinsics block reproduces that. -->
+            <lens>
+              <type>gnomonical</type>
+              <scale_to_hfov>true</scale_to_hfov>
+              <intrinsics>
+                <fx>${camera_fx}</fx>
+                <fy>${camera_fy}</fy>
+                <cx>${camera_cx}</cx>
+                <cy>${camera_cy}</cy>
+                <s>0.0</s>
+              </intrinsics>
+            </lens>
+            <optical_frame_id>${prefix}camera_color_optical_frame</optical_frame_id>
           </camera>
           <topic>${camera_sensor_topic}</topic>
           </sensor>

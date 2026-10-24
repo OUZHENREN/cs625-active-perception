@@ -33,9 +33,25 @@
   <!-- Keep the senior sensor's Gazebo topic contract as the compatibility
        default. The ROS-facing name is assigned by the bridge profile. -->
   <xacro:arg name="camera_sensor_topic" default="/camera"/>
-  <xacro:arg name="camera_image_width" default="320"/>
-  <xacro:arg name="camera_image_height" default="240"/>
-  <xacro:arg name="camera_update_rate" default="10.0"/>
+  <!-- Real Percipio PS800-E1 intrinsics, read from /camera/color/camera_info on
+       the real cell (config/real/camera_intrinsics.json is the same data and is
+       the authority for the real profile).  Gazebo Harmonic puts <lens>
+       <intrinsics> straight into camera_info, so the simulated K is the measured
+       K instead of a number re-derived from a rounded horizontal FOV.
+       sim_base.launch.py declares the same values as launch arguments; these
+       defaults only serve a bare xacro invocation. -->
+  <xacro:arg name="camera_image_width" default="1280"/>
+  <xacro:arg name="camera_image_height" default="960"/>
+  <xacro:arg name="camera_update_rate" default="1.0"/>
+  <xacro:arg name="camera_horizontal_fov_deg" default="68.98"/>
+  <xacro:arg name="camera_fx" default="931.47"/>
+  <xacro:arg name="camera_fy" default="931.60"/>
+  <xacro:arg name="camera_cx" default="648.70"/>
+  <xacro:arg name="camera_cy" default="449.32"/>
+  <xacro:arg name="camera_clip_near" default="0.2"/>
+  <xacro:arg name="camera_clip_far" default="3.0"/>
+  <xacro:arg name="camera_noise_mean" default="0.0"/>
+  <xacro:arg name="camera_noise_stddev" default="0.003"/>
   <xacro:arg name="camera_enabled" default="true"/>
   <xacro:arg name="simulation_controllers" default=""/>
   <xacro:arg name="p7_attachment_enabled" default="true"/>
@@ -72,7 +88,16 @@
 
        camera_link anchors on the DEPTH eye so that the Gazebo rgbd_camera, which
        looks along camera_link +X, coincides exactly with
-       camera_depth_optical_frame.  The colour eye sits 24.411 mm away. -->
+       camera_depth_optical_frame.  The colour eye sits 24.411 mm away.
+
+       The two lines below are the DEPTH eye, i.e. camera_mount_xyz / _rpy in
+       camera_extrinsics_sim.yaml (the generator's output).  Do not swap them for
+       the colour eye (0.096950 0.042212 0.097540): camera_color_xyz already
+       carries the 24.411 mm stereo baseline, so moving camera_link to the colour
+       eye would put camera_color_optical_frame 24.4 mm past the colour lens and
+       the depth optical frame 24.4 mm off the depth lens.  The colour eye is
+       reached by composing camera_mount @ camera_color_xyz; that composition is
+       what equals T_flange_cam_color_optical in config/handeye/tcp_to_camera.json. -->
   <xacro:arg name="camera_mount_xyz" default="0.096754 0.017803 0.097328"/>
   <xacro:arg name="camera_mount_rpy" default="3.049945177808 -1.568363463268 -3.059531774309"/>
   <!-- camera_link uses the usual body convention; optical is x-right,
@@ -268,5 +293,14 @@
     camera_image_width="$(arg camera_image_width)"
     camera_image_height="$(arg camera_image_height)"
     camera_update_rate="$(arg camera_update_rate)"
+    camera_horizontal_fov_deg="$(arg camera_horizontal_fov_deg)"
+    camera_fx="$(arg camera_fx)"
+    camera_fy="$(arg camera_fy)"
+    camera_cx="$(arg camera_cx)"
+    camera_cy="$(arg camera_cy)"
+    camera_clip_near="$(arg camera_clip_near)"
+    camera_clip_far="$(arg camera_clip_far)"
+    camera_noise_mean="$(arg camera_noise_mean)"
+    camera_noise_stddev="$(arg camera_noise_stddev)"
     camera_enabled="$(arg camera_enabled)"/>
 </robot>

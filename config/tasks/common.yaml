@@ -1,0 +1,109 @@
+# 六类模式公共配置（唯一权威来源）：世界常量 + 所有可复用位姿
+# 位姿全部原样搬自两个已验证基线，未改任何数值：
+#   - config/pick_place_real.yaml（2026-10-22 真机跑通，load 流程）
+#   - config/unload_real.yaml（unload 流程）
+# 用法：run_task 先读本文件，再把 config/tasks/<scope>_<mode>.yaml 浅合并覆盖上去，
+#      合并结果直接交给 scripts/run_pick_and_place.py --config。
+# 说明：浅合并意味着模式文件里的 phase_speeds 会整段替换，因此每份模式文件都自带完整
+#      phase_speeds；本文件只放与 scope/mode 无关的位姿、夹爪与几何常量。
+# 坐标系：全部为世界系（base_link）下的 TCP 位置，单位 m；四元数为 (x, y, z, w)。
+
+# ---- 抓取目标（工件台上待抓工件） ----
+pre_grasp: [0.7677, 0.4903, -0.0595]      # 抓取接近点（距 grasp 约 120 mm）
+grasp: [0.8316, 0.5918, -0.0583]          # 抓取点（夹爪闭合处）
+grasp_q: [-0.4835, 0.8753, 0.0075, 0.0018]
+
+# ---- 空中巡航与装入链 ----
+transit: [0.95, 0.45, 0.55]               # 抬升后的空中过渡点
+staging: [1.0748, -0.0122, 0.5252]        # 槽位外侧准备点
+pre_insert: [1.0996, -0.0125, 0.3773]     # 插入前点（沿倾斜轴后退 150 mm）
+insert: [1.1574, -0.0132, 0.0321]         # 插入终点（= unload 的 insert_tcp）
+
+pre_insert_q: [-0.004, 0.997, -0.001, 0.083]   # 进槽倾角（约 -10°）
+insert_q: [-0.003, 1.000, -0.002, -0.004]      # 整平后姿态
+
+# ---- 安全回撤位 ----
+baseline: [1.044, -0.011, 0.726]          # 每段流程开始/结束的机位
+baseline_q: [-0.059, 0.938, 0.060, 0.336]
+
+# ---- 夹爪与行程常量 ----
+grip_width_mm: 50.0
+grip_current: 0.1
+lift_total_mm: 155.0                      # 抬升总高度
+safe_clear_mm: 150.0                      # 轴向安全脱开距离（>= 100 才算合法）
+extract_steps_mm: 20                      # unload 每次抽出的步长（350 mm 行程 = 18 步）
+
+# ---- 全局保守标定（模式文件会覆盖其中速度/时间项） ----
+velocity_scale: 0.02                      # 普通接近速度缩放
+assembly_velocity_scale: 0.01             # 装配段速度缩放
+time_scale: 2.0
+dwell_sec: 1.0
+goal_tolerance: 0.002
+max_chunks: 7
+
+# ---- unload 专用固定链（槽位机械固定，无需重新检测） ----
+slot_origin: [1.241629, 0.181709, 0.443245]
+slot_origin_q: [-0.0016287871280747132, 0.004253108458370272, 0.003384045809911108, 0.9999839030478886]
+box_in_slot: [1.1635, 0.2032, 0.4423]          # 工件就位后的位姿
+box_in_slot_q: [-0.0016, 0.0043, 0.0034, 1.0]
+
+insert_tcp: [1.1574, -0.0132, 0.0321]          # = load 的 insert
+insert_tcp_q: [-0.003, 1.000, -0.002, -0.004]  # 整平姿态
+entrance_q: [-0.004, 0.997, -0.001, 0.083]     # 抽出时的 -10° 倾角
+
+# ---- unload 的放置目标（默认放回原工件台） ----
+place_pre_grasp: [0.7677, 0.4903, -0.0595]
+place_grasp: [0.8316, 0.5918, -0.0583]
+place_grasp_q: [-0.4835, 0.8753, 0.0075, 0.0018]
+
+# ============================================================================
+# environment：环境模型门禁阈值（run_pick_and_place.py 会忽略本段，由 run_task 读取）
+# 语义：位姿/点云与机械臂运动前的环境模型加载检查。
+# ============================================================================
+environment:
+  thresholds:
+    slot_mm: 1.0            # 槽位定位误差上限
+    slot_deg: 0.5           # 槽位姿态误差上限
+    workpiece_mm: 3.0       # 工件位姿误差上限
+    workpiece_deg: 1.0      # 工件姿态误差上限
+    min_points: 20000       # 环境点云最少点数
+    max_age_h: 2.0          # 环境模型最大允许陈旧时间（小时）
+  required: true            # 每次流程前必须加载环境模型
+
+# ============================================================================
+# verification：每阶段实测验收阈值（run_task 读取，runner 忽略）
+# ============================================================================
+verification:
+  pos_mm: 3.0               # 阶段结束 TCP 位置偏差上限
+  rot_rad: 0.01             # 阶段结束姿态偏差上限
+
+# ---- 观测点（观察位姿，2026-10-24 推导/实测） -------------------------
+# 粗观测位来自真机实测定标（agent_memory §118/§119）；
+# 精观测位由 capture_dataset.camera_target() 以 0.68 m / 俯角 20° / 方位 +10° 算出，
+# 夹爪间距 0.449 m（>0.38 门禁）。tables 是宽视角，用于复核两张桌面位姿。
+# check：该观测点的校验命令，退出码 0 才算通过；空字符串表示只取景不判定。
+process_images: true
+observe:
+  workpiece_coarse:
+    xyz: [0.5886, 0.3482, 0.7075]
+    quat: [0.2954, -0.7023, -0.2539, -0.5958]
+    check: ""
+  workpiece_fine:
+    xyz: [0.5301, 0.3222, 0.4126]
+    quat: [-0.34895, 0.74088, 0.25376, 0.51473]
+    check: >-
+      python3 scripts/check_pose_stability.py --repeat 3 --weights ~/cs625_yolo_seg/runs/segment/runs/segment/box_slot_1280/weights/best.pt --template "$HOME/cs625_rvs_archive/models_20261023/弹仓_装配导出.STL"
+  tables:
+    xyz: [0.5886, 0.3482, 0.7075]
+    quat: [0.2954, -0.7023, -0.2539, -0.5958]
+    check: >-
+      python3 scripts/model_environment.py --out runtime/environment --verify-only
+  slot_coarse:
+    xyz: [0.7802, -0.1458, 0.7986]
+    quat: [0.1834, -0.8502, -0.1133, -0.4803]
+    check: ""
+  slot_fine:
+    xyz: [0.7036, -0.0945, 0.8146]
+    quat: [-0.16424, 0.8023, 0.12511, 0.56007]
+    check: >-
+      python3 scripts/model_environment.py --out runtime/environment --verify-only

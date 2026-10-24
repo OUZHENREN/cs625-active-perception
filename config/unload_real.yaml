@@ -1,0 +1,59 @@
+# Unload (取出) flow parameters — derived from the fixed slot pose.
+# Because the slot is mechanically fixed, the inserted workpiece pose is also
+# fixed; only a rough photo check is needed before running.
+
+# ---- fixed chain (no re-detection needed) ----
+slot_origin: [1.241629, 0.181709, 0.443245]
+slot_origin_q: [-0.0016287871280747132, 0.004253108458370272, 0.003384045809911108, 0.9999839030478886]
+box_in_slot: [1.1635, 0.2032, 0.4423]
+box_in_slot_q: [-0.0016, 0.0043, 0.0034, 1.0]
+
+insert_tcp: [1.1574, -0.0132, 0.0321]        # = grasp TCP for unload
+insert_tcp_q: [-0.003, 1.000, -0.002, -0.004] # straightened
+entrance_q: [-0.004, 0.997, -0.001, 0.083]    # -10 deg tilt for extraction
+pre_insert: [1.0996, -0.0125, 0.3773]         # 350 mm back along the tilted axis
+staging: [1.0748, -0.0122, 0.5252]
+transit: [0.95, 0.45, 0.55]
+
+# ---- place target (default: original workpiece-table pose) ----
+place_pre_grasp: [0.7677, 0.4903, -0.0595]
+place_grasp: [0.8316, 0.5918, -0.0583]
+place_grasp_q: [-0.4835, 0.8753, 0.0075, 0.0018]
+
+baseline: [1.044, -0.011, 0.726]
+baseline_q: [-0.059, 0.938, 0.060, 0.336]
+
+grip_width_mm: 50.0
+grip_current: 0.1
+extract_steps_mm: 20
+safe_clear_mm: 150.0
+lift_total_mm: 155.0
+
+velocity_scale: 0.02
+assembly_velocity_scale: 0.01
+time_scale: 5.0
+dwell_sec: 1.5
+goal_tolerance: 0.002
+max_chunks: 7
+
+# Per-phase speed plan (uneven speed): cruise fast, slow down only for the
+# final approach to the workpiece and for motion inside the slot.
+phase_speeds:
+  d1_staging:               {velocity: 0.08, time_scale: 1.0, chunks: 3}
+  d2a_pre_insert:           {velocity: 0.05, time_scale: 1.5, chunks: 3}
+  d2b_entrance_tilted:      {velocity: 0.03, time_scale: 1.5, chunks: 5, slow_tail_mm: 50, slow_velocity: 0.010, slow_time_scale: 2.5}
+  # tight clearance: uniform slow speed
+  d2c_straighten:           {velocity: 0.005, time_scale: 3.0, chunks: 2}
+  d3c_pull_test:            {velocity: 0.005, time_scale: 3.0, chunks: 1}
+  d3e_return:               {velocity: 0.010, time_scale: 2.5, chunks: 1}
+  # tight clearance: uniform slow speed
+  d4_tilt_for_removal:      {velocity: 0.005, time_scale: 3.0, chunks: 2}
+  # tight clearance: uniform slow speed
+  d5_extract:               {velocity: 0.005, time_scale: 3.0, chunks: 2}
+  d6a_lift:                 {velocity: 0.03, time_scale: 1.5, chunks: 3}
+  d6b_transit:              {velocity: 0.08, time_scale: 1.0, chunks: 3}
+  d7a_place_pre_grasp:      {velocity: 0.05, time_scale: 1.5, chunks: 4}
+  d7b_place_grasp:          {velocity: 0.020, time_scale: 1.5, chunks: 3, slow_tail_mm: 30, slow_velocity: 0.008, slow_time_scale: 2.5}
+  d9a_withdraw:             {velocity: 0.03, time_scale: 1.5, chunks: 2}
+  d9b_lift:                 {velocity: 0.05, time_scale: 1.2, chunks: 2}
+  d9c_baseline:             {velocity: 0.08, time_scale: 1.0, chunks: 3}

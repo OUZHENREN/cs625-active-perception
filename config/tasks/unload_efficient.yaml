@@ -1,0 +1,86 @@
+# 取出 + 放置 / 效率模式（scope=unload, mode=efficient）
+# 定位：效率只来自三件事——巡航段提到 0.12 m/s、取消分段（每个 phase_speeds 条目 chunks: 1）、
+#       取消停顿（dwell_sec: 0.0）；槽内速度与 unload_safe 完全一致，都是 0.005 m/s 均匀慢速。
+# 与另外三种 scope 的区别：只跑 unload 一条流程；load 用 load_efficient，全流程用 full_efficient。
+# 关键安全点：槽内抽出仍是 20 mm/步（extract_steps_mm 未改），步内速度与安全模式同为 0.005 m/s；
+#            d2b/d2c/d4/d5 都不带 slow_tail_mm（槽内"快巡航 + 慢尾段"会憋住）；
+#            d3c 3 mm 拉拔测试保留，抽不出位移就停，不许"更快再试一次"。
+# 数值来源：位姿全部来自 common.yaml；巡航提速与取消分段为效率新设（待真机验证），
+#           装配段与槽内速度一律不高于 2026-10-22 真机跑过的值。
+#
+# 预计各段耗时（距离 ÷ 速度，不含规划/通信开销；距离按 common.yaml 位姿量出）：
+#   d1_staging      203 mm @ 0.12 =  1.7 s   d2a_pre_insert  150 mm @ 0.02 =  7.5 s
+#   d2b_entrance    350 mm @ 0.005 = 70.0 s  d2c_straighten  转角 ≈ 9.3°   ≈  3.0 s
+#   d3c_pull_test   3 mm @ 0.005 =  0.6 s    d3e_return      3 mm @ 0.010 =  0.3 s
+#   d4_tilt         转角 ≈ 9.3°   ≈  3.0 s   d5_extract      350 mm @ 0.005 = 70.0 s（18 步）
+#   d6a_lift        155 mm @ 0.03 =  5.2 s   d6b_transit     486 mm @ 0.12 =  4.1 s
+#   d7a_place_pre   637 mm @ 0.05 = 12.7 s   d7b_place       120 mm @ 0.02 =  6.0 s
+#   d9a_withdraw    120 mm @ 0.02 =  6.0 s   d9b_lift        155 mm @ 0.03 =  5.2 s
+#   d9c_baseline    897 mm @ 0.12 =  7.5 s
+#   动作合计 ≈ 203 s；加夹爪初始化/闭合/张开（约 15 s）与规划开销（约 40 s）→ 约 4.3 min。
+#   注：时间几乎全压在 d2b 与 d5 两段槽内行程（各 70 s），这两段不能拿时间换；
+#       本模式相对 safe 的收益只体现在巡航、分段与停顿上。
+
+scope: unload
+mode: efficient
+flow: unload
+
+# 阶段序列与 scripts/run_pick_and_place.py::run_unload 完全一致；
+# d5_extract_* 由 extract_steps_mm=20、行程 350 mm 决定，实跑为 d5_extract_1..18。
+# 阶段表：环境建模前缀 + 取出执行体 + 终点=工件粗观测
+phases:
+  - observe:slot_coarse
+  - observe:slot_fine
+  - observe:tables
+  - d1_staging
+  - d2_init_before_slot
+  - d2a_pre_insert
+  - d2b_entrance_tilted
+  - d2c_straighten
+  - d3a_gripper_init
+  - d3b_grip
+  - d3c_pull_test
+  - d3d_pull_check
+  - d3e_return
+  - d4_tilt_for_removal
+  - d5_extract_*
+  - d6a_lift
+  - d6b_transit
+  - d7a_place_pre_grasp
+  - d7b_place_grasp
+  - d8_release
+  - d8b_init_before_retreat
+  - d9a_withdraw
+  - d9b_lift
+  - d9c_baseline
+  - observe:workpiece_coarse
+
+# ---- 全局标定（效率新设，待真机验证；两项都在 runner 的模式上限之内） ----
+velocity_scale: 0.05              # 没有阶段档案时的兜底接近速度
+assembly_velocity_scale: 0.02     # 没有阶段档案时的兜底装配速度（<= 装配上限 0.03）
+time_scale: 1.0
+dwell_sec: 0.0
+max_chunks: 1
+
+# ---- 单段直通计划：不分段、不停顿、不拉长时间 ----
+# 巡航段 d1_staging / d6b_transit / d9c_baseline：0.12 m/s —— 效率的唯一提速来源。
+# 装配段 d2a / d7b / d9a：<= 0.03 m/s；d6a_lift、d9b_lift 与真机一致用 0.03 m/s。
+# 槽内 d2b / d2c / d4 / d5：0.005 m/s 均匀慢速，与 unload_safe.yaml 完全一致。
+# slow_band_mm=[0,80]：夹爪空载进出时，只在工件扶手区（座入位回退 0~80 mm 这一段）走
+# 慢速，其余段快速。数值为暂定值（由 CAD 与插入轴估算），待所有者确认真机实际扶手高度。
+phase_speeds:
+  d1_staging:               {velocity: 0.12,  time_scale: 1.0, chunks: 1}
+  d2a_pre_insert:           {velocity: 0.02,  time_scale: 1.0, chunks: 1}
+  d2b_entrance_tilted:      {velocity: 0.03, time_scale: 1.0, chunks: 1, slow_band_mm: [0, 80]}
+  d2c_straighten:           {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  d3c_pull_test:            {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  d3e_return:               {velocity: 0.010, time_scale: 1.0, chunks: 1}
+  d4_tilt_for_removal:      {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  d5_extract:               {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  d6a_lift:                 {velocity: 0.03,  time_scale: 1.0, chunks: 1}
+  d6b_transit:              {velocity: 0.12,  time_scale: 1.0, chunks: 1}
+  d7a_place_pre_grasp:      {velocity: 0.05,  time_scale: 1.0, chunks: 1}
+  d7b_place_grasp:          {velocity: 0.02,  time_scale: 1.0, chunks: 1}
+  d9a_withdraw:             {velocity: 0.02,  time_scale: 1.0, chunks: 1, slow_band_mm: [0, 80]}
+  d9b_lift:                 {velocity: 0.03,  time_scale: 1.0, chunks: 1}
+  d9c_baseline:             {velocity: 0.12,  time_scale: 1.0, chunks: 1}

@@ -1,325 +1,134 @@
-# CS625 Active Perception
+# CS625 主动感知 / 遮挡目标定位与可达性观测规划
 
-面向遮挡目标定位的 CS625 机械臂主动感知与视点规划研究。项目以统一的
-sim/real 应用接口组织候选视点生成、可达性筛选、策略选择、MoveIt 规划和执行
-状态记录；当前已验收范围为 **ROS 2 + Gazebo 仿真**。
+> 课题：**面向遮挡目标定位的机械臂可达性规划方法研究**
+> 真机：Elite CS625 六轴协作臂 + HITBOT 夹爪 + Percipio RGB-D + 插槽夹具 + 弹仓工件
+> 环境：WSL2 Ubuntu 24.04 + ROS 2 Jazzy + MoveIt 2 + Gazebo Harmonic
 
-> 真机当前未连接。本仓库中的 real-profile、预检和安全配置仅是软件准备，不能
-> 被解释为真实抓取、真实识别或真实轨迹执行已经通过。
+本仓库只做一件事：**让机械臂"先看清楚再动手"**——在遮挡/不确定的条件下，通过主动选择观测位姿，
+把目标定位到可以抓取/装配的精度，然后把定位结果交给一个可复现的装配流程。
 
-## 当前状态
+---
 
-| 能力层 | 当前状态 | 证据边界 |
-| --- | --- | --- |
-| CS625 URDF、Gazebo、ros2_control、MoveIt | 仿真通过 | 使用 underlay 中复用的 CS625 模型与配置 |
-| 候选视点与硬可达性筛选 | 仿真通过 | IK、关节限位、碰撞与规划服务筛选 |
-| P4 主动感知闭环 | 仿真通过 | 选点、规划、Gazebo 运动、传感器稳定状态、失败码记录 |
-| P5 联合评分基础 | 仿真通过 | 可复现评分与 paired-experiment 工具 |
-| P7 五级门禁 | P7.1--P7.4 `PASS / FROZEN`；P7.5 单场景 `PASS`；正式矩阵 `NOT ACCEPTED` | r12 severe-v5 番茄罐完成一次感知条件下的仿真接触抓取闭环：NBV 后 3/3 位姿更新、MoveIt 预抓取/接近/抬升、双指接触、抬升 0.140928 m、保持 2.599 s；这不是 3 遮挡 × 5 seed × 多基线正式抓取矩阵，也不是真机结论 |
-| P6 真机底座 | 仅软件组装通过 | `real_base.launch.py` 已能组装 driver + 描述 + MoveIt，并用 `use_fake_hardware:=true` 通过冒烟；真机 R1--R4 尚未验收 |
+## 1. 现在能做什么（2026-10-24 状态）
 
-## 最低可展示实验（仿真）
+| 能力 | 状态 | 证据 |
+|---|---|---|
+| 精观测位定位 | ✅ 3 帧一致，位置离散 **1.0 mm**、转角 0.285° | `docs/worklogs/2026-10-24_WORKLOG_EXECUTION_ESTOP_ROOT_CAUSE.md` |
+| 六类任务模式（3 scope × 2 mode） | ✅ 只规划全流程通过：load 19/19、unload 38/38、full 57/57 段 | `runtime/planonly_*.json` |
+| 强制环境建模 + 门禁 | ✅ 四种拒绝（插槽漂移/工件漂移/点云不足/模型超龄） | `scripts/model_environment.py` |
+| 仿真与真机 1:1 场景 | 🚧 桌面/工件已按实测对齐；夹具几何按真机数据重建中 | `scripts/build_sim_world.py` |
+| 双 UI（Qt 面板 + RViz 面板） | ✅ 六模式按钮 + 日志 + 状态 | `scripts/cs625_ui.py`、`src/cs625_rviz_panel` |
+| 实验数据自动采集/裁剪/归档 | ✅ 20 Hz 时序 + 阶段标记 + 过程图 → `~/cs625_experiment_archive` | `scripts/experiment_recorder.py` |
+| 真机自动执行 | ⛔ 待真机恢复（2026-10-24 机器人网络不可达） | — |
 
-已冻结的 P4 矩阵包含 45 个独立 episode：
+---
 
-| 因子 | 取值 |
-| --- | --- |
-| 遮挡场景 | `occlusion_light`、`occlusion_medium`、`occlusion_severe` |
-| 随机种子 | 17、18、19、20、21 |
-| 基线 | `fixed_view`、`random_reachable`、`coverage_nbv` |
-| 总量 | 3 × 5 × 3 = 45 |
-
-每个单元启动独立的 Gazebo + MoveIt 进程，并导出可达率、规划时间、运动代价、
-成功观测率、失败码和终止原因。2026-09-06 的完整仿真运行得到 45/45 个有效
-episode；三种基线各 15 个样本。本轮矩阵全部以 `MAX_FAILED_ATTEMPTS` 终止，
-因此只能作为可达性、规划时间和执行失败码的可审计数据，不能写成成功观测率
-对比实验。对应聚合结果为：
-
-| 基线 | 平均可达率 | 平均规划时间总量 (s) | 平均墙钟时间 (s) | 平均成功观测率 |
-| --- | ---: | ---: | ---: | ---: |
-| `coverage_nbv` | 0.752778 | 0.195406 | 102.413204 | 0.0 |
-| `fixed_view` | 0.758333 | 0.187946 | 101.152591 | 0.0 |
-| `random_reachable` | 0.744444 | 0.175477 | 90.748936 | 0.0 |
-
-这是当前 Gazebo 配置下的描述性仿真结果，不是对真实机器人性能的结论。GitHub
-仓库保留源码、协议、汇总 CSV/JSON 和必要小型日志；大体积原始 RGB-D/点云帧
-继续保留在本地实验归档。
-
-## 日常启动
-
-两个 profile 是**并列的底座**，只负责把硬件/仿真、描述和 MoveIt 组装起来；
-主动感知流水线用单独的 launch 叠加，不折进任一底座。
-
-### 仿真底座
+## 2. 三分钟上手
 
 ```bash
-source scripts/source_dev_env.sh
+cd ~/projects/cs625-active-perception
 
-# 日常手工看机械臂：Gazebo 只跑物理与传感器，RViz 显示机械臂
-ros2 launch cs625_bringup sim_base.launch.py headless:=true launch_rviz:=true
+# ① 唯一支持的环境入口（每个 shell 必做）
+source scripts/source_dev_env.sh --full
 
-# 想在 Gazebo 窗口里也看到机械臂（软件渲染下点云约 2 Hz）
-ros2 launch cs625_bringup sim_base.launch.py \
-  headless:=false gazebo_visuals:=true launch_rviz:=true
-```
-
-Gazebo 实体默认由**无网格**模型生成，因此 Gazebo 窗口里看不到机械臂，这是
-为了避开 WSL2 软件渲染路径下的卡死；`gazebo_visuals:=true` 才保留网格。
-细节见 [`docs/simulation.md`](docs/simulation.md) 的 “Visualization and manual run”。
-
-### 任务场景（插槽夹具 + 弹仓）
-
-这是本课题的正式任务场景：真实的楔形插槽夹具与屏蔽片模块。它替代前面的遮挡
-研究世界，是后续定位、抓取、插入实验的底座。
-
-```bash
-source scripts/source_dev_env.sh
-CS625_P7_ATTACHMENT_ENABLED=false \
-  ros2 launch cs625_bringup sim_task_scene.launch.py
-```
-
-它组合 `sim_base`，把世界换成 `cs625_insertion_scene.sdf`，并强制
-`launch_fixture_world:=false`（那个通用 RGB-D 夹具世界是第二个 Gazebo 实例）。
-
-> `CS625_P7_ATTACHMENT_ENABLED=false` 关掉 P7 的 attachment 插件。它挂在
-> `wrist_3_link` 上、去找名叫 `target_object`/`target_link` 的模型，而本任务世界
-> 里叫 `shielding_module`，所以插件只会打一条 `DetachableJoint ... could not be
-> found` 的警告。**这个开关必须用环境变量给**——`sim_control.launch.py` 是从
-> 环境读的，而 `sim_base` 并不声明这个 launch 参数；当成 include 参数传进去既不
-> 生效、又会被 `IncludeLaunchDescription` 泄漏成全局配置。
-> `test/contract_checks.py` 现在会拦截这种写法。
-启动约 20 秒后会自动把静态夹具和“坐到底”的弹仓镜像进 MoveIt 的 planning
-scene——不做这一步，规划器会把机械臂直接穿过夹具。
-
-场景几何只有一个权威来源：`src/cs625_bringup/config/cs625_task_scene.yaml`。
-世界文件与配置必须一致，`test/contract_checks.py` 会强制这一点。
-
-摆放与查看：
-
-```bash
-# 看当前记录的三组位姿（RPY 与四元数都打印）
-python3 scripts/sync_task_world.py --print
-
-# 校验配置 <-> 世界是否一致
-python3 scripts/sync_task_world.py --check
-
-# 从 Gazebo 的 Pose 面板读到数后写进去（面板角度标的是弧度）
-python3 scripts/sync_task_world.py --set fixture \
-  --position -0.85 0.49 0.27337 --rpy-rad 3.11 0.08 -0.43
-```
-
-> **Gazebo 的 Pose 面板只显示 2 位小数**，位置和角度都是，直接从面板抄数据可能
-> 差厘米级：曾经把夹具 Z 的 `0.27337` 抄成 `0.27`，结果陷进地面 3.4 mm。重要的
-> 数请用 `--print` 读回精确值，或只改你确实想改的那一项。
-
-`insertion.seated_pose_world` **不可直接设置**：它是从夹具位姿**派生**的
-（装配体坐标系下的实测值 × 夹具位姿），每次运行 `sync_task_world.py` 自动重算，
-所以移动夹具不需要手改它。
-
-手动镜像（需要 move_group 已在运行）：
-
-```bash
-python3 src/cs625_bringup/scripts/apply_task_scene.py --seated-module
-```
-
-该脚本装在 `share/cs625_bringup/scripts/` 下而不是 `lib/`，因此用 `python3`
-调用而不是 `ros2 run`——`ros2 run` 只认 `lib/` 里的 ROS 可执行文件。几何来源、
-夹具为何用网格做碰撞、以及已知限制见
-[`docs/simulation.md`](docs/simulation.md) 第 6 节。
-
-### 主动感知流水线
-
-```bash
-source scripts/source_dev_env.sh
-ros2 launch cs625_bringup sim_active_localization.launch.py strategy:=disabled launch_rviz:=false
-```
-
-### 真机底座
-
-```bash
-source scripts/source_dev_env.sh
-
-# 不接机器人，先验证 driver + 描述 + MoveIt 能组装
-ros2 launch cs625_bringup real_base.launch.py launch_driver:=true \
-  use_fake_hardware:=true robot_ip:=127.0.0.1 launch_moveit:=true launch_rviz:=false
-```
-
-真驱动需要控制器 IP。该地址只保存在**本机**，不写进仓库（仓库禁止硬编码 IP，
-`test/contract_checks.py` 会拦截）：
-
-```bash
-printf 'CS625_ROBOT_IP=<控制器IP>\n' > ~/.cs625_local.env   # 只做一次
-ros2 launch cs625_bringup real_base.launch.py launch_driver:=true \
-  robot_ip:="$CS625_ROBOT_IP" launch_moveit:=true
-```
-
-`real_base.launch.py` 的默认值是 `launch_driver:=false`、`robot_ip` 为空、
-`activate_joint_controller:=false`、`execute:=false`；不显式给出 IP 时它不会启动
-驱动，也不会用错误的地址去连。这个 IP 是机器人控制器地址，**夹爪没有独立 IP**
-（走机械臂的 tool IO / 工具通讯）。真机前置条件与 R1--R4 门禁见
-[`docs/real_hardware_readiness.md`](docs/real_hardware_readiness.md)。
-
-### 可选：VS Code 一键任务
-
-本机 `.vscode/tasks.json` 把上面的命令（以及构建、契约检查、任务场景的启动与
-镜像、启动 agent harness）做成了 13 个任务，`Ctrl+Shift+P` → **Tasks: Run Task**
-即可选择。注意 **`.vscode/` 被 `.gitignore` 忽略，不随仓库分发**，新克隆的仓库里
-没有这个文件，请直接用上面的终端命令——本节与下面的“快速复现”是等效的仓库内
-入口。
-
-## 快速复现
-
-当前验证环境为 Ubuntu 24.04、ROS 2 Jazzy、MoveIt 2 与 Gazebo Harmonic。所有
-build/test/launch 命令都必须先加载唯一环境入口，固定链为 ROS 2 Jazzy → CS625
-vendor underlay → 本仓库 overlay：
-
-```text
-/opt/ros/jazzy/setup.bash
-  -> $HOME/cs625_underlay_jazzy/install/setup.bash
-  -> $PWD/install/setup.bash
-```
-
-vendor underlay 位置可用 `CS625_UNDERLAY_SETUP` 覆盖；入口会在任一段 setup.bash
-缺失时直接失败，不会静默跳过。真机 profile 还需要 Elite CS SDK：入口在检测到
-SDK 前缀存在时会一并导出其 include / lib 路径（`ELITE_CS_SDK_PREFIX`，默认
-`$HOME/elite-sdk-1.2.0`），仿真不受影响。来源与固定 commit 见
-[`docs/dependencies.md`](docs/dependencies.md)。
-
-首次构建时 overlay 尚不存在，因此先只加载 ROS 与 vendor underlay。`scripts/build.sh`
-等价于 `colcon build --symlink-install`，产物固定落在本仓库 `build/`、`install/`、
-`log/`：
-
-```bash
-source scripts/source_dev_env.sh --no-overlay
-bash scripts/build.sh
-```
-
-构建完成后校验完整链条（断言 `ROS_DISTRO=jazzy`，并解析 underlay 与 overlay 中的包）：
-
-```bash
+# ② 环境校验 + 全部单测（约 15 s）
 source scripts/source_dev_env.sh --verify
+python3 -m pytest test/ -q
+
+# ③ 建立/检查环境模型（每次任务前必须）
+python3 scripts/model_environment.py --dataset ~/cs625_yolo_seg/datasets/2026-10-25_raw \
+    --out runtime/environment
+python3 scripts/model_environment.py --out runtime/environment --verify-only
+
+# ④ 六类模式：预演（打印阶段表与速度，不动臂）
+python3 scripts/run_task.py --scope load --mode safe --world real --dry-run
+
+# ⑤ 只规划（不动臂，可串起整条流程验证可达性）
+python3 scripts/run_task.py --scope full --mode efficient --plan-only --handover auto
+
+# ⑥ 仿真里跑（需先起 sim_cell；不动真机）
+ros2 launch cs625_bringup sim_cell.launch.py
+python3 scripts/run_task.py --scope load --mode safe --world sim --confirm
+
+# ⑦ 真机执行（确认急停可达、夹爪 init=5 之后）
+python3 scripts/run_task.py --scope load --mode safe --world real --confirm --allow-release
+
+# ⑧ 图形界面（二选一或都开）
+python3 scripts/cs625_ui.py                                   # Qt 面板
+rviz2 -d src/cs625_rviz_panel/config/cs625_task.rviz          # RViz 面板
 ```
 
-运行完整 45-cell 矩阵时，指定一个新的空输出目录：
+VS Code 里用 `.vscode/tasks.json` 的一键任务（编号 00–57）做同样的事，不用记命令。
 
-```bash
-scripts/run_minimum_showcase_matrix.sh \
-  "$PWD/install/setup.bash" \
-  "$HOME/cs625_matrix_run_$(date +%Y%m%d_%H%M%S)"
-```
+---
 
-脚本完成后在输出目录的 `summary/` 生成：
-
-- `matrix_validation.md`：45-cell 完整性校验；
-- `episode_metrics.csv`：逐 episode 的全部指标、失败码与终止原因；
-- `strategy_summary.csv`：三条基线的 15-cell 聚合指标；
-- `failure_codes.csv`：按基线统计的失败码。
-
-仅运行一个非证据 smoke test：
-
-```bash
-scripts/run_minimum_showcase_matrix.sh \
-  "$PWD/install/setup.bash" "$HOME/cs625_matrix_smoke" \
-  --scene occlusion_medium --seed 17 --strategy fixed_view
-```
-
-## 验证
-
-先加载唯一环境入口，再运行静态契约检查与单元测试：
-
-```bash
-source scripts/source_dev_env.sh --verify
-python3 test/contract_checks.py
-pytest -q \
-  src/cs625_experiment_tools/tests/test_paired_experiment.py \
-  src/cs625_experiment_tools/tests/test_p4_matrix_summary.py \
-  src/cs625_view_evaluation/tests/test_joint_score.py
-```
-
-`test/contract_checks.py` 除既有静态契约外，还会校验环境本身：`ROS_DISTRO`
-必须是 `jazzy`，`scripts/source_dev_env.sh` 必须存在，`scripts/` 与 `test/`
-中不得出现旧环境引用，`AMENT_PREFIX_PATH` 必须按“本仓库 overlay → CS625
-underlay → `/opt/ros/jazzy`”排序，并禁止仓库里出现机器相关的 IP / 绝对路径
-字面量。它还断言 sim/real 两个 MoveIt 入口复用同一套配置标记。
-
-P7 的当前串行门禁、停止条件与复现入口见
-[`docs/p7_five_gate_protocol.md`](docs/p7_five_gate_protocol.md)。历史临时验收见
-[`docs/p7_simulation_temporary_acceptance_2026-08-31.md`](docs/p7_simulation_temporary_acceptance_2026-08-31.md)。
-2026-09-06 r12 证明 P7.5 在一个 severe-v5 番茄罐场景中完成感知条件下的
-仿真接触抓取闭环；正式多场景、多 seed、多策略抓取实验尚未完成。
-
-## 工作日志
-
-工作日志在 [`docs/worklogs/`](docs/worklogs/) 内，文件名**日期在前**：
+## 3. 六类任务模式
 
 ```text
-YYYY-MM-DD_<TYPE>_<TOPIC>.md
+scope=load    抓取工件 → 装入插槽          scope=unload  从插槽取出 → 放回工件桌
+scope=full    环境建模 → 装入 → 取出 → 回停车位
+
+mode=safe      分段多、dwell 1 s、time_scale 2.0、每阶段实测验收
+mode=efficient 单段执行、无 dwell、巡航 0.12 m/s；槽内紧间隙仍 0.005 m/s
 ```
 
-`<TYPE>` 取 `WORKLOG` / `HANDOFF` / `PLAN` / `SPEC` / `REVIEW`。`AGENTS.md` 规定
-每条日志必须写明变更文件、确切命令、通过/失败结果、遗留限制，以及是否使用了
-fake hardware / Gazebo / 真实硬件、是否发生真实运动；涉及 sim/real 链路时还要写明
-能力层与关键链条状态。日志写完后用 `scripts/sync_worklog.sh` 镜像到本地 Obsidian
-保管库（保管库路径是机器本地配置，不在仓库里）。
+每条流程都自带**观测前缀**（工件粗/精观测 → 两张桌子扫描 → 插槽粗/精观测），
+观测结果写回环境模型，后续段复用；流程终点是下一段流程的起点（插槽粗观测 ↔ 工件粗观测交替）。
 
-## 仓库结构
+细节：`config/tasks/`（配置分层）、`docs/source_authority.md`（哪些数值可信）。
 
-应用层共 **11 个 ROS 2 package**，与 `colcon list` 一致。package 的完整职责、构建
-类型与文件层级以 [`docs/project_layout.md`](docs/project_layout.md) 为唯一详细来源；
-本 README 与 `AGENTS.md` 只保留简要列表，不再各自维护不同版本。
+---
+
+## 4. 仓库结构
 
 ```text
-src/
-├── cs625_ap_description/       # 应用层 Eye-in-Hand 描述扩展
-├── cs625_ap_interfaces/        # 候选、选择与状态 ROS 接口
-├── cs625_bringup/              # sim/real 启动、配置与矩阵清单
-├── cs625_experiment_tools/     # 矩阵收集与 paired-experiment 工具
-├── cs625_motion_adapter/       # 可达性、规划与仿真/真机执行适配器
-├── cs625_sensor_adapter/       # 仿真/真机相机话题归一化
-├── cs625_simulation/           # 仅 Gazebo：worlds、YCB 资产与真值
-├── cs625_target_perception/    # 目标位姿与定位质量接口层
-├── cs625_task_orchestrator/    # P7 抓取证据与 episode 编排
-├── cs625_view_evaluation/      # 策略、P4 协调器与联合评分
-└── cs625_view_generation/      # 候选视点生成
-.repos/                         # underlay 依赖来源固定（real.repos 含 SDK 与师兄驱动快照）
-docs/                           # 实验协议、接口、仿真与真机边界说明
-├── evidence/                   # 已筛选的 JSON/CSV/PNG/TXT 证据；原始帧本地归档
-├── diagnostics/                # 诊断输出与人工审计辅助材料
-└── worklogs/                   # 工作日志（文件名日期在前，YYYY-MM-DD_TYPE_TOPIC.md）
-scripts/                        # 环境入口、构建/测试、矩阵运行与工作日志镜像脚本
-test/                           # 仓库级 contract check、P7 运行/采集工具与固定测试数据
+src/            12 个 ROS 2 包（接口 / 描述 / 传感器 / 感知 / 视角生成 / 评估 /
+                运动 / 编排 / 实验 / 仿真 / bringup / RViz 面板）→ docs/project_layout.md
+scripts/        任务入口 run_task.py + 阶段执行器 + 感知/标定/建模/记录脚本 → scripts/README.md
+config/         tasks/（六类模式，唯一权威）· handeye/ · real/ · verified 基线
+test/           离线单测（124+ 用例）与契约检查
+docs/           架构、接口、权威性分级、工作日志；旧文档在 docs/archive/
+runtime/        生成物（环境模型、实验原始数据、有效配置），不入库
 ```
 
-`build*`、`install*`、`log*`、`.vscode/` 与 rosbag 均不入库。
+---
 
-## 复用与边界
+## 5. 数据在哪
 
-- 官方 Elite CS625 模型、驱动、MoveIt 配置与 Gazebo 控制能力通过 underlay 复用；
-  不在本仓库直接修改 vendor 代码。
-- 真机驱动与 Elite CS SDK 由 underlay 提供：SDK 用普通 CMake 单独构建安装，驱动包
-  按固定 commit 选择性复制进共享 underlay，来源与修改策略记录在
-  [`docs/dependencies.md`](docs/dependencies.md)。
-- 本仓库只维护主动感知应用层及 sim/real 的共同接口；仿真与真机入口不复制第二套
-  核心逻辑，两个底座共用同一套 MoveIt 配置，仅时钟不同。
-- 真机连接、相机标定、实时点云、抓取与安全停机测试必须按
-  [`docs/p6_on_site_runbook.md`](docs/p6_on_site_runbook.md) 另行完成，并产生新的
-  实物证据。
+| 数据 | 位置 | 说明 |
+|---|---|---|
+| 环境模型 | `runtime/environment/<时间戳>/model.json` + `scene.ply` | 每次任务前重建；门禁不过不许动 |
+| 实验原始数据 | `runtime/experiments/<id>/` | 20 Hz 时序 + 阶段 + 图像 |
+| **实验归档（长期）** | `~/cs625_experiment_archive/<id>/` | 裁剪后 + README + summary，索引见 `docs/evidence/experiment_index.md` |
+| 过程图（训练用） | `runtime/process_images/<run>/` | 每阶段进/出各一张，带 TCP 与时间 |
+| YOLO 数据集/权重 | `~/cs625_yolo_seg/` | 两类分割模型，mask mAP50 0.861 |
+| 标定 | `config/handeye/`、`config/real/camera_intrinsics.json` | 手眼外参、相机内参 |
 
-## 文档入口
+---
 
-- [项目文件层级与 package 结构（唯一详细来源）](docs/project_layout.md)
-- [架构说明（当前实现 vs 未来目标）](docs/architecture.md)
-- [仿真基线与运行边界（含可视化）](docs/simulation.md)
-- [帧与话题契约](docs/frames_and_topics.md)
-- [接口与话题契约](docs/interfaces.md)
-- [真机就绪度与安全门禁（含两个底座的职责边界）](docs/real_hardware_readiness.md)
-- [依赖、来源与复用规则](docs/dependencies.md)
-- [最低可展示实验](docs/minimum_showcase_experiment.md)
-- [P5 实验协议](docs/p5_experiment_protocol.md)
-- [P7 五级门禁协议](docs/p7_five_gate_protocol.md)
-- [P7 抓取闭环仿真协议](docs/p7_attachment_assisted_grasp_protocol.md)
-- [P7 仿真临时验收（2026-08-31）](docs/p7_simulation_temporary_acceptance_2026-08-31.md)
-- [P6 仿真临时验收](docs/p6_simulation_temporary_acceptance.md)
-- [P6 真机现场运行手册](docs/p6_on_site_runbook.md)
-- [工作日志与命名约定](docs/worklogs/README.md)
-- [P7 工具索引](test/README.md)
+## 6. 文档索引
+
+| 想知道 | 看 |
+|---|---|
+| 系统怎么分层、包边界 | [`docs/architecture.md`](docs/architecture.md)、[`docs/project_layout.md`](docs/project_layout.md) |
+| 话题/服务/动作契约 | [`docs/interfaces.md`](docs/interfaces.md) |
+| 坐标系与 TF | [`docs/frames_and_topics.md`](docs/frames_and_topics.md) |
+| 哪些数值可信（A/B/C 分级） | [`docs/source_authority.md`](docs/source_authority.md) |
+| 仿真怎么起、和真机怎么对齐 | [`docs/simulation.md`](docs/simulation.md) |
+| 依赖与第三方边界 | [`docs/dependencies.md`](docs/dependencies.md) |
+| 真机安全与就绪度 | [`docs/real_hardware_readiness.md`](docs/real_hardware_readiness.md) |
+| 每天做了什么、踩了什么坑 | [`docs/worklogs/`](docs/worklogs/)（按日期命名） |
+| 长期记忆（位姿基准、教训） | [`docs/agent_memory.md`](docs/agent_memory.md) |
+| 旧文档（2026-10 之前） | [`docs/archive/`](docs/archive/) |
+
+---
+
+## 7. 三条铁律
+
+1. **真机安全**：`execute:=false` / `require_confirmation:=true` 是默认；动臂前必须
+   `safety_mode=1` + `robot_mode=7` + `arm_controller` active + `control_health.py` 全 True。
+   释放夹爪永远需要 `--allow-release`。
+2. **观测先于运动**：每次流程前先建环境模型并过门禁；看不懂的位姿不许执行。
+3. **源码不删**：旧仿真、旧文档、师兄代码一律只读保留（快照 + 索引），归档要所有者批准。
+
+工作方式与详细规则见 [`AGENTS.md`](AGENTS.md)。

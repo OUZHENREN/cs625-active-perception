@@ -1,0 +1,144 @@
+# 全流程 / 效率模式（scope=full, mode=efficient）
+# 定位：一次上机"装入 + 取出"，两段都取消分段慢速（chunks 1 / dwell 0.0 / time_scale 1.0）。
+# 与另外三种 scope 的区别：把 load 与 unload 两套单段直通计划合到一份配置里，一次启动跑完。
+# 关键安全点：handover=confirm —— load 停在 baseline 等人工确认工件已就位，确认后才从 d1_staging 取出；
+#            槽内 insert/straighten/d2b/d2c/d4/d5 全部 0.005 m/s 均匀慢速，不因整体提速而放宽，
+#            也不带 slow_tail_mm（槽内"快巡航 + 慢尾段"会憋住）。
+# 效率只来自三件事：巡航段 0.12 m/s、取消分段、取消 dwell；槽内速度与 safe 模式完全一致。
+# 数值来源：位姿全部来自 common.yaml；巡航提速与取消分段为效率新设（待真机验证），
+#           装配段与槽内速度一律不高于 2026-10-22 真机跑过的值。
+#
+# 预计耗时（距离 ÷ 速度 + 规划/夹爪开销；距离按 common.yaml 位姿量出）：
+#   load 段：pre_grasp 32.4 + grasp 6.0 + lift 5.2 + transit 4.1 + staging 4.0
+#            + pre_insert 7.5 + insert 70.0 + straighten 3.5 + withdraw 7.5 + baseline 4.6
+#            + 夹爪动作约 9 s ≈ 154 s
+#   unload 段：d1 1.7 + d2a 7.5 + d2b 70.0 + d2c 3.0 + d3c 0.6 + d3e 0.3 + d4 3.0
+#              + d5 70.0 + d6a 5.2 + d6b 4.1 + d7a 12.7 + d7b 6.0 + d9a 6.0 + d9b 5.2 + d9c 7.5
+#              ≈ 203 s
+#   动作合计 ≈ 357 s；加夹爪/规划开销（约 80 s）→ 约 7.3 min（不含 handover 人工确认的等待）。
+#   注：时间主要压在 insert(70 s)、d2b(70 s)、d5(70 s) 三段槽内行程上，这些速度不可压缩；
+#       若要再压总时长，只能动巡航段或减少阶段数。
+
+scope: full
+mode: efficient
+scopes: [load, unload]
+flows: [pick_place, unload]
+handover: confirm
+
+# 阶段表（默认=装入段）：环境建模前缀只做一次，装入执行体，终点=插槽粗观测
+# 便于 run_task 按 flow 切片（runner 忽略这两个键）。
+# ---- 全局标定（效率新设，待真机验证；两项都在 runner 的模式上限之内） ----
+velocity_scale: 0.05              # 没有阶段档案时的兜底接近速度
+assembly_velocity_scale: 0.02     # 没有阶段档案时的兜底装配速度（<= 装配上限 0.03）
+time_scale: 1.0
+dwell_sec: 0.0
+max_chunks: 1
+
+# ---- 单段直通计划：load 段 + unload 段，全部 chunks 1 / time_scale 1.0 ----
+# 巡航：transit / staging / baseline / d1_staging / d6b_transit / d9c_baseline = 0.12 m/s。
+# 装配：grasp / pre_insert / withdraw / d2a / d7b / d9a <= 0.03 m/s；pre_grasp 0.03、d7a 0.05 属自由空间接近。
+# 槽内：insert / straighten / d2b / d2c / d4 / d5 = 0.005 m/s 均匀慢速，与 safe 模式完全一致。
+# slow_band_mm=[0,80]：夹爪空载进出时，只在工件扶手区（座入位回退 0~80 mm 这一段）走
+# 慢速，其余段快速。数值为暂定值（由 CAD 与插入轴估算），待所有者确认真机实际扶手高度。
+phase_speeds:
+  # load
+  pre_grasp:                {velocity: 0.03,  time_scale: 1.0, chunks: 1}
+  grasp:                    {velocity: 0.02,  time_scale: 1.0, chunks: 1}
+  lift:                     {velocity: 0.03,  time_scale: 1.0, chunks: 1}
+  transit:                  {velocity: 0.12,  time_scale: 1.0, chunks: 1}
+  staging:                  {velocity: 0.12,  time_scale: 1.0, chunks: 1}
+  pre_insert:               {velocity: 0.02,  time_scale: 1.0, chunks: 1}
+  insert:                   {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  straighten:               {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  withdraw:                 {velocity: 0.02,  time_scale: 1.0, chunks: 1, slow_band_mm: [0, 80]}
+  baseline:                 {velocity: 0.12,  time_scale: 1.0, chunks: 1}
+  # unload
+  d1_staging:               {velocity: 0.12,  time_scale: 1.0, chunks: 1}
+  d2a_pre_insert:           {velocity: 0.02,  time_scale: 1.0, chunks: 1}
+  d2b_entrance_tilted:      {velocity: 0.03, time_scale: 1.0, chunks: 1, slow_band_mm: [0, 80]}
+  d2c_straighten:           {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  d3c_pull_test:            {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  d3e_return:               {velocity: 0.010, time_scale: 1.0, chunks: 1}
+  d4_tilt_for_removal:      {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  d5_extract:               {velocity: 0.005, time_scale: 1.0, chunks: 1}
+  d6a_lift:                 {velocity: 0.03,  time_scale: 1.0, chunks: 1}
+  d6b_transit:              {velocity: 0.12,  time_scale: 1.0, chunks: 1}
+  d7a_place_pre_grasp:      {velocity: 0.05,  time_scale: 1.0, chunks: 1}
+  d7b_place_grasp:          {velocity: 0.02,  time_scale: 1.0, chunks: 1}
+  d9a_withdraw:             {velocity: 0.02,  time_scale: 1.0, chunks: 1, slow_band_mm: [0, 80]}
+  d9b_lift:                 {velocity: 0.03,  time_scale: 1.0, chunks: 1}
+  d9c_baseline:             {velocity: 0.12,  time_scale: 1.0, chunks: 1}
+
+# 全流程第 1 步：环境建模前缀（工件粗/精观测、桌子扫描、插槽粗/精观测）+ 装入
+# 全流程第 2 步：不再重复桌子扫描（同一次运行里刚做过），补插槽粗/精观测确认工件已入槽 + 取出 + 终点=工件粗观测
+
+# 阶段表（默认 = 装入段）：观测前缀只做一次 → baseline → 装入 → 终点插槽粗观测
+phases:
+  - observe:workpiece_coarse
+  - observe:workpiece_fine
+  - observe:tables
+  - observe:slot_coarse
+  - observe:slot_fine
+  - baseline
+  - pre_grasp
+  - gripper_init
+  - grip
+  - grasp
+  - lift
+  - transit
+  - staging
+  - pre_insert
+  - insert
+  - straighten
+  - release
+  - withdraw
+  - observe:slot_coarse
+
+# 全流程第 1 步：环境建模前缀 + 装入
+phases_load:
+  - observe:workpiece_coarse
+  - observe:workpiece_fine
+  - observe:tables
+  - observe:slot_coarse
+  - observe:slot_fine
+  - baseline
+  - pre_grasp
+  - gripper_init
+  - grip
+  - grasp
+  - lift
+  - transit
+  - staging
+  - pre_insert
+  - insert
+  - straighten
+  - release
+  - withdraw
+  - observe:slot_coarse
+
+# 全流程第 2 步：不再重复桌子扫描（同一次运行刚做过）+ 取出
+phases_unload:
+  - observe:slot_coarse
+  - observe:slot_fine
+  - d1_staging
+  - d2_init_before_slot
+  - d2a_pre_insert
+  - d2b_entrance_tilted
+  - d2c_straighten
+  - d3a_gripper_init
+  - d3b_grip
+  - d3c_pull_test
+  - d3d_pull_check
+  - d3e_return
+  - d4_tilt_for_removal
+  - d5_extract_*
+  - d6a_lift
+  - d6b_transit
+  - d7a_place_pre_grasp
+  - d7b_place_grasp
+  - d8_release
+  - d8b_init_before_retreat
+  - d9a_withdraw
+  - d9b_lift
+  - d9c_baseline
+  - observe:workpiece_coarse

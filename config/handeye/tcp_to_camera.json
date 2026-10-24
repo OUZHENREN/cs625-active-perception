@@ -1,0 +1,99 @@
+{
+  "source": "RobotVisionSuite eye-in-hand hand-eye calibration",
+  "derived_by": "scripts/sync_real_handeye.py",
+  "source_files": [
+    "/mnt/d/Program Files (x86)/RobotVisionSuite/runtime/HandEyeTool.ini",
+    "/mnt/d/Program Files (x86)/RobotVisionSuite/runtime/ColorToRobotTCP.txt",
+    "/mnt/d/Program Files (x86)/RobotVisionSuite/runtime/DepthToRobotTCP.txt"
+  ],
+  "reference_frame": "flange; the calibration's own frame is the camera OPTICAL frame and its numbers are metres/radians (cross-checked against the mm/deg encoding)",
+  "frame_chain": "T_base_cam = T_base_tcp @ T_tcp_cam, with T_base_tcp from /tcp_pose_broadcaster/pose (frame 'base') and T_tcp_cam = inv(T_flange_tcp) @ T_flange_cam_color_optical",
+  "camera_frame": "camera_color_optical_frame",
+  "note": "Do not hand-edit: regenerate with scripts/sync_real_handeye.py. A hand-written value here (camera 50 mm from the TCP, 45 deg tilt) disagreed with the calibration by 135 deg / 0.34 m and put every base-frame target about 1.4 m off.",
+  "T_flange_tcp": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      -0.046
+    ],
+    [
+      0.0,
+      1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0,
+      0.353
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "T_flange_cam_color_optical": [
+    [
+      -0.012874762188,
+      0.999916978378,
+      0.000526165878,
+      0.09695
+    ],
+    [
+      -0.999823229143,
+      -0.012866340685,
+      -0.013710132853,
+      0.042212
+    ],
+    [
+      -0.013702224786,
+      -0.000702587567,
+      0.999905873273,
+      0.09754
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "T_tcp_cam": [
+    [
+      -0.012874762188,
+      0.999916978378,
+      0.000526165878,
+      0.14295
+    ],
+    [
+      -0.999823229143,
+      -0.012866340685,
+      -0.013710132853,
+      0.042212
+    ],
+    [
+      -0.013702224786,
+      -0.000702587567,
+      0.999905873273,
+      -0.25546
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "calibration_color_optical_in_flange": [
+    0.09695,
+    0.042212,
+    0.09754,
+    3.14089,
+    3.12789,
+    1.55792
+  ]
+}

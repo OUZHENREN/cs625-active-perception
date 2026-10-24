@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<!--
+  Real slot fixture (真机插槽夹具) for the CS625 insertion task.
+
+  Geometry provenance: the RobotVisionSuite export `slot_pointcloud.STL`
+  (ASCII STL, mm, 96,760 faces), decimated to 60,000 faces by
+  `scripts/build_fixture_collision_mesh.py` and converted to metres.  That mesh
+  is the only candidate whose slot width (0.457 m) and slot centre match the
+  real RGB-D reconstruction; see `scripts/analyze_fixture_geometry.py`.
+
+  Frame: the RobotVisionSuite MODEL frame, which is the frame `slot_origin` /
+  `slot_origin_q` in `config/tasks/common.yaml` was calibrated in.  The model
+  origin is NOT the part centre.
+
+  Bounding box (-0.1773, -0.5655, -0.5077) to (0.0227, 0.1795, 0.0000) m.
+
+  The slot is a vertical wedge channel: 0.457 m wide at the bottom, 0.445 m at
+  the top, about 0.40 m deep, open at the top and at -x.  A box decomposition
+  would close the channel, so the collision body must stay a mesh.  Being
+  static, the mesh costs nothing at runtime.
+
+  The fixture origin sits at the top of the frame; the bottom flange therefore
+  reaches ~24 mm below the measured slot-table surface (z=-0.0407).  This is
+  the calibration itself, not an alignment error: placing the origin at
+  `slot_origin` puts the measured top (z≈0.441) and the wedge walls exactly
+  where the RGB-D cloud shows them, and puts the insertion path in the middle
+  of the slot (0.2 mm).
+-->
+<sdf version="1.9">
+  <model name="slot_fixture">
+    <static>true</static>
+    <link name="slot_fixture_link">
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://cs625_real_cell/slot_fixture/meshes/slot_fixture_collision.stl</uri>
+          </mesh>
+        </geometry>
+        <surface>
+          <friction>
+            <ode><mu>0.4</mu><mu2>0.4</mu2></ode>
+          </friction>
+        </surface>
+      </collision>
+
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://cs625_real_cell/slot_fixture/meshes/slot_fixture_collision.stl</uri>
+          </mesh>
+        </geometry>
+        <material>
+          <ambient>0.62 0.63 0.66 1</ambient>
+          <diffuse>0.72 0.73 0.76 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

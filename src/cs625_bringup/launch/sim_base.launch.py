@@ -27,6 +27,7 @@ from launch.substitutions import (
     LaunchConfiguration,
     PathJoinSubstitution,
 )
+from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -79,9 +80,23 @@ def _compose(context):
                     "prefix": LaunchConfiguration("prefix"),
                     "world_file": LaunchConfiguration("world"),
                     "headless": LaunchConfiguration("headless"),
+                    # camera_rate_hz is this profile's name; sim_control keeps the
+                    # xacro-facing name camera_update_rate (it is literally the
+                    # Gazebo <update_rate>).
+                    "camera_rate_hz": LaunchConfiguration("camera_rate_hz"),
                     "camera_image_width": LaunchConfiguration("camera_image_width"),
                     "camera_image_height": LaunchConfiguration("camera_image_height"),
-                    "camera_update_rate": LaunchConfiguration("camera_update_rate"),
+                    "camera_horizontal_fov_deg": LaunchConfiguration(
+                        "camera_horizontal_fov_deg"
+                    ),
+                    "camera_fx": LaunchConfiguration("camera_fx"),
+                    "camera_fy": LaunchConfiguration("camera_fy"),
+                    "camera_cx": LaunchConfiguration("camera_cx"),
+                    "camera_cy": LaunchConfiguration("camera_cy"),
+                    "camera_clip_near": LaunchConfiguration("camera_clip_near"),
+                    "camera_clip_far": LaunchConfiguration("camera_clip_far"),
+                    "camera_noise_mean": LaunchConfiguration("camera_noise_mean"),
+                    "camera_noise_stddev": LaunchConfiguration("camera_noise_stddev"),
                     "camera_enabled": LaunchConfiguration("camera_enabled"),
                     "gazebo_visuals": LaunchConfiguration("gazebo_visuals"),
                     "gazebo_model_file": LaunchConfiguration("gazebo_model_file"),
@@ -185,6 +200,30 @@ def _compose(context):
                     "simulation sensor adapter is disabled until Gazebo source "
                     "topics are verified and supplied."
                 )
+            )
+        )
+
+    # Real-topic alias, so the same commands work in simulation and on the cell.
+    # The Percipio driver publishes /camera/color/image_raw, /camera/depth/image_raw
+    # and /camera/color/camera_info; the bridge above deliberately presents the
+    # Gazebo sensor as /sim/camera/* so the adapter stays brand-neutral.  This
+    # second, read-only bridge exports the three real names from the same Gazebo
+    # topics.  It publishes no TF and is not part of the normalized
+    # /sensors/camera/* contract; it exists so a real-cell frame capture or a
+    # ``ros2 topic hz`` check can be replayed unchanged in simulation.
+    if camera_enabled == "true":
+        actions.append(
+            Node(
+                package="ros_gz_bridge",
+                executable="parameter_bridge",
+                name="cs625_sim_real_topic_alias",
+                output="screen",
+                arguments=[
+                    "/camera/color/image_raw@sensor_msgs/msg/Image[gz.msgs.Image",
+                    "/camera/depth/image_raw@sensor_msgs/msg/Image[gz.msgs.Image",
+                    "/camera/color/camera_info"
+                    "@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo",
+                ],
             )
         )
     return actions
@@ -316,9 +355,47 @@ def generate_launch_description():
         DeclareLaunchArgument("moveit_controllers_file", default_value="cs625_moveit_controllers.yaml", description="Reused MoveIt trajectory/controller configuration."),
         DeclareLaunchArgument("moveit_sensors_config", default_value=moveit_sensors_default, description="Normalized point-cloud configuration for MoveIt scene updates."),
         DeclareLaunchArgument("headless", default_value="false", description="Run Gazebo without GUI. WSL2/GPU: false; VMware headless: true (Xvfb+ogre1 fallback)."),
-        DeclareLaunchArgument("camera_image_width", default_value="320", description="Eye-in-hand RGB-D image width for the sim profile."),
-        DeclareLaunchArgument("camera_image_height", default_value="240", description="Eye-in-hand RGB-D image height for the sim profile."),
-        DeclareLaunchArgument("camera_update_rate", default_value="10.0", description="Eye-in-hand RGB-D update rate in Hz for the sim profile."),
+        DeclareLaunchArgument("camera_image_width", default_value="1280",
+                              description="Eye-in-hand RGB-D image width for the sim profile "
+                                          "(matches the real camera: 1280x960)."),
+        DeclareLaunchArgument("camera_image_height", default_value="960",
+                              description="Eye-in-hand RGB-D image height for the sim profile."),
+        # This block is the single place where the simulation profile spells out
+        # the measured camera.  The real numbers come from
+        # config/real/camera_intrinsics.json (read from /camera/color/camera_info
+        # on 2026-10-24) and from the bench frame-rate measurement (0.79 fps for
+        # colour+depth at 1280x960, 0.797 fps at 640x480, 23 fps colour-only):
+        # the depth stream is the bottleneck, not the resolution.
+        DeclareLaunchArgument("camera_rate_hz", default_value="1.0",
+                              description="Eye-in-hand RGB-D update rate in Hz. The real "
+                                          "cell measures 0.79 fps because the depth stream is "
+                                          "the bottleneck; 1 Hz is chosen to reproduce the "
+                                          "\"observation phases must wait for a new frame\" "
+                                          "timing, not to look good. Passed to the xacro as "
+                                          "camera_update_rate."),
+        DeclareLaunchArgument("camera_horizontal_fov_deg", default_value="68.98",
+                              description="Horizontal FOV 2*atan(640/931.47) of the real "
+                                          "camera; documentation value, the intrinsics below "
+                                          "set the projection."),
+        DeclareLaunchArgument("camera_fx", default_value="931.47",
+                              description="Measured focal length x in pixels at 1280x960."),
+        DeclareLaunchArgument("camera_fy", default_value="931.60",
+                              description="Measured focal length y in pixels at 1280x960."),
+        DeclareLaunchArgument("camera_cx", default_value="648.70",
+                              description="Measured principal point x (8.7 px right of centre)."),
+        DeclareLaunchArgument("camera_cy", default_value="449.32",
+                              description="Measured principal point y (30.7 px above centre)."),
+        DeclareLaunchArgument("camera_clip_near", default_value="0.2",
+                              description="RGB-D near clip in metres (real PS800-E1 is "
+                                          "unusable closer than ~0.2 m)."),
+        DeclareLaunchArgument("camera_clip_far", default_value="3.0",
+                              description="RGB-D far clip in metres (the task never looks "
+                                          "further than 3 m)."),
+        DeclareLaunchArgument("camera_noise_mean", default_value="0.0",
+                              description="Depth Gaussian noise mean in metres."),
+        DeclareLaunchArgument("camera_noise_stddev", default_value="0.003",
+                              description="Depth Gaussian noise sigma in metres; the real "
+                                          "ICP residual on metal parts is 3-4 mm."),
         DeclareLaunchArgument("gazebo_model_file", default_value="/tmp/cs625_active_perception_gazebo_model.urdf", description="Generated visual-mesh-free URDF used only by Gazebo."),
         DeclareLaunchArgument("official_sim_launch", default_value="", description="Pinned official CS625 simulation launch path; empty means not connected."),
     ]

@@ -1,0 +1,120 @@
+<?xml version="1.0"?>
+<!--
+  CS625 真机对齐世界（由 scripts/build_sim_world.py 从实测数据生成，勿手改）。
+
+  与旧的 cs625_insertion_scene.sdf 的区别：旧世界是 SolidWorks 装配系，夹具在
+  (-0.85, 0.49)、工件在 (-0.51, -0.81)，没有桌面；本世界直接按真机点云拟合的
+  世界系重配，因此位姿与真机实测可比。
+
+  数据来源：
+    - 环境模型 runtime/environment/20261024_122523/model.json（真机实测点云拟合）
+    - 槽位 config/tasks/common.yaml slot_origin / slot_origin_q（RobotVisionSuite 标定）
+    - 模型 bbox 来自 model.sdf 引用的 STL 顶点极值
+
+  几何口径（重要）：
+    - 工件桌：顶面 z=-0.09097 m，xy x[0.260, 1.180]
+      y[0.280, 1.080]；盒子从地面顶面 z=-0.200 长到桌面。
+    - 插槽桌：顶面 z=-0.04073 m，xy x[0.780, 1.700]
+      y[-0.280, 0.640]。
+    - 两张桌子的盒子在 xy 上重叠 x[0.780, 1.180] y[0.280, 0.640]，重叠区允许两个盒子叠在一起。
+    - 夹具：模型 origin = slot_origin（RobotVisionSuite 对这块真机网格的标定），只转 yaw。
+      模型 origin 不在零件中心，bbox 中心因此偏离 slot_origin
+      0.3281 m，这是坐标系的定义，不是对齐误差；底部法兰落在
+      插槽桌顶面以下 23.7 mm。
+    - 工件：直接使用实测 CAD 位姿（模型系 == CAD 系，已用 bbox 中心和 CAD 中心核验），
+      不按 bbox 摆。工件 bbox 底面比工件桌顶面低 14.8 mm，这是实测位姿本身带出来的，
+      不是对齐误差；若要当动力学体生成，需另抬这 14.8 mm 才不穿模。
+-->
+<sdf version="1.9">
+  <world name="cs625_real_cell">
+    <physics name="cs625_task_physics" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin filename="ignition-gazebo-physics-system" name="gz::sim::systems::Physics"/>
+    <plugin filename="ignition-gazebo-sensors-system" name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+    <plugin filename="ignition-gazebo-user-commands-system" name="gz::sim::systems::UserCommands"/>
+    <plugin filename="ignition-gazebo-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
+    <plugin filename="gz-sim-contact-system" name="gz::sim::systems::Contact"/>
+
+    <light type="directional" name="sun">
+      <pose>0 0 5 0 0 0</pose>
+      <diffuse>1.0 1.0 1.0 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <!-- 地面：旧世界写法的地面，但顶面放在 z=-0.200。
+         真机实测两张桌面在 z=-0.091 / -0.041，都在机械臂基座安装面
+         (base_link, z=0) 以下；地面若留在 z=0 会把桌子埋掉。 -->
+    <model name="ground_plane">
+      <static>true</static>
+      <pose>0 0 -0.250000 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>10 10 0.1</size></box></geometry>
+        </collision>
+        <sensor name="task_ground_contact" type="contact">
+          <contact><collision>collision</collision></contact>
+          <always_on>true</always_on>
+          <update_rate>100</update_rate>
+          <topic>/cs625_task/contacts/ground</topic>
+        </sensor>
+        <visual name="visual">
+          <geometry><box><size>10 10 0.1</size></box></geometry>
+          <material><ambient>0.25 0.25 0.27 1</ambient><diffuse>0.35 0.35 0.38 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 工件桌：实测 xy 范围 + 顶面 z=-0.09097，盒子向下长到地面。 -->
+    <model name="workpiece_table">
+      <static>true</static>
+      <pose>0.720000000 0.680000000 -0.145485000 0.000000000 0.000000000 0.000000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.920000 0.800000 0.109030</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.920000 0.800000 0.109030</size></box></geometry>
+          <material><ambient>0.55 0.45 0.32 1</ambient><diffuse>0.62 0.52 0.38 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 插槽桌：顶面 z=-0.04073。 -->
+    <model name="slot_table">
+      <static>true</static>
+      <pose>1.240000000 0.180000000 -0.120365000 0.000000000 0.000000000 0.000000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.920000 0.920000 0.159270</size></box></geometry>
+          <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.920000 0.920000 0.159270</size></box></geometry>
+          <material><ambient>0.40 0.42 0.46 1</ambient><diffuse>0.48 0.50 0.54 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 夹具：模型 origin = slot_origin（真机网格标定系），只转 yaw。static。 -->
+    <include>
+      <uri>model://cs625_real_cell/slot_fixture</uri>
+      <name>slot_fixture</name>
+      <static>true</static>
+      <pose>1.241629000 0.181709000 0.443245000 0.000000000 0.000000000 0.006754424</pose>
+    </include>
+
+    <!-- 工件：实测 CAD 位姿原样（xyz + quat 转 rpy），非 bbox 对齐。 -->
+    <include>
+      <uri>model://cs625_task/shielding_module</uri>
+      <name>shielding_module</name>
+      <pose>0.502900000 0.635100000 0.125400000 3.140460140 -0.014075048 2.757242828</pose>
+    </include>
+  </world>
+</sdf>

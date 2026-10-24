@@ -53,6 +53,49 @@ if [[ -z "${destination_directory}" ]]; then
 fi
 
 if [[ ! -d "${destination_directory}" ]]; then
+  # The vault usually lives on a WSL-unmounted Windows drive (G:), so the native
+  # path above does not exist inside WSL even though the vault is perfectly
+  # reachable.  Rather than failing, hand the copy to Windows PowerShell, which
+  # reads the file straight out of the distribution (\\wsl.localhost\...).  The
+  # Windows path is derived from the same configured value, so there is still one
+  # place to edit when the vault moves.
+  if command -v powershell.exe >/dev/null 2>&1 && command -v wslpath >/dev/null 2>&1 \
+     && [[ "${destination_directory}" =~ ^/mnt/([a-zA-Z])/(.*)$ ]]; then
+    drive="${BASH_REMATCH[1]^^}"
+    rest="${BASH_REMATCH[2]}"
+    windows_directory="${drive}:\\${rest//\//\\}"
+    windows_source="$(wslpath -w "${source_file}")"
+    windows_destination="${windows_directory}\\${base_name}"
+
+    ps1="$(mktemp --suffix=.ps1)"
+    trap 'rm -f "${ps1}"' EXIT
+    {
+      printf '\xef\xbb\xbf'          # BOM: Windows PowerShell 5.1 needs it for UTF-8
+      printf '$ErrorActionPreference = "Stop"\n'
+      printf '$src = %s\n' "'${windows_source//\'/\'\'}'"
+      printf '$dst = %s\n' "'${windows_destination//\'/\'\'}'"
+      printf 'if (-not (Test-Path -LiteralPath (Split-Path -Parent $dst))) {\n'
+      printf '  Write-Output ("ERROR: Obsidian work-log directory does not exist: " + (Split-Path -Parent $dst))\n'
+      printf '  exit 4\n'
+      printf '}\n'
+      printf 'Copy-Item -LiteralPath $src -Destination $dst -Force\n'
+      printf '$a = (Get-FileHash -LiteralPath $src -Algorithm SHA256).Hash\n'
+      printf '$b = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash\n'
+      printf 'if ($a -ne $b) { Write-Output "ERROR: checksum mismatch after copying"; exit 5 }\n'
+      printf 'Write-Output ("synced: " + $dst)\n'
+      printf 'Write-Output ("sha256: " + $b)\n'
+    } >"${ps1}"
+
+    echo "vault drive is not mounted in WSL; copying through Windows PowerShell"
+    if ! powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$(wslpath -w "${ps1}")" \
+         | tr -d '\r'; then
+      die "PowerShell copy of ${base_name} failed"
+    fi
+    echo "  from ${source_file}"
+    echo "  to   ${windows_destination}"
+    exit 0
+  fi
+
   {
     echo "ERROR: Obsidian work-log directory does not exist:"
     echo "       ${destination_directory}"

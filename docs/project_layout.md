@@ -27,7 +27,7 @@ ignored by Git and may be moved to the local archive when the root gets noisy.
 ## ROS 2 packages
 
 This table is the single detailed source for the package structure.  It must
-match `colcon list` exactly: **11 packages**, no more and no fewer.  Other
+match `colcon list` exactly: **12 packages**, no more and no fewer.  Other
 documents (including `README.md` and `AGENTS.md`) reference this file instead of
 maintaining their own lists.
 
@@ -38,10 +38,11 @@ maintaining their own lists.
 | `cs625_bringup` | `ament_cmake` | launch composition and profile-specific runtime configuration |
 | `cs625_experiment_tools` | `ament_python` | matrix summaries, paired experiments and metrics export |
 | `cs625_motion_adapter` | `ament_python` | TF conversion, IK, MoveIt planning and execution adapters |
+| `cs625_rviz_panel` | `ament_cmake` | RViz2 dockable panel: the six task modes as buttons (2026-10-24) |
 | `cs625_sensor_adapter` | `ament_python` | simulation/real sensor topic normalization |
 | `cs625_simulation` | `ament_cmake` | Gazebo worlds, YCB assets and simulation-only resources |
 | `cs625_target_perception` | `ament_python` | target pose and localization quality interface layer |
-| `cs625_task_orchestrator` | `ament_python` | P7 grasp evidence, task receipts and atomic episode helpers |
+| `cs625_task_orchestrator` | `ament_python` | P7 grasp evidence, task receipts, atomic episode helpers, P4 vision/plan failure retry and re-observation request |
 | `cs625_view_evaluation` | `ament_python` | view scoring, strategy selection and P4 episode coordination |
 | `cs625_view_generation` | `ament_python` | candidate view generation |
 
