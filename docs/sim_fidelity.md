@@ -11,8 +11,8 @@
 | 两张桌面 | 顶面 z 差值 **0.00 mm**（由实测点云生成） | PASS |
 | 插槽夹具 | 碰撞网格与相机实测点云：中位 **4.95 mm**、p90 17.2 mm、73.6% 表面在 10 mm 内 | PASS（≈5 mm 级） |
 | 工件 | 网格 vs 点云中位 12.45 mm（点云含桌面背景，未严格配准） | PARTIAL |
-| 相机内参 | 已改为真机 1280×960、水平 FOV 68.9°（由 fx 931.47 反算） | 代码已改，**运行时未复核**（本机 Gazebo 反复被终止） |
-| 相机帧率 | 已设 1 Hz（真机实测 0.79 fps） | 代码已改，运行时未复核 |
+| 相机内参 | 1280×960，fx 931.47 / fy 931.60 / cx 648.70 / cy 449.32 | 仿真实测 K 与真机逐个差 ≤0.005 px（<0.001%） | PASS（§4 运行时复核） |
+| 相机帧率 | 0.79 fps（1280×960 彩色+深度） | 配置 1 Hz；空闲时间片下帧间隔 1.00–1.02 s，本机被别的会话抢占时 70 s 平均 0.28 Hz | PARTIAL（§4） |
 | 相机安装位 | 用 RVS 手眼链：`camera_link` = 深度眼，`camera_color_xyz` = 彩色眼 24.4 mm 基线；传感器渲染在**彩色眼** | PARTIAL（见 §4） |
 | 夹爪行程/几何 | 行程已对齐到 CAD 实测的 246.57 mm 外撑跨距，质量改为**标注估算值**（不是实测） | PARTIAL（见 §8；`position_mm`↔跨距仍缺标定） |
 | 动力学/接触/力 | 无 F/T、无摩擦模型、无真实伺服 | NOT MODELED |
@@ -71,7 +71,7 @@ NO_COLLISION_CHECK_PHASES    = 上面这些 + d2b_entrance_tilted             �
 | 项目 | 真机 | 仿真（当前代码） | 说明 |
 |---|---|---|---|
 | 分辨率 | 1280×960 | 1280×960 | xacro + launch 默认已改 |
-| 水平 FOV | 68.9°（fx 931.47） | 1.20274 rad = 68.9° | 由真机内参反算，不再用 vendor 的 60° |
+| 水平 FOV | 68.98°（2·atan(640/931.47)） | `camera_horizontal_fov_deg=68.98` → 1.20393 rad | 由真机内参反算，不再用 vendor 的 60°；K 由 `<lens><intrinsics>` 直接给 |
 | 帧率 | 0.79 fps（深度流是瓶颈） | `camera_update_rate=1.0` | 用 1 Hz 复现"观测要等新帧" |
 | 深度噪声 | 金属件 3~4 mm 散布 + 约 25% 空洞 | Gaussian σ=3 mm；**空洞不模拟** | 空洞是渲染限制，不伪造 |
 | 相机位姿 | `T_tcp_cam`（彩色光心，距 TCP 0.2958 m） | `camera_link`=深度眼（`camera_extrinsics_sim.yaml`），彩色眼由 `camera_color_xyz` 偏置 24.4 mm；**渲染传感器移到彩色眼** | 见下 |
@@ -81,16 +81,62 @@ NO_COLLISION_CHECK_PHASES    = 上面这些 + d2b_entrance_tilted             �
 放在彩色眼才与真机发布的图像一致；代价是仿真深度也来自彩色眼（真机是两路独立后配准），
 这一项标 PARTIAL。
 
-**未验证**：本次会话里 Gazebo 实例反复被（并发的其他会话/清理动作）终止，
-`/camera/color/camera_info` 的 K 矩阵与实测帧率没有在稳定实例上复核。复核方法：
+**运行时复核（2026-10-24 22:05–22:15，`ROS_DOMAIN_ID=63` 隔离，未与真机相机抢 `/camera/*`）**：
 
 ```bash
-ROS_DOMAIN_ID=63 GZ_PARTITION=cs625sim \
+ROS_DOMAIN_ID=63 CS625_GZ_PARTITION=cs625_cam_align \
   ros2 launch cs625_bringup sim_cell.launch.py headless:=true launch_rviz:=false
 # 等 90 s 后
-ros2 topic echo /camera/color/camera_info --once      # 期望 fx≈931.5 fy≈931.6 cx≈648.7 cy≈449.3
-ros2 topic hz /camera/color/image_raw                 # 期望 ≈1 Hz
+ros2 topic echo /camera/color/camera_info --once      # 对照 fx/fy/cx/cy
+ros2 topic hz /camera/color/image_raw --window 10     # 帧率
 ```
+
+| 项目 | 真机（A 级） | 仿真实测 | 差 | 结论 |
+|---|---|---|---|---|
+| 分辨率 | 1280×960 | 1280×960 | 0 | PASS |
+| fx | 931.4731 | 931.4700 | −0.003 px (−0.0003%) | PASS |
+| fy | 931.5953 | 931.6000 | +0.005 px (+0.0005%) | PASS |
+| cx | 648.6953 | 648.7000 | +0.005 px (+0.0007%) | PASS |
+| cy | 449.3193 | 449.3200 | +0.001 px (+0.0002%) | PASS |
+| 水平 / 垂直 FOV | 68.98° / 54.52° | 68.98° / 54.52° | 0 | PASS |
+| 帧率 | 0.79 fps | 配置 1 Hz；70 s 实测 19 帧 = **0.279 Hz**，帧间隔 min/中位 **1.00 / 2.02 s** | — | PARTIAL（见下） |
+| 深度噪声 σ | 3~4 mm（ICP 中位残差） | 实测 **3.01 mm**（两帧差分 ÷√2） | +0.01 mm | PASS |
+| 深度有效比例 | ~75%（金属件视角） | 40.45%（59.5% 像素超出 3 m clip） | 不可直接比 | PARTIAL |
+| 深度编码 | uint16 mm | 32FC1 米 | 单位不同 | FAIL（差异，见下） |
+| P 矩阵 | 未读到（驱动当晚离线） | `[931.554,0,640; 0,931.554,480]` | — | PARTIAL |
+
+K 为什么能精确：Harmonic 的 `<camera><lens><intrinsics>` 会直接写进
+`sensor_msgs/CameraInfo`；只写 `<horizontal_fov>` 时 cx/cy 会退化成图像中心 640/480
+（cy 差 30.7 px = 6.8%）。`/camera/color/camera_info --once` 的原始输出：
+
+```text
+k: [931.47, 0.0, 648.7, 0.0, 931.6, 449.32, 0.0, 0.0, 1.0]
+p: [931.5540447642347, 0.0, 640.0, 0.0, 0.0, 931.5540447642345, 480.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+```
+
+帧率 PARTIAL 的原因：1 Hz 是配置值，`update_rate` 确实生效（有空闲 CPU 时帧间隔就是
+1.00–1.02 s）；本机同时跑着 4 个 Gazebo（别的会话）+ MoveIt + llvmpipe 软件渲染
+（load average ≈22 / 24 核），渲染线程被抢占时出现 4–13 s 停顿，70 s 平均被拉低到 0.28 Hz。
+这不是参数问题，稳定 1 Hz 要在空闲机器上复测。
+
+深度一帧统计（`/camera/depth/image_raw`）：1280×960、32FC1、有效 40.45%（497023/1228800）、
+中位 **0.863 m**、p5/p95 0.531/2.302 m、min/max 0.4975/2.9759 m（clip 0.2–3.0 m 内）。
+有效比例低于真机 75% 的原因不是噪声，而是视野里 59.5% 像素超过 3 m；同时仿真**没有**
+金属反射造成的深度失效（`<noise>` 只加高斯，不产生空洞）。**单位不同**：真机深度是
+uint16 mm，仿真桥接后是 32FC1 米，`sensor_adapter` 原样转发，下游按 mm 假设会差 1000 倍。
+
+**安装位（`parent_frame → child_frame`）**：URDF 里的 `tool0 → camera_link` 不是
+`T_tcp_cam` 本身，因为 `tool0` 就是法兰、不是控制器 TCP；两者关系已核算：
+
+```text
+tool0 -> camera_link            (0.096754, 0.017803, 0.097328) m   = 深度眼
+tool0 -> camera_color_optical   (0.096950, 0.042212, 0.097540) m   = T_flange_cam_color_optical
+T_tcp_cam = inv(T_flange_tcp) @ T_tool0_cam_color                  |t| = 0.295764 m
+平移差 0.000 mm，旋转差 3.8e-5 deg，与 config/handeye/tcp_to_camera.json 数值一致
+```
+
+注意：把渲染传感器挪到彩色眼时 `<pose>` **只能平移**，不能带 `color_rpy`：那是光学系
+旋转，直接当传感器姿态会让相机歪 90°（传感器 +X 变成 camera_link −Y）。
 
 > 注意：**真机相机与仿真相机默认都在 ROS_DOMAIN_ID=0**，会同时发布 `/camera/*`。
 > 验证仿真相机时必须用独立 `ROS_DOMAIN_ID`（例如 63）并配 `GZ_PARTITION`。
