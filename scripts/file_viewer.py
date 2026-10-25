@@ -255,6 +255,42 @@ class ViewerHandler(BaseHTTPRequestHandler):
         sys.stderr.write("%s  %s\n" % (time.strftime("%H:%M:%S"), fmt % args))
 
 
+def _already_ours(host: str, port: int) -> bool:
+    """Is something on this port already a CS625 file viewer?"""
+    import urllib.request
+
+    try:
+        with urllib.request.urlopen(f"http://{host}:{port}/", timeout=2) as response:
+            body = response.read(4096).decode("utf-8", "replace")
+    except Exception:  # noqa: BLE001 - any failure means "not a healthy viewer"
+        return False
+    return "CS625 文件查看器" in body
+
+
+def _bind_or_explain(host: str, port: int, root: pathlib.Path):
+    """Bind the port; if it is taken, say what to do instead of dumping a traceback.
+
+    Starting the VS Code task while a viewer is already running used to fail with
+    OSError(98).  That is not an error worth a traceback: the useful answer is
+    either "already running, open this URL" or "try the next free port".
+    """
+    for candidate in (port, port + 1, port + 2):
+        try:
+            return ThreadingHTTPServer((host, candidate), ViewerHandler)
+        except OSError as exc:
+            if getattr(exc, "errno", None) != 98:
+                raise
+            if _already_ours(host, candidate):
+                print(f"CS625 文件查看器已经在 {host}:{candidate} 上运行："
+                      f"http://{host}:{candidate}/")
+                print("  （无需再启动；要换根目录请先停掉原来那个）")
+                return None
+            print(f"端口 {candidate} 被其它程序占用，尝试下一个 ...")
+    raise SystemExit(
+        f"{host}:{port}~{port + 2} 都被占用。换一个端口："
+        f"python3 scripts/file_viewer.py --port {port + 10}")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -271,7 +307,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"目录不存在：{root}", file=sys.stderr)
         return 2
     ViewerHandler.root = root
-    server = ThreadingHTTPServer((args.host, args.port), ViewerHandler)
+    server = _bind_or_explain(args.host, args.port, root)
+    if server is None:
+        return 0
     url = f"http://{args.host}:{args.port}/"
     print(f"CS625 文件查看器: {url}")
     print(f"  根目录 : {root}")
