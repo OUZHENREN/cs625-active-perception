@@ -40,7 +40,7 @@
                                                     chosen by the task owner
                                                     (see config/cs625_task_scene.yaml,
                                                     interference_fit: none_zero_preload).
-      j = 0.021285     outer-face span 246.570 mm   = SolidWorks measured span
+      j = 0.021285     pad displacement (NOT the gripper opening)
                                                     between the tool's two
                                                     parallel arm faces
                                                     (cs625_task_scene.yaml,
@@ -50,6 +50,12 @@
 
       span_outer_mm(j) = 204.0 + 2000.0 * j        (j in metres)
       j(span_outer_mm) = (span_outer_mm - 204.0) / 2000.0
+
+    Read the number carefully: the real gripper opens 50 mm in total (owner,
+    verified on the hardware).  This joint does NOT model that opening - it models
+    how far each support pad moves outwards when the brace linkage converts the
+    50 mm stroke, i.e. (246.570 - 204.000) / 2 = 21.285 mm per pad.  The brace
+    ratio is therefore 42.57/50 = 0.8514 (span per mm of opening).
 
     The upper limit was 0.020, which is the zero-preload contact, i.e. the model
     stopped 2.57 mm short of the measured full aperture.  It is now 0.021285 so
