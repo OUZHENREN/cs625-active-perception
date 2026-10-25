@@ -2177,3 +2177,24 @@ full/safe 57/57 · full/efficient 57/57          单测 185 passed
 ```
 
 详细工作日志：docs/worklogs/2026-10-24_WORKLOG_SIX_MODES_ACCEPTANCE.md
+
+
+## 125. 2026-10-25 夜：仿真真正跑起来 + 用真机记录定义仿真场景
+
+### 一句话
+工件碰撞体从"实心块"改成"扶手凹槽"后，仿真能零误差回放真机轨迹；
+六模式只规划全过；仿真执行 13/19（剩 pre_grasp/grasp/staging/pre_insert）。
+真机仍不可达。
+
+### 必须记住的三件事
+1. **dartsim 不支持 SDF mesh 碰撞**：机械臂 9 个 link、夹爪本体、夹具、桌子在 Gazebo 里
+   都没有碰撞体（mesh 被静默建成空）。所以"仿真验证碰撞安全"目前只对 box/cylinder 有效。
+   用 mesh 当工件碰撞体时轨迹会"通过"但 effort 恒 0 —— 等于把工件删了，别被骗。
+2. **夹爪三个数别混**：开度 50 mm（硬件）、两臂跨距 204.00→246.57 mm（连杆比 0.8514）、
+   URDF 关节 = 单侧垫块位移 0→21.285 mm。
+3. **中转点 0.95,0.45,0.55**（装入/取出共用，朝向 [-0.4835,0.8753,0.0075,0.0018]）；
+   原始 z=0.35 带工件无解，抬到 0.55 后真机 4 段全成功。
+
+### 权威文档
+docs/sim_scene_from_real_runs.md（场景定义）、docs/real_run_reference.md（49 条真机轨迹）、
+docs/sim_fidelity.md（保真度）、docs/worklogs/2026-10-25_HANDOFF_SIM_REAL_ALIGNMENT.md（交接）
