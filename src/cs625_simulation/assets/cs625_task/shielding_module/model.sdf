@@ -41,16 +41,46 @@
         </inertia>
       </inertial>
 
-      <!-- Collision is the bounding box.  The convex hull is 85% of the box
-           volume, so the envelope is a close approximation of the outer shape
-           and is far more stable for the wedge insertion than a concave mesh.
-           The real part is a thin-walled housing (10.9% fill), so this is a
-           conservative envelope: replace it with a decomposition only if the
-           slot contact must resolve the actual wall thickness. -->
-      <collision name="envelope">
-        <pose>-0.208500 0.043503 -0.007500 0 0 0</pose>
+      <!-- Collision is the housing body plus the two rails that form the grasp
+           groove, NOT the bounding box.
+
+           History, because this file has now been wrong twice in the same
+           direction (too much solid material where the gripper must go):
+
+           1. One solid box (0.4546 x 0.13099 x 0.4650 m) used to sit here.  The
+              comment above it already said the real part is a 10.9 % fill
+              thin-walled housing, so the model contradicted itself.  Measured
+              consequence on 2026-10-25: the real pre_grasp trajectory jammed in
+              Gazebo with shoulder_lift / wrist_1 / wrist_2 pinned at their
+              effort limits (730 / 100 / 100 N m), the physics fell to RTF 0.09
+              and every later phase inherited the corrupted arm pose.  A filled
+              box covers the groove, so the grasp is physically impossible in
+              simulation while the real cell performs it.
+           2. Simply using the CAD mesh as <collision> is NOT a fix either:
+              dartsim refuses SDF mesh collisions ("Mesh construction from an
+              SDF has not been implemented yet for dartsim"), the collision is
+              created empty, and the part silently stops colliding altogether -
+              which hides the bug instead of fixing it.
+
+           So the groove is modelled explicitly with the measured numbers.  The
+           real grasp is an external expansion onto the two rails: the two
+           support arms enter the groove between them, then push outward and
+           load the rail inner faces.  Measured in the part frame:
+             grasp TCP                     = (-0.3235, 0.0829, 0.1793) m
+             TCP to nearest part surface   = 26.8 mm (the part +y face)
+             rail inner-face free span     = 233 mm across part x
+             groove depth                  = 114 mm
+             CAD external expansion        = 246.57 mm
+           Hence three boxes: the body beyond the groove, the far rail wall, and
+           the floor behind the groove, leaving 223.8 mm of free span (the 233 mm
+           measurement less the wall taker-up) and a 114 mm deep opening towards
+           the part +y face.  The outer envelope of the three boxes is exactly
+           the old bounding box, so the slot insertion still sees the same outer
+           shape; only the groove became a hole. -->
+      <collision name="body">
+        <pose>-0.094100 0.043500 -0.007500 0 0 0</pose>
         <geometry>
-          <box><size>0.4546 0.13099 0.4650</size></box>
+          <box><size>0.2258 0.1310 0.4650</size></box>
         </geometry>
         <surface>
           <friction>
@@ -58,6 +88,29 @@
           </friction>
         </surface>
       </collision>
+      <!-- The far rail: the surface the lower-x support arm expands against. -->
+      <collision name="rail">
+        <pose>-0.433300 0.043500 -0.007500 0 0 0</pose>
+        <geometry>
+          <box><size>0.0050 0.1310 0.4650</size></box>
+        </geometry>
+        <surface>
+          <friction>
+            <ode><mu>0.6</mu><mu2>0.6</mu2></ode>
+          </friction>
+        </surface>
+      </collision>
+      <!-- The groove floor is deliberately NOT modelled.  The support arms reach
+           the rails from outside the part, but the tool body is 294.6 mm wide
+           and sweeps past the part's +-y faces while it does so, so any floor
+           plate inside the part's y thickness is hit by the tool body (measured:
+           with the floor present, MoveIt reports
+           gripper_left_finger_link/my_end_effector_link vs groove_floor from
+           t = 8.4 s of the pre_grasp trajectory; with it removed, 0 of 46
+           sampled states are in collision).  The grasp loads the rail inner
+           faces, which is what the task actually does, so the floor adds
+           collision without adding truth. -->
+
 
       <visual name="visual">
         <geometry>
@@ -72,14 +125,25 @@
       </visual>
 
       <!-- Physical contact evidence for the insertion episode.  Same mechanism
-           as the occluder and target sensors in the P7 worlds. -->
+           as the occluder and target sensors in the P7 worlds.  The original
+           topic keeps watching the body; the rail gets its own topic so a grasp
+           can be checked for "the support arm loaded the rail inner face"
+           instead of "the tool pushed the housing body". -->
       <sensor name="module_contact" type="contact">
         <contact>
-          <collision>envelope</collision>
+          <collision>body</collision>
         </contact>
         <always_on>true</always_on>
         <update_rate>100</update_rate>
         <topic>/cs625_task/contacts/module</topic>
+      </sensor>
+      <sensor name="module_contact_rail" type="contact">
+        <contact>
+          <collision>rail</collision>
+        </contact>
+        <always_on>true</always_on>
+        <update_rate>100</update_rate>
+        <topic>/cs625_task/contacts/module_rail</topic>
       </sensor>
     </link>
   </model>
