@@ -94,6 +94,59 @@ d4_tilt_for_removal    0.000     同上
 
 接触点位置（供以后核对）：低处 `z≈0.102 m`、高处 `z≈0.365 m`，都在槽口/槽道范围内。
 
+### 3.2 工件碰撞体：从"实心块"改成"扶手凹槽"（2026-10-25 修复）
+
+**现象**：仿真里 `pre_grasp` 起的所有执行段都 `GOAL_TOLERANCE_VIOLATED`，终端误差集中在单个腕关节。
+**根因**：`shielding_module/model.sdf` 的碰撞体是一个实心包络盒 `0.4546 x 0.13099 x 0.4650 m`，
+而真机是**两条支撑臂插进两根扶手之间 233 mm 宽的凹槽、再向外撑**。盒子把凹槽填死了：
+
+```text
+grasp TCP 在零件系 = (-0.3235, 0.0829, 0.1793) m  → 落在实心盒内部
+实测后果：肩/腕力矩顶到 URDF 上限（730 / 100 N·m），RTF 从 1.06 掉到 0.089~0.239，
+          wrist_1 传递力矩甚至到 3985 N·m（限值 100），控制器按仿真时间耗尽 goal_time 才 abort
+```
+
+**修复**（只改这一个文件）：拆成 `body` box `0.2258 x 0.1310 x 0.4650` + `rail` box `0.0050 x 0.1310 x 0.4650`，
+中间留 **223.8 mm** 自由跨度（实测 233 mm，差值是壁厚余量），凹槽沿 part +y 贯通；接触传感器分别挂到
+`body`（原 topic）与新增的 `rail`（`/cs625_task/contacts/module_rail`）。
+
+**验证**（真机录制轨迹原样回放）：
+
+```text
+pre_grasp   11.36 s  status=4 error=0  终端误差 0.000 rad  RTF=1.000
+transit     76.14 s  status=4 error=0  终端误差 0.000 rad  RTF=1.110
+            （wrist_2 从 0.366 扫到 1.584，**穿过 pi/2 奇异**，六关节 path ratio 全 1.00、no stall）
+pre_insert  16.69 s  status=4 error=0  终端误差 0.000 rad  RTF=1.000
+MoveIt check_state_validity：46 个状态 0 invalid（改前从 t=8.4 s 起报工具撞工件）
+力矩：改前 730/730/353/100/100/100 N·m → 改后全 0
+```
+
+**两条被否掉的方案**（重要，别再试）：
+
+1. **`<mesh>` 用 CAD 真实几何** —— dartsim **不支持 SDF mesh 碰撞**：
+   `Mesh construction from an SDF has not been implemented yet for dartsim`。
+   碰撞体会被**静默建成空**：轨迹"通过"但所有关节 effort 恒为 0，等于把工件删了。
+2. **给凹槽加底板** —— 工具本体宽 294.6 mm、跨越 part ±y 面向外扫，加底板后 6/23 个状态撞 `groove_floor`；
+   去掉底板后 0/46。抓取只撑扶手内侧，底板只增加假碰撞。
+
+### 3.3 由此暴露的既有缺陷：Gazebo 里机械臂和夹具**没有碰撞体**
+
+同一条 dartsim 限制导致机器人 URDF 里 9 个 link 的 mesh 碰撞全部没被创建：
+
+```text
+collision [base_link_inertia_collision] couldn't be created
+collision [shoulder_link_collision] / [upperarm_link_collision] / [forearm_link_collision] couldn't be created
+collision [wrist_1_link_collision] / [wrist_2_link_collision] / [wrist_3_link_collision]
+collision [my_end_effector_collision] couldn't be created
+```
+
+`slot_fixture` 与两张桌子也是 mesh → 同样为空。结论：
+
+> **现在 Gazebo 里的碰撞只对 box/cylinder 这类 primitive 有效**（例如夹爪手指）。
+> 机械臂本体、夹爪本体、夹具、桌子在物理引擎里都没有碰撞体。
+> 因此"仿真验证间隙/碰撞安全"目前是失真的，必须单开一轮用 box/cylinder 近似补齐，
+> 并以"真机轨迹回放零误差"作为回归判据（补齐会改变现有已通过的链，不能顺手做）。
+
 ## 4. 相机：已对齐的与未验证的
 
 | 项目 | 真机 | 仿真（当前代码） | 说明 |
