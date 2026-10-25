@@ -172,3 +172,68 @@ AGENTS.md                            工程规则（必须读）
 - active perception / NBV           NOT STARTED
 - real-hardware integration/safety  BLOCKED   机器人不可达
 ```
+
+---
+
+## 13. 仿真控制器排查线（sim-control-debug）的最终交接
+
+> 这一节是子智能体在交接时的自述，补上 §4 第 1 条的诊断细节。
+
+### 13.1 已确认并验证
+
+```text
+改动文件：只有 src/cs625_simulation/assets/cs625_task/shielding_module/model.sdf
+         （实心 envelope → body + rail 两盒，凹槽 223.8 mm、沿 part +y 贯通；
+          contact sensor 改挂 body，另加 module_rail）
+已入库：commit 791b767；工作区干净
+回放验证：pre_grasp 11.36 s / transit 76.14 s（wrist_2 0.366→1.584 过 π/2）/ pre_insert 16.69 s
+         全部 status=4 error=0、终端误差 0.000 rad、RTF 1.00/1.11/1.00、六关节 ratio 1.00 无 stall
+MoveIt 复检：真机轨迹 46 个实测状态 invalid 0（改前从 t=8.4 s 起报 tool/finger vs 工件）
+```
+
+### 13.2 `load/efficient` 仿真 13/19 的失败细节
+
+```text
+pre_grasp  813 点 / 81.2 s，GOAL_TOLERANCE 0.234 / 0.197 / 0.100 rad
+grasp      GOAL_TOLERANCE 0.250 rad
+staging    PLAN_FAILED
+pre_insert 在 leg 重试中被交接清场中断（无结论）
+（修前同一批阶段误差 1.25~1.49 rad，现在小 5~6 倍，但没根治）
+```
+
+### 13.3 对 §4 第 1 条的**关键新结论**（下一会话优先看这条）
+
+```text
+813 点/81 s 本身不是异常：那是 baseline → pre_grasp 的整段关节空间规划（v=0.03）+ time_scale×1.6，
+                            点数是规划器自适应采样出来的。
+真正的异常是：**终点落在另一个 IK 分支**
+             规划末点 pan 0.14 / wrist_3 1.70
+             真机录制段末点 pan 0.718 / wrist_3 1.29
+原因：MoveIt 场景里**没有工件**（真机也故意不发布，因为夹爪要接触工件），
+      所以换分支不受任何约束。
+残余卡滞最可能的原因：body 盒仍被 tool 扫到（盒近似表达不了真实壳体）。
+```
+
+**因此下一会话的第一件事**应为：让规划**锁在真机那条分支上**——
+最省事的做法是直接用真机录制轨迹的**终点关节值**作为 joint goal（而不是 pose goal），
+或者把录制轨迹的中间点作为 waypoint 约束；然后再看残余接触。
+
+### 13.4 尚未做 / 待决定
+
+```text
+· 19/19
+· dartsim mesh 碰撞补齐（臂 9 个 link + 夹爪本体 + 夹具 + 两张桌子全部无碰撞体）
+· 撑开接触力（仿真夹爪是刚性 tool + 21 mm 手指行程，没有真实外撑机构，取不到）
+· 坐标链 353 vs 207 mm 的验明
+```
+
+### 13.5 临时文件（都在 /tmp，可删）
+
+```text
+/tmp/wrist_repro.py                复现 + 测量工具（RTF、终端误差、逐关节偏差）
+/tmp/mkchunk.py                    由真机轨迹生成 chunk
+/tmp/simdbg/                       日志与 CSV，含三条通过证据：
+                                   f2_real_pg.csv / f2_real_transit.csv / f2_real_preinsert.csv
+/tmp/simdbg/real_*.json            真机轨迹副本
+runtime/environment/20261025_070113/   离线重建模型（gate PASS，delta 0.00 mm，latest 已指向）
+```
