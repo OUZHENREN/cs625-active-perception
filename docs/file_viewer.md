@@ -26,9 +26,13 @@ VS Code 里也有对应任务：`50 · 文件查看器（浏览器看视频/图�
 
 ## 演示视频在哪
 ```text
-~/cs625_evidence/sim_load_efficient_20261025.mp4
+~/cs625_evidence/sim_load_efficient_20261025.webm    7.9 MB  322 帧  4 fps
 ```
-在查看器里：`cs625_evidence/` → 点这个文件。
+在查看器里：`cs625_evidence/` → 点文件名 → 播放页（带下载链接）。
+
+**为什么是 webm 不是 mp4**：原先用 OpenCV 写的 `mp4v`（MPEG-4 Part 2）浏览器**解不了**，
+页面里只有一个 0:00 的播放器；Chromium/Edge 只认 H.264 的 mp4 或 VP8/VP9 的 webm。
+本机 OpenCV 没有 H.264 编码器（`avc1` 打不开），VP9 可以，所以改成 `webm`。
 
 ## 安全边界（刻意很窄）
 - 只读：只实现 GET/HEAD，没有上传/删除/重命名；

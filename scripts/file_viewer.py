@@ -89,7 +89,23 @@ class ViewerHandler(BaseHTTPRequestHandler):
         self.do_GET(head_only=True)
 
     def do_GET(self, head_only: bool = False) -> None:  # noqa: N802
-        path = self._resolve(self.path.split("?")[0])
+        request_path = self.path.split("?")[0]
+        if request_path.startswith("/raw/"):
+            # bytes for <video src>/<img src>: Range is handled here
+            path = self._resolve(request_path[len("/raw"):])
+            if path is None or not path.is_file():
+                self._send_bytes("404".encode(), "text/plain", 404)
+                return
+            self._serve_file(path, head_only)
+            return
+        if request_path.startswith("/view/"):
+            path = self._resolve(request_path[len("/view"):])
+            if path is None or not path.exists():
+                self._send_bytes("404 不存在".encode(), "text/plain; charset=utf-8", 404)
+                return
+            self._send_bytes(self._render_viewer(path), "text/html; charset=utf-8")
+            return
+        path = self._resolve(request_path)
         if path is None:
             self._send_bytes("403 路径越界".encode(), "text/plain; charset=utf-8", 403)
             return
@@ -99,7 +115,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
         if path.is_dir():
             self._send_bytes(self._render_index(path), "text/html; charset=utf-8")
             return
-        self._serve_file(path, head_only)
+        self._send_bytes(self._render_viewer(path), "text/html; charset=utf-8")
 
     # ------------------------------------------------------------ directory
     def _render_index(self, directory: pathlib.Path) -> bytes:
@@ -133,7 +149,7 @@ class ViewerHandler(BaseHTTPRequestHandler):
                 kind, size = "目录", "—"
                 name = html.escape(item.name) + "/"
             else:
-                href = urllib.parse.quote("/" + str(item.relative_to(root)))
+                href = urllib.parse.quote("/view/" + str(item.relative_to(root)))
                 suffix = item.suffix.lower()
                 if suffix in VIDEO_SUFFIXES:
                     kind = "视频"
@@ -181,6 +197,42 @@ class ViewerHandler(BaseHTTPRequestHandler):
 {''.join(entries) if entries else '<tr><td colspan="4">（空目录）</td></tr>'}
 </tbody></table></body></html>"""
         return page.encode("utf-8")
+
+    # --------------------------------------------------------------- viewer page
+    def _render_viewer(self, path: pathlib.Path) -> bytes:
+        """One page per file: proper player for video, image preview, text inline."""
+        suffix = path.suffix.lower()
+        relative = path.relative_to(self.root.resolve()).as_posix()
+        raw = "/raw/" + urllib.parse.quote(relative)
+        size = human_size(path.stat().st_size)
+        download = (f'<p class="meta">大小 {size} · '
+                    f'<a href="{raw}" download>下载原文件</a> · '
+                    f'<a href="{urllib.parse.quote("/" + str(path.parent.relative_to(self.root.resolve())) + "/")}">返回目录</a></p>')
+        head = ("<html><head><meta charset='utf-8'><title>%s</title><style>"
+                "body{margin:0;padding:20px;background:#0f141a;color:#dbe7f3;"
+                "font:13px/1.6 system-ui,'Microsoft YaHei',sans-serif;}"
+                "h1{font-size:14px;color:#9fb4c8;font-weight:600;}"
+                "video,img{max-width:100%%;border-radius:10px;display:block;}"
+                "pre{background:#161d26;padding:14px;border-radius:10px;overflow:auto;"
+                "white-space:pre-wrap;word-break:break-word;"
+                "font:12.5px/1.5 ui-monospace,Consolas,monospace;}"
+                "a{color:#35d0c0;} .meta{color:#8aa0b4;font-size:12px;}"
+                ".warn{color:#f2b04a;}</style></head><body><h1>%s</h1>"
+                % (html.escape(path.name), html.escape(relative))) + download
+        if suffix in VIDEO_SUFFIXES:
+            mime = MIME_OVERRIDES.get(suffix, "video/mp4")
+            body = (f'<video controls preload="metadata" playsinline>'
+                    f'<source src="{raw}" type="{mime}"></video>'
+                    '<p class="warn">若浏览器仍不能播放，说明该容器/编码不被支持；'
+                    '用上面的「下载原文件」用本地播放器打开。</p>')
+        elif suffix in IMAGE_SUFFIXES:
+            body = f'<img src="{raw}" alt="{html.escape(path.name)}">'
+        elif suffix in TEXT_SUFFIXES and path.stat().st_size < 2_000_000:
+            body = "<pre>" + html.escape(
+                path.read_text(encoding="utf-8", errors="replace")) + "</pre>"
+        else:
+            body = '<p>该类型不在预览范围内，请用「下载原文件」。</p>'
+        return (head + body + "</body></html>").encode("utf-8")
 
     # ------------------------------------------------------------------ file
     def _serve_file(self, path: pathlib.Path, head_only: bool) -> None:
