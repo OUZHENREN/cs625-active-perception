@@ -560,6 +560,9 @@ class Runner(Node):
         # 仿真夹爪预压行程（来自 config/tasks/world_sim.yaml 的 sim_gripper_stroke_m）
         self.sim_gripper_stroke_m: float = 0.0
         self.gripper_geometry: dict = {"max": 50.0, "min": 204.0, "max_span": 246.57}
+        # rad; how far a chunk endpoint may sit from the plan before we call it a
+        # block.  0.05 rad is ~3 deg at the wrist, a few millimetres at the tool.
+        self.chunk_endpoint_error: float = 0.05
         self._gripper_pub = None
         self._fk = self.create_client(GetPositionFK, "/compute_fk")
         self.joint_limits: dict[str, tuple[float, float]] = {}
@@ -790,15 +793,18 @@ class Runner(Node):
         return {"ok": True, "init": 5, "position_mm": position * 1000.0, "sim": True}
 
     def ensure_gripper_initialized(self) -> bool:
-        """Initialise only when the gripper is not already initialised.
+        """Always run the gripper calibration before a real run.
 
-        Repeated init is slow (~10 s of calibration motion) and was being
-        triggered on every rerun, so it is now conditional.
+        The old version skipped init when the bridge reported ``init == 5`` to
+        save ~10 s.  That flag survives an E-stop / power event and does not prove
+        the jaws are referenced.  On 2026-10-26 the skip path was taken, the grip
+        ran on an unverified opening, and the arm then drove into the workpiece.
+        Ten seconds of calibration per run is cheap insurance, so it always runs.
         """
         status = self.gripper("status")
-        if status.get("init") == 5:
-            self.get_logger().info("gripper already initialised; skipping init")
-            return True
+        if status.get("init") != 5:
+            self.get_logger().info(
+                f"gripper init flag {status.get('init')} != 5; calibrating")
         self.gripper("init")
         return self.wait_gripper_init()
 
@@ -1244,6 +1250,19 @@ class Runner(Node):
                     f"chunk {index} failed; returning for a fresh replan"
                 )
                 return False
+            # Did the arm actually go where the chunk ended?  The controller can
+            # report success while the arm is short of the endpoint (it only has
+            # to reach the trajectory's own last point).  A large gap means the
+            # arm is blocked by something: stop instead of pushing further.
+            state = self.fresh_joints()
+            current = dict(zip(state.name, state.position))
+            worst = max(abs(chunk[-1]["q"][i] - current.get(name, chunk[-1]["q"][i]))
+                        for i, name in enumerate(JOINTS))
+            if worst > self.chunk_endpoint_error:
+                self.get_logger().error(
+                    f"chunk {index} ended {worst:.3f} rad away from the planned "
+                    "endpoint; the arm is blocked -- stopping (no replan, no push)")
+                return False
         return True
 
     def _first_point_far(self, point: dict, limit_rad: float = 0.35) -> bool:
@@ -1301,13 +1320,18 @@ class Runner(Node):
                 "available in this shell (source the underlay)")
             return None, None
         values: dict[str, int] = {}
+        # These are latched (TRANSIENT_LOCAL) topics published on change.  A plain
+        # volatile subscription never receives the current value, which made the
+        # runner report safety_mode=None and refuse to move even though the driver
+        # was healthy (measured 2026-10-26).
+        latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         subscriptions = [
             self.create_subscription(
                 SafetyMode, "/io_and_status_controller/safety_mode",
-                lambda msg: values.__setitem__("safety", int(msg.mode)), 10),
+                lambda msg: values.__setitem__("safety", int(msg.mode)), latched),
             self.create_subscription(
                 RobotMode, "/io_and_status_controller/robot_mode",
-                lambda msg: values.__setitem__("robot", int(msg.mode)), 10),
+                lambda msg: values.__setitem__("robot", int(msg.mode)), latched),
         ]
         deadline = time.time() + timeout
         while len(values) < 2 and time.time() < deadline:
@@ -1784,6 +1808,13 @@ def run_unload(node, args, cfg: UnloadConfig) -> list[dict]:
 ALLOW_UNEVEN_CLEARANCE = False
 
 
+# Pushing phases: the tool is in contact with the part/fixture, so a blocked
+# trajectory must be detected early.  They are executed as several short chunks
+# and every chunk end is measured against the plan (see run_chunks).
+CONTACT_PHASES = {"grasp", "insert", "straighten", "d5_extract"}
+MIN_CONTACT_CHUNKS = 4
+
+
 def profile_for(speeds: dict, name: str, fallback_velocity: float,
                 fallback_scale: float, fallback_chunks: int) -> SpeedProfile:
     raw = speeds.get(name)
@@ -1800,6 +1831,11 @@ def profile_for(speeds: dict, name: str, fallback_velocity: float,
             profile.slow_tail_mm = 0.0
             profile.velocity = min(profile.velocity, profile.slow_velocity)
             profile.time_scale = max(profile.time_scale, profile.slow_time_scale)
+    if name in CONTACT_PHASES:
+        # Split the push into short chunks so a blocked arm is detected after a few
+        # millimetres instead of after the whole trajectory (2026-10-26: the grasp
+        # pushed into the workpiece for the entire 7 s move).
+        profile.chunks = max(profile.chunks, MIN_CONTACT_CHUNKS)
     return profile
 
 

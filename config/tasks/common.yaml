@@ -41,6 +41,10 @@ assembly_velocity_scale: 0.01             # 装配段速度缩放
 time_scale: 2.0
 dwell_sec: 1.0
 goal_tolerance: 0.002
+# 规划器允许的关节终点偏差（rad）。0.02 rad = 1.15 deg，在 0.6 m 力臂上就是 ~20 mm；
+# 验收判据是 3 mm，所以真实流程必须把规划终点钉在 IK 解上。仿真覆盖层早已用 0.002，
+# 真机此前一直用默认 0.02 —— 2026-10-26 实测 pre_grasp 偏 21.3 mm 就来自这里。
+goal_joint_tolerance: 0.002
 max_chunks: 7
 
 # ---- unload 专用固定链（槽位机械固定，无需重新检测） ----
@@ -91,10 +95,20 @@ observe:
     quat: [0.2954, -0.7023, -0.2539, -0.5958]
     check: ""
   workpiece_fine:
-    xyz: [0.5301, 0.3222, 0.4126]
-    quat: [-0.34895, 0.74088, 0.25376, 0.51473]
+    # check 分两段：①位姿可重复性（3 帧）；②实测工件位姿与"抓取位姿所依据的参考位姿"
+    # 的漂移。②是 2026-10-26 撞倒工件事故后的守卫：工件被移动 >5 mm/1° 时直接拒绝，
+    # 不再拿旧常量去抓。
+    # 2026-10-26: the previous pose (0.5301,0.3222,0.4126) is geometrically identical
+    # to camera_target(part, 0.68 m, az=10, el=20) -- i.e. it was correct, but so
+    # frontal that the 441x465 mm near-square face is four-fold ambiguous and the
+    # stability check measured a 429 mm spread over three frames.  This pose is the
+    # same distance/orbit at az=25, el=30: oblique enough to break the ambiguity
+    # (IK solvable, projection area 37 %, centre offset 0.08).
+    xyz: [0.63539, 0.33191, 0.46905]
+    quat: [-0.46740, 0.72884, 0.27878, 0.41546]
     check: >-
       python3 scripts/check_pose_stability.py --repeat 3 --weights ~/cs625_yolo_seg/runs/segment/runs/segment/box_slot_1280/weights/best.pt --template "$HOME/cs625_rvs_archive/models_20261023/弹仓_装配导出.STL"
+      && python3 scripts/grasp_from_measurement.py --measure --check --tol-mm 5 --tol-deg 1
   tables:
     xyz: [0.5886, 0.3482, 0.7075]
     quat: [0.2954, -0.7023, -0.2539, -0.5958]
