@@ -78,39 +78,103 @@ def controller_state(text: str) -> str | None:
     return None
 
 
-def controller_active() -> bool:
+def controller_state_live(timeout_sec: float = 12.0) -> str | None:
+    """Ask controller_manager directly for the arm controller's state.
+
+    The ``ros2 control list_controllers`` CLI is not reliable while the camera
+    publishes a 900k-point cloud: measured 2026-10-26 it sometimes answered in
+    1.6 s and sometimes timed out three times at 10 s each, which made the start
+    task report "controller always fails to activate" while the controller had
+    been active the whole time.  A direct service call from a short-lived rclpy
+    node is what the task runner itself uses, and it is bounded here.
+    """
     try:
-        out = subprocess.run(
-            ["ros2", "control", "list_controllers",
-             "--controller-manager", CONTROLLER_MANAGER],
-            capture_output=True, text=True, timeout=8,
-        ).stdout
-    except Exception:
-        return False
-    return controller_state(out) == "active"
+        import rclpy
+        from controller_manager_msgs.srv import ListControllers
+    except Exception:  # noqa: BLE001 - fall back to the CLI
+        return None
+    try:
+        rclpy.init(args=None)
+    except Exception:  # noqa: BLE001 - already initialised by the caller
+        pass
+    node = rclpy.create_node("control_health_controller_probe")
+    try:
+        client = node.create_client(ListControllers, f"{CONTROLLER_MANAGER}/list_controllers")
+        if not client.wait_for_service(timeout_sec=timeout_sec / 3.0):
+            return None
+        future = client.call_async(ListControllers.Request())
+        deadline = time.time() + timeout_sec
+        while not future.done() and time.time() < deadline:
+            rclpy.spin_once(node, timeout_sec=0.1)
+        response = future.result() if future.done() else None
+        if response is None:
+            return None
+        for controller in response.controller:
+            if controller.name == ARM_CONTROLLER:
+                return controller.state
+        return None
+    except Exception:  # noqa: BLE001 - never let a probe crash the health check
+        return None
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
 
 
-def joints_flowing(timeout_sec: float = 2.0) -> bool:
-    """Count two /joint_states messages within the timeout using rclpy."""
+def controller_active() -> tuple[bool, str | None]:
+    """(is the arm controller active, its state name).
+
+    Service first; the CLI is only a fallback for environments where the service
+    python bindings are unavailable.
+    """
+    state = controller_state_live()
+    if state is None:
+        try:
+            out = subprocess.run(
+                ["ros2", "control", "list_controllers",
+                 "--controller-manager", CONTROLLER_MANAGER],
+                capture_output=True, text=True, timeout=8,
+            ).stdout
+            state = controller_state(out)
+        except Exception:  # noqa: BLE001
+            state = None
+    return state == "active", state
+
+
+def joints_flowing(timeout_sec: float = 4.0, attempts: int = 2) -> bool:
+    """Count two /joint_states messages within the timeout using rclpy.
+
+    Two attempts and a 4 s window, because a freshly created probe node needs a
+    moment to discover a 125 Hz topic and because controller_manager is busy right
+    after a controller switch.  Measured 2026-10-26: immediately after activating
+    arm_controller the first probe saw zero messages and reported an unhealthy
+    control chain although /joint_states was running at 125 Hz.  A false alarm
+    here makes the operator think the arm is broken.
+    """
     try:
         import rclpy
         from sensor_msgs.msg import JointState
     except Exception:
         return False
-    seen = {"n": 0}
-    rclpy.init(args=None)
-    node = rclpy.create_node("control_health_probe")
-    try:
-        node.create_subscription(JointState, "/joint_states",
-                                 lambda _m: seen.__setitem__("n", seen["n"] + 1), 10)
-        deadline = time.time() + timeout_sec
-        while time.time() < deadline and seen["n"] < 2:
-            rclpy.spin_once(node, timeout_sec=0.1)
-    finally:
-        node.destroy_node()
-        if rclpy.ok():
-            rclpy.shutdown()
-    return seen["n"] >= 2
+    for attempt in range(attempts):
+        seen = {"n": 0}
+        rclpy.init(args=None)
+        node = rclpy.create_node("control_health_probe")
+        try:
+            node.create_subscription(JointState, "/joint_states",
+                                     lambda _m: seen.__setitem__("n", seen["n"] + 1), 10)
+            deadline = time.time() + timeout_sec
+            while time.time() < deadline and seen["n"] < 2:
+                rclpy.spin_once(node, timeout_sec=0.1)
+        finally:
+            node.destroy_node()
+            if rclpy.ok():
+                rclpy.shutdown()
+        if seen["n"] >= 2:
+            return True
+        if attempt + 1 < attempts:
+            time.sleep(1.0)
+    return False
 
 
 def recover() -> bool:
@@ -130,35 +194,96 @@ def recover() -> bool:
     return True
 
 
+def activate_controller(timeout_sec: float = 15.0) -> tuple[bool, str]:
+    """Activate the arm controller through controller_manager, if it is not active.
+
+    Returns (ok, message).  The ``ros2 control switch_controllers`` CLI is not used:
+    with the camera cloud running it took three 10 s timeouts and then "failed"
+    although the controller was already active.  Asking the state first and
+    calling the service directly keeps this bounded to a few seconds.
+    """
+    active, state = controller_active()
+    if active:
+        return True, f"{ARM_CONTROLLER} is already active"
+    try:
+        import rclpy
+        from controller_manager_msgs.srv import SwitchController
+    except Exception as exc:  # noqa: BLE001
+        return False, f"cannot import controller_manager_msgs: {exc}"
+    try:
+        rclpy.init(args=None)
+    except Exception:  # noqa: BLE001
+        pass
+    node = rclpy.create_node("control_health_activate")
+    try:
+        client = node.create_client(SwitchController, f"{CONTROLLER_MANAGER}/switch_controller")
+        if not client.wait_for_service(timeout_sec=timeout_sec / 3.0):
+            return False, f"service {CONTROLLER_MANAGER}/switch_controller is not available"
+        request = SwitchController.Request()
+        request.activate_controllers = [ARM_CONTROLLER]
+        request.strictness = SwitchController.Request.STRICT
+        future = client.call_async(request)
+        deadline = time.time() + timeout_sec
+        while not future.done() and time.time() < deadline:
+            rclpy.spin_once(node, timeout_sec=0.1)
+        if not future.done():
+            return False, "switch_controller call timed out"
+        response = future.result()
+        if response is None or not response.ok:
+            return False, "controller_manager refused the activation"
+    except Exception as exc:  # noqa: BLE001
+        return False, f"activation error: {exc}"
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+    active, state = controller_active()
+    return active, f"{ARM_CONTROLLER}: {state or 'unknown'}"
+
+
+def inspect() -> tuple[dict, str | None]:
+    active, state = controller_active()
+    checks = {
+        "sockets": sockets_ok(),
+        "controller": active,
+        "joint_states": joints_flowing(),
+    }
+    return checks, state
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--fix", action="store_true")
+    parser.add_argument("--activate", action="store_true",
+                        help="activate the arm controller first (service call, not the CLI)")
     args = parser.parse_args()
 
-    checks = {
-        "sockets": sockets_ok(),
-        "controller": controller_active(),
-        "joint_states": joints_flowing(),
-    }
+    if args.activate:
+        ok, message = activate_controller()
+        print(("activated: " if ok else "activation failed: ") + message)
+        if not ok:
+            return 1
+
+    checks, state = inspect()
     bad = [name for name, ok in checks.items() if not ok]
     print("health:", checks)
+    print(f"  {ARM_CONTROLLER}: {state or 'unknown'}")
     if not bad:
         return 0
     print("unhealthy:", bad)
     if not checks["controller"]:
+        # Point at this script, not the ros2 control CLI: under camera-cloud load
+        # that CLI timed out three times at 10 s and made an active controller look
+        # broken.
         print(f"  {ARM_CONTROLLER} is not active (manager {CONTROLLER_MANAGER}); "
-              "activate it with: ros2 control switch_controllers "
-              f"--controller-manager {CONTROLLER_MANAGER} --activate {ARM_CONTROLLER} --strict")
+              "activate it with: python3 scripts/control_health.py --activate")
     if not args.fix:
         return 1
     print("recovering ...")
     recovered = recover()
-    checks = {
-        "sockets": sockets_ok(),
-        "controller": controller_active(),
-        "joint_states": joints_flowing(),
-    }
+    checks, state = inspect()
     print("after recovery:", checks)
+    print(f"  {ARM_CONTROLLER}: {state or 'unknown'}")
     return 0 if recovered and all(checks.values()) else 2
 
 
