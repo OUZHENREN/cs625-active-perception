@@ -108,6 +108,11 @@ MODELING_SPEC = {
     "color_res": "1280x960",
     "depth_res": "1280x960",
     "depth_enable": True,
+    # The normalised contract topic /sensors/camera/points is a relay of the
+    # driver cloud; without this flag the driver publishes no cloud at all and
+    # cs625_sensor_adapter refuses to configure (all four inputs are required).
+    # Measured 2026-10-26: with the flag, /camera/depth_registered/points exists.
+    "point_cloud": True,
 }
 
 FAST_CANDIDATES = [
@@ -116,18 +121,21 @@ FAST_CANDIDATES = [
         "color_res": "640x480",
         "depth_res": "640x480",
         "depth_enable": True,
+        "point_cloud": False,
     },
     {
         "label": "320x240 color+depth",
         "color_res": "320x240",
         "depth_res": "320x240",
         "depth_enable": True,
+        "point_cloud": False,
     },
     {
         "label": "640x480 color only",
         "color_res": "640x480",
         "depth_res": None,
         "depth_enable": False,
+        "point_cloud": False,
     },
 ]
 
@@ -136,7 +144,6 @@ FAST_CANDIDATES = [
 # usable on the metal workpiece.
 COMMON_LAUNCH_ARGS = [
     f"device_ip:={CAMERA_IP}",
-    "point_cloud_enable:=false",
     "laser_power:=100",
     # RELIABLE image QoS.  A 1280x960 BGR8 image is ~3.7 MiB, larger than the
     # default Fast DDS shared-memory segment; with SENSOR_DATA (best effort) the
@@ -311,7 +318,20 @@ def is_camera_launch(pid):
     cmd = proc_cmdline(pid)
     if not cmd:
         return False
-    return "percipio_camera.launch.py" in cmd and "ros2 launch" in cmd
+    if "percipio_camera.launch.py" not in cmd or "ros2 launch" not in cmd:
+        return False
+    # A launch started from a shell wrapper shows the same text in both the
+    # ``bash -c '... ros2 launch ...'`` parent and the python launcher child.
+    # Matching both made the tool refuse to act ("multiple launch processes
+    # found: 28197, 28210").  Only the python launcher is the process worth
+    # signing; its children are found separately via ``descendants``.
+    try:
+        comm = Path(f"/proc/{pid}/comm").read_text(encoding="utf-8").strip()
+    except OSError:
+        return False
+    # ``ros2 launch`` renames its process to "ros2"; a python entry point shows
+    # "python3".  Accept both, and never the "bash -c" wrapper around them.
+    return comm == "ros2" or comm.startswith("python")
 
 
 def find_camera_launch_pids():
@@ -386,7 +406,8 @@ def driver_reported_fps():
 # ---------------------------------------------------------------------------
 def describe_spec(spec):
     depth = spec.get("depth_res") if spec.get("depth_enable") else "off"
-    return f"color={spec['color_res']} depth={depth}"
+    cloud = "on" if spec.get("point_cloud") else "off"
+    return f"color={spec['color_res']} depth={depth} point_cloud={cloud}"
 
 
 def build_launch_command(spec):
@@ -402,6 +423,17 @@ def build_launch_command(spec):
         )
     else:
         args.extend(["depth_enable:=false", "depth_registration_enable:=false"])
+    if spec.get("point_cloud"):
+        args.extend(
+            [
+                "point_cloud_enable:=true",
+                "color_point_cloud_enable:=true",
+                "point_cloud_qos:=default",
+                "depth_camera_info_qos:=default",
+            ]
+        )
+    else:
+        args.extend(["point_cloud_enable:=false", "color_point_cloud_enable:=false"])
     quoted = " ".join(shlex.quote(arg) for arg in args)
     return (
         f"source {shlex.quote(str(DEV_ENV))} --full && "

@@ -1,9 +1,28 @@
 /**:
   ros__parameters:
     use_sim_time: false
-    # Deliberately empty until the PS800E1/Percipio driver and its Humble
-    # source topics are verified on the real system.
-    input_color_topic: ""
-    input_depth_topic: ""
-    input_camera_info_topic: ""
-    input_points_topic: ""
+    # Source topics measured on the real cell (2026-10-26, Percipio at 1280x960
+    # "modeling" mode; the device address stays in ~/.cs625_local.env):
+    #   /camera/color/image_raw           colour 1280x960
+    #   /camera/depth/image_raw           depth  1280x960
+    #   /camera/depth/camera_info         depth intrinsics (same frame as the cloud)
+    #   /camera/depth_registered/points   colour-registered cloud (needs point_cloud_enable:=true)
+    #
+    # These used to be empty strings -- a Humble-era placeholder whose own comment
+    # said the driver was unverified.  With empty values cs625_sensor_adapter
+    # reports "Required topic parameters are unset", exits, and none of the
+    # /sensors/camera/* contract topics exist, so every observation check in a task
+    # fails no matter how healthy the arm and the camera are.
+    #
+    # The output topics (/sensors/camera/...) and the status topic stay in
+    # config/common.yaml; they are not repeated here.
+    input_color_topic: /camera/color/image_raw
+    input_depth_topic: /camera/depth/image_raw
+    input_camera_info_topic: /camera/depth/camera_info
+    input_points_topic: /camera/depth_registered/points
+
+    # Measured rate on this cell: 1280x960 colour+depth+cloud runs at 0.8-1.0 fps.
+    # The shared 1.0 s freshness window (config/common.yaml) therefore made
+    # /sensors/camera/status flap between fresh and waiting.  Three frames worth
+    # of headroom keeps the status meaningful without hiding a stopped camera.
+    freshness_timeout_sec: 3.0
