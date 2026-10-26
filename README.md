@@ -58,6 +58,26 @@ python3 scripts/cs625_ui.py                                   # Qt 面板
 rviz2 -d src/cs625_rviz_panel/config/cs625_task.rviz          # RViz 面板
 ```
 
+### 查看环境建模点云（第二个 RViz）
+
+`scripts/model_environment.py` 除了 `model.json` 还会写 `runtime/environment/<ts>/scene.ply`
+（多帧合并、降采样后的 `base_link` 点云）。它默认不显示；要肉眼检查"相机重建出来的桌面/插槽/工件
+准不准"，用这一条命令（仿真、真机、纯离线都适用）：
+
+```bash
+source scripts/source_dev_env.sh --full
+python3 scripts/publish_environment_point_cloud.py --rviz     # 发布 scene.ply + 打开专用 RViz
+```
+
+- 数据流：`runtime/environment/latest/scene.ply` → 本脚本 → `/environment/point_cloud`
+  （`sensor_msgs/PointCloud2`，`frame_id=base_link`）→ `src/cs625_bringup/config/environment_point_cloud.rviz`。
+- 只发布、不新开窗口（RViz 已在别的窗口/别的机器上）：去掉 `--rviz`。
+- 看某一次建模结果：`--scene runtime/environment/20261025_070113`（目录或 `scene.ply` 路径都行）。
+- 点太多：`--voxel 0.01` 先降采样；只想做话题自检：`--once` 后 `ros2 topic hz /environment/point_cloud`。
+- 任务跑在非默认 DDS 域时，先 `export ROS_DOMAIN_ID=<同一个值>`，否则两边互相看不见。
+- 固定帧选 `base_link` 是刻意的：`scene.ply` 本来就是 `base_link` 数据，两者相同就不需要任何 TF，
+  所以机器人栈没起来也能看；但它不能替代 `/sensors/camera/points` 的 TF 变换。
+
 VS Code 里用 `.vscode/tasks.json` 的一键任务（编号 00–57）做同样的事，不用记命令。
 
 ---
