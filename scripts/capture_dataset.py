@@ -49,9 +49,20 @@ PLAN = REPO / "scripts" / "plan_pose_once.py"
 EXEC = REPO / "scripts" / "execute_assembly_chunks.py"
 HAND_EYE = REPO / "config" / "handeye" / "tcp_to_camera.json"
 
-# The reference workpiece pose in the base frame (fine stage consensus,
-# 2026-10-24).  Only used to build the pose list; each frame records its own.
+# Fallback workpiece reference (fine-stage consensus, 2026-10-24).  Only used
+# when runtime/environment/latest.json cannot be read: on 2026-10-26 the measured
+# pose was 180 mm away from this constant, which made every framing/clearance
+# verdict wrong.  The live value is the environment model.
 PART_REFERENCE = np.array([0.6804, 0.7163, 0.1240])
+# Offset from the CAD origin to the workpiece geometric centre (same numbers the
+# framing gate uses; kept in one place now).
+PART_CENTRE_OFFSET = np.array([-0.208, 0.066, -0.011])
+# Pairing a camera distance with the TCP clearance guard: the camera sits ~0.2 m
+# in front of the TCP, so a 0.52 m camera distance leaves only 0.30 m TCP-part.
+# Raise the camera distance until the guard is satisfied (measured: 0.70 m -> 0.47 m).
+MAX_ORBIT_DISTANCE = 0.80
+DISTANCE_STEP = 0.05
+MODEL_POINTER = REPO / "runtime" / "environment" / "latest.json"
 
 # Hard workspace guard.  A -45 deg azimuth at 0.52 m drove the TCP to x=-1.02
 # (the arm swung across the cell) and the run was E-stopped.  The workpiece is
@@ -269,7 +280,8 @@ def plan_feasible(node, xyz, quat, budget: float = 20.0):
     for index, name in enumerate(names):
         if name in OBSERVATION_ENVELOPE_DEG:
             low, high = OBSERVATION_ENVELOPE_DEG[name]
-            if not (low <= final[index] <= high):
+            value = final[index]
+            if not angle_in_envelope(value, low, high):
                 return (False, f"{name} ends at {final[index]:.0f} deg "
                                f"outside [{low},{high}]", None)
     payload = {"joint_names": names,
@@ -307,6 +319,60 @@ def plan_and_execute(xyz, quat) -> bool:
         if not tail or "ALL_ASSEMBLY_CHUNKS_OK" not in tail[-1]:
             return False
     return True
+
+
+def workpiece_pose_from_model() -> tuple[np.ndarray, np.ndarray, str] | None:
+    """Measured workpiece pose from the freshest environment model, if any.
+
+    Returns (xyz, quat, model_path).  The pose is what the framing gate and the
+    orbit centre must use; hard-coded 2026-10-24 values are 180 mm off and make
+    every captured pose look badly framed.
+    """
+    try:
+        pointer = json.loads(MODEL_POINTER.read_text(encoding="utf-8"))
+        model_path = MODEL_POINTER.parent / str(pointer["model"])
+        model = json.loads(model_path.read_text(encoding="utf-8"))
+        workpiece = model["workpiece"]
+        xyz = np.asarray(workpiece["xyz"], dtype=float)
+        quat = np.asarray(workpiece["quat"], dtype=float)
+        if xyz.shape != (3,) or quat.shape != (4,):
+            return None
+        return xyz, quat, str(model_path)
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
+
+
+def angle_in_envelope(value: float, low: float, high: float) -> bool:
+    """Is ``value`` (degrees) inside [low, high] under any 360-degree representation?
+
+    The planner reports the same physical joint angle as e.g. -346 deg where +14 is
+    meant.  Comparing the raw number rejected reachable capture poses on 2026-10-26.
+    """
+    return any(low <= candidate <= high
+               for candidate in (value, value - 360.0, value + 360.0))
+
+
+def part_centre_of(xyz, quat) -> np.ndarray:
+    return np.asarray(xyz) + Rotation.from_quat(quat).as_matrix() @ PART_CENTRE_OFFSET
+
+
+def target_for(centre, base_distance, azimuth, elevation, t_tcp_cam, start_tcp,
+               part_centre, min_clearance):
+    """Target TCP pose, raising the camera distance until the clearance guard passes.
+
+    Returns (xyz, quat, distance_used, clearance).  Raising the distance instead of
+    lowering MIN_TCP_CLEARANCE keeps the safety guard intact: the guard exists so
+    the gripper never ends up inside the workpiece.
+    """
+    distance = float(base_distance)
+    while True:
+        target = camera_target(centre, distance, azimuth, elevation,
+                               t_tcp_cam, start_tcp)
+        xyz = target[:3, 3]
+        clearance = float(np.linalg.norm(xyz - part_centre))
+        if clearance >= min_clearance or distance >= MAX_ORBIT_DISTANCE - 1e-9:
+            return xyz, Rotation.from_matrix(target[:3, :3]).as_quat(), distance, clearance
+        distance = min(MAX_ORBIT_DISTANCE, distance + DISTANCE_STEP)
 
 
 def camera_target(part: np.ndarray, distance: float, azimuth_deg: float,
@@ -355,11 +421,24 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     parser.add_argument("--tag", required=True, help="scene tag, e.g. workpiece/empty")
     parser.add_argument("--label", default="")
-    parser.add_argument("--azimuths", type=float, nargs="+", default=[-45, -30, -15, 0, 15, 30, 45])
-    parser.add_argument("--elevations", type=float, nargs="+", default=[-10, 0, 10])
-    parser.add_argument("--distance", type=float, default=0.52)
+    parser.add_argument("--azimuths", type=float, nargs="+",
+                        default=[0, 5, 10, 15, 20, 25, 30, 35],
+                        help="orbit azimuth; negative azimuths put shoulder_pan "
+                             "outside its verified band with the workpiece at its "
+                             "measured pose (2026-10-26)")
+    parser.add_argument("--elevations", type=float, nargs="+",
+                        default=[25, 30, 35],
+                        help="orbit elevation.  Measured 2026-10-26: with the workpiece "
+                             "at its measured pose, elevation 0 and below puts the TCP "
+                             "below the workspace box and forces shoulder_pan beyond "
+                             "its verified band; 15..35 deg looking down is the "
+                             "reachable band (77 feasible viewpoints found).")
+    parser.add_argument("--distance", type=float, default=0.52,
+                        help="camera-to-part distance; raised automatically (up to "
+                             "MAX_ORBIT_DISTANCE) when the TCP clearance guard fails")
     parser.add_argument("--center", type=float, nargs=3, default=None,
-                        help="orbit centre in base frame (default: the workpiece)")
+                        help="orbit centre in base frame (default: the measured "
+                             "workpiece centre from runtime/environment/latest.json)")
     parser.add_argument("--safe-min", type=float, nargs=3, default=None)
     parser.add_argument("--safe-max", type=float, nargs=3, default=None)
     parser.add_argument("--max-poses", type=int, default=0)
@@ -371,10 +450,10 @@ def main() -> int:
                              "which has no CAD model)")
     parser.add_argument("--dry-run", action="store_true",
                         help="print the guard verdict for every target pose and exit")
-    parser.add_argument("--part-xyz", type=float, nargs=3,
-                        default=[0.6803, 0.7166, 0.1245])
-    parser.add_argument("--part-quat", type=float, nargs=4,
-                        default=[0.259, 0.9659, 0.0041, -0.0035])
+    parser.add_argument("--part-xyz", type=float, nargs=3, default=None,
+                        help="CAD origin of the workpiece in base frame "
+                             "(default: measured pose from the environment model)")
+    parser.add_argument("--part-quat", type=float, nargs=4, default=None)
     parser.add_argument("--weights",
                         default=str(pathlib.Path.home() /
                                     "cs625_yolo_seg/runs/segment/runs/box_seg640/weights/best.pt"))
@@ -382,7 +461,23 @@ def main() -> int:
                         help="seconds to wait after the move before capturing")
     arguments = parser.parse_args()
 
-    centre = np.array(arguments.center) if arguments.center else PART_REFERENCE
+    model_pose = workpiece_pose_from_model()
+    if model_pose is not None:
+        measured_xyz, measured_quat, model_source = model_pose
+        print(f"workpiece pose: measured ({model_source})")
+    else:
+        measured_xyz, measured_quat, model_source = None, None, None
+        print("workpiece pose: FALLBACK constants -- runtime/environment/latest.json "
+              "is missing; framing/clearance verdicts use the 2026-10-24 reference")
+    if arguments.part_xyz is None:
+        arguments.part_xyz = (measured_xyz.tolist() if measured_xyz is not None
+                              else [0.6803, 0.7166, 0.1245])
+    if arguments.part_quat is None:
+        arguments.part_quat = (measured_quat.tolist() if measured_quat is not None
+                               else [0.259, 0.9659, 0.0041, -0.0035])
+    part_centre = part_centre_of(arguments.part_xyz, arguments.part_quat)
+    centre = (np.array(arguments.center) if arguments.center is not None
+              else part_centre)
     safe_min = np.array(arguments.safe_min) if arguments.safe_min else SAFE_BOX_MIN
     safe_max = np.array(arguments.safe_max) if arguments.safe_max else SAFE_BOX_MAX
     output = pathlib.Path(arguments.out).expanduser() / arguments.tag
@@ -422,27 +517,26 @@ def main() -> int:
         return 2
 
     if arguments.dry_run:
-        part_centre = (np.asarray(arguments.part_xyz)
-                       + Rotation.from_quat(arguments.part_quat).as_matrix()
-                       @ np.array([-0.208, 0.066, -0.011]))
-        print(f"part centre {np.round(part_centre, 3).tolist()}")
+        print(f"orbit centre {np.round(centre, 3).tolist()}  "
+              f"part centre {np.round(part_centre, 3).tolist()}")
         print(f"{'label':<16}{'TCP':<30}{'clear':>7}  verdict")
         for azimuth, elevation in poses:
-            target = camera_target(centre, arguments.distance, azimuth,
-                                   elevation, t_tcp_cam, start_tcp)
-            xyz = target[:3, 3]
+            xyz, quat_preview, distance_used, clearance = target_for(
+                centre, arguments.distance, azimuth, elevation, t_tcp_cam,
+                start_tcp, part_centre, arguments.min_clearance)
             label = f"az{azimuth:+.0f}_el{elevation:+.0f}"
             if np.any(xyz < safe_min) or np.any(xyz > safe_max):
                 print(f"{label:<16}{str(np.round(xyz,3).tolist()):<30}{'-':>7}  BOX")
                 continue
-            clearance = float(np.linalg.norm(xyz - part_centre))
             if clearance < arguments.min_clearance:
-                print(f"{label:<16}{str(np.round(xyz,3).tolist()):<30}{clearance:7.2f}  CLEARANCE")
+                print(f"{label:<16}{str(np.round(xyz,3).tolist()):<30}{clearance:7.2f}  "
+                      f"CLEARANCE max distance {MAX_ORBIT_DISTANCE:.2f} m reached")
                 continue
-            quat_preview = Rotation.from_matrix(target[:3, :3]).as_quat()
             feasible, reason, _plan = plan_feasible(node, xyz, quat_preview)
+            distance_note = (f" d={distance_used:.2f}" if
+                             abs(distance_used - arguments.distance) > 1e-9 else "")
             print(f"{label:<16}{str(np.round(xyz,3).tolist()):<30}{clearance:7.2f}  "
-                  f"{'OK' if feasible else reason}")
+                  f"{'OK' if feasible else reason}{distance_note}")
         node.destroy_node()
         rclpy.shutdown()
         return 0
@@ -450,31 +544,28 @@ def main() -> int:
     index = 0
     failures = 0
     for azimuth, elevation in poses:
-        target = camera_target(centre, arguments.distance, azimuth,
-                               elevation, t_tcp_cam, start_tcp)
-        xyz = target[:3, 3]
+        xyz, quat, distance_used, clearance = target_for(
+            centre, arguments.distance, azimuth, elevation, t_tcp_cam,
+            start_tcp, part_centre, arguments.min_clearance)
         label = f"az{azimuth:+.0f}_el{elevation:+.0f}"
         if np.any(xyz < safe_min) or np.any(xyz > safe_max):
             print(f"  REFUSED {label}: TCP {np.round(xyz, 3).tolist()} outside safe box")
             failures += 1
             continue
-        part_centre = (np.asarray(arguments.part_xyz)
-                       + Rotation.from_quat(arguments.part_quat).as_matrix()
-                       @ np.array([-0.208, 0.066, -0.011]))
-        clearance = float(np.linalg.norm(xyz - part_centre))
         if clearance < arguments.min_clearance:
             print(f"  REFUSED {label}: TCP clearance {clearance:.2f} m "
-                  f"< {MIN_TCP_CLEARANCE} m")
+                  f"< {MIN_TCP_CLEARANCE} m even at {MAX_ORBIT_DISTANCE:.2f} m")
             failures += 1
             continue
-        quat_preview = Rotation.from_matrix(target[:3, :3]).as_quat()
-        feasible, reason, plan_payload = plan_feasible(node, xyz, quat_preview)
+        feasible, reason, plan_payload = plan_feasible(node, xyz, quat)
         if not feasible:
             print(f"  REFUSED {label}: {reason}")
             failures += 1
             continue
-        quat = Rotation.from_matrix(target[:3, :3]).as_quat()
-        print(f"[{index + 1}/{len(poses)}] {label} -> TCP {np.round(xyz, 3).tolist()}")
+        distance_note = (f" (camera distance {distance_used:.2f} m)" if
+                         abs(distance_used - arguments.distance) > 1e-9 else "")
+        print(f"[{index + 1}/{len(poses)}] {label} -> TCP "
+              f"{np.round(xyz, 3).tolist()}{distance_note}")
         if not plan_and_execute(xyz, quat):
             # A goal timeout leaves the controller refusing new trajectories;
             # recover once and retry before giving up on this pose.

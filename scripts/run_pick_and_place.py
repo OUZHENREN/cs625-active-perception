@@ -48,9 +48,9 @@ from moveit_msgs.srv import (
 )
 from rclpy.duration import Duration as RDuration
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, QoSProfile
+from rclpy.qos import DurabilityPolicy, QoSProfile, qos_profile_sensor_data
 from scipy.spatial.transform import Rotation as R
-from sensor_msgs.msg import JointState
+from sensor_msgs.msg import Image, JointState
 from std_msgs.msg import String
 
 JOINTS = (
@@ -511,6 +511,14 @@ class Runner(Node):
         self._joints: JointState | None = None
         self._joints_at: float = 0.0
         self.create_subscription(JointState, "/joint_states", self._on_joints, 10)
+        # Observation checks must run on a frame taken AFTER the arm moved.  The
+        # camera streams ~1 fps on this cell and the old code slept 1.0 s and then
+        # took whatever was in the buffer, which can be the pre-move view.  The
+        # adapter publishes with sensor-data QoS, so this subscription must too.
+        self._camera_stamp_ns: int = 0
+        self.create_subscription(
+            Image, "/sensors/camera/color/image", self._on_camera_frame,
+            qos_profile_sensor_data)
         self._tf_buffer = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
         self._ik = self.create_client(GetPositionIK, "/compute_ik")
@@ -587,7 +595,7 @@ class Runner(Node):
     def _load_joint_limits(self) -> None:
         """Position limits straight from /robot_description (latched URDF)."""
         try:
-            from rclpy.qos import DurabilityPolicy, QoSProfile
+            from rclpy.qos import DurabilityPolicy, QoSProfile, qos_profile_sensor_data
             import xml.etree.ElementTree as ET
 
             got: dict = {}
@@ -620,6 +628,30 @@ class Runner(Node):
             if bounds and not (bounds[0] - 1e-6 <= value <= bounds[1] + 1e-6):
                 return False
         return True
+
+    def _on_camera_frame(self, message) -> None:
+        stamp = message.header.stamp
+        ns = int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
+        if ns > self._camera_stamp_ns:
+            self._camera_stamp_ns = ns
+
+    def camera_stamp_ns(self) -> int:
+        return self._camera_stamp_ns
+
+    def wait_camera_frame_after(self, stamp_ns: int, timeout: float = 10.0) -> bool:
+        """Block until a frame stamped later than ``stamp_ns`` arrives.
+
+        Comparing message stamps against each other (not against the wall clock)
+        keeps this correct regardless of clock offsets.  At the cell's ~1 fps a
+        fresh frame arrives within ~1-2 s; the 10 s bound only fires when the
+        camera is dead.
+        """
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+            if self._camera_stamp_ns > stamp_ns:
+                return True
+        return False
 
     def _on_joints(self, msg: JointState) -> None:
         self._joints = msg
@@ -1928,21 +1960,6 @@ def publish_task_state(node, state: dict) -> None:
         pass
 
 
-def set_camera_mode(mode: str) -> None:
-    """Ask the camera to switch between the modeling and the fast profile.
-
-    Best effort on purpose: a camera that is already in the requested mode, or
-    that is missing entirely, must never abort a task phase.  The fast profile
-    drops depth (the depth stream caps the camera at ~0.8 fps), so every
-    observation check switches back to modeling first.
-    """
-    script = Path(__file__).resolve().parent / "camera_mode.py"
-    if not script.exists():
-        return
-    subprocess.run(["python3", "-u", str(script), mode],
-                   capture_output=True, timeout=180, check=False)
-
-
 def arm_seed_from_state(names, positions) -> list[float]:
     """The six arm joints in JOINTS order, matched by NAME.
 
@@ -2415,6 +2432,7 @@ def main() -> int:
                 quat = tuple(float(v) for v in pose["quat"])
                 profile = profile_for(cfg.speeds, waypoint, cfg.velocity_scale,
                                       cfg.time_scale, 3)
+                camera_before = node.camera_stamp_ns()
                 goal = node.ik(xyz, quat, seed=start_positions())
                 points = (node.plan_joint(goal, profile.velocity, start_positions())
                           if goal else None)
@@ -2429,8 +2447,16 @@ def main() -> int:
                     continue
                 if plan_only:
                     continue
-                # settle, grab a labelled process image, then run the check
-                time.sleep(1.0)
+                # Wait for a frame taken AFTER the move instead of sleeping and
+                # hoping.  The camera runs at ~1 fps; without this the process
+                # image and the check could be computed on the pre-move view.
+                if cfg.world == "real":
+                    fresh = node.wait_camera_frame_after(camera_before)
+                    if not fresh:
+                        node.get_logger().warn(
+                            f"[{name}] no camera frame newer than the motion within "
+                            "10 s; the check below may look at an old view")
+                time.sleep(0.2)
                 if cfg.process_images:
                     capture_process_image(f"observe:{waypoint}", "enter")
                 check = (pose.get("check") or "").strip()
@@ -2447,8 +2473,6 @@ def main() -> int:
                                               encoding="utf-8")
                     node.get_logger().info(f"[{name}] check {check} skipped in sim")
                 elif check:
-                    # an observation check needs depth: back to the fine profile
-                    set_camera_mode("modeling")
                     ok_check, check_detail = run_observation_check(check, pose)
                     record[-1]["check"] = {"name": check, "ok": ok_check,
                                            "detail": check_detail}

@@ -52,6 +52,16 @@ def _compose(context):
     semantic_file = LaunchConfiguration("semantic_file").perform(context)
     controllers_file = LaunchConfiguration("moveit_controllers_file").perform(context)
     sensors_file = LaunchConfiguration("sensors_config").perform(context)
+    # MoveIt's octomap is fed by /sensors/camera/points.  On this cell the camera
+    # is mounted on the tool and sees the arm itself: with the full cloud enabled,
+    # every plan aborted at the start-state check with
+    #   "CheckStartStateCollision failed: 1 contact(s) detected : <octomap> - upperarm_link"
+    # MoveIt 2's point-cloud updater has no robot self-filter here, so the real
+    # profile keeps the cloud out of the octomap until a filtered/downsampled
+    # cloud exists.  Collisions still come from the measured static scene (P5).
+    use_point_cloud_sensor = (
+        LaunchConfiguration("use_point_cloud_sensor").perform(context).lower()
+        in ("1", "true", "yes", "on"))
     rviz_config = LaunchConfiguration("moveit_rviz_config").perform(context)
     use_sim_time = LaunchConfiguration("use_sim_time").perform(context).lower() in (
         "1",
@@ -90,7 +100,7 @@ def _compose(context):
         "tf_prefix": LaunchConfiguration("tf_prefix").perform(context),
     }
 
-    moveit_config = (
+    builder = (
         MoveItConfigsBuilder("cs625", package_name=moveit_package)
         .robot_description(file_path=description_path, mappings=robot_mappings)
         .robot_description_semantic(file_path=srdf_path, mappings=semantic_mappings)
@@ -102,9 +112,10 @@ def _compose(context):
             publish_robot_description=True,
             publish_robot_description_semantic=True,
         )
-        .sensors_3d(file_path=sensors_file)
-        .to_moveit_configs()
     )
+    if use_point_cloud_sensor:
+        builder = builder.sensors_3d(file_path=sensors_file)
+    moveit_config = builder.to_moveit_configs()
 
     move_group = Node(
         package="moveit_ros_move_group",
@@ -133,6 +144,9 @@ def _compose(context):
         condition=IfCondition(LaunchConfiguration("launch_rviz")),
     )
     return [
+        LogInfo(msg=(f"real_moveit point_cloud_octomap="
+                     f"{'ENABLED' if use_point_cloud_sensor else 'DISABLED'} "
+                     "(DISABLED avoids the <octomap>-upperarm_link self-collision)")),
         LogInfo(msg=f"real_moveit description_file={description_path}"),
         LogInfo(msg=f"real_moveit semantic_file={srdf_path}"),
         move_group,
@@ -195,6 +209,17 @@ def generate_launch_description():
                     Path(get_package_share_directory("cs625_bringup"))
                     / "config"
                     / "moveit_sensors_3d.yaml"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "use_point_cloud_sensor",
+                default_value="false",
+                description=(
+                    "Feed /sensors/camera/points into MoveIt's octomap.  Default "
+                    "false on the real cell: the tool-mounted camera sees the arm, "
+                    "the octomap then reports a contact with upperarm_link at the "
+                    "plan start state and every plan is aborted.  Set true only "
+                    "after the cloud is filtered/downsampled against the robot body."
                 ),
             ),
             DeclareLaunchArgument(
