@@ -183,7 +183,14 @@ def print_model_summary(model: dict, model_path: pathlib.Path | None) -> None:
         return
     delta = model.get("baseline_delta", {})
     print(f"environment model : {model_path}")
-    print(f"  created_at      : {model.get('created_at')}")
+    created = model.get("created_at")
+    print(f"  created_at      : {created}")
+    try:
+        age_h = (datetime.now(timezone.utc)
+                 - datetime.fromisoformat(str(created))).total_seconds() / 3600.0
+        print(f"  age             : {age_h:.2f} h")
+    except (TypeError, ValueError):
+        pass
     print(f"  frames/points   : {model.get('frames_used')} / {model.get('valid_points')}")
     print(f"  slot delta      : {delta.get('slot_mm', 0):.2f} mm / "
           f"{delta.get('slot_deg', 0):.2f} deg")
@@ -301,8 +308,13 @@ def main() -> int:
                 extra = f" band={band}" if band else ""
                 print(f"    {name:<28} v={velocity:<6} chunks={chunks}{extra}")
         print("\ndry run: no motion, no planning")
+        if not ok:
+            print("dry run gate verdict: REJECT -- a real run would refuse here "
+                  "(exit code 2); re-measure the environment model first")
         _write_summary(summary, args.summary)
-        return 0
+        # The old code returned 0 here, so the runbook's step 3 ("dry-run, look at
+        # the gate") reported success even with a stale model.
+        return 0 if ok else 2
 
     if not ok:
         print("\nrefusing to run: the environment model did not pass the gate")
@@ -349,7 +361,7 @@ def main() -> int:
         command = runner_command(step_path, step, args)
         print(f"\n=== [{step}] {' '.join(command)}")
         started = time.time()
-        completed = subprocess.run(command)
+        completed = subprocess.run(command, cwd=str(REPO))
         elapsed = time.time() - started
         summary["steps"].append({"step": step, "returncode": completed.returncode,
                                  "seconds": round(elapsed, 1)})

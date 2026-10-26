@@ -45,7 +45,6 @@ from moveit_msgs.srv import (
     GetMotionPlan,
     GetPositionFK,
     GetPositionIK,
-    GetStateValidity,
 )
 from rclpy.duration import Duration as RDuration
 from rclpy.node import Node
@@ -63,8 +62,20 @@ JOINTS = (
     "wrist_3_joint",
 )
 GRIPPER_PS1 = r"C:\Users\Public\hitbot_cmd.ps1"
-RECOVER_SH = "scripts/recover_control.sh"
-HEALTH_PY = "scripts/control_health.py"
+# Absolute, so the runner behaves the same when it is started from anywhere.  The
+# old relative strings only worked when the caller happened to be in the repository
+# root; control_health.py in particular was invoked from ``try:``-free code and a
+# FileNotFoundError there produced a bare traceback with no hint.
+SCRIPTS_DIR = Path(__file__).resolve().parent
+RECOVER_SH = str(SCRIPTS_DIR / "recover_control.sh")
+HEALTH_PY = str(SCRIPTS_DIR / "control_health.py")
+CHUNK_PY = str(SCRIPTS_DIR / "execute_assembly_chunks.py")
+VERIFY_PY = str(SCRIPTS_DIR / "verify_pose.py")
+# Goals are sent to a controller that may be inactive even though the driver and
+# the action server are up; give the operator a bounded, named failure instead of
+# hanging (measured 2026-10-26: a missing move_group left the runner silent for
+# ever, with no output at all).
+MOVEIT_SERVICE_TIMEOUT_S = 20.0
 
 
 @dataclass
@@ -117,6 +128,8 @@ class Config:
     baseline_q: tuple[float, float, float, float]
     advance_axis: np.ndarray
     grip_width_mm: float
+    # 夹持电流（A）。以前只在调用处用 getattr(..., 0.1) 兜底，配置里改了也不生效。
+    grip_current: float = 0.1
     lift_total_mm: float = 155.0
     safe_clear_mm: float = 150.0
     velocity_scale: float = 0.02
@@ -176,6 +189,7 @@ def load_config(path: str) -> Config:
         baseline_q=q("baseline_q"),
         advance_axis=axis / np.linalg.norm(axis),
         grip_width_mm=float(raw.get("grip_width_mm", 52.2)),
+        grip_current=float(raw.get("grip_current", 0.1)),
         lift_total_mm=float(raw.get("lift_total_mm", 155.0)),
         safe_clear_mm=float(raw.get("safe_clear_mm", 150.0)),
         velocity_scale=float(raw.get("velocity_scale", 0.02)),
@@ -228,6 +242,12 @@ NO_COLLISION_CHECK_PHASES = TIGHT_CLEARANCE_PHASES | {"d2b_entrance_tilted"}
 MAX_TIGHT_CLEARANCE_VELOCITY = 0.005
 MIN_SAFE_CLEAR_MM = 100.0         # axial clearance before any rotation
 MAX_GOAL_TOLERANCE = 0.005        # rad; loose tolerances fake success
+# Joint-goal tolerance is what MoveIt accepts as "at the goal" for every planned
+# phase.  The real cell uses 0.02 rad and the simulation overlay tightens it to
+# 0.002; anything looser than this makes "planned" meaningless.
+MAX_GOAL_JOINT_TOLERANCE = 0.05
+# Upper bound for per-phase chunk counts; a typo used to slip through validation.
+MAX_CHUNKS = 12
 # Phases that physically enter the part or the fixture: their speed is checked
 # against the assembly cap no matter what the profile file says.
 ASSEMBLY_PHASES = {"grasp", "pre_insert", "insert", "straighten", "withdraw",
@@ -240,6 +260,21 @@ def _is_tight(phase: str) -> bool:
     if phase in TIGHT_CLEARANCE_PHASES:
         return True
     return any(phase.startswith(prefix) for prefix in TIGHT_CLEARANCE_PHASES)
+
+
+def chunk_count(total_points: int, requested: int) -> int:
+    """Largest useful chunk count for a trajectory with ``total_points`` points.
+
+    A chunk is a slice ``points[start:end + 1]``, so ``n`` chunks need at least
+    ``n + 1`` points to avoid duplicate or single-point segments.  The old code
+    used the requested count blindly: with 3 points and 6 chunks it produced
+    ``[1, 2, 1, 1, 2, 1]`` points per chunk -- repeated motion the arm had already
+    made (the "twitch" seen on 2026-10-2x) and 1-point trajectories the controller
+    can reject.  Returns 0 when there is nothing to execute.
+    """
+    if total_points < 2 or requested < 1:
+        return 0
+    return min(int(requested), total_points - 1)
 
 
 def _no_collision_check(phase: str) -> bool:
@@ -262,6 +297,17 @@ def phase_speed_problems(speeds: dict, mode: str) -> list[str]:
     for name, raw in (speeds or {}).items():
         if not isinstance(raw, dict):
             continue
+        if "chunks" in raw:
+            try:
+                requested = int(raw["chunks"])
+            except (TypeError, ValueError):
+                problems.append(f"phase {name}.chunks {raw['chunks']!r} is not an integer")
+            else:
+                if requested < 1:
+                    # chunks <= 0 used to execute nothing and report success.
+                    problems.append(f"phase {name}.chunks {requested} < 1")
+                elif requested > MAX_CHUNKS:
+                    problems.append(f"phase {name}.chunks {requested} > {MAX_CHUNKS}")
         if _is_tight(str(name)):
             cap = MAX_TIGHT_CLEARANCE_VELOCITY
             if float(raw.get("slow_tail_mm", 0.0)) > 0.0:
@@ -296,6 +342,9 @@ def validate(cfg: Config) -> None:
         problems.append(f"safe_clear_mm {cfg.safe_clear_mm} < {MIN_SAFE_CLEAR_MM}")
     if cfg.goal_tolerance > MAX_GOAL_TOLERANCE:
         problems.append(f"goal_tolerance {cfg.goal_tolerance} > {MAX_GOAL_TOLERANCE}")
+    if not 0.0 < cfg.goal_joint_tolerance <= MAX_GOAL_JOINT_TOLERANCE:
+        problems.append(f"goal_joint_tolerance {cfg.goal_joint_tolerance} not in "
+                        f"(0, {MAX_GOAL_JOINT_TOLERANCE}]")
     stroke = float(np.linalg.norm(cfg.insert - cfg.pre_insert)) * 1000.0
     if stroke < 100.0:
         problems.append(f"insert stroke {stroke:.1f} mm looks wrong")
@@ -467,10 +516,29 @@ class Runner(Node):
         self._ik = self.create_client(GetPositionIK, "/compute_ik")
         self._plan = self.create_client(GetMotionPlan, "/plan_kinematic_path")
         self._cart = self.create_client(GetCartesianPath, "/compute_cartesian_path")
-        self._valid = self.create_client(GetStateValidity, "/check_state_validity")
-        for client in (self._ik, self._plan, self._cart, self._valid):
-            while not client.wait_for_service(timeout_sec=1.0):
-                pass
+        # Bounded wait with the missing names printed.  Before 2026-10-26 this was
+        # ``while not client.wait_for_service(): pass``: with MoveIt not running the
+        # runner printed nothing at all and never timed out, which is exactly what
+        # "the task will not start" looked like from the operator's side.
+        services = (
+            ("/compute_ik", self._ik),
+            ("/plan_kinematic_path", self._plan),
+            ("/compute_cartesian_path", self._cart),
+        )
+        missing: list[str] = []
+        deadline = time.time() + MOVEIT_SERVICE_TIMEOUT_S
+        for name, client in services:
+            while not client.service_is_ready() and time.time() < deadline:
+                time.sleep(0.25)
+            if not client.service_is_ready():
+                missing.append(name)
+        if missing:
+            raise SystemExit(
+                "MoveIt services are not available: " + ", ".join(missing)
+                + f"\n  waited {MOVEIT_SERVICE_TIMEOUT_S:.0f} s."
+                "\n  Most likely: move_group was not started (ros2 launch cs625_bringup "
+                "real_moveit.launch.py ...), or this shell uses a different ROS_DOMAIN_ID.\n"
+                "  Nothing was commanded; fix the stack and re-run.")
         # Plan-only needs forward kinematics for a *simulated* joint state: the
         # arm never moves, so the next phase has to be planned from where the
         # previous phase WOULD have ended.
@@ -796,31 +864,6 @@ class Runner(Node):
             return None
         return JointState(name=list(JOINTS), position=best[1])
 
-    def _ik_legacy(self, xyz, quat, seed: list[float] | None = None) -> JointState | None:
-        pose = Pose()
-        pose.position.x, pose.position.y, pose.position.z = (float(v) for v in xyz)
-        (pose.orientation.x, pose.orientation.y,
-         pose.orientation.z, pose.orientation.w) = (float(v) for v in quat)
-        req = GetPositionIK.Request()
-        req.ik_request.group_name = "cs625_arm"
-        if seed is None:
-            req.ik_request.robot_state.joint_state = JointState(
-                name=list(JOINTS), position=self.arm_positions())
-        else:
-            # Plan-only: seed from the simulated state so the solution stays on
-            # the branch the previous planned phase ends on.
-            req.ik_request.robot_state.joint_state = JointState(
-                name=list(JOINTS), position=[float(v) for v in seed])
-        req.ik_request.pose_stamped.header.frame_id = "world"
-        req.ik_request.pose_stamped.pose = pose
-        req.ik_request.timeout.sec = 3
-        future = self._ik.call_async(req)
-        rclpy.spin_until_future_complete(self, future, timeout_sec=10)
-        result = future.result()
-        if result is None or result.error_code.val != 1:
-            return None
-        return result.solution.joint_state
-
     def plan_joint(self, goal: JointState, speed: float,
                    start_positions: list[float] | None = None) -> list[dict] | None:
         constraints = Constraints()
@@ -1140,6 +1183,13 @@ class Runner(Node):
     def run_chunks(self, points: list[dict], chunks: int, time_scale: float,
                    dwell: float) -> bool:
         total = len(points)
+        chunks = chunk_count(total, chunks)
+        if chunks == 0:
+            # A one-point plan means "already at the target"; there is nothing to
+            # send.  The old formula would have divided by ``chunks`` and produced
+            # repeated single-point chunks instead.
+            self.get_logger().warn("trajectory has fewer than 2 points; no motion sent")
+            return True
         bounds = [round(i * (total - 1) / chunks) for i in range(chunks + 1)]
         for index in range(chunks):
             chunk = points[bounds[index]: bounds[index + 1] + 1]
@@ -1189,14 +1239,50 @@ class Runner(Node):
             # clearances) does not change.
             command[command.index("--time-scale") + 1] = str(time_scale * 1.6)
         result = subprocess.run(command, capture_output=True, text=True, timeout=600)
-        ok = "ALL_ASSEMBLY_CHUNKS_OK" in (result.stdout or "")
+        # The executor already distinguishes its failures with exit codes 2..8; the
+        # old test grepped stdout for "ALL_ASSEMBLY_CHUNKS_OK", so a truncated log
+        # or a crash just before the print looked like a rejection.
+        ok = result.returncode == 0
         if not ok:
             # Say why: a silent False here sent the whole simulated run down a
             # "replan" path with no visible cause.
             tail = ((result.stdout or "") + (result.stderr or "")).strip().splitlines()
             self.get_logger().error(
-                "chunk executor failed: " + " | ".join(tail[-4:] or ["no output"]))
+                f"chunk executor failed (rc={result.returncode}): "
+                + " | ".join(tail[-4:] or ["no output"]))
         return ok
+
+    def robot_modes(self, timeout: float = 5.0) -> tuple[int | None, int | None]:
+        """Read the two driver status topics once, freshly.
+
+        AGENTS.md requires all four before any motion: safety_mode = 1, robot_mode
+        = 7, arm_controller active, control_health three True.  Only the last two
+        were ever checked; a dead driver keeps publishing its old safety_mode, so
+        these are read right before the phase that is about to move, not once at
+        start-up.
+        """
+        try:
+            from eli_common_interface.msg import RobotMode, SafetyMode
+        except Exception:  # noqa: BLE001 - report, do not crash
+            self.get_logger().error(
+                "cannot read safety_mode/robot_mode: eli_common_interface is not "
+                "available in this shell (source the underlay)")
+            return None, None
+        values: dict[str, int] = {}
+        subscriptions = [
+            self.create_subscription(
+                SafetyMode, "/io_and_status_controller/safety_mode",
+                lambda msg: values.__setitem__("safety", int(msg.mode)), 10),
+            self.create_subscription(
+                RobotMode, "/io_and_status_controller/robot_mode",
+                lambda msg: values.__setitem__("robot", int(msg.mode)), 10),
+        ]
+        deadline = time.time() + timeout
+        while len(values) < 2 and time.time() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+        for subscription in subscriptions:
+            self.destroy_subscription(subscription)
+        return values.get("safety"), values.get("robot")
 
     def ensure_control_ready(self) -> bool:
         """Fail fast instead of waiting: check and auto-recover the control chain.
@@ -1209,9 +1295,22 @@ class Runner(Node):
         """
         if self.world == "sim":
             return self._ensure_sim_control_ready()
-        result = subprocess.run(
-            ["python3", HEALTH_PY, "--fix"], capture_output=True, text=True, timeout=90
-        )
+        safety, robot = self.robot_modes()
+        if safety != 1 or robot != 7:
+            self.get_logger().error(
+                f"refusing to move: safety_mode={safety} (want 1 NORMAL), "
+                f"robot_mode={robot} (want 7 RUNNING). Release the E-stop / clear "
+                "the protective stop, then re-check with scripts/control_health.py")
+            return False
+        try:
+            result = subprocess.run(
+                [sys.executable, HEALTH_PY, "--fix"], capture_output=True,
+                text=True, timeout=90, cwd=str(SCRIPTS_DIR.parent))
+        except subprocess.TimeoutExpired:
+            self.get_logger().error(
+                "control_health.py --fix timed out after 90 s (controller manager "
+                "unresponsive); refusing to move")
+            return False
         healthy = result.returncode == 0
         if not healthy:
             self.get_logger().error("control chain unhealthy after recovery")
@@ -1247,22 +1346,6 @@ class Runner(Node):
         # The gripper is a plain ForwardCommandController: a publisher is enough.
         return True
 
-    def validity(self) -> tuple[bool, list[tuple[str, str]]]:
-        req = GetStateValidity.Request()
-        state = RobotState()
-        state.joint_state = self.joints()
-        req.robot_state = state
-        req.group_name = "cs625_arm"
-        future = self._valid.call_async(req)
-        rclpy.spin_until_future_complete(self, future, timeout_sec=8)
-        result = future.result()
-        if result is None:
-            return False, []
-        return bool(result.valid), [(c.contact_body_1, c.contact_body_2) for c in result.contacts]
-
-
-
-
 # --------------------------------------------------------------------------- #
 # Unload (取出) flow
 # --------------------------------------------------------------------------- #
@@ -1282,6 +1365,7 @@ class UnloadConfig:
     box_in_slot: np.ndarray
     slot_origin: np.ndarray
     grip_width_mm: float
+    grip_current: float = 0.1
     extract_steps_mm: float = 40.0
     lift_total_mm: float = 155.0
     velocity_scale: float = 0.02
@@ -1327,6 +1411,7 @@ def load_unload_config(path: str) -> UnloadConfig:
         box_in_slot=g("box_in_slot"),
         slot_origin=g("slot_origin"),
         grip_width_mm=float(raw.get("grip_width_mm", 52.2)),
+        grip_current=float(raw.get("grip_current", 0.1)),
         extract_steps_mm=float(raw.get("extract_steps_mm", 40.0)),
         lift_total_mm=float(raw.get("lift_total_mm", 155.0)),
         velocity_scale=float(raw.get("velocity_scale", 0.02)),
@@ -1361,6 +1446,9 @@ def load_unload_config(path: str) -> UnloadConfig:
     problems.extend(phase_speed_problems(cfg.speeds, mode))
     if cfg.goal_tolerance > MAX_GOAL_TOLERANCE:
         problems.append("goal_tolerance too loose")
+    if not 0.0 < cfg.goal_joint_tolerance <= MAX_GOAL_JOINT_TOLERANCE:
+        problems.append(f"goal_joint_tolerance {cfg.goal_joint_tolerance} not in "
+                        f"(0, {MAX_GOAL_JOINT_TOLERANCE}]")
     if stroke < 100.0:
         problems.append(f"extraction stroke {stroke:.1f} mm looks wrong")
     if problems:
@@ -1542,12 +1630,6 @@ def run_unload(node, args, cfg: UnloadConfig) -> list[dict]:
     # D1 approach from the slot baseline to the outer staging point
     if not joint("d1_staging", cfg.staging, cfg.entrance_q):
         return record
-    def skipped(name: str) -> bool:
-        if name in skip:
-            node.get_logger().info(f"[{name}] skipped (already satisfied)")
-            return True
-        return False
-
     # Init before entering the slot: a residual finger gap would collide.
     if plan_only:
         step("d2_init_before_slot", True, "gripper phase skipped (plan-only)")
@@ -2031,6 +2113,16 @@ def main() -> int:
         node.goal_tolerance = ucfg.goal_tolerance
         node.goal_joint_tolerance = ucfg.goal_joint_tolerance
         node.action_name = ucfg.action
+        # 之前漏了这两行：Runner 默认 world="real"，于是 --world sim 的 unload 会去
+        # 调真机夹爪的 PowerShell 桥（真把夹爪撑开）、并等真机的 control_health。
+        node.world = ucfg.world
+        node.sim_model = getattr(ucfg, "sim_workpiece_model", SIM_WORKPIECE_MODEL)
+        node.sim_gripper_stroke_m = getattr(ucfg, "sim_gripper_stroke_m", 0.0)
+        node.gripper_geometry = {
+            "max": getattr(ucfg, "gripper_max_opening_mm", 50.0),
+            "min": getattr(ucfg, "gripper_span_min_mm", 204.0),
+            "max_span": getattr(ucfg, "gripper_span_max_mm", 246.57),
+        }
         if not args.confirm and not args.plan_only:
             node.get_logger().warn("dry run: pass --confirm to execute motion "
                                    "(or --plan-only to plan without moving)")
@@ -2166,21 +2258,33 @@ def main() -> int:
         return node.run_chunks(points, profile.chunks, profile.time_scale,
                                cfg.dwell_sec)
 
-    def verify(name: str, xyz, quat) -> None:
-        """Measured-pose acceptance after an executed phase (skipped in plan-only)."""
+    def verify(name: str, xyz, quat) -> bool:
+        """Measured-pose acceptance after an executed phase (skipped in plan-only).
+
+        Returns True when the measurement is inside tolerance.  A failure now also
+        turns the phase record into ``ok=False``: before 2026-10-26 it only logged
+        a warning, so a run whose insert ended 50 mm off still exited 0 -- the one
+        promise "safe mode = every phase measured afterwards" was not kept.
+        """
         if plan_only or not cfg.verify or not record:
-            return
+            return True
         if cfg.world == "sim":
             # 仿真里没有 /tcp_pose_broadcaster/pose（那是真机驱动一侧的控制器），
             # verify_pose.py 只会打印 NO_POSE。仿真的验收改在 step() 里按工件位姿
             # 做（见 sim_workpiece_acceptance / capture_grasp_baseline）。
-            return
-        ok, detail = node.verify_stage(name, xyz, quat, cfg)
+            return True
+        ok, text = node.verify_stage(name, xyz, quat, cfg)
         record[-1]["verified"] = ok
-        record[-1]["verify_detail"] = detail
-        Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
+        record[-1]["verify_detail"] = text
         if not ok:
-            node.get_logger().warn(f"[{name}] measured pose outside tolerance: {detail}")
+            record[-1]["ok"] = False
+            record[-1]["detail"] = ((record[-1]["detail"] + " | ")
+                                    if record[-1]["detail"] else "") + text
+            node.get_logger().error(
+                f"[{name}] measured pose outside tolerance: {text} "
+                "(phase marked failed; the flow stops here)")
+        Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
+        return ok
 
     seed = None
     if plan_only:
@@ -2197,6 +2301,14 @@ def main() -> int:
         node.sim_q = list(seed)
 
     phases = resolve_phase_list(cfg)
+    if wanted:
+        known = {name for name, _kind in phases}
+        unknown = [name for name in wanted if name not in known]
+        if unknown:
+            # A typo used to skip every phase, leave the record empty and return 0,
+            # which looked exactly like a successful run.
+            raise SystemExit(f"--phases {unknown} not in this flow; allowed: "
+                             f"{sorted(known)}")
     if not args.confirm and not plan_only:
         node.get_logger().warn("dry run: pass --confirm to execute motion "
                                "(or --plan-only to plan without moving)")
@@ -2221,23 +2333,40 @@ def main() -> int:
         if not plan_only and not node.ensure_control_ready():
             step(name, False, "control chain unhealthy")
             break
+        records_before = len(record)
         try:
             if kind == "special":
                 if plan_only:
                     step(name, True, "gripper phase skipped (plan-only)")
                     continue
                 if name == "gripper_init":
-                    node.gripper("init")
-                    step(name, True)
+                    # 真机 init 是 ~10 s 的校准动作；以前只发命令就记成功，夹爪停在
+                    # init=1 时下一条 grip 会把手指停在中途（10-23 的事故就是这几步）。
+                    ready = node.ensure_gripper_initialized()
+                    step(name, ready, "" if ready else "gripper init did not reach 5")
                 elif name == "grip":
-                    node.gripper("grip", cfg.grip_width_mm, getattr(cfg, "grip_current", 0.1))
-                    step(name, True, f"{cfg.grip_width_mm} mm")
+                    # 同理：命令被接受 ≠ 手指到位。等它真的停在请求开度（或顶住工件）。
+                    gripped = node.grip_and_wait(cfg.grip_width_mm, cfg.grip_current)
+                    step(name, gripped,
+                         f"{cfg.grip_width_mm} mm" if gripped else "grip did not settle")
                 else:  # release
+                    # 释放 = 张开手指，必须由所有者当次授权（与 unload 的 d8 同一门槛）。
+                    if not getattr(args, "allow_release", False):
+                        step(name, False,
+                             "refused: gripper release requires --allow-release "
+                             "(owner approval)")
+                        break
                     node.gripper("grip", max(0.0, cfg.grip_width_mm - 20))
                     node.gripper("grip", 20.0)
                     node.gripper("init")
+                    # init 完成才代表手指收拢/归位；以前发完就往下走 withdraw，
+                    # 手指还撑在工件里时向后拉会把工件/夹具一起拖。
+                    released = node.wait_gripper_init()
                     node._grasp_event.publish(String(data="release_confirmed"))
-                    step(name, True)
+                    step(name, released,
+                         "" if released else "release did not confirm init=5")
+                if not record[-1]["ok"]:
+                    break
             elif name == "pre_grasp":
                 # Was hard-coded to 6 chunks at the global velocity, so the phase
                 # profile in the config file never applied to the longest move.
@@ -2250,7 +2379,7 @@ def main() -> int:
                 step(name, ok, f"v={profile.velocity} ts={profile.time_scale}"
                                f" {detail(goal, points)}")
                 if ok:
-                    verify(name, cfg.pre_grasp, cfg.grasp_q)
+                    ok = verify(name, cfg.pre_grasp, cfg.grasp_q)
             elif name == "grasp":
                 profile = profile_for(cfg.speeds, name, cfg.assembly_velocity_scale,
                                       cfg.time_scale, 4)
@@ -2261,19 +2390,21 @@ def main() -> int:
                 step(name, ok, f"v={profile.velocity} ts={profile.time_scale}"
                                f" {detail(goal, points)}")
                 if ok:
-                    verify(name, cfg.grasp, cfg.grasp_q)
-                    if not plan_only:
-                        node._grasp_event.publish(String(data="grasp_confirmed"))
-                        if cfg.world == "sim":
-                            # 等 carry 节点确认"真的焊住了"再取基线/继续抬臂：
-                            # DetachableJoint 是按 attach 那一刻的相对位姿建关节，
-                            # 若关节在抬臂中途才建立，工件会被留在桌上、夹持关系
-                            # 带着那一段位移（跟随判据会假失败）。
-                            node.wait_for_carry_state("attached")
-                        if cfg.world == "sim" and cfg.verify:
-                            # A) 抓取基线：必须在 attached 之后取（见上面
-                            # capture_grasp_baseline 的说明）。真机走不到这里。
-                            capture_grasp_baseline()
+                    ok = verify(name, cfg.grasp, cfg.grasp_q)
+                if ok and not plan_only:
+                    # 抓取点实测超差时绝不继续"夹住/抬臂"：以前这里不看 verify 结果，
+                    # 偏 50 mm 也会照常发 grasp_confirmed 并把工件带上去。
+                    node._grasp_event.publish(String(data="grasp_confirmed"))
+                    if cfg.world == "sim":
+                        # 等 carry 节点确认"真的焊住了"再取基线/继续抬臂：
+                        # DetachableJoint 是按 attach 那一刻的相对位姿建关节，
+                        # 若关节在抬臂中途才建立，工件会被留在桌上、夹持关系
+                        # 带着那一段位移（跟随判据会假失败）。
+                        node.wait_for_carry_state("attached")
+                    if cfg.world == "sim" and cfg.verify:
+                        # A) 抓取基线：必须在 attached 之后取（见上面
+                        # capture_grasp_baseline 的说明）。真机走不到这里。
+                        capture_grasp_baseline()
             elif kind == "observe":
                 waypoint = name.split(":", 1)[1]
                 pose = (cfg.observe or {}).get(waypoint)
@@ -2400,12 +2531,19 @@ def main() -> int:
         except Exception as exc:  # noqa: BLE001 - recorded, then stop
             step(name, False, f"{type(exc).__name__}: {exc}")
             break
+        if len(record) > records_before and not record[-1]["ok"]:
+            node.get_logger().error(
+                f"[{name}] phase failed; stopping the flow instead of moving on "
+                "with a wrong result (the remaining phases would act on a wrong state)")
+            break
 
     node.destroy_node()
     if rclpy.ok():
         rclpy.shutdown()
     print(json.dumps(record[-1] if record else {}, indent=2))
-    return 0 if all(item["ok"] for item in record) else 1
+    # An empty record is not success: it means nothing ran (for example --phases
+    # matched nothing).  ``all([])`` is True, which used to return 0.
+    return 0 if record and all(item["ok"] for item in record) else 1
 
 
 if __name__ == "__main__":

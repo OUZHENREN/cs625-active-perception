@@ -14,11 +14,38 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
+import pathlib
 import subprocess
 import sys
 import time
 
 SOCKETS = ("50001", "50003", "50004")
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
+
+
+def _setting(name: str, default: str) -> str:
+    """Controller/socket names are machine configuration, not source code.
+
+    ``~/.cs625_local.env`` (or the environment) may override them; the defaults
+    are the names this cell has always used, so nothing changes on this machine.
+    """
+    value = os.environ.get(name, "").strip()
+    if value:
+        return value
+    try:
+        for line in pathlib.Path("~/.cs625_local.env").expanduser().read_text(
+                encoding="utf-8").splitlines():
+            line = line.strip()
+            if line.startswith(f"{name}="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    except OSError:
+        pass
+    return default
+
+
+CONTROLLER_MANAGER = _setting("CS625_CONTROLLER_MANAGER", "/eli_ros2_control_node")
+ARM_CONTROLLER = _setting("CS625_ARM_CONTROLLER", "arm_controller")
 
 
 def sockets_ok() -> bool:
@@ -34,19 +61,33 @@ def sockets_ok() -> bool:
     )
 
 
+def controller_state(text: str) -> str | None:
+    """Return the state column of the arm controller, or None when absent.
+
+    ``ros2 control list_controllers`` prints ``name type state`` (optionally with
+    a ``[*]`` marker in front of the active row).  The old check was
+    ``"active" in line``, which is also true for ``inactive`` -- on 2026-10-26 the
+    cell reported ``controller: True`` while ``arm_controller`` was inactive, so
+    the runner happily sent goals to a controller that could not execute them.
+    Compare the state token exactly instead.
+    """
+    for line in text.splitlines():
+        columns = [column for column in line.replace("[*]", " ").split() if column]
+        if len(columns) >= 3 and columns[0] == ARM_CONTROLLER:
+            return columns[-1]
+    return None
+
+
 def controller_active() -> bool:
     try:
         out = subprocess.run(
             ["ros2", "control", "list_controllers",
-             "--controller-manager", "/eli_ros2_control_node"],
+             "--controller-manager", CONTROLLER_MANAGER],
             capture_output=True, text=True, timeout=8,
         ).stdout
     except Exception:
         return False
-    for line in out.splitlines():
-        if line.startswith("arm_controller") and "active" in line:
-            return True
-    return False
+    return controller_state(out) == "active"
 
 
 def joints_flowing(timeout_sec: float = 2.0) -> bool:
@@ -72,9 +113,21 @@ def joints_flowing(timeout_sec: float = 2.0) -> bool:
     return seen["n"] >= 2
 
 
-def recover() -> None:
-    subprocess.run(["bash", "scripts/recover_control.sh"], check=False,
-                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+def recover() -> bool:
+    """Run the recovery script from the repository root and report what it said.
+
+    The old version threw the output away, so a failed recovery looked exactly
+    like a successful one and the caller only saw "still unhealthy".
+    """
+    script = REPO_ROOT / "scripts" / "recover_control.sh"
+    result = subprocess.run(["bash", str(script)], cwd=str(REPO_ROOT),
+                            capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        tail = ((result.stdout or "") + (result.stderr or "")).strip().splitlines()
+        print("recovery failed (rc=%d): %s" % (result.returncode,
+                                               " | ".join(tail[-4:] or ["no output"])))
+        return False
+    return True
 
 
 def main() -> int:
@@ -92,17 +145,21 @@ def main() -> int:
     if not bad:
         return 0
     print("unhealthy:", bad)
+    if not checks["controller"]:
+        print(f"  {ARM_CONTROLLER} is not active (manager {CONTROLLER_MANAGER}); "
+              "activate it with: ros2 control switch_controllers "
+              f"--controller-manager {CONTROLLER_MANAGER} --activate {ARM_CONTROLLER} --strict")
     if not args.fix:
         return 1
     print("recovering ...")
-    recover()
+    recovered = recover()
     checks = {
         "sockets": sockets_ok(),
         "controller": controller_active(),
         "joint_states": joints_flowing(),
     }
     print("after recovery:", checks)
-    return 0 if all(checks.values()) else 2
+    return 0 if recovered and all(checks.values()) else 2
 
 
 if __name__ == "__main__":

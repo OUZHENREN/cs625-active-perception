@@ -297,10 +297,14 @@ def generate_launch_description():
         DeclareLaunchArgument("safety_k_position", default_value="20"),
         DeclareLaunchArgument(
             "launch_moveit",
-            default_value="true",
+            default_value="false",
             description=(
                 "Start the real-profile MoveIt base after the driver.  It is "
-                "skipped when the driver is not running."
+                "skipped when the driver is not running.  Default false: the "
+                "documented start-up sequence launches MoveIt in a second "
+                "terminal, and the old default produced duplicate move_group "
+                "nodes (observed 2026-10-26: /move_group listed four times), "
+                "which makes planning results depend on which instance answers."
             ),
         ),
         DeclareLaunchArgument(
