@@ -6,3 +6,10 @@
 | id | 日期 | world | scope | mode | 耗时 (s) | 结果 | 归档路径 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | 20261024_204453_sim_pick_and_place_validation | 2026-10-24 | sim | pick_and_place | validation | 11.00 | ok | /home/oy/cs625_experiment_archive/20261024_204453_sim_pick_and_place_validation |
+| 20261026_082844_sim_load_efficient | 2026-10-26 | sim | load | efficient | 4349.15 | ok | /home/oy/cs625_experiment_archive/20261026_082844_sim_load_efficient |
+| 20261026_094449_sim_load_efficient | 2026-10-26 | sim | load | efficient | 162.65 | ok | /home/oy/cs625_experiment_archive/20261026_094449_sim_load_efficient |
+| 20261026_094756_sim_load_efficient | 2026-10-26 | sim | load | efficient | 50.05 | ok | /home/oy/cs625_experiment_archive/20261026_094756_sim_load_efficient |
+| 20261026_095147_sim_load_efficient | 2026-10-26 | sim | load | efficient | 7.65 | ok | /home/oy/cs625_experiment_archive/20261026_095147_sim_load_efficient |
+| 20261026_095215_sim_load_efficient | 2026-10-26 | sim | load | efficient | 6.00 | ok | /home/oy/cs625_experiment_archive/20261026_095215_sim_load_efficient |
+| 20261026_095302_sim_load_efficient | 2026-10-26 | sim | load | efficient | 232.90 | ok | /home/oy/cs625_experiment_archive/20261026_095302_sim_load_efficient |
+| 20261026_095732_sim_load_efficient | 2026-10-26 | sim | load | efficient | 50.00 | ok | /home/oy/cs625_experiment_archive/20261026_095732_sim_load_efficient |

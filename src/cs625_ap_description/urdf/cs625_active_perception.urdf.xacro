@@ -210,7 +210,7 @@
     <gazebo reference="$(arg prefix)wrist_1_link"><gravity>false</gravity></gazebo>
     <gazebo reference="$(arg prefix)wrist_2_link"><gravity>false</gravity></gazebo>
     <gazebo reference="$(arg prefix)wrist_3_link"><gravity>false</gravity></gazebo>
-    <gazebo reference="$(arg prefix)my_end_effector_link"><gravity>false</gravity></gazebo>
+    <gazebo reference="$(arg prefix)tool0"><gravity>false</gravity></gazebo>
     <gazebo reference="$(arg prefix)gripper_base_link"><gravity>false</gravity></gazebo>
     <gazebo reference="$(arg prefix)gripper_left_finger_link"><gravity>false</gravity></gazebo>
     <gazebo reference="$(arg prefix)gripper_right_finger_link"><gravity>false</gravity></gazebo>
@@ -224,48 +224,93 @@
 
        This replaces the senior's tool0_vision.STL, which was a DIFFERENT object
        (177 x 240 x 214 mm against 294.6 x 85 x 214 mm), was an ASCII mesh of
-       50 MB with 183373 triangles, and sat 146..360 mm off its own origin, which
-       is where the old -0.046 0 0.353 joint offset came from.  The joint below is
-       therefore identity: the tool's own frame is the flange frame.
+       50 MB with 183373 triangles, and sat 146..360 mm off its own origin.
 
        Inertia is the SolidWorks positive-tensor output, converted at 1e-6 and
        rotated from the part frame into this one; the mass is the measured
        4.580 kg.  The centre of mass X is -0.10 mm, which the symmetry check above
-       predicts.  The SRDF tip stays my_end_effector_link, so the group, the P7
-       contracts and the MoveIt configuration are untouched. -->
-  <link name="$(arg prefix)my_end_effector_link">
+       predicts.
+
+       The mesh hangs on tool0, which coincides with the flange, because the mesh
+       is authored in flange coordinates.  The TCP frame (my_end_effector_link) is
+       a separate, geometry-free frame 353 mm further out (see the next block). -->
+  <link name="$(arg prefix)tool0">
+    <!-- 安装朝向：绕工具轴 +90°（`1.5707963` rad）。见 cs625_parallel_gripper.xacro
+         里同名说明——师兄的 tool0_vision.STL 宽轴沿 Y（240 mm），本仓库的
+         gripper_0920.stl 宽轴沿 X（294.6 mm），两者都是 identity 挂载，
+         所以本仓库这份少了一次 90° 安装旋转。tool0 这个坐标系本身不动：
+         相机外参 T_flange_cam 与 TCP T_flange_tcp 都相对法兰标定，不能被带偏。 -->
     <visual>
+      <origin rpy="0 0 1.5707963"/>
       <geometry>
         <mesh filename="file://$(find cs625_ap_description)/meshes/tool/gripper_0920.stl"/>
       </geometry>
       <material name="eef_color"><color rgba="0.75 0.75 0.75 1.0"/></material>
     </visual>
+    <!-- 支架（只显示、不加碰撞）。真机控制器 TCP 在法兰前 353 mm，而 gripper_0920.stl
+         只有 207 mm，中间 146 mm 是没建模的支架。不补这一段，夹爪会看起来"悬空"在
+         手腕外面。盒子截面 50x50 mm、沿工具轴 0.20..0.353 m，纯粹为了视觉连续，
+         不参与任何碰撞检查（dartsim 支持 box 碰撞，加了会多出实体、与工件产生假接触）。 -->
+    <visual>
+      <origin xyz="0 0 0.2765"/>
+      <geometry><box size="0.050 0.050 0.146"/></geometry>
+      <material name="tool_bracket_color"><color rgba="0.62 0.63 0.66 1.0"/></material>
+    </visual>
     <collision>
+      <origin rpy="0 0 1.5707963"/>
       <geometry>
         <mesh filename="file://$(find cs625_ap_description)/meshes/tool/gripper_0920.stl"/>
       </geometry>
     </collision>
+    <!-- 惯量随本体转 90°（R I Rᵀ，R = 绕 z 转 +90°）：质心 (x,y)→(-y,x)，ixx/iyy 互换。 -->
     <inertial>
-      <origin xyz="-0.0001013 0.0140800 0.1095589" rpy="0 0 0"/>
+      <origin xyz="-0.0140800 -0.0001013 0.1095589" rpy="0 0 0"/>
       <mass value="4.580"/>
-      <inertia ixx="1.656126300e-02" ixy="4.500000000e-07" ixz="4.718400000e-05"
-               iyy="3.412100900e-02" iyz="-6.521470000e-04" izz="2.090739800e-02"/>
+      <inertia ixx="3.412100900e-02" ixy="-4.500000000e-07" ixz="6.521470000e-04"
+               iyy="1.656126300e-02" iyz="4.718400000e-05" izz="2.090739800e-02"/>
     </inertial>
   </link>
-  <joint name="$(arg prefix)flange_to_eef_joint" type="fixed">
-    <parent link="$(arg prefix)flange"/>
-    <child link="$(arg prefix)my_end_effector_link"/>
-    <origin xyz="0 0 0" rpy="0 0 0"/>
-  </joint>
 
-  <!-- Stable application frame used by the active-perception contract. -->
-  <link name="$(arg prefix)tool0"/>
-  <joint name="$(arg prefix)eef_to_tool0" type="fixed">
-    <parent link="$(arg prefix)my_end_effector_link"/>
+  <!-- Stable application frame used by the active-perception contract: the flange
+       itself.  The parallel gripper and the eye-in-hand camera hang off this link,
+       and config/handeye/tcp_to_camera.json stores both tools relative to the
+       FLANGE (T_flange_tcp / T_flange_cam), so this anchor must not move. -->
+  <joint name="$(arg prefix)flange_to_tool0" type="fixed">
+    <parent link="$(arg prefix)flange"/>
     <child link="$(arg prefix)tool0"/>
     <origin xyz="0 0 0" rpy="0 0 0"/>
   </joint>
 
+  <!-- TCP frame = the real controller's TCP: 353 mm out along the tool axis and
+       46 mm along -X.  That is exactly what the vendor eli_cs_robot_description
+       uses for the same joint, and the real cell runs MoveIt on that vendor
+       description instead of this file:
+         <origin xyz="-0.046 0 0.353"/>
+       The SRDF group tip is this link, so MoveIt solves IK for THIS point, and
+       every pose in config/tasks/*.yaml is a point in this frame.  Cross-checked
+       against the 2026-10-22 recorded joint trajectory: FK of the recorded
+       pre_grasp end joints plus this offset reproduces the controller's
+       tcp_pose_broadcaster value to 0.5 mm.
+
+       Geometry-free on purpose: the tool mesh, the gripper and the camera are
+       353 mm behind this frame and must not be pushed forward by it.
+
+       2026-10-25 correction: the 2026-09-20 revision made this joint identity,
+       reading the old 353 mm offset as an artefact of the senior mesh's origin.
+       That conflated "where the mesh's coordinates start" (the flange, correctly
+       anchored above) with "where the TCP is" (here).  With an identity joint the
+       simulation put the FLANGE on every pose target, i.e. ~356 mm below where
+       the real arm went, and load/efficient drove the tool into the workpiece
+       table and never finished. -->
+  <link name="$(arg prefix)my_end_effector_link"/>
+  <joint name="$(arg prefix)flange_to_eef_joint" type="fixed">
+    <parent link="$(arg prefix)flange"/>
+    <child link="$(arg prefix)my_end_effector_link"/>
+    <origin xyz="-0.046 0 0.353" rpy="0 0 0"/>
+  </joint>
+
+  <!-- 夹爪（gripper_0920 对称网格）挂在 tool0 上；占位手指/底板由
+       cs625_parallel_gripper.xacro 提供（与上一段对话结束时的状态一致）。 -->
   <xacro:cs625_parallel_gripper parent="$(arg prefix)tool0" prefix="$(arg prefix)"/>
 
   <!-- Grasp centre between the two support arms.  Massless and collision-free.

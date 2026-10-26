@@ -153,9 +153,17 @@ def generate_launch_description():
             DeclareLaunchArgument("fake_sensor_commands", default_value="false"),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("launch_rviz", default_value="false"),
-            DeclareLaunchArgument("description_package", default_value="cs625_ap_description"),
             DeclareLaunchArgument(
-                "description_file", default_value="cs625_active_perception.urdf.xacro"
+                "description_package",
+                default_value="eli_cs_robot_description",
+                description=(
+                    "参考模型 = 真机 RViz 显示的那份厂商描述（含夹爪+相机安装座+相机"
+                    "的 tool0_vision.STL）。真机每次启动本来都手工覆盖成它，默认值不"
+                    "改就是等着踩坑；仓库包装层仍可用参数显式指定。"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "description_file", default_value="cs625.urdf.xacro"
             ),
             DeclareLaunchArgument(
                 "initial_positions_file",

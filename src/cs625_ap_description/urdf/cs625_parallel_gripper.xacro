@@ -108,6 +108,11 @@
         <inertia ixx="8.83e-05" ixy="0" ixz="0" iyy="8.83e-05" iyz="0" izz="1.35e-04"/>
       </inertial>
     </link>
+    <!-- 2026-10-25：本夹爪模型（gripper_0920 + 两片手指 link）在仿真里被证明与真机
+         不符（手指应落在法兰前 353 mm 的真机 TCP 处，而这里建模在 77 mm），
+         且真机描述本身**没有**手指 link。按所有者要求改为"直接复用真机（师兄）的描述"，
+         这个 xacro 不再被 cs625_active_perception.urdf.xacro 引用。
+         保留文件是为了不删除源码（项目规则：不为清理而删除）。 -->
     <joint name="${prefix}tool0_to_gripper_base" type="fixed">
       <parent link="${parent}"/>
       <child link="${prefix}gripper_base_link"/>

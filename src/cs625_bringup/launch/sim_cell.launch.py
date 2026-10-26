@@ -145,6 +145,11 @@ def _compose(context):
             "headless": LaunchConfiguration("headless"),
             "gazebo_visuals": LaunchConfiguration("gazebo_visuals"),
             "launch_rviz": LaunchConfiguration("launch_rviz"),
+            # 机器人描述的透传开关。默认为仓库包装层（历史行为），
+            # 但可以一行切到真机/师兄那份厂商描述，做"仿真与真机同一模型"的验证：
+            #   description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro
+            "description_package": LaunchConfiguration("description_package"),
+            "description_file": LaunchConfiguration("description_file"),
         }.items(),
     )
 
@@ -161,6 +166,9 @@ def _compose(context):
             # Same value sim_base forwards, so the planning-side description
             # matches the accepted simulation composition.
             "use_fake_hardware": "true",
+            # 规划侧与执行侧用同一份描述，否则 MoveIt 的 tip 和 Gazebo 的实体不是同一个。
+            "description_package": LaunchConfiguration("description_package"),
+            "description_file": LaunchConfiguration("description_file"),
         }.items(),
     )
 
@@ -214,6 +222,27 @@ def generate_launch_description() -> LaunchDescription:
                 "gazebo_visuals",
                 default_value="true",
                 description="Keep the CS625 mesh visuals in the Gazebo GUI.",
+            ),
+            # 参考模型 = 真机（师兄）那份描述，所有者 2026-10-25 明确定下：
+            # "真正对的是前两天跑通的 RViz 中显示的模型，大概多了相机安装座和相机
+            #  这些……绝对不是几个方块的，而是具体的 CAD 模型"。
+            # 厂商 cs625.urdf.xacro 的 my_end_effector_link 挂 tool0_vision.STL，
+            # 一个 CAD 网格里同时含夹爪 + 两条支撑臂 + 相机安装座 + 相机。
+            # 仓库包装层（cs625_ap_description）只保留给 P7 时代的其它仿真 launch，
+            # 不再是六模式仿真的默认；要显式切回仍可传参数，不删任何文件。
+            DeclareLaunchArgument(
+                "description_package",
+                default_value="eli_cs_robot_description",
+                description=(
+                    "Robot description package. 默认 = 真机 RViz 那份厂商描述"
+                    "（含相机安装座/相机的 CAD）；传 cs625_ap_description 可切回"
+                    "仓库包装层做对比。"
+                ),
+            ),
+            DeclareLaunchArgument(
+                "description_file",
+                default_value="cs625.urdf.xacro",
+                description="Robot description xacro inside that package's urdf/ directory.",
             ),
             OpaqueFunction(function=_compose),
         ]

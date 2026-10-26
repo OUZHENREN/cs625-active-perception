@@ -133,38 +133,63 @@ def test_fixture_model_origin_lands_on_slot_origin():
 
 
 def test_table_boxes_match_measured_limits():
-    """桌面盒子：xy = 实测范围，顶面 = 实测 z，没有缩放。"""
+    """桌面盒子：顶面严格 = 实测 z；xy 允许被 `config/cell_tables.yaml` 覆盖。
+
+    2026-10-25 起的口径变化
+    ----------------------
+    `model.json` 里的桌子 xy 是"锚点 ±search_radius 洪泛填充"的外接矩形；真机桌面
+    比这个窗口大时四边会被裁平（实测两张桌子都正好 0.92 = 0.90 + 0.02），结果两张
+    桌子被人为撑成同样大小并互相重叠 400×360 mm、高度还差 50 mm。所有者确认真机
+    两桌并不重叠、中间有小缝，因此允许用一份**近似**测绘边界覆盖 xy。
+
+    本测试守住的不变量：
+      · 顶面高度**不可**覆盖，必须严格等于实测 z（高度差是物理量）；
+      · 覆盖之后两张桌子**不许重叠**（这正是覆盖的目的）；
+      · 桌面盒子仍然从地面顶面长到桌面。
+    """
 
     measured = MEASUREMENTS["tables"]
     tables = PLAN["tables"]
 
     workpiece = tables["workpiece_table"]
-    assert workpiece["xy_min"] == pytest.approx([0.26, 0.28])
-    assert workpiece["xy_max"] == pytest.approx([1.18, 1.08])
-    assert workpiece["top_z"] == pytest.approx(measured["workpiece_table"]["z"], abs=0.0)
-    assert workpiece["centre"][:2] == pytest.approx([0.72, 0.68])
-    assert workpiece["size"][:2] == pytest.approx([0.92, 0.80])
-    assert workpiece["centre"][2] == pytest.approx((workpiece["top_z"] + build_sim_world.DEFAULT_FLOOR_TOP_Z) / 2.0)
-
     slot = tables["slot_table"]
-    assert slot["xy_min"] == pytest.approx([0.78, -0.28])
-    assert slot["xy_max"] == pytest.approx([1.70, 0.64])
-    assert slot["top_z"] == pytest.approx(measured["slot_table"]["z"], abs=0.0)
-    assert slot["centre"][:2] == pytest.approx([1.24, 0.18])
-    assert slot["size"][:2] == pytest.approx([0.92, 0.92])
 
-    # 盒子从地面顶面长到桌面：底面统一、厚度由实测 z 决定（不是写死的 0.05）。
-    for table in tables.values():
+    # ① 顶面高度必须严格等于实测值——覆盖文件只能改 xy。
+    assert workpiece["top_z"] == pytest.approx(measured["workpiece_table"]["z"], abs=0.0)
+    assert slot["top_z"] == pytest.approx(measured["slot_table"]["z"], abs=0.0)
+
+    # ② xy：有近似测绘覆盖就用它，否则退回实测范围。
+    override_path = build_sim_world.ROOT / "config/cell_tables.yaml"
+    if override_path.is_file():
+        import yaml
+
+        overrides = yaml.safe_load(override_path.read_text(encoding="utf-8"))["cell_tables"]
+        assert workpiece["xy_min"] == pytest.approx(overrides["workpiece_table"]["xy_min"])
+        assert workpiece["xy_max"] == pytest.approx(overrides["workpiece_table"]["xy_max"])
+        assert slot["xy_min"] == pytest.approx(overrides["slot_table"]["xy_min"])
+        assert slot["xy_max"] == pytest.approx(overrides["slot_table"]["xy_max"])
+    else:
+        assert workpiece["xy_min"] == pytest.approx([0.26, 0.28])
+        assert workpiece["xy_max"] == pytest.approx([1.18, 1.08])
+        assert slot["xy_min"] == pytest.approx([0.78, -0.28])
+        assert slot["xy_max"] == pytest.approx([1.70, 0.64])
+
+    # ③ 两张桌子不许重叠，并且这个结论要反映在 plan["overlap"] 与说明里。
+    assert build_sim_world.tables_overlap(workpiece, slot) is None
+    assert PLAN["overlap"] is None
+    assert all(not note.startswith("两张桌子的盒子在 xy 上重叠") for note in PLAN["notes"])
+
+    # ④ 底座桌：顶面 = base_link 安装面 z=0，且与两张桌子都不重叠。
+    base = tables["robot_base_table"]
+    assert base["top_z"] == pytest.approx(0.0)
+    assert build_sim_world.tables_overlap(base, workpiece) is None
+    assert build_sim_world.tables_overlap(base, slot) is None
+
+    # ⑤ 三张桌子都从地面顶面长到各自顶面。
+    for name, table in tables.items():
         assert table["bottom_z"] == pytest.approx(build_sim_world.DEFAULT_FLOOR_TOP_Z)
         assert table["size"][2] == pytest.approx(table["top_z"] - table["bottom_z"])
-        assert table["top_z"] > table["bottom_z"]
-
-    # 实测范围确实叠在一起，且提示信息被算出来了（脚本会打印）。
-    overlap = PLAN["overlap"]
-    assert overlap is not None
-    assert overlap["xy_min"] == pytest.approx([0.78, 0.28])
-    assert overlap["xy_max"] == pytest.approx([1.18, 0.64])
-    assert any("重叠" in note for note in PLAN["notes"])
+        assert table["top_z"] > table["bottom_z"], name
 
 
 # ---------------------------------------------------------------------------

@@ -7,16 +7,16 @@
   世界系重配，因此位姿与真机实测可比。
 
   数据来源：
-    - 环境模型 runtime/environment/20261024_122523/model.json（真机实测点云拟合）
+    - 环境模型 runtime/environment/20261025_091250/model.json（真机实测点云拟合）
     - 槽位 config/tasks/common.yaml slot_origin / slot_origin_q（RobotVisionSuite 标定）
     - 模型 bbox 来自 model.sdf 引用的 STL 顶点极值
 
   几何口径（重要）：
-    - 工件桌：顶面 z=-0.09097 m，xy x[0.260, 1.180]
-      y[0.280, 1.080]；盒子从地面顶面 z=-0.200 长到桌面。
-    - 插槽桌：顶面 z=-0.04073 m，xy x[0.780, 1.700]
-      y[-0.280, 0.640]。
-    - 两张桌子的盒子在 xy 上重叠 x[0.780, 1.180] y[0.280, 0.640]，重叠区允许两个盒子叠在一起。
+    - 工件桌：顶面 z=-0.09097 m，xy x[0.300, 0.990]
+      y[0.300, 0.900]；盒子从地面顶面 z=-0.200 长到桌面。
+    - 插槽桌：顶面 z=-0.04073 m，xy x[1.010, 1.700]
+      y[-0.450, 0.400]。
+    - 两张桌子的盒子在 xy 上重叠 无，重叠区允许两个盒子叠在一起。
     - 夹具：模型 origin = slot_origin（RobotVisionSuite 对这块真机网格的标定），只转 yaw。
       模型 origin 不在零件中心，bbox 中心因此偏离 slot_origin
       0.3281 m，这是坐标系的定义，不是对齐误差；底部法兰落在
@@ -70,17 +70,35 @@
       </link>
     </model>
 
+    <!-- 机械臂底座桌：把 base_link 安装面 (z=0) 与地面顶面 (z=-0.200) 之间填满，
+         让机械臂有个落地的基座，不再悬空。尺寸由生成器定（0.58 m 见方），
+         与两张桌子都不重叠。 -->
+    <model name="robot_base_table">
+      <static>true</static>
+      <pose>0.000000000 0.000000000 -0.100000000 0.000000000 0.000000000 0.000000000</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.580000 0.580000 0.200000</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.580000 0.580000 0.200000</size></box></geometry>
+          <material><ambient>0.30 0.31 0.34 1</ambient><diffuse>0.38 0.40 0.43 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
     <!-- 工件桌：实测 xy 范围 + 顶面 z=-0.09097，盒子向下长到地面。 -->
     <model name="workpiece_table">
       <static>true</static>
-      <pose>0.720000000 0.680000000 -0.145485000 0.000000000 0.000000000 0.000000000</pose>
+      <pose>0.645000000 0.600000000 -0.145485000 0.000000000 0.000000000 0.000000000</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>0.920000 0.800000 0.109030</size></box></geometry>
+          <geometry><box><size>0.690000 0.600000 0.109030</size></box></geometry>
           <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
         </collision>
         <visual name="visual">
-          <geometry><box><size>0.920000 0.800000 0.109030</size></box></geometry>
+          <geometry><box><size>0.690000 0.600000 0.109030</size></box></geometry>
           <material><ambient>0.55 0.45 0.32 1</ambient><diffuse>0.62 0.52 0.38 1</diffuse></material>
         </visual>
       </link>
@@ -89,14 +107,14 @@
     <!-- 插槽桌：顶面 z=-0.04073。 -->
     <model name="slot_table">
       <static>true</static>
-      <pose>1.240000000 0.180000000 -0.120365000 0.000000000 0.000000000 0.000000000</pose>
+      <pose>1.355000000 -0.025000000 -0.120365000 0.000000000 0.000000000 0.000000000</pose>
       <link name="link">
         <collision name="collision">
-          <geometry><box><size>0.920000 0.920000 0.159270</size></box></geometry>
+          <geometry><box><size>0.690000 0.850000 0.159270</size></box></geometry>
           <surface><friction><ode><mu>0.8</mu><mu2>0.8</mu2></ode></friction></surface>
         </collision>
         <visual name="visual">
-          <geometry><box><size>0.920000 0.920000 0.159270</size></box></geometry>
+          <geometry><box><size>0.690000 0.850000 0.159270</size></box></geometry>
           <material><ambient>0.40 0.42 0.46 1</ambient><diffuse>0.48 0.50 0.54 1</diffuse></material>
         </visual>
       </link>

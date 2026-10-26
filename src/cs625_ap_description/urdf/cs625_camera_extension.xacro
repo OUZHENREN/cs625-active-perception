@@ -16,6 +16,16 @@
                        camera_clip_near:=0.2 camera_clip_far:=3.0
                        camera_noise_mean:=0.0 camera_noise_stddev:=0.003">
     <link name="${prefix}camera_mount_link">
+      <!-- 安装座可视化。师兄那套里相机与安装座都是工具网格 (tool0_vision.STL) 的一部分，
+           换成 gripper_0920.stl 之后这个网格里没有相机，相机就在 Gazebo 里彻底看不见了。
+           这里补一个只用于显示的支座盒子；**不加 collision**，因为 dartsim 支持 box 碰撞，
+           加了会在工具上多出一块实体、可能和工件/夹具产生假接触。
+           尺寸 60x60x20 mm 是安装板量级估计，不是测量值。 -->
+      <visual>
+        <origin xyz="0 0 -0.010"/>
+        <geometry><box size="0.060 0.060 0.020"/></geometry>
+        <material name="camera_mount_color"><color rgba="0.55 0.57 0.60 1.0"/></material>
+      </visual>
       <inertial>
         <!-- ESTIMATED, needs CAD mass/CoG.  Not measured.  No datasheet weight
              exists in this repository, so 0.010 kg is a 60 x 60 x 20 mm
@@ -45,6 +55,12 @@
          launch arguments still place this frame and are still placeholders; they
          must be set from the real extrinsics before the sensor pose is trusted. -->
     <link name="${prefix}camera_link">
+      <!-- 相机本体可视化：与师兄那份 `camera_link` 的占位盒子一致（0.03 x 0.05 x 0.02 m）。
+           同样只显示、不加 collision，避免给工具新增实体碰撞。 -->
+      <visual>
+        <geometry><box size="0.030 0.050 0.020"/></geometry>
+        <material name="camera_color"><color rgba="0.20 0.20 0.20 1.0"/></material>
+      </visual>
       <inertial>
         <!-- ESTIMATED, needs CAD mass/CoG.  Not measured.  The real depth eye is
              part of the tool mesh on my_end_effector_link, so this mass is again

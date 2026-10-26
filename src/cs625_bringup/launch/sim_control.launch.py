@@ -33,7 +33,7 @@ from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 
 
-def camera_arguments(separators: bool = False) -> list:
+def camera_arguments() -> list:
     """xacro arguments for the measured Percipio PS800-E1 camera.
 
     All twelve numbers describe the real camera (1280x960, fx 931.47, fy 931.60,
@@ -42,14 +42,9 @@ def camera_arguments(separators: bool = False) -> list:
     provenance of each one; this launch is also included directly by
     ``sim_active_localization.launch.py``, so its defaults mirror sim_base.
 
-    ``separators=True`` inserts literal spaces between the ``name:=value``
-    pairs, which is required by launch's ``Command`` because it concatenates
-    substitutions without separators.  ``ExecuteProcess`` takes a real argv, so
-    it must NOT get those spaces: prepare_gazebo_model.py joins each
-    ``name:=`` with the next token, and a standalone ``" "`` token would reach
-    xacro as a positional file argument.
+    本函数只服务 ``ExecuteProcess`` 的真实 argv：每个 ``name:=value`` 拆成
+    ``name:=`` 和值两个 token，由 prepare_gazebo_model.py 再拼回去交给 xacro。
     """
-
     arguments: list = []
     for name in (
         "camera_image_width",
@@ -66,13 +61,9 @@ def camera_arguments(separators: bool = False) -> list:
         "camera_enabled",
     ):
         arguments += [f"{name}:=", LaunchConfiguration(name)]
-        if separators:
-            arguments.append(" ")
     # The Gazebo sensor element still calls the rate camera_update_rate; the
     # profile-facing launch argument is camera_rate_hz (1 Hz, real 0.79 fps).
     arguments += ["camera_update_rate:=", LaunchConfiguration("camera_rate_hz")]
-    if separators:
-        arguments.append(" ")
     return arguments
 
 
@@ -94,43 +85,6 @@ def _compose(context):
     attachment_enabled = os.getenv("CS625_P7_ATTACHMENT_ENABLED", "true").lower()
     if attachment_enabled not in ("true", "false"):
         raise ValueError("CS625_P7_ATTACHMENT_ENABLED must be true or false")
-    robot_description_content = Command(
-        [
-            FindExecutable(name="xacro"),
-            " ",
-            description_path,
-            " ",
-            "name:=cs",
-            " ",
-            "cs_type:=",
-            LaunchConfiguration("cs_type"),
-            " ",
-            "prefix:=",
-            LaunchConfiguration("prefix"),
-            " ",
-            "safety_limits:=",
-            LaunchConfiguration("safety_limits"),
-            " ",
-            "safety_pos_margin:=",
-            LaunchConfiguration("safety_pos_margin"),
-            " ",
-            "safety_k_position:=",
-            LaunchConfiguration("safety_k_position"),
-            " ",
-            "sim_ignition:=true",
-            " ",
-            "simulation_controllers:=",
-            controllers_path,
-            " ",
-            "initial_positions_file:=",
-            LaunchConfiguration("initial_positions_file"),
-            " ",
-            "p7_attachment_enabled:=",
-            attachment_enabled,
-            " ",
-        ]
-        + camera_arguments(separators=True)
-    )
     gazebo_model_path = LaunchConfiguration("gazebo_model_file")
     # gz_ros2_control is configured by the robot model to read
     # ``robot_description`` from this node.  Publish the exact renderer-safe
@@ -205,6 +159,18 @@ def _compose(context):
         "yes",
         "on",
     )
+    # 为什么把注入器接在这条 prepare 命令上：Gazebo 实体（ros_gz_sim create -file）
+    # 和 robot_state_publisher（cat 同一个文件）都只读 prepare 生成的这份 URDF，所以
+    # 想影响仿真里的控制，就必须改这份文件。而 gz_ros2_control 的
+    # position_proportional_gain 只能写在 URDF 的 <hardware> 块里、运行中设不了，
+    # 那段硬件块在厂商只读包 eli_cs_robot_description 里（项目规则不允许改厂商）。
+    # 于是让 scripts/sim_robot_description.py 以 xacro 的同一调用形状
+    # （<xacro> <描述> [key:=value ...]）包一层，由 prepare_gazebo_model.py 先调它：
+    # 默认把 CS625_POSITION_PROPORTIONAL_GAIN（默认 5.0）塞进第一个 <hardware> 块，
+    # 并在用厂商描述时把工具网格换成对称的 gripper_0920；已有该参数就不动，所以对
+    # 自带 0.5 的仓库包装层描述是 no-op。注入先于去网格，--keep-visuals 时换上的
+    # 对称夹爪网格会被保留。
+    _repo_root = pathlib.Path(__file__).resolve().parents[3]
     prepare_gazebo_model_cmd = [
         FindExecutable(name="python3"),
         PathJoinSubstitution(
@@ -214,6 +180,8 @@ def _compose(context):
                 "prepare_gazebo_model.py",
             ]
         ),
+        "--preprocess",
+        str(_repo_root / "scripts" / "sim_robot_description.py"),
     ]
     if gazebo_visuals:
         prepare_gazebo_model_cmd.append("--keep-visuals")
@@ -241,7 +209,7 @@ def _compose(context):
         LaunchConfiguration("initial_positions_file"),
         "p7_attachment_enabled:=",
         attachment_enabled,
-    ] + camera_arguments(separators=False)
+    ] + camera_arguments()
     prepare_gazebo_model = ExecuteProcess(
         cmd=prepare_gazebo_model_cmd,
         output="screen",

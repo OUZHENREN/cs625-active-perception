@@ -359,7 +359,41 @@ def load_measurements(
             "xy_min": [float(v) for v in entry["xy_min"]],
             "xy_max": [float(v) for v in entry["xy_max"]],
             "label": entry.get("label", name),
+            "xy_source": "model.json（点云洪泛填充的外接矩形）",
         }
+
+    # 两张桌子的 xy 边界可以被一份**近似**测绘数据覆盖。
+    #
+    # 为什么需要：model.json 里的 xy 是"锚点 ±search_radius 窗口内洪泛填充"的外接矩形。
+    # 当真机桌面比窗口大时，四边会被窗口裁平（实测两桌都是 0.92 = 0.90 + 0.02），
+    # 于是两张桌子被人为撑成同样大小并互相重叠 400×360 mm、高度还差 50 mm。
+    # 所有者确认真机两桌并不重叠、中间有小缝，因此这里允许用近似边界覆盖 xy。
+    #
+    # 不允许覆盖的：z（顶面高度）。高度差是实测的物理量，必须由 model.json 决定。
+    # 完整的多机位点云建模（真正量出桌边）留待真机阶段补做。
+    cell_tables_path = root / "config/cell_tables.yaml"
+    if cell_tables_path.is_file():
+        with cell_tables_path.open(encoding="utf-8") as handle:
+            overrides = (yaml.safe_load(handle) or {}).get("cell_tables") or {}
+        for name, override in overrides.items():
+            if name not in tables:
+                continue
+            tables[name]["xy_min"] = [float(v) for v in override["xy_min"]]
+            tables[name]["xy_max"] = [float(v) for v in override["xy_max"]]
+            tables[name]["xy_source"] = "config/cell_tables.yaml（近似测绘边界）"
+        # 覆盖的目的就是消除重叠；覆盖之后仍然重叠说明这份近似数据本身是错的，
+        # 与其生成一个物理上不可能的世界，不如在这里就停下来。
+        w, s = tables["workpiece_table"], tables["slot_table"]
+        x0 = max(w["xy_min"][0], s["xy_min"][0])
+        y0 = max(w["xy_min"][1], s["xy_min"][1])
+        x1 = min(w["xy_max"][0], s["xy_max"][0])
+        y1 = min(w["xy_max"][1], s["xy_max"][1])
+        if x1 > x0 and y1 > y0:
+            raise ValueError(
+                "config/cell_tables.yaml 覆盖之后两张桌子仍然重叠："
+                f"x[{x0:.3f}, {x1:.3f}] y[{y0:.3f}, {y1:.3f}]。"
+                "请修正这份近似边界（真机两桌并不重叠）。"
+            )
 
     slot_origin = [float(v) for v in common["slot_origin"]]
     slot_quat = [float(v) for v in common["slot_origin_q"]]
@@ -432,6 +466,24 @@ def plan_scene(
     tables = {
         "workpiece_table": table_box(measurements["tables"]["workpiece_table"], floor_top_z),
         "slot_table": table_box(measurements["tables"]["slot_table"], floor_top_z),
+    }
+
+    # --- 机械臂底座桌 -------------------------------------------------------
+    #
+    # base_link 的安装面在 z=0，而地面顶面在 floor_top_z（默认 -0.20），所以机械臂
+    # 原本是"悬空"的：没有东西托住基座，画面上一眼就能看出不对。这里补一张底座桌。
+    #
+    # 尺寸不是实测值（真机那里就是安装支撑，不影响任何任务位姿），由生成器自己定：
+    # 边长 0.58 m —— 比 0.60 略小，取这个数是为了和工件桌的 x_min=0.30 留出 10 mm 缝，
+    # 保证与两张桌子都不重叠（两张桌子的顶面都在 z=0 以下，底座桌顶面正好在 z=0）。
+    base_side = 0.58
+    tables["robot_base_table"] = {
+        "xy_min": [-0.5 * base_side, -0.5 * base_side],
+        "xy_max": [0.5 * base_side, 0.5 * base_side],
+        "top_z": 0.0,                       # = base_link 安装面
+        "bottom_z": float(floor_top_z),
+        "centre": [0.0, 0.0, 0.5 * float(floor_top_z)],
+        "size": [base_side, base_side, 0.0 - float(floor_top_z)],
     }
 
     # --- 夹具：模型 origin 直接对齐 slot_origin（RVS 标定语义） -------------
@@ -750,6 +802,7 @@ def build_world_sdf(plan: dict, measurements: dict) -> str:
     module = plan["module"]
     workpiece_table = tables["workpiece_table"]
     slot_table = tables["slot_table"]
+    base_table = tables["robot_base_table"]
     module_bottom = module["bbox_world"]["min"][2]
     module_sink = workpiece_table["top_z"] - module_bottom
     fixture_number = plan["fixture"]["pose"]
@@ -832,6 +885,24 @@ def build_world_sdf(plan: dict, measurements: dict) -> str:
         <visual name="visual">
           <geometry><box><size>10 10 0.1</size></box></geometry>
           <material><ambient>0.25 0.25 0.27 1</ambient><diffuse>0.35 0.35 0.38 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- 机械臂底座桌：把 base_link 安装面 (z=0) 与地面顶面 (z={plan['floor_top_z']:.3f}) 之间填满，
+         让机械臂有个落地的基座，不再悬空。尺寸由生成器定（{base_table['size'][0]:.2f} m 见方），
+         与两张桌子都不重叠。 -->
+    <model name="robot_base_table">
+      <static>true</static>
+      <pose>{_pose_text(base_table['centre'], (0.0, 0.0, 0.0))}</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>{base_table['size'][0]:.6f} {base_table['size'][1]:.6f} {base_table['size'][2]:.6f}</size></box></geometry>
+          <surface><friction><ode><mu>0.9</mu><mu2>0.9</mu2></ode></friction></surface>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>{base_table['size'][0]:.6f} {base_table['size'][1]:.6f} {base_table['size'][2]:.6f}</size></box></geometry>
+          <material><ambient>0.30 0.31 0.34 1</ambient><diffuse>0.38 0.40 0.43 1</diffuse></material>
         </visual>
       </link>
     </model>

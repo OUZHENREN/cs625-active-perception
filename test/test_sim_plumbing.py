@@ -143,7 +143,21 @@ def test_action_client_uses_parsed_action():
 
 def test_world_sim_config_is_minimal_and_matches_controller():
     document = yaml.safe_load(WORLD_SIM_CONFIG.read_text(encoding="utf-8"))
-    assert document == {"action": SIM_ACTION, "world": "sim"}
+    # 仿真覆盖层只允许"真机确实没有"的键：
+    #   action               仿真控制器是 joint_trajectory_controller
+    #   world                 标记当前配置属于仿真
+    #   sim_workpiece_model   仿真阶段验收要 `gz model -m <model> --pose` 读工件真值
+    #                         （仿真没有 /tcp_pose_broadcaster），真机判据不走这条
+    #   goal_joint_tolerance  仿真的"夹住"是物理外撑，规划端点偏差会一路传到插槽，
+    #                         所以规划端点精度比真机收紧（真机 0.02 不变）
+    #   sim_gripper_stroke_m  仿真夹爪预压行程（刚体外撑需要"刚好压住"，真机走 EFG 桥）
+    assert document == {
+        "action": SIM_ACTION,
+        "world": "sim",
+        "sim_workpiece_model": "shielding_module",
+        "goal_joint_tolerance": 0.002,
+        "sim_gripper_stroke_m": 0.0115,
+    }
 
     controllers = yaml.safe_load(SIM_CONTROLLERS_CONFIG.read_text(encoding="utf-8"))
     parameters = controllers["controller_manager"]["ros__parameters"]

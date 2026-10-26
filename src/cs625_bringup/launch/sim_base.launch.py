@@ -239,9 +239,49 @@ def _compose(context):
     return actions
 
 
+def _record_gz_partition(partition: str):
+    """把本次仿真的 Gazebo 分区名写进 ``runtime/gz_partition.txt``。
+
+    为什么需要这一层：sim_base 每次启动都给 Gazebo 生成一个唯一分区
+    （``cs625_<unix 时间>``），用来避免连到上一次没退干净的服务器。命令行工具
+    （``gz model`` / ``gz service`` / ``ros_gz_bridge``）必须用**同一个**分区才
+    连得上，而这个分区名只存在于本次 launch 进程的环境变量里。仿真侧的脚本
+    （``scripts/sim_carry_workpiece.py`` 读工件位姿、``scripts/run_pick_and_place.py``
+    读工件真值位姿）如果靠人手工 export，一旦忘了就是"能跑但什么也测不到"的
+    静默失败。写一个运行时文件是最稳的交接方式，和 ``runtime/camera.pid`` 同类。
+    """
+
+    def _action(_context):
+        try:
+            path = Path(__file__).resolve().parents[3] / "runtime" / "gz_partition.txt"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(partition + "\n", encoding="utf-8")
+            print(f"[sim_base] Gazebo partition recorded: {path} -> {partition}")
+        except OSError as exc:  # 写不进去不影响仿真本身
+            print(f"[sim_base] could not record the Gazebo partition: {exc}")
+        return []
+
+    return OpaqueFunction(function=_action)
+
+
 def generate_launch_description():
     gz_control_lib_dir = Path(get_package_prefix("gz_ros2_control")) / "lib"
     ycb_resource_dir = Path(get_package_prefix("cs625_simulation")) / "share" / "cs625_simulation" / "assets"
+
+    # 真机（师兄）那份描述用 `package://eli_cs_robot_description/meshes/...` 引用网格，
+    # URDF→SDF 会把它写成 `model://eli_cs_robot_description/meshes/...`。Gazebo 解析
+    # `model://<包名>/...` 时是在资源路径下找 `<包名>/...`，所以要把该包的 **share 父目录**
+    # 加进 GZ_SIM_RESOURCE_PATH。不加的话表现是：机械臂在、但工具/相机视觉全部加载失败
+    # （日志 "Failed to load mesh from [model://eli_cs_robot_description/...]"）。
+    vendor_resource_dirs = []
+    try:
+        from ament_index_python.packages import get_package_share_directory
+
+        vendor_share = Path(get_package_share_directory("eli_cs_robot_description"))
+        vendor_resource_dirs.append(str(vendor_share.parent))
+    except Exception:  # 厂商包不在环境里时不影响原有包装层
+        pass
+
     gz_control_library = gz_control_lib_dir / "libgz_ros2_control-system.so"
     if not gz_control_library.is_file():
         raise RuntimeError(
@@ -259,6 +299,8 @@ def generate_launch_description():
     # inspection in a single simulation session.
     ign_partition = os.environ.get("CS625_GZ_PARTITION", f"cs625_{int(time.time())}")
     plugin_environment = [
+        # 把本次会话的分区名落盘，给脚本层读（见 _record_gz_partition 的说明）。
+        _record_gz_partition(ign_partition),
         SetEnvironmentVariable(
             "IGN_GAZEBO_SYSTEM_PLUGIN_PATH",
             [
@@ -278,6 +320,8 @@ def generate_launch_description():
         SetEnvironmentVariable(
             "GZ_SIM_RESOURCE_PATH",
             [
+                # 厂商描述网格优先（见上方 vendor_resource_dirs 的说明）。
+                *[f"{d}{os.pathsep}" for d in vendor_resource_dirs],
                 str(ycb_resource_dir),
                 os.pathsep,
                 EnvironmentVariable("GZ_SIM_RESOURCE_PATH", default_value=""),

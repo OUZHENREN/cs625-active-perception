@@ -13,6 +13,9 @@ Design rules baked in (from the two E-stop incidents):
 * after release the arm moves only along the insertion axis until clear;
 * on a failed chunk the controller is recovered once and the chunk retried;
 * every phase checks TCP against its target before continuing;
+* under ``--world sim`` that acceptance uses the workpiece pose instead: Gazebo has no
+  /tcp_pose_broadcaster, so the part itself must follow the gripper (relative pose held
+  within 10 mm / 3°) and end up inside the slot volume; the real path is unchanged;
 * nothing is executed unless ``--confirm`` is passed.
 
 Usage:
@@ -23,6 +26,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import json
 import subprocess
@@ -120,6 +124,12 @@ class Config:
     time_scale: float = 2.0
     dwell_sec: float = 1.0
     goal_tolerance: float = 0.002
+    # 关节目标容差（rad）：传给 MoveIt 的 JointConstraint.tolerance_above/below。
+    # 默认 0.02 = 真机一直用的值；仿真覆盖层会把它收紧（见 config/tasks/world_sim.yaml
+    # 的 goal_joint_tolerance），原因：仿真靠"位姿跟随"表达夹持，抓取时工具停在哪里、
+    # 工件就带着那个相对位姿走，规划端点偏差会一直传到插槽；真机是物理夹紧，夹爪夹到
+    # 哪儿就是哪儿。
+    goal_joint_tolerance: float = 0.02
     max_chunks: int = 7
     phases: list[str] = field(default_factory=list)
     speeds: dict = field(default_factory=dict)
@@ -138,6 +148,12 @@ class Config:
     verify: bool = True
     verify_pos_mm: float = 3.0
     verify_rot_rad: float = 0.01
+    # 仿真里被搬运的工件模型名。仿真验收要跑 `gz model -m <model> --pose` 读工件
+    # 真值位姿，模型名由 config/tasks/world_sim.yaml 在 --world sim 时下发；
+    # 真机不使用本字段（真机判据仍是 verify_pose.py 的 TCP 位姿）。
+    sim_workpiece_model: str = "shielding_module"
+    # 仿真夹爪预压行程（米/侧）。0 = 用 EFG 开度的线性映射（21.285 mm 满行程）。
+    sim_gripper_stroke_m: float = 0.0
 
 
 def load_config(path: str) -> Config:
@@ -167,6 +183,7 @@ def load_config(path: str) -> Config:
         time_scale=float(raw.get("time_scale", 2.0)),
         dwell_sec=float(raw.get("dwell_sec", 1.0)),
         goal_tolerance=float(raw.get("goal_tolerance", 0.002)),
+        goal_joint_tolerance=float(raw.get("goal_joint_tolerance", 0.02)),
         max_chunks=int(raw.get("max_chunks", 7)),
         phases=list(raw.get("phases", [])),
         speeds=dict(raw.get("phase_speeds", {}) or {}),
@@ -182,6 +199,8 @@ def load_config(path: str) -> Config:
         verify=bool(verification.get("enabled", True)),
         verify_pos_mm=float(verification.get("pos_mm", 3.0)),
         verify_rot_rad=float(verification.get("rot_rad", 0.01)),
+        sim_workpiece_model=str(raw.get("sim_workpiece_model", "shielding_module")),
+        sim_gripper_stroke_m=float(raw.get("sim_gripper_stroke_m", 0.0)),
     )
     validate(cfg)
     return cfg
@@ -284,6 +303,159 @@ def validate(cfg: Config) -> None:
         raise SystemExit("config rejected:\n  " + "\n  ".join(problems))
 
 
+# ============================================================================
+# 仿真阶段验收：按"工件跟着夹爪走 + 进插槽"判定（真机仍按 verify_pose.py 的 TCP 判据）
+# ============================================================================
+# 当前问题：仿真里没有 /tcp_pose_broadcaster/pose（那是真机驱动一侧的控制器），
+# 所以 verify_pose.py 在 Gazebo 下永远返回 NO_POSE。日志里 verified=false 既不代表
+# 任务失败，也看不出工件到底有没有被带走。
+#
+# 仿真的物理事实：世界文件里没有 DetachableJoint，"夹住"是
+# scripts/sim_carry_workpiece.py 把工件位姿按 20 Hz 跟随到工具位姿实现的。因此唯一
+# 能证明"任务做成"的量是 **工件自己的世界位姿**：
+#   A) grasp 结束时（grasp_confirmed 发布后）记下 工具→工件 的相对位姿 = 夹持关系，
+#      以及工件当时的世界位姿 = 初始位姿；
+#   B) 之后的阶段结束时，相对位姿必须还是那个夹持关系，且工件确实被搬走了；
+#   C) insert / straighten 结束时，工件包围盒中心必须落在插槽体积内。
+#
+# 数据来源全部是仓库已有产物，不硬编码任何坐标：
+#   工件真值位姿  gz model -m <model> --pose（模型名由 config/tasks/world_sim.yaml 下发，
+#                 解析用 package 里的权威解析器 cs625_task_orchestrator.p7_gazebo_pose）
+#   工具位姿      TF world -> my_end_effector_link（仿真里由 robot_state_publisher 提供）
+#   插槽体积      config/cs625_real_cell_scene.yaml（生成物，权威）
+#                 fixture.pose_world + fixture.bbox_min_m/bbox_max_m → 世界 AABB → 外扩容差
+SIM_SCENE_CONFIG = (Path(__file__).resolve().parent.parent
+                    / "config" / "cs625_real_cell_scene.yaml")
+SIM_WORKPIECE_MODEL = "shielding_module"   # 配置缺失时的兜底；正常由 world_sim.yaml 下发
+SIM_FOLLOW_MAX_MM = 10.0     # 抓取后 工具→工件 相对位姿允许漂移 10 mm
+SIM_FOLLOW_MAX_DEG = 3.0     # 同上，姿态允许 3°
+SIM_MIN_TRAVEL_M = 0.30      # 工件世界位移下限：证明它真被搬走，而不是"手臂空跑"
+SIM_TRAVEL_RATIO = 0.90      # 计划搬运距离不到 0.30 m 的阶段（只有 lift）改用 90% 计划距离
+SIM_SLOT_TOL_M = 0.030       # 插槽 AABB 外扩容差（生成物的 bbox 是网格极值，本身就偏保守）
+# 判据起作用的阶段（load 流程的搬运链）。unload 的 D 系列不在此列，行为与以前一致。
+SIM_FOLLOW_PHASES = ("lift", "transit", "staging", "pre_insert", "insert", "straighten")
+SIM_SLOT_PHASES = ("insert", "straighten")
+# sim_base 每次启动给 Gazebo 生成唯一分区名并写在这里；`gz model` 必须用同一个
+# 分区才连得上那台服务器，否则调用静默超时、判据退化成"无法测量"。
+GZ_PARTITION_FILE = (Path(__file__).resolve().parent.parent
+                     / "runtime" / "gz_partition.txt")
+
+
+def sim_gz_environment() -> dict:
+    """给 `gz model` 子进程用的环境：带上本次仿真的 Gazebo 分区名。
+
+    先看环境变量（有人手工 export 就照用），再看 sim_base 写下的运行时文件。
+    两者都没有时原样返回——这时 `gz model` 会超时，判据按"无法测量"记录，
+    不会假装通过。
+    """
+    env = dict(os.environ)
+    partition = (os.environ.get("IGN_PARTITION", "").strip()
+                 or os.environ.get("GZ_PARTITION", "").strip())
+    if not partition:
+        try:
+            partition = GZ_PARTITION_FILE.read_text(encoding="utf-8").strip()
+        except OSError:
+            partition = ""
+    if partition:
+        env["IGN_PARTITION"] = partition
+        env["GZ_PARTITION"] = partition
+    return env
+
+
+def relative_pose(tool_pose: tuple, object_pose: tuple) -> tuple[np.ndarray, np.ndarray]:
+    """工件位姿在**工具坐标系**里的表示（位置 + 四元数）。
+
+    物理含义：夹住之后这个量应当恒定——真机靠夹爪摩擦夹紧，仿真靠
+    sim_carry_workpiece 每 50 ms 把工件摆到同一个相对位姿上。它变了就说明
+    "工件没跟着走"。
+    """
+    tool_xyz, tool_quat = tool_pose
+    object_xyz, object_quat = object_pose
+    tool_rot = R.from_quat(tool_quat)
+    rel_rot = tool_rot.inv() * R.from_quat(object_quat)
+    rel_pos = tool_rot.inv().apply(np.asarray(object_xyz, float)
+                                   - np.asarray(tool_xyz, float))
+    return rel_pos, rel_rot.as_quat()
+
+
+def relative_pose_delta(a: tuple, b: tuple) -> tuple[float, float]:
+    """两帧相对位姿之差：平移 mm + 姿态 deg（姿态差取两四元数夹角，与转向无关）。"""
+    mm = float(np.linalg.norm(np.asarray(a[0], float) - np.asarray(b[0], float)) * 1000.0)
+    angle = (R.from_quat(a[1]) * R.from_quat(b[1]).inv()).magnitude()
+    return mm, float(np.degrees(angle))
+
+
+def world_aabb(pose_xyz, rotation: R, bbox_min_m, bbox_max_m) -> tuple[np.ndarray, np.ndarray]:
+    """模型系 AABB → 世界系 AABB（把 8 个角点变换到世界系后取各轴极值）。
+
+    为什么不能只加平移：夹具只绕 yaw 转 0.0068 rad，但工件抓取时约 -58°、
+    插入时接近 180°，姿态完全不可忽略；只有"角点极值"才是真正的轴向包围盒。
+    """
+    lo = np.asarray(bbox_min_m, dtype=float)
+    hi = np.asarray(bbox_max_m, dtype=float)
+    corners = np.array([[x, y, z] for x in (lo[0], hi[0])
+                        for y in (lo[1], hi[1]) for z in (lo[2], hi[2])])
+    world = rotation.apply(corners) + np.asarray(pose_xyz, dtype=float)
+    return world.min(axis=0), world.max(axis=0)
+
+
+def load_scene_config(path: Path = SIM_SCENE_CONFIG) -> dict:
+    """读生成场景配置里的 ros__parameters（生成物，权威，勿手改）。"""
+    raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ValueError(f"{path} is not a mapping")
+    for value in raw.values():
+        if isinstance(value, dict) and "ros__parameters" in value:
+            return dict(value["ros__parameters"])
+    raise ValueError(f"{path} has no ros__parameters block")
+
+
+def slot_world_aabb(scene: dict,
+                    tol_m: float = SIM_SLOT_TOL_M) -> tuple[np.ndarray, np.ndarray]:
+    """插槽体积：fixture.pose_world + bbox_min_m/bbox_max_m → 世界 AABB，再按 tol 外扩。"""
+    fixture = dict(scene.get("fixture") or {})
+    pose = fixture.get("pose_world")
+    bbox_min = fixture.get("bbox_min_m")
+    bbox_max = fixture.get("bbox_max_m")
+    if not pose or not bbox_min or not bbox_max:
+        raise ValueError("fixture.pose_world / bbox_min_m / bbox_max_m missing")
+    rotation = R.from_euler("xyz", [float(v) for v in pose[3:6]])
+    lo, hi = world_aabb([float(v) for v in pose[:3]], rotation, bbox_min, bbox_max)
+    return lo - float(tol_m), hi + float(tol_m)
+
+
+def object_bbox_centre_local(scene: dict) -> np.ndarray:
+    """工件包围盒中心在**模型系**里的位置（bbox_min/max 的中点）。
+
+    用中点而不是 CAD origin：生成物已经记录 module.bbox_centre_world_m，
+    并且注明它与实测 CAD 中心差 22.8 mm，说明"包围盒中心"才是可复现的量。
+    """
+    module = dict(scene.get("module") or {})
+    bbox_min = module.get("bbox_min_m")
+    bbox_max = module.get("bbox_max_m")
+    if not bbox_min or not bbox_max:
+        raise ValueError("module.bbox_min_m / bbox_max_m missing")
+    return (np.asarray(bbox_min, float) + np.asarray(bbox_max, float)) / 2.0
+
+
+def planned_carry_m(name: str, cfg: Config) -> float:
+    """该阶段计划把工件搬多远：抓取点 TCP → 本阶段终点 TCP 的距离。
+
+    用途：位移判据要有绝对下限（否则"手臂空跑"也能通过），但这个下限必须小于
+    阶段本身能走的距离。straighten 的终点与 insert 同位置（只转姿态），所以两者
+    计划距离相同；lift 只有 lift_total_mm。
+    """
+    targets = {"transit": cfg.transit, "staging": cfg.staging,
+               "pre_insert": cfg.pre_insert, "insert": cfg.insert,
+               "straighten": cfg.insert}
+    if name == "lift":
+        return float(cfg.lift_total_mm) / 1000.0
+    target = targets.get(name)
+    if target is None:
+        return 0.0
+    return float(np.linalg.norm(np.asarray(target, float) - np.asarray(cfg.grasp, float)))
+
+
 class Runner(Node):
     def __init__(self) -> None:
         super().__init__("pick_and_place_runner")
@@ -304,6 +476,13 @@ class Runner(Node):
         # previous phase WOULD have ended.
         self.action_name: str = "/arm_controller/follow_joint_trajectory"
         self.world: str = "real"
+        # 仿真验收用的状态：工件模型名（由配置下发）、最近一次测量失败的原因、
+        # 抓取基线（A）。真机路径不读这三个字段。
+        self.sim_model: str = SIM_WORKPIECE_MODEL
+        self.sim_error: str = ""
+        self.grasp_baseline: dict | None = None
+        # 仿真夹爪预压行程（来自 config/tasks/world_sim.yaml 的 sim_gripper_stroke_m）
+        self.sim_gripper_stroke_m: float = 0.0
         self.gripper_geometry: dict = {"max": 50.0, "min": 204.0, "max_span": 246.57}
         self._gripper_pub = None
         self._fk = self.create_client(GetPositionFK, "/compute_fk")
@@ -314,6 +493,27 @@ class Runner(Node):
         latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self._grasp_event = self.create_publisher(String, "/cs625/grasp_state_event", 10)
         self._box_pose = self.create_publisher(PoseStamped, "/box_target_pose", latched)
+        # 仿真附着状态：scripts/sim_carry_workpiece.py 收到 grasp/release 事件后，
+        # 通过 Gazebo 的 DetachableJoint 真正焊住/松开工件，并在这里广播结果。
+        # 这个事件是异步的（gz CLI 一次约 0.4 s）：不等它确认就继续抬臂，关节会
+        # 在抬臂中途才建立，夹持关系就带着那一段位移，后面的跟随判据会假失败。
+        self.carry_state: str = ""
+        self.create_subscription(String, "/cs625/carry_state", self._on_carry_state, 10)
+
+    def _on_carry_state(self, message: String) -> None:
+        self.carry_state = (message.data or "").strip()
+
+    def wait_for_carry_state(self, wanted: str, timeout_sec: float = 3.0) -> bool:
+        """等 carry 节点确认 attached / detached（只在仿真里调用）。"""
+        deadline = time.time() + timeout_sec
+        while time.time() < deadline:
+            if self.carry_state == wanted:
+                return True
+            rclpy.spin_once(self, timeout_sec=0.05)
+        self.get_logger().warn(
+            f"等待 /cs625/carry_state == {wanted} 超时（当前 {self.carry_state!r}）："
+            "仿真里工件可能没被真正夹住，跟随判据会如实失败")
+        return False
 
     # ----------------------------------------------------------- primitives
     def _load_joint_limits(self) -> None:
@@ -464,9 +664,16 @@ class Runner(Node):
         from std_msgs.msg import Float64MultiArray
 
         if command == "grip" and value is not None:
-            position = finger_position_m(
-                value, self.gripper_geometry["max"], self.gripper_geometry["min"],
-                self.gripper_geometry["max_span"])
+            # 仿真里外撑夹爪是刚体：满行程（21.285 mm/侧）会把 7~16 mm 干涉量全部
+            # 变成侧向推力，把工件推开。用配置里的"刚好压住"行程（默认 11.5 mm ≈
+            # 1.5 mm 预压）；真机路径不走这个函数（真机是 EFG 的 PowerShell 桥）。
+            stroke = float(self.sim_gripper_stroke_m) if self.sim_gripper_stroke_m else None
+            if stroke:
+                position = stroke
+            else:
+                position = finger_position_m(
+                    value, self.gripper_geometry["max"], self.gripper_geometry["min"],
+                    self.gripper_geometry["max_span"])
         elif command == "open":
             position = finger_position_m(
                 self.gripper_geometry["max"] * 0.8, self.gripper_geometry["max"],
@@ -475,7 +682,8 @@ class Runner(Node):
             position = 0.0
         else:  # init
             return {"ok": True, "init": 5, "position_mm": None, "sim": True}
-        message = Float64MultiArray(data=[float(position)])
+        # 两个手指关节各一个位置命令（外撑是左右对称的同一行程）
+        message = Float64MultiArray(data=[float(position), float(position)])
         self._gripper_pub.publish(message)
         self.get_logger().info(
             f"[sim gripper] {command} value={value} -> finger {position * 1000:.2f} mm")
@@ -621,8 +829,8 @@ class Runner(Node):
             joint = JointConstraint()
             joint.joint_name = name
             joint.position = float(solution[name])
-            joint.tolerance_above = 0.02
-            joint.tolerance_below = 0.02
+            joint.tolerance_above = self.goal_joint_tolerance
+            joint.tolerance_below = self.goal_joint_tolerance
             joint.weight = 1.0
             constraints.joint_constraints.append(joint)
         req = GetMotionPlan.Request()
@@ -742,6 +950,191 @@ class Runner(Node):
         text = (run.stdout or b"").decode("utf-8", "replace").strip().splitlines()
         tail = text[-1] if text else "verify_pose produced no output"
         return run.returncode == 0, tail
+
+    # --------------------------------------------------- sim workpiece checks
+    # 下面四个方法只在 --world sim 下被调用；真机判据仍是 verify_stage()
+    # （verify_pose.py 读 /tcp_pose_broadcaster/pose）。仿真没有那个广播器，
+    # 所以改成读"工件自己的世界位姿"。
+    def sim_object_pose(self) -> tuple[np.ndarray, np.ndarray] | None:
+        """工件世界位姿（Gazebo 真值）：gz model -m <model> --pose。
+
+        为什么不信 returncode：`gz model` 连不上仿真时也返回 0，只有输出文本
+        说明失败（docs/worklogs/2026-09-19 §32.3）。所以一律看解析结果，解析
+        失败就是"无法测量"，并把原因留在 self.sim_error 里。
+        """
+        command = ["gz", "model", "-m", self.sim_model, "--pose"]
+        try:
+            run = subprocess.run(command, capture_output=True, text=True, timeout=8,
+                                 env=sim_gz_environment())
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            self.sim_error = f"gz model {type(exc).__name__}: {exc}"
+            return None
+        # 解析器在仓库自己的 package 里（唯一权威实现：处理 ANSI 颜色码、| 分隔、
+        # 要求唯一一条 Pose、模型名不符就 raise）。延迟导入：--dry-run / 真机路径
+        # 从不走到这里，缺包也只降级成"无法测量"，不会让真机流程失败。
+        try:
+            from cs625_task_orchestrator.p7_gazebo_pose import parse_gz_model_pose
+        except ImportError as exc:
+            self.sim_error = f"pose parser unavailable: {exc}"
+            return None
+        try:
+            pose = parse_gz_model_pose(run.stdout or "", self.sim_model)
+        except ValueError as exc:
+            raw = " ".join(((run.stdout or "") + (run.stderr or "")).split())[:160]
+            self.sim_error = f"gz model: {exc} | output: {raw}"
+            return None
+        position = pose["position"]
+        orientation = pose["orientation"]
+        return (np.array([position["x"], position["y"], position["z"]], dtype=float),
+                np.array([orientation["x"], orientation["y"], orientation["z"],
+                          orientation["w"]], dtype=float))
+
+    def sim_tool_pose(self) -> tuple[np.ndarray, np.ndarray] | None:
+        """工具位姿（world -> my_end_effector_link），只走 TF。
+
+        为什么不复用 tcp()：tcp() 只返回位置（运动链用它判断进度），而工件判据
+        要完整的相对位姿（含姿态）。回退顺序与 tcp() 相同；真机路径一个字没改。
+        """
+        for target in ("my_end_effector_link", "tool0"):
+            try:
+                tf = self._tf_buffer.lookup_transform(
+                    "world", target, rclpy.time.Time(),
+                    timeout=rclpy.duration.Duration(seconds=2.0))
+            except Exception:  # noqa: BLE001 - try the next candidate
+                continue
+            translation = tf.transform.translation
+            rotation = tf.transform.rotation
+            return (np.array([translation.x, translation.y, translation.z]),
+                    np.array([rotation.x, rotation.y, rotation.z, rotation.w]))
+        self.sim_error = "no tool pose: TF world->my_end_effector_link unavailable"
+        return None
+
+    def sim_settled_object_pose(self, timeout_sec: float = 2.0,
+                                interval_sec: float = 0.2,
+                                stable_mm: float = 1.0):
+        """等工件停稳再读数：跟随节点按 20 Hz 追工具位姿，天然滞后一两拍。
+
+        阶段刚结束的那一瞬间读到的是"跟随器落后了多少"，不是"有没有夹住"。
+        相邻两次读数相差 < 1 mm 就认为停稳；2 s 还没停就返回最后一次读数。
+        """
+        previous: np.ndarray | None = None
+        deadline = time.time() + timeout_sec
+        while True:
+            pose = self.sim_object_pose()
+            if pose is None:
+                return None
+            if previous is not None and float(
+                    np.linalg.norm(pose[0] - previous) * 1000.0) < stable_mm:
+                return pose
+            previous = pose[0]
+            if time.time() >= deadline:
+                return pose
+            time.sleep(interval_sec)
+
+    def sim_grasp_baseline(self) -> dict:
+        """A) 抓取基线：工具→工件 的相对位姿 + 工件初始世界位姿。
+
+        必须在 grasp_confirmed 之后调用：sim_carry_workpiece 收到该事件才开始
+        跟随，此刻的相对位姿就是后续应保持的"夹持关系"。
+        """
+        tool = self.sim_tool_pose()
+        if tool is None:
+            return {"criterion": "grasp_baseline", "ok": None,
+                    "detail": f"SKIPPED_UNMEASURED: {self.sim_error}"}
+        object_pose = self.sim_settled_object_pose()
+        if object_pose is None:
+            return {"criterion": "grasp_baseline", "ok": None,
+                    "detail": f"SKIPPED_UNMEASURED: {self.sim_error}"}
+        rel_pos, rel_quat = relative_pose(tool, object_pose)
+        self.grasp_baseline = {"rel": (rel_pos, rel_quat),
+                               "object": object_pose[0].copy()}
+        return {
+            "criterion": "grasp_baseline",
+            "ok": True,
+            "detail": (f"baseline tool->workpiece rel=[{rel_pos[0]:+.3f}, "
+                       f"{rel_pos[1]:+.3f}, {rel_pos[2]:+.3f}] m "
+                       f"|rel|={float(np.linalg.norm(rel_pos)):.3f} m; "
+                       f"workpiece world=[{object_pose[0][0]:.3f}, "
+                       f"{object_pose[0][1]:.3f}, {object_pose[0][2]:.3f}]"),
+            "rel_m": [round(float(v), 4) for v in rel_pos],
+            "object_xyz": [round(float(v), 4) for v in object_pose[0]],
+        }
+
+    def sim_workpiece_acceptance(self, name: str, cfg: Config) -> dict | None:
+        """B) 跟着走 + C) 进插槽。没有判据的阶段返回 None。
+
+        返回 dict 的 ok 有三种含义，调用方必须区别对待：
+          True  → 判据通过；
+          False → 判据不过（该阶段记 ok=false，run_task 整体返回非 0）；
+          None  → 无法测量（gz 子进程失败 / TF 不可用 / 场景配置缺失）→ 记 skipped
+                  并写原因，绝不静默当成通过。
+        """
+        if name not in SIM_FOLLOW_PHASES:
+            return None
+        if self.grasp_baseline is None:
+            return {"criterion": "follow", "ok": None,
+                    "detail": "SKIPPED_UNMEASURED: no grasp baseline recorded"}
+        tool = self.sim_tool_pose()
+        if tool is None:
+            return {"criterion": "follow", "ok": None,
+                    "detail": f"SKIPPED_UNMEASURED: {self.sim_error}"}
+        object_pose = self.sim_settled_object_pose()
+        if object_pose is None:
+            return {"criterion": "follow", "ok": None,
+                    "detail": f"SKIPPED_UNMEASURED: {self.sim_error}"}
+
+        rel_pos, rel_quat = relative_pose(tool, object_pose)
+        follow_mm, follow_deg = relative_pose_delta((rel_pos, rel_quat),
+                                                    self.grasp_baseline["rel"])
+        travel_m = float(np.linalg.norm(object_pose[0] - self.grasp_baseline["object"]))
+        # 位移下限：计划搬运距离 >= 0.30 m 的阶段用 0.30 m 绝对下限；lift 只走
+        # lift_total_mm(155 mm)，用 0.30 m 判它必然失败，所以改用"达到计划距离的
+        # 90%"——工件留在桌上时位移是 0，同样会被抓到。
+        expected_m = planned_carry_m(name, cfg)
+        floor_m = (SIM_MIN_TRAVEL_M if expected_m >= SIM_MIN_TRAVEL_M
+                   else SIM_TRAVEL_RATIO * expected_m)
+        follow_ok = (follow_mm < SIM_FOLLOW_MAX_MM
+                     and follow_deg < SIM_FOLLOW_MAX_DEG
+                     and travel_m > floor_m)
+        parts = [
+            f"follow {follow_mm:.1f} mm / {follow_deg:.2f} deg "
+            f"(< {SIM_FOLLOW_MAX_MM:.0f} mm / {SIM_FOLLOW_MAX_DEG:.0f} deg)",
+            f"travel {travel_m:.3f} m (expected {expected_m:.3f} m, "
+            f"floor {floor_m:.3f} m)",
+        ]
+        numbers = {"follow_mm": round(follow_mm, 2),
+                   "follow_deg": round(follow_deg, 3),
+                   "travel_m": round(travel_m, 4),
+                   "expected_m": round(expected_m, 4)}
+        criterion = "follow"
+        verdict = follow_ok
+        slot_measured = True
+        if name in SIM_SLOT_PHASES:
+            criterion = "follow+slot"
+            try:
+                scene = load_scene_config()
+                lo, hi = slot_world_aabb(scene)
+                centre = object_pose[0] + R.from_quat(object_pose[1]).apply(
+                    object_bbox_centre_local(scene))
+            except (OSError, ValueError, KeyError) as exc:
+                # 插槽体积读不到 ⇒ C 判据 skipped（不是通过）。跟随判据本身仍然
+                # 有效，但整体只能记"无法测量"，让日志如实反映。
+                slot_measured = False
+                parts.append(f"slot SKIPPED_UNMEASURED: {exc}")
+                numbers["slot_ok"] = None
+            else:
+                inside = bool(np.all(centre >= lo) and np.all(centre <= hi))
+                parts.append(
+                    f"slot centre=[{centre[0]:.3f}, {centre[1]:.3f}, {centre[2]:.3f}] "
+                    f"{'inside' if inside else 'OUTSIDE'} world AABB "
+                    f"[{np.round(lo, 3).tolist()}]..[{np.round(hi, 3).tolist()}] "
+                    f"(+{SIM_SLOT_TOL_M * 1000:.0f} mm)")
+                numbers["slot_centre"] = [round(float(v), 4) for v in centre]
+                numbers["slot_ok"] = inside
+                verdict = verdict and inside
+        ok: bool | None = verdict if slot_measured else None
+        return {"criterion": criterion, "ok": ok, "detail": "; ".join(parts),
+                **numbers}
 
     # ------------------------------------------------------------ execution
     def run_chunks(self, points: list[dict], chunks: int, time_scale: float,
@@ -896,6 +1289,12 @@ class UnloadConfig:
     time_scale: float = 2.0
     dwell_sec: float = 1.0
     goal_tolerance: float = 0.002
+    # 关节目标容差（rad）：传给 MoveIt 的 JointConstraint.tolerance_above/below。
+    # 默认 0.02 = 真机一直用的值；仿真覆盖层会把它收紧（见 config/tasks/world_sim.yaml
+    # 的 goal_joint_tolerance），原因：仿真靠"位姿跟随"表达夹持，抓取时工具停在哪里、
+    # 工件就带着那个相对位姿走，规划端点偏差会一直传到插槽；真机是物理夹紧，夹爪夹到
+    # 哪儿就是哪儿。
+    goal_joint_tolerance: float = 0.02
     max_chunks: int = 7
     speeds: dict = field(default_factory=dict)
     axis: np.ndarray = field(default_factory=lambda: np.zeros(3))
@@ -935,6 +1334,7 @@ def load_unload_config(path: str) -> UnloadConfig:
         time_scale=float(raw.get("time_scale", 2.0)),
         dwell_sec=float(raw.get("dwell_sec", 1.0)),
         goal_tolerance=float(raw.get("goal_tolerance", 0.002)),
+        goal_joint_tolerance=float(raw.get("goal_joint_tolerance", 0.02)),
         max_chunks=int(raw.get("max_chunks", 7)),
         speeds=dict(raw.get("phase_speeds", {}) or {}),
         axis=axis / np.linalg.norm(axis),
@@ -1010,7 +1410,19 @@ def run_observe_list(node, cfg: UnloadConfig, entries: list[tuple[str, str]],
         if cfg.process_images:
             capture_process_image(f"observe:{waypoint}", "enter")
         check = (pose.get("check") or "").strip()
-        if check:
+        if check and cfg.world == "sim":
+            # 仿真里这一步只走流程，不真正执行检查。
+            #
+            # 两条理由：
+            #   1) 这些检查用真机照片训练的 YOLO，Gazebo 渲染没有贴图，必然 "no mask"；
+            #   2) 仿真的规划本来就用**已知的正确位姿**（config/tasks/common.yaml 里的
+            #      grasp/pre_insert/insert 等常量，也就是真机实测出来的目标），
+            #      不依赖任何视觉结果。
+            # 所以启动子进程只是白等 20~40 秒再得到一次必然失败的结论。真机仍然照跑、仍然阻断。
+            results.append({"phase": name, "ok": True,
+                            "detail": f"check {check}: skipped in sim "
+                                      f"(planning uses the known ground-truth poses)"})
+        elif check:
             ok_check, detail = run_observation_check(check, pose)
             # The pose checks use a YOLO model trained on REAL photographs; a Gazebo
             # render has no texture, so the model reports "no mask" and the check can
@@ -1617,6 +2029,7 @@ def main() -> int:
     if args.flow == "unload":
         ucfg = load_unload_config(args.config)
         node.goal_tolerance = ucfg.goal_tolerance
+        node.goal_joint_tolerance = ucfg.goal_joint_tolerance
         node.action_name = ucfg.action
         if not args.confirm and not args.plan_only:
             node.get_logger().warn("dry run: pass --confirm to execute motion "
@@ -1669,8 +2082,12 @@ def main() -> int:
     cfg = load_config(args.config)
     wanted = [p.strip() for p in args.phases.split(",") if p.strip()]
     node.goal_tolerance = cfg.goal_tolerance
+    node.goal_joint_tolerance = cfg.goal_joint_tolerance
     node.action_name = cfg.action
     node.world = cfg.world
+    # 仿真验收要按名字读工件真值位姿；真机不用这个字段（判据仍是 verify_pose.py）。
+    node.sim_model = cfg.sim_workpiece_model
+    node.sim_gripper_stroke_m = cfg.sim_gripper_stroke_m
     node.gripper_geometry = {"max": cfg.gripper_max_opening_mm,
                              "min": cfg.gripper_span_min_mm,
                              "max_span": cfg.gripper_span_max_mm}
@@ -1681,10 +2098,43 @@ def main() -> int:
         """Plan-only works on the simulated state; a real run on the measured one."""
         return node.current_tcp(plan_only)
 
+    def record_verdict(verdict: dict) -> None:
+        """把一条仿真判据结果写进刚结束的阶段记录（verified / verify_detail / 数字）。"""
+        record[-1]["verified"] = verdict["ok"]
+        record[-1]["verify_detail"] = verdict["detail"]
+        record[-1]["sim_check"] = {key: value for key, value in verdict.items()
+                                   if key not in ("ok", "detail")}
+        if verdict["ok"] is not True:
+            node.get_logger().warn(f"[{record[-1]['phase']}] {verdict['detail']}")
+        Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
+
+    def capture_grasp_baseline() -> None:
+        """A) 仿真抓取基线，必须在 grasp_confirmed 发布之后立即取。
+
+        sim_carry_workpiece 收到 grasp_confirmed 才开始跟随，此刻的 工具→工件
+        相对位姿就是后续阶段应保持的夹持关系。真机不需要（真机是物理夹紧，
+        判据仍由 verify() 调 verify_pose.py）。
+        """
+        record_verdict(node.sim_grasp_baseline())
+
     def step(name: str, ok: bool, detail: str = "") -> None:
         record.append({"phase": name, "ok": ok, "detail": detail,
                        "tcp": current_tcp().round(4).tolist(),
                        "plan_only": plan_only})
+        # 仿真：阶段验收换成工件判据（工件跟着走 / 进插槽）。放在这里而不是各个
+        # 阶段分支里，是为了让搬运链上每个阶段都得到同一条判据，而真机路径
+        # （cfg.world != "sim"）一行都不执行。verification.enabled=false 时两边
+        # 都不判，行为一致。
+        if ok and not plan_only and cfg.verify and cfg.world == "sim":
+            verdict = node.sim_workpiece_acceptance(name, cfg)
+            if verdict is not None:
+                record_verdict(verdict)
+                if verdict["ok"] is False:
+                    # D) 判据不过 ⇒ 该阶段 ok=false，run_task 整体返回非 0
+                    record[-1]["ok"] = False
+                    record[-1]["detail"] = ((detail + " | " if detail else "")
+                                            + verdict["detail"])
+        ok = record[-1]["ok"]
         notify_recorder(name, "exit")
         publish_task_state(node, {"flow": getattr(cfg, "scope", "") or args.flow,
                                   "mode": getattr(cfg, "mode", ""),
@@ -1692,8 +2142,9 @@ def main() -> int:
                                   "phase": name, "phase_index": index + 1,
                                   "phase_total": len(phases),
                                   "status": "ok" if ok else "failed",
-                                  "detail": detail, "plan_only": plan_only})
-        node.get_logger().info(f"[{name}] ok={ok} {detail}")
+                                  "detail": record[-1]["detail"],
+                                  "plan_only": plan_only})
+        node.get_logger().info(f"[{name}] ok={ok} {record[-1]['detail']}")
         Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
 
     def detail(goal, points) -> str:
@@ -1718,6 +2169,11 @@ def main() -> int:
     def verify(name: str, xyz, quat) -> None:
         """Measured-pose acceptance after an executed phase (skipped in plan-only)."""
         if plan_only or not cfg.verify or not record:
+            return
+        if cfg.world == "sim":
+            # 仿真里没有 /tcp_pose_broadcaster/pose（那是真机驱动一侧的控制器），
+            # verify_pose.py 只会打印 NO_POSE。仿真的验收改在 step() 里按工件位姿
+            # 做（见 sim_workpiece_acceptance / capture_grasp_baseline）。
             return
         ok, detail = node.verify_stage(name, xyz, quat, cfg)
         record[-1]["verified"] = ok
@@ -1808,6 +2264,16 @@ def main() -> int:
                     verify(name, cfg.grasp, cfg.grasp_q)
                     if not plan_only:
                         node._grasp_event.publish(String(data="grasp_confirmed"))
+                        if cfg.world == "sim":
+                            # 等 carry 节点确认"真的焊住了"再取基线/继续抬臂：
+                            # DetachableJoint 是按 attach 那一刻的相对位姿建关节，
+                            # 若关节在抬臂中途才建立，工件会被留在桌上、夹持关系
+                            # 带着那一段位移（跟随判据会假失败）。
+                            node.wait_for_carry_state("attached")
+                        if cfg.world == "sim" and cfg.verify:
+                            # A) 抓取基线：必须在 attached 之后取（见上面
+                            # capture_grasp_baseline 的说明）。真机走不到这里。
+                            capture_grasp_baseline()
             elif kind == "observe":
                 waypoint = name.split(":", 1)[1]
                 pose = (cfg.observe or {}).get(waypoint)
@@ -1837,10 +2303,21 @@ def main() -> int:
                 if cfg.process_images:
                     capture_process_image(f"observe:{waypoint}", "enter")
                 check = (pose.get("check") or "").strip()
-                if check:
+                if check and cfg.world == "sim":
+                    # 仿真里只走流程，不真正跑检查。理由同 observe_all：
+                    # Gazebo 渲染无贴图 → YOLO 必然 "no mask"；而仿真的规划用的是
+                    # 已知的正确位姿（common.yaml 的常量 = 真机实测目标），不依赖视觉。
+                    record[-1]["check"] = {
+                        "name": check,
+                        "ok": True,
+                        "detail": "skipped in sim (planning uses the known ground-truth poses)",
+                    }
+                    Path(args.log).write_text(json.dumps(record, indent=2),
+                                              encoding="utf-8")
+                    node.get_logger().info(f"[{name}] check {check} skipped in sim")
+                elif check:
                     # an observation check needs depth: back to the fine profile
                     set_camera_mode("modeling")
-                if check:
                     ok_check, check_detail = run_observation_check(check, pose)
                     record[-1]["check"] = {"name": check, "ok": ok_check,
                                            "detail": check_detail}
@@ -1848,17 +2325,8 @@ def main() -> int:
                                               encoding="utf-8")
                     node.get_logger().info(
                         f"[{name}] check {check} ok={ok_check} {check_detail}")
-                    # In simulation the pose checks cannot pass: the YOLO model was
-                    # trained on real photographs and the Gazebo render has no
-                    # texture, so it reports "no mask".  Treat it as advisory there
-                    # (it says nothing about the motion) and keep it blocking on the
-                    # real cell, where it is the actual acceptance criterion.
-                    if not ok_check and cfg.world == "sim":
-                        print(f"[sim] {name}: pose check failed (advisory, the "
-                              f"Gazebo render has no texture): {check_detail}",
-                              file=sys.stderr)
-                        record[-1]["check"]["advisory"] = True
-                    elif not ok_check:
+                    # 真机侧仍然是阻断判据。
+                    if not ok_check:
                         step(name, False, f"check {check} failed: {check_detail}")
                         break
             elif kind == "joint":

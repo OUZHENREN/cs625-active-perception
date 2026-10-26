@@ -14,9 +14,17 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, OpaqueFunction
 from launch.conditions import IfCondition
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import Command, FindExecutable, LaunchConfiguration
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from moveit_configs_utils import MoveItConfigsBuilder
+
+# robot_description 的注入器与 sim_control.launch.py 共用同一个脚本。仓库用
+# colcon --symlink-install，launch 文件在源码树里，所以这里的相对路径能解析到
+# <仓库根>/scripts；解析不到就直接报错，不做静默回退（否则 MoveIt 会悄悄用回
+# 厂商原始描述，和仿真实体悄悄不一致）。
+REPO_ROOT = Path(__file__).resolve().parents[3]
+ROBOT_DESCRIPTION_INJECTOR = REPO_ROOT / "scripts" / "sim_robot_description.py"
 
 
 def _resolve_share_file(package_name: str, relative_or_absolute: str) -> str:
@@ -55,16 +63,54 @@ def _compose(context):
         "safety_limits": LaunchConfiguration("safety_limits").perform(context),
         "safety_pos_margin": LaunchConfiguration("safety_pos_margin").perform(context),
         "safety_k_position": LaunchConfiguration("safety_k_position").perform(context),
-        "use_fake_hardware": LaunchConfiguration("use_fake_hardware").perform(context),
+        # 规划侧描述里的 <ros2_control> 块对 MoveIt 没有用处，但**会被
+        # gz_ros2_control 抢着读**（控制器管理器订阅 /robot_description，谁先发就
+        # 读谁的；move_group 也会发一份）。如果这一份写的是 mock_components，
+        # 控制器管理器就会去加载 mock 硬件并失败
+        # （实测：class mock_components/GenericSystem ... does not exist）。
+        # 所以规划侧也用 Gazebo 硬件块，谁被读到都正确。
+        "use_fake_hardware": "false",
         "fake_sensor_commands": LaunchConfiguration("fake_sensor_commands").perform(context),
         "initial_positions_file": LaunchConfiguration("initial_positions_file").perform(context),
         "sim_gazebo": "false",
-        "sim_ignition": "false",
+        "sim_ignition": "true",
     }
     semantic_mappings = {
         "name": "cs625",
         "tf_prefix": LaunchConfiguration("tf_prefix").perform(context),
     }
+
+    # 为什么规划侧也要过注入器：
+    #   1) 厂商 cs625.urdf.xacro 的 <hardware> 块里没有 position_proportional_gain，
+    #      而 gz_ros2_control 的位置环静差只能靠这个参数压下去（详见脚本头部）；
+    #   2) 厂商的 tool0_vision.STL 偏在工具轴一侧，注入器会换成关于工具轴对称的
+    #      gripper_0920.stl。
+    #   sim_control.launch.py 已经用同一个注入器生成 Gazebo 实体的描述；如果 MoveIt
+    #   仍用原始描述，规划用的工具几何/碰撞体就会和真实执行机构不同，规划结论不可信。
+    #   这里沿用 sim_control 的写法：python3 <注入器> <xacro> <urdf> key:=value ...
+    if not ROBOT_DESCRIPTION_INJECTOR.is_file():
+        raise RuntimeError(
+            f"robot description injector missing: {ROBOT_DESCRIPTION_INJECTOR}; "
+            "sim_moveit must not fall back to the vendor description"
+        )
+    # Command 是拼接式 substitution（相邻 token 之间不会自动加空格），所以每个
+    # token 后面都要显式跟一个 " "，否则 xacro 会收到 "name:=cs625cs_type:=..."
+    # 这样一个畸形参数并直接报错。
+    robot_description_command: list = [
+        FindExecutable(name="python3"),
+        " ",
+        str(ROBOT_DESCRIPTION_INJECTOR),
+        " ",
+        FindExecutable(name="xacro"),
+        " ",
+        description_path,
+        " ",
+    ]
+    for key, value in robot_mappings.items():
+        robot_description_command += [f"{key}:=", value, " "]
+    injected_robot_description = ParameterValue(
+        Command(robot_description_command), value_type=str
+    )
 
     moveit_config = (
         MoveItConfigsBuilder("cs625", package_name=moveit_package)
@@ -81,6 +127,14 @@ def _compose(context):
         .sensors_3d(file_path=sensors_file)
         .to_moveit_configs()
     )
+    # 仍保留 .robot_description() 调用：builder 需要它来完成描述文件解析与存在性检查，
+    # 否则 to_moveit_configs() 会退回 .setup_assistant 里的厂商默认 URDF 并告警。
+    # 但真正交给 move_group / RViz 的参数必须是注入版，所以这里替换掉唯一一项。
+    moveit_config.robot_description = {
+        "robot_description": injected_robot_description
+    }
+    # 两个 Node 共用同一份参数字典，保证 move_group 规划用的模型和 RViz 显示的一致。
+    moveit_parameters = moveit_config.to_dict()
 
     move_group = Node(
         package="moveit_ros_move_group",
@@ -88,7 +142,7 @@ def _compose(context):
         name="move_group",
         output="screen",
         parameters=[
-            moveit_config.to_dict(),
+            moveit_parameters,
             {
                 # Point clouds and TF are stamped by Gazebo.  Keep the
                 # occupancy-map message filter on the same clock so it can
@@ -109,7 +163,7 @@ def _compose(context):
         name="moveit_rviz",
         output="screen",
         arguments=["-d", rviz_config],
-        parameters=[moveit_config.to_dict()],
+        parameters=[moveit_parameters],
         condition=IfCondition(LaunchConfiguration("launch_rviz")),
     )
     return [move_group, rviz]

@@ -61,6 +61,9 @@ joint_trajectory_controller:
 
 gripper_controller:
   ros__parameters:
+    # 两条支撑臂都要被命令：gz_ros2_control 不实现 URDF 的 <mimic>，只命令一侧的话
+    # 另一侧在 Gazebo 里不会动，外撑夹爪就只剩一条臂在撑。
     joints:
       - gripper_right_finger_joint
+      - gripper_left_finger_joint
     interface_name: position

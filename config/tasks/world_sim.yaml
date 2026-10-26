@@ -9,6 +9,10 @@
 #         仿真控制器见 cs625_bringup/config/sim_controllers.yaml：
 #         joint_trajectory_controller。
 # world:  仅作标记，供 run_task / 日志区分当前配置属于仿真；不参与运动学计算。
+# sim_workpiece_model: 仿真里被搬运的工件模型名。--world sim 下 run_pick_and_place.py
+#         的阶段验收要跑 `gz model -m <model> --pose` 读工件真值位姿（仿真没有
+#         /tcp_pose_broadcaster，verify_pose.py 在 Gazebo 下永远是 NO_POSE）。
+#         模型名必须和 world 里 spawn 出来的名字一致，所以放在配置里下发。
 #
 # 用法：
 #   python3 scripts/run_task.py --scope load --mode safe --world sim --dry-run
@@ -16,3 +20,19 @@
 
 action: "/joint_trajectory_controller/follow_joint_trajectory"
 world: sim
+sim_workpiece_model: shielding_module
+
+# 规划端点精度（rad）：传给 MoveIt JointConstraint 的 tolerance_above/below。
+# 真机用默认 0.02（一直如此）；仿真收紧到 0.002，原因不是"放宽容差凑通过"，而是：
+# 仿真的"夹住"是 scripts/sim_carry_workpiece.py 的 DetachableJoint 位姿跟随，抓取
+# 时工具停在哪里、工件就带着**那个**相对位姿走，规划端点偏差会一路传到插槽；真机是
+# 物理夹紧，夹爪夹到哪儿就是哪儿，所以真机不需要这个值。
+# 2026-10-26 实测：0.02 时计划终点 TCP 偏离 IK 解 10~15 mm（叠加关节容差后可到 30 mm），
+# 会让"工件进 1 mm 间隙插槽"这一段的相对位姿整段偏掉。
+goal_joint_tolerance: 0.002
+
+# 仿真夹爪的预压行程（米/侧）。真机用 EFG 的 50 mm 开度命令，靠结构弹性产生约
+# 2.57 mm 预压；仿真里两条支撑臂是刚体，命令满行程 21.285 mm 会把干涉量全部变成
+# 侧向推力，把 19 kg 工件推开（实测被推走 0.4 m）。这里给一个"刚好压住"的行程：
+# 槽口单边间隙 ≈10 mm → 11.5 mm 行程 ≈ 1.5 mm 预压。可用 --gripper-stroke 覆盖。
+sim_gripper_stroke_m: 0.0115

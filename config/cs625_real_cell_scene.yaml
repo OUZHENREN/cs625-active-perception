@@ -2,7 +2,7 @@
 # 重新生成（会覆盖本文件）：
 #   python3 scripts/build_sim_world.py --out-world <world.sdf> --out-config <本文件>
 #
-# 数据来源：环境模型 runtime/environment/20261024_122523/model.json（真机实测点云拟合）
+# 数据来源：环境模型 runtime/environment/20261025_091250/model.json（真机实测点云拟合）
 #           + config/tasks/common.yaml 的 slot_origin / slot_origin_q（机械固定槽位标定）
 #           + 两个模型 STL 的顶点极值（bbox）
 # 世界文件：src/cs625_simulation/worlds/cs625_real_cell.sdf
@@ -20,23 +20,23 @@ cs625_real_cell_scene:
     # --- 生成信息 ---------------------------------------------------------
     generated_by: "scripts/build_sim_world.py"
     world_file: "src/cs625_simulation/worlds/cs625_real_cell.sdf"
-    env_model: "runtime/environment/20261024_122523/model.json"
+    env_model: "runtime/environment/20261025_091250/model.json"
     warn_threshold_m: 0.020
 
     # --- 实测桌面（世界系） -----------------------------------------------
     tables:
       workpiece_table:
         top_z: -0.090970
-        xy_min: [0.260000, 0.280000]
-        xy_max: [1.180000, 1.080000]
-        box_centre: [0.720000, 0.680000, -0.145485]
-        box_size: [0.920000, 0.800000, 0.109030]
+        xy_min: [0.300000, 0.300000]
+        xy_max: [0.990000, 0.900000]
+        box_centre: [0.645000, 0.600000, -0.145485]
+        box_size: [0.690000, 0.600000, 0.109030]
       slot_table:
         top_z: -0.040730
-        xy_min: [0.780000, -0.280000]
-        xy_max: [1.700000, 0.640000]
-        box_centre: [1.240000, 0.180000, -0.120365]
-        box_size: [0.920000, 0.920000, 0.159270]
+        xy_min: [1.010000, -0.450000]
+        xy_max: [1.700000, 0.400000]
+        box_centre: [1.355000, -0.025000, -0.120365]
+        box_size: [0.690000, 0.850000, 0.159270]
     floor_top_z: -0.200000
 
     # --- 夹具（静态） -----------------------------------------------------

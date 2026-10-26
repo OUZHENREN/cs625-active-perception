@@ -78,9 +78,16 @@
            the old bounding box, so the slot insertion still sees the same outer
            shape; only the groove became a hole. -->
       <collision name="body">
-        <pose>-0.094100 0.043500 -0.007500 0 0 0</pose>
+        <!-- 底面比 CAD 包围盒高 14.8 mm（顶面与四侧不变）。
+             原因：实测 CAD 位姿让包围盒底面比工件桌顶面低 14.8 mm
+             （scripts/build_sim_world.py 的 module_sink 有说明）。工件是动力学体，
+             碰撞体若照 CAD 包围盒走，它会一直和桌面互相挤压、被顶成半悬空且不稳，
+             夹爪一接近就被碰倒（实测：被推走 470 mm、翻倒约 75°，pre_grasp 失败）。
+             抬高碰撞体底面只是把"接触代理"对齐到真实零件底面，不改任何实测位姿：
+             顶面和四个侧面不动，所以对着设计位姿算出来的抓取点仍然对得上。 -->
+        <pose>-0.094100 0.043500 -0.000100 0 0 0</pose>
         <geometry>
-          <box><size>0.2258 0.1310 0.4650</size></box>
+          <box><size>0.2258 0.1310 0.4502</size></box>
         </geometry>
         <surface>
           <friction>
@@ -90,9 +97,10 @@
       </collision>
       <!-- The far rail: the surface the lower-x support arm expands against. -->
       <collision name="rail">
-        <pose>-0.433300 0.043500 -0.007500 0 0 0</pose>
+        <!-- 与 body 一样抬高 14.8 mm，两块碰撞体保持上下对齐。 -->
+        <pose>-0.433300 0.043500 -0.000100 0 0 0</pose>
         <geometry>
-          <box><size>0.0050 0.1310 0.4650</size></box>
+          <box><size>0.0050 0.1310 0.4502</size></box>
         </geometry>
         <surface>
           <friction>
