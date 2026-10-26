@@ -2,8 +2,48 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "00 · 环境校验（必须最先跑）",
-      "detail": "source_dev_env.sh --full --verify：ROS Jazzy → 厂商 underlay → 本仓库 overlay。正常最后打印 OK；失败说明环境链断了，先别跑别的。",
+      "label": "A1 · 一键开工（真机：驱动 + MoveIt + 场景 + 状态）",
+      "detail": "已有驱动/MoveIt 就直接复用；没有就在后台起（日志在 runtime/logs/real_startup_*.log，关掉终端也不会停），等就绪后把夹具加进规划场景，最后打印四项状态。控制器仍保持 inactive——那是 A2 的事。",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; if [ -z \"$CS625_ROBOT_IP\" ]; then echo \"[A1] CS625_ROBOT_IP 未设置：写进 ~/.cs625_local.env\"; exit 1; fi; mkdir -p runtime/logs; nodes=$(ros2 node list 2>/dev/null); if printf '%s\\n' \"$nodes\" | grep -qx '/eli_ros2_control_node' && printf '%s\\n' \"$nodes\" | grep -qx '/move_group'; then echo \"[A1] 驱动和 MoveIt 已在运行，跳过启动\"; else log=\"runtime/logs/real_startup_$(date +%H%M%S).log\"; echo \"[A1] 启动 驱动 + MoveIt（日志 $log；后台常驻，关掉这个终端也不会停）\"; setsid nohup ros2 launch cs625_bringup real_base.launch.py launch_driver:=true robot_ip:=\"$CS625_ROBOT_IP\" description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro headless_mode:=true launch_moveit:=true launch_rviz:=false activate_joint_controller:=false execute:=false require_confirmation:=true > \"$log\" 2>&1 < /dev/null & for i in $(seq 1 45); do nodes=$(ros2 node list 2>/dev/null); if printf '%s\\n' \"$nodes\" | grep -qx '/eli_ros2_control_node' && printf '%s\\n' \"$nodes\" | grep -qx '/move_group'; then break; fi; sleep 2; done; if ! printf '%s\\n' \"$nodes\" | grep -qx '/move_group'; then echo '[A1] 90 秒内没等到 MoveIt，日志末尾：'; tail -15 \"$log\"; exit 1; fi; fi; echo \"[A1] 把真机夹具加进规划场景\"; python3 scripts/apply_real_cell_scene.py || exit 1; echo; echo \"[A1] 四项状态（控制器此时应仍是 inactive，等 A2 激活）\"; printf \"  safety_mode : \"; timeout 8 ros2 topic echo /io_and_status_controller/safety_mode --once 2>/dev/null | head -1; printf \"  robot_mode  : \"; timeout 8 ros2 topic echo /io_and_status_controller/robot_mode --once 2>/dev/null | head -1; printf \"  controller  : \"; ros2 control list_controllers --controller-manager \"${CS625_CONTROLLER_MANAGER:-/eli_ros2_control_node}\" 2>/dev/null | awk '$1==\"arm_controller\"{print $NF}'; echo \"  health      :\"; python3 scripts/control_health.py || true; echo; echo \"[A1] 下一步：A2 开动（激活控制器）；要采数据/建模时跑 P3 相机 → P4\"",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "A2 · 开动（激活控制器 + 四项检查）",
+      "detail": "把执行权交给 arm_controller，然后打印四项：safety_mode=1 / robot_mode=7 / controller=active / control_health 三 True。激活后再检查一次状态，避免被 switch_controllers 的退出码误导（控制器已 active 时它会返回 1，属正常）。这是动臂前最后一次人工确认。",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; cm=\"${CS625_CONTROLLER_MANAGER:-/eli_ros2_control_node}\"; ac=\"${CS625_ARM_CONTROLLER:-arm_controller}\"; echo \"[A2] 激活 $ac（把执行权交给控制器）\"; ros2 control switch_controllers --controller-manager \"$cm\" --activate \"$ac\" --strict || true; state=$(ros2 control list_controllers --controller-manager \"$cm\" 2>/dev/null | awk '$1==\"arm_controller\"{print $NF}'); if [ \"$state\" != \"active\" ]; then echo \"[A2] 激活失败：$ac 现在状态 = ${state:-未知}\"; exit 1; fi; echo; echo \"[A2] 四项检查\"; printf \"  safety_mode : \"; timeout 8 ros2 topic echo /io_and_status_controller/safety_mode --once 2>/dev/null | head -1; printf \"  robot_mode  : \"; timeout 8 ros2 topic echo /io_and_status_controller/robot_mode --once 2>/dev/null | head -1; printf \"  controller  : \"; echo \"$state\"; echo \"  health      :\"; python3 scripts/control_health.py",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "B · 跑一次任务（dry-run / plan-only / execute）",
+      "detail": "dry-run：只打印配置、模型检查和阶段表（模型过期时 exit 2）；plan-only：只做规划不动臂；execute：真动，3 秒内 Ctrl+C 可取消。需要相机与新鲜环境模型的只有 execute 的观测阶段。",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; case \"${input:runAction}\" in dry-run) echo '[B] 预演：不动臂'; python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world ${input:world} --dry-run ;; plan-only) echo '[B] 只规划：不动臂'; python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world ${input:world} --plan-only ;; execute) echo '[B] 真动：${input:scope}/${input:mode} @ ${input:world}，3 秒内可 Ctrl+C'; sleep 3; python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world ${input:world} --confirm ;; *) echo '未知 runAction'; exit 1 ;; esac",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "C · 离线测试（pytest + 契约，不碰机器人）",
+      "detail": "改代码后先跑它：pytest 全量 + 仓库契约检查，任一失败非零退出。不需要真机、不需要相机。",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; echo '[C] pytest'; python3 -m pytest test/ -q; rc1=$?; echo '[C] 契约检查'; python3 test/contract_checks.py; rc2=$?; if [ $rc1 -ne 0 ] || [ $rc2 -ne 0 ]; then echo '[C] 失败：先修测试再碰真机'; exit 1; fi; echo '[C] 全部通过'",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "P1 · 环境校验（换终端/改代码后跑）",
+      "detail": "source_dev_env.sh --full --verify：ROS Jazzy → 厂商 underlay → 本仓库 overlay。最后打印 OK 才是环境链正常。",
       "type": "shell",
       "command": "source scripts/source_dev_env.sh --full --verify",
       "options": {
@@ -12,108 +52,68 @@
       "problemMatcher": []
     },
     {
-      "label": "01 · 构建 overlay",
-      "detail": "首次构建时 install/ 还不存在，--full 会失败，所以回退到 --no-overlay。改完 C++/Python 包后跑这一条。",
+      "label": "P2 · 构建 overlay（改了包之后）",
+      "detail": "首次构建时 install/ 不存在，--full 会失败，所以回退 --no-overlay。",
       "type": "shell",
-      "command": "if ! source scripts/source_dev_env.sh --full || exit 1; then echo '首次构建：overlay 还不存在，改用 --no-overlay'; source scripts/source_dev_env.sh --no-overlay || exit 1; fi; bash scripts/build.sh",
+      "command": "if ! source scripts/source_dev_env.sh --full || exit 1; then echo '首次构建：overlay 不存在，改用 --no-overlay'; source scripts/source_dev_env.sh --no-overlay || exit 1; fi; bash scripts/build.sh",
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
     },
     {
-      "label": "02 · 自动化测试（离线：pytest + 契约）",
-      "detail": "不启 ROS、不碰机械臂。先 pytest 全量，再跑仓库契约检查；任一失败即非零退出。改代码后第一件事就是跑它。",
+      "label": "P3 · 相机（modeling / fast / status）",
+      "detail": "camera_mode.py 自己加载 camport 工作区。实测：modeling=1280x960 有深度（约 0.8 fps，建模/观测用）；fast=640x480 彩色-only、25 fps（无深度）。",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; echo '[02] pytest'; python3 -m pytest test/ -q; rc1=$?; echo '[02] 契约检查'; python3 test/contract_checks.py; rc2=$?; if [ $rc1 -ne 0 ] || [ $rc2 -ne 0 ]; then echo '[02] 失败：先修测试，再碰真机'; exit 1; fi; echo '[02] 全部通过'",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; case \"${input:cameraMode}\" in modeling) echo '[P3] 精细模式 1280x960（有深度）'; python3 scripts/camera_mode.py modeling ;; fast) echo '[P3] 高帧率模式（彩色 25 fps，无深度）'; python3 scripts/camera_mode.py fast ;; status) python3 scripts/camera_mode.py status ;; *) echo '未知 cameraMode'; exit 1 ;; esac",
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
     },
     {
-      "label": "03 · 环境建模 + 门禁",
-      "detail": "rebuild 需要当天采集的数据集目录（默认值写死的是 2026-10-25，用它等于拿旧点云刷新鲜度）；verify 只判门禁：槽/工件偏差、点数、模型年龄。",
+      "label": "P4 · 采集 + 建模 + 门禁（capture / rebuild / verify）",
+      "detail": "capture：臂会动，绕工件采多视角（需相机 modeling）；rebuild：用指定数据集重建 runtime/environment；verify：只判门禁（偏差/点数/年龄）。模型超过 2 小时会被 B 的 dry-run/execute 拒绝。",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; case \"${input:modelAction}\" in rebuild) ds=\"${input:datasetDir}\"; if [ -z \"$ds\" ]; then echo '[03] 缺少当天数据集：例如 ~/cs625_yolo_seg/datasets/2026-10-26_raw'; exit 1; fi; echo \"[03] 用 $ds 重新测量 → runtime/environment\"; python3 scripts/model_environment.py --dataset \"$ds\" --out runtime/environment ;; verify) echo '[03] 只判门禁（不重新测量）'; python3 scripts/model_environment.py --out runtime/environment --verify-only ;; *) echo '未知 modelAction'; exit 1 ;; esac",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; case \"${input:modelAction}\" in capture) ds=\"${input:datasetDir}\"; [ -n \"$ds\" ] || ds=\"$HOME/cs625_yolo_seg/datasets/$(date +%F)_raw\"; echo \"[P4] 臂会动：采多视角 → $ds\"; python3 scripts/capture_dataset.py --out \"$ds\" --tag workpiece ;; rebuild) ds=\"${input:datasetDir}\"; if [ -z \"$ds\" ]; then echo \"[P4] rebuild 需要数据集目录（capture 输出的那个）\"; exit 1; fi; echo \"[P4] 用 $ds 重建模型\"; python3 scripts/model_environment.py --dataset \"$ds\" --out runtime/environment ;; verify) echo '[P4] 只判门禁'; python3 scripts/model_environment.py --out runtime/environment --verify-only ;; *) echo '未知 modelAction'; exit 1 ;; esac",
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
     },
     {
-      "label": "04 · 采集环境数据（当天，臂会动）",
-      "detail": "绕工件规划 7×3 个视角并录 RGB-D，输出到当天目录。这一步臂会真动（每段都有碰撞规划与首点保护）。采完用 03 的 rebuild 指向同一目录重建模型。",
+      "label": "P5 · 规划场景（apply / verify / remove）",
+      "detail": "把真机夹具加进 MoveIt（A1 已自动做一次；重启 MoveIt 后要再做）。verify 直接问 /get_planning_scene 有没有 real_cell_slot_fixture。",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; ds=\"${input:datasetDir}\"; [ -n \"$ds\" ] || ds=\"$HOME/cs625_yolo_seg/datasets/$(date +%F)_raw\"; echo \"[04] 臂会动：绕工件采多视角 → $ds\"; python3 scripts/capture_dataset.py --out \"$ds\" --tag workpiece",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; case \"${input:sceneAction}\" in apply) python3 scripts/apply_real_cell_scene.py ;; verify) out=$(timeout 25 ros2 service call /get_planning_scene moveit_msgs/srv/GetPlanningScene \"{components: {components: 0}}\" 2>/dev/null); if printf '%s' \"$out\" | grep -q \"id='real_cell_slot_fixture'\"; then echo '[P5] 夹具已在场景里'; else echo '[P5] 场景里没有夹具：先 apply'; exit 1; fi ;; remove) python3 scripts/apply_real_cell_scene.py --remove ;; *) echo '未知 sceneAction'; exit 1 ;; esac",
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
     },
     {
-      "label": "10 · 运行任务（picker 选范围/模式/动作/世界）",
-      "detail": "dry-run：只打印合并后的配置、门禁判定和阶段表（门禁 REJECT 时 exit 2）；plan-only：做可达性/碰撞规划，不发执行指令；execute：真动，3 秒内 Ctrl+C 可取消。",
+      "label": "P6 · 感知链路自检（相机 → /sensors/*）",
+      "detail": "只读：相机节点在不在、5 个话题各有几个 publisher。判读标准：/sensors/camera/points 必须 >0；为 0 说明归一化链路没通（real.yaml 的输入话题还空着）。",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; case \"${input:runAction}\" in dry-run) echo '[10] 预演：不动臂'; python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world ${input:world} --dry-run ;; plan-only) echo '[10] 只规划：不动臂'; python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world ${input:world} --plan-only ;; execute) echo '[10] 真动：${input:scope}/${input:mode} @ ${input:world}，3 秒内可 Ctrl+C'; sleep 3; python3 scripts/run_task.py --scope ${input:scope} --mode ${input:mode} --world ${input:world} --confirm ;; *) echo '未知 runAction'; exit 1 ;; esac",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; echo '[P6] 相机节点'; if ros2 node list 2>/dev/null | grep -qE '^/camera'; then ros2 node list | grep -E '^/camera'; else echo '  没有相机节点：先跑 P3'; fi; echo; echo '[P6] publisher 数'; for t in /camera/color/image_raw /camera/color/camera_info /camera/depth/image_raw /camera/depth/points /sensors/camera/points; do printf \"  %-30s \" \"$t\"; ros2 topic info \"$t\" 2>/dev/null | awk '/Publisher count/ {print $3}' | tr -d \"\\n\"; echo; done; echo; echo '[P6] 判读：/sensors/camera/points 必须 >0'",
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
     },
     {
-      "label": "20 · 起仿真（Gazebo + RViz）",
-      "detail": "sim_cell.launch.py：用真机实测生成的世界，RViz 一起起。正常看到 Gazebo 窗口和 /joint_states。",
+      "label": "P7 · 分步起真机（A1 失败时排查：base / moveit）",
+      "detail": "把 A1 拆开：base 只起驱动；moveit 只起 MoveIt（会先检查底座）。两个各占一个终端。",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1 && ros2 launch cs625_bringup sim_cell.launch.py",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; case \"${input:realStage}\" in base) if [ -z \"$CS625_ROBOT_IP\" ]; then echo \"CS625_ROBOT_IP 未设置\"; exit 1; fi; echo \"[P7] 驱动底座（控制器 inactive）\"; ros2 launch cs625_bringup real_base.launch.py launch_driver:=true robot_ip:=\"$CS625_ROBOT_IP\" description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro headless_mode:=true launch_moveit:=false launch_rviz:=false activate_joint_controller:=false execute:=false require_confirmation:=true ;; moveit) if ! ros2 node list 2>/dev/null | grep -qx '/eli_ros2_control_node'; then echo '[P7] 底座没跑：先跑 base'; exit 1; fi; echo '[P7] MoveIt'; ros2 launch cs625_bringup real_moveit.launch.py description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro moveit_config_package:=elite_cs625_moveit_config semantic_package:=cs625_bringup semantic_file:=config/cs625_active_perception.srdf ;; *) echo '未知 realStage'; exit 1 ;; esac",
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
     },
     {
-      "label": "21 · 起真机（底座 / MoveIt）",
-      "detail": "all：一条命令起驱动底座 + MoveIt（最常用）；base / moveit 分开起用于排查。底座的 arm_controller 保持 inactive，MoveIt 没起来时会报错而不是空等。",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; case \"${input:realStage}\" in all) if [ -z \"$CS625_ROBOT_IP\" ]; then echo 'CS625_ROBOT_IP 未设置：写进 ~/.cs625_local.env'; exit 1; fi; echo '[21] 一条命令：驱动底座 + MoveIt（控制器仍 inactive）'; ros2 launch cs625_bringup real_base.launch.py launch_driver:=true robot_ip:=\"$CS625_ROBOT_IP\" description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro headless_mode:=true launch_moveit:=true launch_rviz:=false activate_joint_controller:=false execute:=false require_confirmation:=true ;; base) if [ -z \"$CS625_ROBOT_IP\" ]; then echo 'CS625_ROBOT_IP 未设置：写进 ~/.cs625_local.env'; exit 1; fi; echo '[21] 第 1 步：驱动底座（控制器保持 inactive）'; ros2 launch cs625_bringup real_base.launch.py launch_driver:=true robot_ip:=\"$CS625_ROBOT_IP\" description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro headless_mode:=true launch_moveit:=false launch_rviz:=false activate_joint_controller:=false execute:=false require_confirmation:=true ;; moveit) if ! ros2 node list 2>/dev/null | grep -qx '/eli_ros2_control_node'; then echo '[21] 底座没在跑：先执行 21 的 base'; exit 1; fi; echo '[21] 第 2 步：MoveIt'; ros2 launch cs625_bringup real_moveit.launch.py description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro moveit_config_package:=elite_cs625_moveit_config semantic_package:=cs625_bringup semantic_file:=config/cs625_active_perception.srdf ;; *) echo '未知 realStage'; exit 1 ;; esac",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "22 · 控制器（四项检查 / 激活 / 恢复）",
-      "detail": "动臂前四项缺一不可：safety_mode=1、robot_mode=7、arm_controller active、control_health 三 True。health 会直接打印 mode 值；inactive 时 control_health 现在会失败并给出激活命令。",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; cm=\"$CS625_CONTROLLER_MANAGER\"; [ -n \"$cm\" ] || cm=/eli_ros2_control_node; ac=\"$CS625_ARM_CONTROLLER\"; [ -n \"$ac\" ] || ac=arm_controller; case \"${input:controllerAction}\" in health) echo '[22] 四项健康检查'; printf '  safety_mode: '; timeout 8 ros2 topic echo /io_and_status_controller/safety_mode --once 2>/dev/null | head -1; printf '  robot_mode : '; timeout 8 ros2 topic echo /io_and_status_controller/robot_mode --once 2>/dev/null | head -1; python3 scripts/control_health.py ;; activate) echo \"[22] 激活 $ac（strict）\"; ros2 control switch_controllers --controller-manager \"$cm\" --activate \"$ac\" --strict ;; recover) echo '[22] 恢复控制链（只在真正需要时用）'; bash scripts/recover_control.sh ;; *) echo '未知 controllerAction'; exit 1 ;; esac",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "23 · 规划场景（夹具）",
-      "detail": "把真机夹具加进 MoveIt 规划场景（默认只发夹具，不发桌面/工件，理由见脚本 --include-tables 的说明）。verify 直接问 move_group 场景里有没有 real_cell_slot_fixture。",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; case \"${input:sceneAction}\" in apply) python3 scripts/apply_real_cell_scene.py ;; verify) out=$(timeout 25 ros2 service call /get_planning_scene moveit_msgs/srv/GetPlanningScene \"{components: {components: 0}}\" 2>/dev/null); if printf '%s' \"$out\" | grep -q \"id='real_cell_slot_fixture'\"; then echo '[23] 夹具已在规划场景里'; else echo '[23] 场景里没有夹具：先执行 apply'; exit 1; fi ;; remove) python3 scripts/apply_real_cell_scene.py --remove ;; *) echo '未知 sceneAction'; exit 1 ;; esac",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "24 · 感知链路自检（相机 → /sensors/*）",
-      "detail": "只检查、不启动任何东西：相机节点在不在、四个话题各有几个 publisher。判读标准：/sensors/camera/points 的 publisher 必须 >0；现在是 0 就说明归一化链路没通（见任务 31 与 real.yaml）。",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; echo '[24] 相机节点'; if ros2 node list 2>/dev/null | grep -qE '^/camera'; then ros2 node list | grep -E '^/camera'; else echo '  没有相机节点：先跑 31 · 相机'; fi; echo; echo '[24] 话题 publisher 数（publisher count）'; for t in /camera/color/image_raw /camera/color/camera_info /camera/depth/image_raw /camera/depth/points /sensors/camera/points; do printf '  %-30s ' \"$t\"; ros2 topic info \"$t\" 2>/dev/null | awk '/Publisher count/ {print $3}' | tr -d '\\n'; echo; done; echo; echo '[24] 判读：/sensors/camera/points 必须 >0；0 表示相机→适配器链路未通'",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "29 · 伪硬件冒烟（不接真机）",
-      "detail": "use_fake_hardware=true：只验 URDF / ros2_control / 控制器链路，不连机器人。真机不可用时用它排查软件栈。",
+      "label": "P8 · 伪硬件冒烟（不接真机）",
+      "detail": "use_fake_hardware=true：只验 URDF / ros2_control / 控制器链路。真机不可用时排查软件栈。",
       "type": "shell",
       "command": "source scripts/source_dev_env.sh --full || exit 1; if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; ros2 launch cs625_bringup real_base.launch.py launch_driver:=true use_fake_hardware:=true description_package:=eli_cs_robot_description description_file:=cs625.urdf.xacro headless_mode:=true launch_moveit:=false launch_rviz:=false activate_joint_controller:=false execute:=false require_confirmation:=true",
       "options": {
@@ -122,38 +122,28 @@
       "problemMatcher": []
     },
     {
-      "label": "30 · Qt 操作面板",
-      "detail": "cs625_ui.py：六个任务模式按钮，和任务 10 等价（二选一即可）。",
+      "label": "P9 · Qt 操作面板（B 的替代界面）",
+      "detail": "cs625_ui.py：六个任务模式按钮。和 B 等价，二选一。",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1 && python3 scripts/cs625_ui.py",
+      "command": "source scripts/source_dev_env.sh --full && python3 scripts/cs625_ui.py",
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
     },
     {
-      "label": "31 · 相机（精细 / 高帧率 / 状态）",
-      "detail": "camera_mode.py 自己加载 camport 工作区并读 CS625_CAMERA_IP。实测：fast = 640x480 彩色-only（25 fps，无深度）；modeling = 1280x960（0.8 fps，有深度）。建模/观测用 modeling，跑流程前可切 fast。",
+      "label": "P10 · 实验归档",
+      "detail": "归档 runtime/experiments 最新一次到 ~/cs625_experiment_archive，并写 docs/evidence/experiment_index.md。",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; case \"${input:cameraMode}\" in modeling) echo '[31] 切到精细模式 1280x960（有深度，建模/标定用）'; python3 scripts/camera_mode.py modeling ;; fast) echo '[31] 切到高帧率模式（实测彩色 25 fps，无深度）'; python3 scripts/camera_mode.py fast ;; status) python3 scripts/camera_mode.py status ;; *) echo '未知 cameraMode'; exit 1 ;; esac",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; archive_latest() { run=$(ls -td runtime/experiments/*/ 2>/dev/null | head -1); if [ -z \"$run\" ]; then echo \"没有可归档的 run\"; return 1; fi; echo \"[P10] 归档 $run\"; python3 scripts/archive_experiment.py --run-dir \"$run\"; }; case \"${input:archiveAction}\" in latest) archive_latest ;; stop-and-archive) python3 scripts/experiment_recorder.py stop; archive_latest ;; *) echo \"未知 archiveAction\"; exit 1 ;; esac",
       "options": {
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
     },
     {
-      "label": "40 · 实验归档",
-      "detail": "归档 runtime/experiments 里最新一次到 $CS625_EXPERIMENT_ARCHIVE（默认 ~/cs625_experiment_archive），并写 docs/evidence/experiment_index.md。stop-and-archive 会先停记录器。",
-      "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; archive_latest() { run=$(ls -td runtime/experiments/*/ 2>/dev/null | head -1); if [ -z \"$run\" ]; then echo '没有 runtime/experiments/* 可归档：先跑一次 --confirm 的执行'; return 1; fi; echo \"[40] 归档 $run\"; python3 scripts/archive_experiment.py --run-dir \"$run\"; }; case \"${input:archiveAction}\" in latest) archive_latest ;; stop-and-archive) echo '[40] 先停记录器'; python3 scripts/experiment_recorder.py stop; archive_latest ;; *) echo '未知 archiveAction'; exit 1 ;; esac",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "50 · 文件查看器（浏览器看视频/图片/日志）",
-      "detail": "WSL 里起只读网页服务（默认 $HOME，端口 8090），Windows 浏览器打开 http://localhost:8090/。只读、只监听 127.0.0.1。",
+      "label": "P11 · 文件查看器（浏览器看视频/图片/日志）",
+      "detail": "只读网页服务（默认 $HOME，端口 8090），Windows 浏览器打开 http://localhost:8090/。",
       "type": "shell",
       "command": "python3 scripts/file_viewer.py --root \"$HOME\" --port 8090",
       "options": {
@@ -162,8 +152,8 @@
       "problemMatcher": []
     },
     {
-      "label": "99 · DSH Web 快速启动（已开就只开浏览器）",
-      "detail": "探 127.0.0.1 的 3080/3081；已监听就跳过启动，否则后台起 dsh web --no-open --port 3080，从日志取带 token 的 URL 交给浏览器。任务本身立刻返回。",
+      "label": "P12 · DSH Web（已开就只开浏览器）",
+      "detail": "探 127.0.0.1:3080/3081；没开就后台起 dsh web，从日志取带 token 的 URL 交给浏览器。",
       "type": "shell",
       "command": "bash -lc 'cd \"${workspaceFolder}\" || exit 1; source scripts/source_dev_env.sh --full >/dev/null 2>&1 || true; if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; ports=\"$CS625_DSH_PORT\"; [ -n \"$ports\" ] || ports=\"3080 3081\"; log=\"runtime/logs/dsh_web.log\"; mkdir -p runtime/logs; ensure_node() { command -v node >/dev/null 2>&1 && return 0; if [ -s \"$HOME/.nvm/nvm.sh\" ]; then . \"$HOME/.nvm/nvm.sh\" >/dev/null 2>&1; fi; command -v node >/dev/null 2>&1 && return 0; _nv=$(ls -d \"$HOME\"/.nvm/versions/node/*/bin 2>/dev/null | sort -V | tail -1); if [ -n \"$_nv\" ]; then PATH=\"$_nv:$PATH\"; export PATH; fi; command -v node >/dev/null 2>&1; }; dsh_cmd() { if command -v dsh >/dev/null 2>&1; then echo dsh; return 0; fi; _np=$(ls -dt \"$HOME\"/.npm/_npx/*/node_modules/.bin/dsh 2>/dev/null | head -1); if [ -n \"$_np\" ] && [ -x \"$_np\" ]; then echo \"$_np\"; return 0; fi; _gm=\"$(npm root -g 2>/dev/null)/@deepseek-ai/dsh/lib/bin.js\"; if [ -f \"$_gm\" ] && command -v node >/dev/null 2>&1; then echo \"node $_gm\"; return 0; fi; return 1; }; listening() { (exec 3<>\"/dev/tcp/127.0.0.1/$1\") 2>/dev/null && return 0; command -v ss >/dev/null 2>&1 && ss -ltn 2>/dev/null | grep -q \"127.0.0.1:$1 \" && return 0; return 1; }; url_from_log() { if [ -f \"$log\" ]; then grep -o \"http://127.0.0.1:$1/[^ ]*token=[A-Za-z0-9_-]*\" \"$log\" | tail -1; fi; }; active=\"\"; for p in $ports; do if listening \"$p\"; then active=\"$p\"; echo \"[99.1] 127.0.0.1:$p 已在监听\"; break; fi; done; if [ -z \"$active\" ]; then ensure_node || true; cmd=$(dsh_cmd) || cmd=\"\"; if [ -z \"$cmd\" ]; then echo \"[99.2] 找不到 dsh/node\"; exit 1; fi; : > \"$log\"; setsid nohup $cmd web --no-open --port 3080 >>\"$log\" 2>&1 < /dev/null & echo \"[99.2] 已后台启动 (pid $!)\"; for i in $(seq 1 60); do listening 3080 && break; sleep 0.25; done; active=3080; fi; url=$(url_from_log \"$active\"); [ -n \"$url\" ] || url=\"http://127.0.0.1:$active/\"; echo \"[99.3] 打开 $url\"; if command -v xdg-open >/dev/null 2>&1; then xdg-open \"$url\" >/dev/null 2>&1; elif grep -qi microsoft /proc/version 2>/dev/null && command -v cmd.exe >/dev/null 2>&1; then cmd.exe /c start \"\" \"$url\" >/dev/null 2>&1; else echo '[99.3] 手动打开上面的 URL'; fi'",
       "options": {
@@ -189,8 +179,8 @@
       "type": "pickString",
       "description": "任务模式",
       "options": [
-        "safe",
-        "efficient"
+        "efficient",
+        "safe"
       ],
       "default": "efficient"
     },
@@ -216,11 +206,23 @@
       "default": "dry-run"
     },
     {
+      "id": "cameraMode",
+      "type": "pickString",
+      "description": "相机模式",
+      "options": [
+        "modeling",
+        "fast",
+        "status"
+      ],
+      "default": "modeling"
+    },
+    {
       "id": "modelAction",
       "type": "pickString",
       "description": "建模动作",
       "options": [
         "verify",
+        "capture",
         "rebuild"
       ],
       "default": "verify"
@@ -228,30 +230,8 @@
     {
       "id": "datasetDir",
       "type": "promptString",
-      "description": "当天采集的数据集目录（rebuild 必填）",
+      "description": "数据集目录（capture 默认今天；rebuild 必填）",
       "default": ""
-    },
-    {
-      "id": "realStage",
-      "type": "pickString",
-      "description": "真机阶段",
-      "options": [
-        "all",
-        "base",
-        "moveit"
-      ],
-      "default": "all"
-    },
-    {
-      "id": "controllerAction",
-      "type": "pickString",
-      "description": "控制器动作",
-      "options": [
-        "health",
-        "activate",
-        "recover"
-      ],
-      "default": "health"
     },
     {
       "id": "sceneAction",
@@ -265,15 +245,14 @@
       "default": "apply"
     },
     {
-      "id": "cameraMode",
+      "id": "realStage",
       "type": "pickString",
-      "description": "相机模式",
+      "description": "分步起真机",
       "options": [
-        "fast",
-        "modeling",
-        "status"
+        "base",
+        "moveit"
       ],
-      "default": "fast"
+      "default": "base"
     },
     {
       "id": "archiveAction",
