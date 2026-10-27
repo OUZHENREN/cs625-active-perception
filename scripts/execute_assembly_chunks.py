@@ -143,11 +143,18 @@ def main() -> int:
 
     try:
         from eli_common_interface.msg import RobotMode, SafetyMode
+        from rclpy.qos import DurabilityPolicy, QoSProfile
 
+        # These two topics are latched (TRANSIENT_LOCAL) and published on change;
+        # a volatile subscription never receives the current value, which is why
+        # this probe used to print safety_mode=? and could not notice an E-stop.
+        latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         node.create_subscription(
-            SafetyMode, "/io_and_status_controller/safety_mode", _status("safety"), 10)
+            SafetyMode, "/io_and_status_controller/safety_mode", _status("safety"),
+            latched)
         node.create_subscription(
-            RobotMode, "/io_and_status_controller/robot_mode", _status("robot"), 10)
+            RobotMode, "/io_and_status_controller/robot_mode", _status("robot"),
+            latched)
     except Exception as exc:  # driver messages are an underlay dependency
         print(f"robot-state probe unavailable ({exc}); failures report raw status only")
 
@@ -178,7 +185,8 @@ def main() -> int:
             goal.trajectory.points[-1].time_from_start.sec
             + goal.trajectory.points[-1].time_from_start.nanosec * 1e-9
         )
-        goal.goal_time_tolerance = Duration(sec=int(scaled_total + 25))
+        # +5 s, not +25: the controller must say "I did not make it" quickly.
+        goal.goal_time_tolerance = Duration(sec=int(scaled_total + 5))
 
         offset = first_point_far(data)
         if offset > args.max_start_offset:
@@ -202,7 +210,11 @@ def main() -> int:
         # window was duration + 20 s, so the client gave up while the server was
         # still running the goal and then queued the next chunk on top of it.
         duration = scaled_total
-        wait_budget = (duration * 2.0 + 40.0) * args.wait_scale
+        # The controller aborts at duration + 5 s now; give the result 20 s to
+        # arrive instead of 2*duration + 40 (a failed 60 s insert used to keep the
+        # caller blind for almost two minutes while the Qt panel already showed
+        # the failure).
+        wait_budget = (duration + 20.0) * args.wait_scale
         expected_span = max(
             (abs(a - b) for a, b in zip(data["points"][-1]["q"], data["points"][0]["q"])),
             default=0.0,
@@ -214,6 +226,15 @@ def main() -> int:
         motion_seen = expected_span <= 0.02
         while not result_future.done() and time.time() - started < wait_budget:
             rclpy.spin_once(node, timeout_sec=0.05)
+            # An E-stop / protective stop ends the trajectory immediately; report
+            # it as such instead of waiting for the controller's timeout.
+            safety_now = state.get("safety")
+            robot_now = state.get("robot")
+            if (safety_now not in (None, 1)) or (robot_now not in (None, 7)):
+                handle.cancel_goal_async()
+                print(f"ESTOP_OR_PROTECTIVE_STOP: {robot_state_text()}; "
+                      "the trajectory was cancelled")
+                return 9
             if not motion_seen and start_positions:
                 motion_seen = max(
                     (abs(latest.get(name, value) - value)
