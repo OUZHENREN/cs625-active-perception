@@ -32,8 +32,9 @@ def graspmod():
 def test_formula_reproduces_the_proven_config_values(graspmod):
     pre, grasp = graspmod.poses_from_workpiece(
         graspmod.REFERENCE_WORKPIECE_XYZ, graspmod.REFERENCE_WORKPIECE_QUAT)
-    assert np.allclose(grasp, graspmod.REFERENCE_GRASP, atol=1e-9)
-    assert np.allclose(pre, graspmod.REFERENCE_PRE_GRASP, atol=1e-9)
+    # The part-frame constants are stored to 0.1 mm, so allow that rounding.
+    assert np.allclose(grasp, graspmod.REFERENCE_GRASP, atol=3e-4)
+    assert np.allclose(pre, graspmod.REFERENCE_PRE_GRASP, atol=3e-4)
 
 
 def test_part_point_is_the_documented_cad_grasp_point(graspmod):
@@ -46,8 +47,8 @@ def test_translating_the_workpiece_translates_the_grasp_point(graspmod):
     shift = np.array([0.0, 0.020, 0.0])  # 20 mm "to the right"
     pre, grasp = graspmod.poses_from_workpiece(
         graspmod.REFERENCE_WORKPIECE_XYZ + shift, graspmod.REFERENCE_WORKPIECE_QUAT)
-    assert np.allclose(grasp - graspmod.REFERENCE_GRASP, shift, atol=1e-9)
-    assert np.allclose(pre - graspmod.REFERENCE_PRE_GRASP, shift, atol=1e-9)
+    assert np.allclose(grasp - graspmod.REFERENCE_GRASP, shift, atol=3e-4)
+    assert np.allclose(pre - graspmod.REFERENCE_PRE_GRASP, shift, atol=3e-4)
 
 
 def test_rotating_the_workpiece_rotates_the_approach_offset(graspmod):
@@ -59,16 +60,17 @@ def test_rotating_the_workpiece_rotates_the_approach_offset(graspmod):
     offset = grasp - pre
     assert np.linalg.norm(offset) == pytest.approx(0.120, abs=2e-4)
     expected = turn.as_matrix() @ (graspmod.REFERENCE_GRASP - graspmod.REFERENCE_PRE_GRASP)
-    assert np.allclose(offset, expected, atol=1e-9)
+    assert np.allclose(offset, expected, atol=3e-4)
 
 
-def test_drift_is_zero_at_the_reference_and_grows_with_a_shift(graspmod):
-    mm, deg = graspmod.drift(graspmod.REFERENCE_WORKPIECE_XYZ,
-                             graspmod.REFERENCE_WORKPIECE_QUAT)
+def test_drift_is_zero_at_the_configured_reference(graspmod):
+    # The reference lives in config/tasks/common.yaml (workpiece_reference); it is
+    # updated whenever the part is re-placed and the grasp poses re-derived.
+    reference_xyz, reference_quat = graspmod.reference_pose()
+    mm, deg = graspmod.drift(reference_xyz, reference_quat)
     assert mm == pytest.approx(0.0, abs=1e-6)
     assert deg == pytest.approx(0.0, abs=1e-6)
-    mm, _ = graspmod.drift(graspmod.REFERENCE_WORKPIECE_XYZ + np.array([0, 0.02, 0]),
-                           graspmod.REFERENCE_WORKPIECE_QUAT)
+    mm, _ = graspmod.drift(reference_xyz + np.array([0, 0.02, 0]), reference_quat)
     assert mm == pytest.approx(20.0, abs=1e-3)
 
 

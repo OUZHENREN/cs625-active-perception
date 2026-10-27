@@ -96,6 +96,29 @@ WORKPIECE_POSE = {
                "-0.0068); CAD origin is not the geometric centre"),
 }
 
+
+def _configured_workpiece_pose() -> tuple[list, list]:
+    """Workpiece pose the grasp config was derived from (common.yaml).
+
+    The model used to take the pose from the constant above no matter what, so its
+    "workpiece delta" gate compared the constant with itself and a moved workpiece
+    was invisible (one of the causes of the 2026-10-26 collision).  When the task
+    config carries ``workpiece_reference`` that pose wins; the constant stays as the
+    fallback for older configs.
+    """
+    try:
+        import yaml as _yaml
+        config = _yaml.safe_load(
+            (REPO_ROOT / "config" / "tasks" / "common.yaml").read_text(encoding="utf-8"))
+        reference = (config or {}).get("workpiece_reference") or {}
+        xyz = reference.get("xyz")
+        quat = reference.get("quat")
+        if xyz and quat and len(xyz) == 3 and len(quat) == 4:
+            return [float(v) for v in xyz], [float(v) for v in quat]
+    except (OSError, ValueError, TypeError, Exception):  # noqa: BLE001 - optional
+        pass
+    return list(WORKPIECE_POSE["xyz"]), list(WORKPIECE_POSE["quat"])
+
 # --- cloud / table / collision defaults -------------------------------------
 DEPTH_MIN_M = 0.15        # closer returns are noise on this sensor
 DEPTH_MAX_M = 2.0         # far returns saturate around 16 m; they are invalid
@@ -816,6 +839,19 @@ def build_model(arguments) -> tuple[int, dict | None]:
     write_latest(out_dir, target)
 
     passed, reasons = evaluate_gate(model, GATE_THRESHOLDS, created_at.isoformat())
+    if not passed and arguments.accept_workpiece_move:
+        configured_xyz, configured_quat = _configured_workpiece_pose()
+        same_xyz = np.allclose(workpiece_xyz, configured_xyz, atol=1e-4)
+        dot = abs(float(np.dot(workpiece_quat, configured_quat)))
+        if same_xyz and dot >= 0.9999:
+            kept = [reason for reason in reasons if "工件" not in reason]
+            print("  accepted workpiece move: the measured pose matches "
+                  "workpiece_reference in config/tasks/common.yaml")
+            reasons = kept
+            passed = not kept
+        else:
+            print("  --accept-workpiece-move ignored: config/tasks/common.yaml "
+                  "workpiece_reference does not match this pose")
     print()
     print("key numbers")
     print(f"  frames used        {model['frames_used']}")
@@ -941,6 +977,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="capture root; every batch subdirectory is scanned")
     parser.add_argument("--out", default="runtime/environment",
                         help="output root (one timestamped directory per model)")
+    parser.add_argument("--accept-workpiece-move", action="store_true",
+                        help="accept a workpiece pose change that is already reflected "
+                             "in config/tasks/common.yaml (workpiece_reference).  Used "
+                             "when the part was deliberately moved/re-placed and the "
+                             "grasp poses were re-derived with "
+                             "scripts/grasp_from_measurement.py")
     parser.add_argument("--verify-only", action="store_true",
                         help="load the newest model.json and print the gate verdict")
     parser.add_argument("--now", default=None,
@@ -964,11 +1006,13 @@ def build_parser() -> argparse.ArgumentParser:
                         help="keep only points within +-band of the table z")
     parser.add_argument("--min-voxel-points", type=int, default=DEFAULT_MIN_VOXEL_POINTS)
     parser.add_argument("--max-boxes", type=int, default=DEFAULT_MAX_BOXES)
+    _configured_xyz, _configured_quat = _configured_workpiece_pose()
     parser.add_argument("--workpiece-xyz", type=float, nargs=3,
-                        default=WORKPIECE_POSE["xyz"])
+                        default=_configured_xyz,
+                        help="default: workpiece_reference in config/tasks/common.yaml")
     parser.add_argument("--workpiece-quat", type=float, nargs=4,
-                        default=WORKPIECE_POSE["quat"],
-                        help="xyzw")
+                        default=_configured_quat,
+                        help="xyzw; default: workpiece_reference in common.yaml")
     for key, value in GATE_THRESHOLDS.items():
         parser.add_argument(f"--threshold-{key.replace('_', '-')}", dest=f"threshold_{key}",
                             type=float, default=None,

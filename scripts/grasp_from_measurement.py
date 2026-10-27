@@ -44,6 +44,7 @@ import subprocess
 import sys
 
 import numpy as np
+import yaml
 from scipy.spatial.transform import Rotation
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -60,6 +61,7 @@ REFERENCE_WORKPIECE_XYZ = np.array([0.5029, 0.6351, 0.1254])
 REFERENCE_WORKPIECE_QUAT = np.array([0.1910, 0.9816, 0.0019, -0.0068])
 REFERENCE_GRASP = np.array([0.8316, 0.5918, -0.0583])
 REFERENCE_PRE_GRASP = np.array([0.7677, 0.4903, -0.0595])
+REFERENCE_GRASP_Q = np.array([-0.4835, 0.8753, 0.0075, 0.0018])
 DEFAULT_TOL_MM = 5.0
 DEFAULT_TOL_DEG = 1.0
 
@@ -71,16 +73,67 @@ def _transform(xyz, quat) -> np.ndarray:
     return transform
 
 
+def reference_pose() -> tuple[np.ndarray, np.ndarray]:
+    """The workpiece pose the *stored* config poses were derived from.
+
+    ``config/tasks/common.yaml`` carries it as ``workpiece_reference`` so that
+    updating the grasp poses and the reference stay in one place; the 2026-10-24
+    values are the fallback for older configs.
+    """
+    try:
+        common = yaml.safe_load(COMMON.read_text(encoding="utf-8")) or {}
+        reference = common.get("workpiece_reference") or {}
+        xyz = reference.get("xyz")
+        quat = reference.get("quat")
+        if xyz and quat:
+            return np.asarray(xyz, dtype=float), np.asarray(quat, dtype=float)
+    except (OSError, yaml.YAMLError):
+        pass
+    return REFERENCE_WORKPIECE_XYZ, REFERENCE_WORKPIECE_QUAT
+
+
+def stored_config() -> dict:
+    """Poses currently in common.yaml (fallback: the 2026-10-24 proven values)."""
+    values = {
+        "pre_grasp": REFERENCE_PRE_GRASP,
+        "grasp": REFERENCE_GRASP,
+        "grasp_q": REFERENCE_GRASP_Q,
+    }
+    try:
+        common = yaml.safe_load(COMMON.read_text(encoding="utf-8")) or {}
+        for key in values:
+            entry = common.get(key)
+            if entry:
+                values[key] = np.asarray(entry, dtype=float)
+    except (OSError, yaml.YAMLError, TypeError, ValueError):
+        pass
+    return values
+
+
+def grasp_quaternion(measured_quat) -> np.ndarray:
+    """Tool orientation = stored orientation rotated by the workpiece delta."""
+    _reference_xyz, reference_quat = reference_pose()
+    stored = stored_config()["grasp_q"]
+    delta = Rotation.from_quat(np.asarray(measured_quat, dtype=float)) \
+        * Rotation.from_quat(reference_quat).inv()
+    return (delta * Rotation.from_quat(stored)).as_quat()
+
+
+# Part-frame geometry: fixed by the CAD and the proven approach.  Recovered once
+# from the 2026-10-24 reference pose + config (tests pin both numbers), so they do
+# not drift when the stored reference is updated for a new workpiece placement.
+PART_POINT = np.array([-0.3235, 0.0829, 0.1793])
+APPROACH_OFFSET_PART = np.array([-0.02116, 0.11806, -0.00136])
+
+
 def part_point() -> np.ndarray:
-    """CAD-frame grasp point (metres), recovered from the reference pose+config."""
-    transform = _transform(REFERENCE_WORKPIECE_XYZ, REFERENCE_WORKPIECE_QUAT)
-    return transform[:3, :3].T @ (REFERENCE_GRASP - transform[:3, 3])
+    """CAD-frame grasp point (metres)."""
+    return PART_POINT
 
 
 def approach_offset_part() -> np.ndarray:
     """pre_grasp -> grasp offset expressed in the part frame (metres)."""
-    rotation = _transform(REFERENCE_WORKPIECE_XYZ, REFERENCE_WORKPIECE_QUAT)[:3, :3]
-    return rotation.T @ (REFERENCE_GRASP - REFERENCE_PRE_GRASP)
+    return APPROACH_OFFSET_PART
 
 
 def poses_from_workpiece(xyz, quat) -> tuple[np.ndarray, np.ndarray]:
@@ -90,17 +143,18 @@ def poses_from_workpiece(xyz, quat) -> tuple[np.ndarray, np.ndarray]:
     return pre_grasp, grasp
 
 
-def orientation_for_grasp(current_quat=None):
-    """The grasp orientation is unchanged by a translation; keep the proven one."""
-    return np.asarray([-0.4835, 0.8753, 0.0075, 0.0018])
+def orientation_for_grasp(measured_quat):
+    """Grasp orientation for a measured workpiece pose (see grasp_quaternion)."""
+    return grasp_quaternion(measured_quat)
 
 
 def drift(measured_xyz, measured_quat, reference_xyz=None, reference_quat=None):
     """Translation (mm) and rotation (deg) between measured and reference pose."""
-    reference_xyz = (REFERENCE_WORKPIECE_XYZ if reference_xyz is None
-                     else np.asarray(reference_xyz, dtype=float))
-    reference_quat = (REFERENCE_WORKPIECE_QUAT if reference_quat is None
-                      else np.asarray(reference_quat, dtype=float))
+    if reference_xyz is None or reference_quat is None:
+        reference_xyz, reference_quat = reference_pose()
+    else:
+        reference_xyz = np.asarray(reference_xyz, dtype=float)
+        reference_quat = np.asarray(reference_quat, dtype=float)
     delta_mm = float(np.linalg.norm(np.asarray(measured_xyz) - reference_xyz) * 1000.0)
     rotation = (Rotation.from_quat(reference_quat).inv()
                 * Rotation.from_quat(np.asarray(measured_quat, dtype=float)))
@@ -126,10 +180,14 @@ def measure_with_camera(weights: pathlib.Path, template: pathlib.Path,
     return xyz, quat
 
 
-def yaml_block(pre_grasp: np.ndarray, grasp: np.ndarray) -> str:
-    quat = orientation_for_grasp()
+def yaml_block(pre_grasp: np.ndarray, grasp: np.ndarray,
+               measured_xyz, measured_quat) -> str:
+    quat = orientation_for_grasp(measured_quat)
     fmt = lambda v: ", ".join(f"{float(x):.4f}" for x in v)  # noqa: E731
-    return ("pre_grasp: [" + fmt(pre_grasp) + "]\n"
+    return ("workpiece_reference:\n"
+            "  xyz: [" + fmt(measured_xyz) + "]\n"
+            "  quat: [" + fmt(measured_quat) + "]\n"
+            "pre_grasp: [" + fmt(pre_grasp) + "]\n"
             "grasp: [" + fmt(grasp) + "]\n"
             "grasp_q: [" + ", ".join(f"{float(x):.4f}" for x in quat) + "]")
 
@@ -168,7 +226,7 @@ def main() -> int:
     print(f"drift vs the reference pose used to derive the stored constants: "
           f"{delta_mm:.2f} mm / {delta_deg:.2f} deg")
     print("derived poses:")
-    print(yaml_block(pre_grasp, grasp))
+    print(yaml_block(pre_grasp, grasp, xyz, quat))
 
     if args.check:
         ok = delta_mm <= args.tol_mm and delta_deg <= args.tol_deg
