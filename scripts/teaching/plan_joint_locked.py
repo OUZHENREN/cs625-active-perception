@@ -29,7 +29,7 @@ import rclpy
 from geometry_msgs.msg import PoseStamped
 from moveit_msgs.msg import (Constraints, JointConstraint, PositionIKRequest,
                              RobotState)
-from moveit_msgs.srv import GetMotionPlan, GetPositionIK
+from moveit_msgs.srv import GetMotionPlan, GetPositionIK, GetStateValidity
 from sensor_msgs.msg import JointState
 
 sys.stdout.reconfigure(line_buffering=True)
@@ -71,6 +71,37 @@ def sanity_violation(candidate: list[float], seed: list[float], args) -> str | N
     return None
 
 
+def collision_violation(client, node, candidate: list[float]) -> str | None:
+    """Explicit collision check of an IK solution (replaces avoid_collisions IK).
+
+    Returns a reason string when the configuration is in collision, else None.
+    A failure to answer counts as a violation: never move on an unverified pose.
+    """
+    from moveit_msgs.msg import RobotState
+    from moveit_msgs.srv import GetStateValidity
+    state = RobotState()
+    joints = JointState()
+    joints.name = ORDER
+    joints.position = list(candidate)
+    state.joint_state = joints
+    request = GetStateValidity.Request()
+    request.robot_state = state
+    request.group_name = "cs625_arm"
+    request.constraints = Constraints()
+    future = client.call_async(request)
+    deadline = time.time() + 10.0
+    while not future.done() and time.time() < deadline:
+        rclpy.spin_once(node, timeout_sec=0.05)
+    response = future.result()
+    if response is None:
+        return "state validity check timed out"
+    if not response.valid:
+        pairs = "; ".join(f"{c.contact_body_1}<->{c.contact_body_2}"
+                          for c in response.contacts[:3])
+        return f"configuration in collision ({pairs})"
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("pose", nargs=7, type=float, metavar=("X", "Y", "Z", "QX", "QY", "QZ", "QW"))
@@ -108,6 +139,10 @@ def main() -> int:
     if not ik.wait_for_service(timeout_sec=40):
         print("NO /compute_ik")
         return 3
+    validity = node.create_client(GetStateValidity, "/check_state_validity")
+    if not validity.wait_for_service(timeout_sec=40):
+        print("NO /check_state_validity")
+        return 3
     pose = PoseStamped()
     pose.header.frame_id = "world"
     pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = args.pose[:3]
@@ -128,7 +163,13 @@ def main() -> int:
         request = PositionIKRequest()
         request.group_name = "cs625_arm"
         request.ik_link_name = "my_end_effector_link"
-        request.avoid_collisions = True
+        # Kinematics only.  MoveIt's avoid_collisions IK short-circuits to -31
+        # (or to a wrapped branch) when the FIRST solution it finds is in
+        # collision, hiding a perfectly valid branch -- verified 2026-11-03:
+        # the RVS fine-view pose IS reachable (J=[3.8,-89.2,-113.5,-42.4,143.3,
+        # 21.4], valid) but avoid_collisions=True never returned it.  So we take
+        # the raw solution and validate it ourselves below.
+        request.avoid_collisions = False
         request.pose_stamped = pose
         state = RobotState()
         joints = JointState()
@@ -149,6 +190,10 @@ def main() -> int:
                                        response.solution.joint_state.position))[k]
                               for k in ORDER]
         reason = sanity_violation(candidate_solution, seed, args)
+        if reason is not None:
+            last_reason = f"seed '{label}': {reason}"
+            continue
+        reason = collision_violation(validity, node, candidate_solution)
         if reason is not None:
             last_reason = f"seed '{label}': {reason}"
             continue
