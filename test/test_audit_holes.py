@@ -144,3 +144,36 @@ def test_sanity_rules_reject_wrapped_branch():
     # a legitimate move must pass
     sane = np.radians([43.0, -123.0, -101.7, -45.0, 90.7, 38.4]).tolist()
     assert mod.sanity_violation(sane, seed, args) is None
+
+
+# --- frame convention lock (2026-11-03 flange/TCP confusion) --------------------
+
+def test_view_pose_frame_is_declared_and_valid(teach):
+    """The RVS view-pose frame lives in ONE place and is a known value.
+
+    Confusing RVS's flange-referenced calibration with its TCP-referenced output
+    cost a 353 mm error that took two days to notice.  This test fails the moment
+    the config drifts or a new value appears.
+    """
+    frame = teach.view_pose_frame()
+    assert frame in teach.VALID_VIEW_FRAMES
+    assert frame == "tcp", (
+        "2026-11-03 evidence: standing at S0-as-TCP made T1 match in 3.5-4.2 s "
+        "(3 frames, 0.2 mm); treating it as a flange pose puts the camera 0.23 m "
+        "from the slot, outside the 0.5-0.7 m working distance.")
+
+
+def test_view_pose_to_tcp_is_identity_for_tcp(teach):
+    xyz, quat = teach.view_pose_to_tcp([1.0785, 0.0101, 0.6172],
+                                      [-0.0404, -0.9275, 0.0572, -0.3671])
+    assert xyz == [1.0785, 0.0101, 0.6172]
+    assert quat == [-0.0404, -0.9275, 0.0572, -0.3671]
+
+
+def test_flange_conversion_shifts_353mm(teach):
+    """Even when not in force, the conversion must be the documented 353 mm."""
+    import numpy as np
+    from scipy.spatial.transform import Rotation as R
+    rotation = R.from_quat([0.0, 0.0, 0.0, 1.0]).as_matrix()
+    shifted = np.array([0.0, 0.0, 0.0]) + rotation @ np.array(teach.FLANGE_TO_TCP)
+    np.testing.assert_allclose(np.linalg.norm(shifted), 0.356, atol=0.005)

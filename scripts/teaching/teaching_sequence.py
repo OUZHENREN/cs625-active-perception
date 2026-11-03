@@ -152,15 +152,26 @@ def execute_plan(path: Path, time_scale: float, tail_fraction: float,
         seg.write_text(json.dumps({"joint_names": data["joint_names"],
                                    "points": seg_points}))
         print(f"   segment {i + 1}/{segments}: points {start + 1}..{end} of {len(points)}")
-        code, text = run([sys.executable, "-u", str(EXECUTE), str(seg),
-                          "--time-scale", str(time_scale),
-                          "--tail-fraction", "0.0", "--tail-scale", "1.0",
-                          "--goal-tolerance", str(goal_tol),
-                          "--verify-final", str(goal_tol),
-                          "--fault-poll", "0.2"], timeout=600.0)
-        for line in text.splitlines()[-2:]:
-            print("   ", line)
-        ok = "ALL_ASSEMBLY_CHUNKS_OK" in text
+        # Exit code 10 means the executor auto-recovered the reverse-control
+        # channel (resend_external_control) and the caller is expected to retry
+        # this segment (2026-11-03: the channel dropped three times in one day).
+        attempts = 0
+        while True:
+            attempts += 1
+            code, text = run([sys.executable, "-u", str(EXECUTE), str(seg),
+                              "--time-scale", str(time_scale),
+                              "--tail-fraction", "0.0", "--tail-scale", "1.0",
+                              "--goal-tolerance", str(goal_tol),
+                              "--verify-final", str(goal_tol),
+                              "--fault-poll", "0.2"], timeout=600.0)
+            for line in text.splitlines()[-2:]:
+                print("   ", line)
+            ok = "ALL_ASSEMBLY_CHUNKS_OK" in text
+            if code == 10 and attempts < 3:
+                print(f"   reverse-control channel was down and has been re-sent "
+                      f"(attempt {attempts}); retrying this segment")
+                continue
+            break
         if not ok:
             print("   segment failed; refusing to continue the descent")
             break
@@ -401,16 +412,93 @@ def check_slot_history(newest_r1: dict | None = None) -> None:
 # sits (-0.046, 0, 0.353) in the flange frame.  Using them unchanged moves the arm
 # 353 mm off along the tool axis (the mistake made on 2026-10-30/11-02).
 FLANGE_TO_TCP = (-0.046, 0.0, 0.353)
+VALID_VIEW_FRAMES = ("tcp", "flange")
+
+
+def view_pose_frame() -> str:
+    """The reference frame of RVS view poses, from the ONE place that records it.
+
+    ``config/tasks/common.yaml`` -> ``rvs_view_pose_frame``.  Reading it here (and
+    nowhere else) is what stops the flange/TCP confusion from coming back: a new
+    script cannot hold a different opinion than the config, and every capture
+    record stores the interpretation that was in force.
+    """
+    try:
+        import yaml
+        config = yaml.safe_load((REPO / "config" / "tasks" / "common.yaml").read_text())
+        value = str(config.get("rvs_view_pose_frame", "tcp")).strip().lower()
+    except Exception:
+        value = "tcp"
+    if value not in VALID_VIEW_FRAMES:
+        raise SystemExit(f"config rvs_view_pose_frame={value!r} is not one of "
+                         f"{VALID_VIEW_FRAMES}")
+    return value
 
 
 def view_pose_to_tcp(xyz, quat) -> tuple[list[float], list[float]]:
-    """Convert an RVS view pose (flange) into a TCP pose for MoveIt."""
+    """Convert an RVS view pose into a TCP pose for MoveIt.
+
+    Identity when the published value is already a TCP pose (verified 2026-11-03);
+    otherwise shifts it by the flange -> TCP offset along the tool axis.
+    """
+    if view_pose_frame() == "tcp":
+        return [float(v) for v in xyz], [float(v) for v in quat]
     import numpy as np
     from scipy.spatial.transform import Rotation as R
     rotation = R.from_quat(quat).as_matrix()
     tcp = np.asarray(xyz, dtype=float) + rotation @ np.array(FLANGE_TO_TCP)
     return [float(v) for v in tcp], [float(v) for v in quat]
 
+
+
+# --- slot pose authority (2026-11-03) -----------------------------------------
+# RVS's fine slot match (R1) carries a STANCE-DEPENDENT bias of tens of mm:
+#   measured going from 10-30 to 11-03, the commanded flange moved 42 mm in y and
+#   R1 moved 50 mm with it, while the slot is mechanically fixed.  Cross-checked
+#   against the mechanical calibration in config/cs625_real_cell_scene.yaml:
+#     six-mode constants   delta 1.9 mm   <- agrees with the calibration
+#     2026-10-30 R1        delta 15 mm
+#     2026-11-03 R1        delta 36 mm   <- caused a 30 mm "left" offset at the slot
+# So the insertion chain is derived from the CALIBRATED slot pose, and R1 is used
+# only as a health check: if it disagrees beyond --slot-check-mm, the run warns and
+# keeps the calibrated value instead of driving a 1 mm-clearance insertion with a
+# biased measurement.
+SLOT_CHECK_MM = 20.0
+SLOT_CHECK_DEG = 3.0
+
+
+def calibrated_slot_pose():
+    """Slot pose from the mechanical calibration (fixture in the scene config)."""
+    import numpy as np
+    import yaml
+    from scipy.spatial.transform import Rotation as R
+    scene = yaml.safe_load((REPO / "config" / "cs625_real_cell_scene.yaml").read_text())
+    fixture = scene["cs625_real_cell_scene"]["ros__parameters"]["fixture"]
+    pose = fixture["pose_world"]
+    xyz = [float(v) for v in pose[:3]]
+    quat = [float(v) for v in R.from_euler("xyz", [float(v) for v in pose[3:6]]).as_quat()]
+    return xyz, quat
+
+
+def slot_pose_for_insert():
+    """(xyz, quat, source) for the insertion chain, plus the R1 cross-check."""
+    import numpy as np
+    from scipy.spatial.transform import Rotation as R
+    calibrated = calibrated_slot_pose()
+    r1 = latest_capture("T1")
+    if r1 is None:
+        print("   [slot] no fresh R1; using the mechanical calibration")
+        return calibrated[0], calibrated[1], "calibration"
+    gap_mm = float(np.linalg.norm(np.array(r1["position"]) - np.array(calibrated[0])) * 1000.0)
+    gap_deg = float(np.degrees((R.from_quat(r1["orientation"]).inv()
+                                * R.from_quat(calibrated[1])).magnitude()))
+    print(f"   [slot] R1 vs mechanical calibration: {gap_mm:.1f} mm / {gap_deg:.2f} deg")
+    if gap_mm > SLOT_CHECK_MM or gap_deg > SLOT_CHECK_DEG:
+        print(f"   [slot] WARN: R1 deviates beyond {SLOT_CHECK_MM:.0f} mm / "
+              f"{SLOT_CHECK_DEG:.1f} deg; the slot is mechanically fixed, so RVS's "
+              "match is biased today -- keeping the CALIBRATED pose for insertion")
+        return calibrated[0], calibrated[1], "calibration (R1 rejected)"
+    return r1["position"], r1["orientation"], "R1"
 
 def aim_target():
     """Where the fine-view camera should look: the freshest plausible part pose.
@@ -668,23 +756,17 @@ def main() -> int:
     if not move("staging", POSE["staging"][0], grasp_pose[1], "staging"):
         return 2
 
-    # Slot chain (2026-11-02 audit, hole 5): derive insert/rotated/pre_insert from
-    # the LIVE R1 instead of the fixed constants.  The constants sit 13 mm from
-    # today's R1-derived insert -- half of the 10-27 overload root cause.  Only
-    # when there is no fresh T1 capture do we fall back to the proven constants.
-    r1 = latest_capture("T1")
-    if r1 is not None:
-        insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(
-            r1["position"], r1["orientation"])
-        print("\n   insert chain from live R1:")
-        print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
-        print(f"     tilted     {[round(v, 4) for v in insert_tilted[0]]}")
-        print(f"     pre_insert {[round(v, 4) for v in pre_insert_pose[0]]}")
-    else:
-        print("\n   WARN: no fresh T1 capture; using the six-mode insert constants")
-        insert_flat = ([1.1574, -0.0132, 0.0321], [-0.003, 1.000, -0.002, -0.004])
-        insert_tilted = ([1.1574, -0.0132, 0.0321], [-0.004, 0.997, -0.001, 0.083])
-        pre_insert_pose = ([1.0996, -0.0125, 0.3773], [-0.004, 0.997, -0.001, 0.083])
+    # Insertion chain (2026-11-03 revision of audit hole 5): derived from the
+    # MECHANICAL slot calibration, with R1 used as a health check only.  RVS's
+    # fine slot match carries a stance-dependent bias of tens of mm (36 mm on
+    # 2026-11-03), which is far too coarse for a 1 mm-clearance insertion; the
+    # calibrated pose agrees with the proven six-mode constants to 2 mm.
+    slot_xyz, slot_quat, slot_source = slot_pose_for_insert()
+    insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(slot_xyz, slot_quat)
+    print(f"\n   insert chain from {slot_source}:")
+    print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
+    print(f"     tilted     {[round(v, 4) for v in insert_tilted[0]]}")
+    print(f"     pre_insert {[round(v, 4) for v in pre_insert_pose[0]]}")
 
     pre_insert_xyz, pre_insert_q = pre_insert_pose
     insert_xyz, tilted_q = insert_tilted            # tilted entry attitude

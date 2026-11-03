@@ -164,11 +164,15 @@ tool_safety_note: >-
   scripts/check_tool_envelope.py against BOTH measured table footprints and be
   executed slowly, in segments with verification (2026-10-30 accident lesson).
 
-# ---- RVS 视角位姿的参考系（所有者 2026-11-03 裁定，不要再搞错） --------------
-# RVS 给出的视角位姿 S0 / S2 是【法兰位姿】，不是我们的 TCP 位姿。
-# 依据：RVS 的手眼标定 DepthToRobotTCP 以法兰为参照（config/handeye 里
-#       T_flange_cam 与 RVS DepthToRobotTCP 四位小数一致）。
-# 直接当成 TCP 使用会整体偏 353 mm（沿工具轴）。
-# 移动前必须转换：TCP = 法兰 + R_flange * (-0.046, 0, 0.353)。
-# 目标位姿（R1 插槽 / S3 工件）不受此规则影响——它们是物体位姿，经 pose_math 换算。
-rvs_view_pose_frame: "flange"
+# ---- RVS 视角位姿（S0 / S2）的参考系 ----------------------------------------
+# 唯一事实来源。两张容易混淆的事实，都必须记住：
+#   1) RVS 内部的手眼标定 DepthToRobotTCP 以【法兰】为参照
+#      （config/handeye 的 T_flange_cam 与它四位小数一致）——这是标定事实；
+#   2) 但 RVS 经 9999 发出的视位姿 S0/S2 已经是【TCP 位姿】——这是实测事实：
+#      2026-11-03 16:17 站在 S0-as-TCP (1.0785,0.0101,0.6172) 触发 T1，
+#      3.5-4.2 s 三帧匹配成功（0.2 mm / 0.07°）；10-30 的成功记录同样是
+#      S0-as-TCP (1.0841,0.049,0.6145)。若按法兰解释，相机距插槽仅 0.23 m，
+#      与全链路 0.5-0.7 m 的工作距离不符。
+# 允许值：tcp | flange。任何新脚本都必须读这里，不得自行假设。
+# 目标位姿（R1 插槽 / S3 工件）永远是物体位姿，经 pose_math 换算，不受本条影响。
+rvs_view_pose_frame: "tcp"
