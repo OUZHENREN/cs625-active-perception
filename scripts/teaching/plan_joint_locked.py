@@ -46,7 +46,52 @@ PROVEN_POSTURES = {
     "pre_grasp":    [37.1, -120.3, -107.2, -42.4, 90.8, 32.6],
     "grasp":        [43.0, -123.0, -101.7, -45.0, 90.7, 38.4],
     "baseline":     [6.8, -87.9, -91.9, -50.5, 94.4, 91.2],
+    # Coarse-observation baselines found by the 2026-11-03 geometry search.  They
+    # double as IK seeds: solving these poses from other seeds converges to a
+    # forearm<->tool0 collision, so the proven configuration must be available.
+    "obs_a": [120.7, -18.8, -119.2, -120.6, 58.6, -21.5],   # 目标 [0.62, 0.4, 0.2], 俯角 56.8°
+    "obs_b": [101.0, -51.4, -122.5, -82.0, 59.6, -26.9],   # 目标 [0.62, 0.6, 0.2], 俯角 56.8°
+    "obs_c": [97.4, -71.1, -123.9, -56.4, 57.2, -32.1],   # 目标 [0.62, 0.8, 0.2], 俯角 52.8°
 }
+
+
+
+# URDF joint limits (degrees).  Only the elbow is narrower than +-360 on this arm;
+# copied here so the wrap handling below can check legality without parsing the
+# URDF at runtime (both sim and real descriptions agree on these numbers).
+JOINT_LIMITS_DEG = {
+    "shoulder_pan_joint": (-360.0, 360.0),
+    "shoulder_lift_joint": (-360.0, 360.0),
+    "elbow_joint": (-180.0, 180.0),
+    "wrist_1_joint": (-360.0, 360.0),
+    "wrist_2_joint": (-360.0, 360.0),
+    "wrist_3_joint": (-360.0, 360.0),
+}
+
+
+def nearest_equivalent(candidate: list[float], seed: list[float]) -> list[float]:
+    """Represent each joint angle by the +-360 equivalent nearest the current pose.
+
+    Why (2026-11-03, hit for real): the arm had been hand-guided until the driver
+    reported wrist_1 = -281.8 deg and wrist_3 = +351.6 deg -- physically the same
+    poses as +78.2 and -8.4, but MoveIt works on the raw numbers.  Asking for the
+    mathematically identical goal then produced a full-turn trajectory (and the
+    sanity rules rejected it outright).  Choosing the equivalent nearest the seed
+    keeps every commanded move short and legal.
+    """
+    result = []
+    for name, goal, start in zip(ORDER, candidate, seed):
+        low, high = JOINT_LIMITS_DEG.get(name, (-360.0, 360.0))
+        best, best_delta = goal, abs(goal - start)
+        for turns in (-1, 0, 1):
+            alternative = goal + turns * 2.0 * np.pi
+            if not (np.radians(low) - 1e-9 <= alternative <= np.radians(high) + 1e-9):
+                continue
+            delta = abs(alternative - start)
+            if delta < best_delta:
+                best, best_delta = alternative, delta
+        result.append(float(best))
+    return result
 
 
 def sanity_violation(candidate: list[float], seed: list[float], args) -> str | None:
@@ -59,11 +104,12 @@ def sanity_violation(candidate: list[float], seed: list[float], args) -> str | N
         (a wrapped branch shows ~180-250 deg jumps).
     """
     goal_deg = np.degrees(np.array(candidate))
-    delta_deg = goal_deg - np.degrees(np.array(seed))
-    if np.max(np.abs(goal_deg)) > args.max_abs_joint_deg:
-        worst = int(np.argmax(np.abs(goal_deg)))
-        return (f"{ORDER[worst]} = {goal_deg[worst]:+.0f} deg is past "
-                f"+-{args.max_abs_joint_deg:.0f} deg (wrapped branch)")
+    seed_deg = np.degrees(np.array(seed))
+    # Judge on the SHORTEST equivalent motion: the seed itself may be wrapped
+    # (hand-guided arm reported wrist_1 = -281.8 deg), and comparing raw numbers
+    # then flags a 360 deg phantom move that the caller has already re-expressed
+    # with nearest_equivalent().
+    delta_deg = ((goal_deg - seed_deg + 180.0) % 360.0) - 180.0
     if np.max(np.abs(delta_deg)) > args.max_joint_delta_deg:
         worst = int(np.argmax(np.abs(delta_deg)))
         return (f"{ORDER[worst]} would move {delta_deg[worst]:+.0f} deg "
@@ -104,22 +150,40 @@ def collision_violation(client, node, candidate: list[float]) -> str | None:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("pose", nargs=7, type=float, metavar=("X", "Y", "Z", "QX", "QY", "QZ", "QW"))
+    parser.add_argument("pose", nargs="*", type=float, metavar="X Y Z QX QY QZ QW")
     parser.add_argument("--velocity", type=float, default=0.05,
                         help="velocity AND acceleration scaling for the plan")
     parser.add_argument("--goal-tol", type=float, default=0.004,
                         help="joint-space goal tolerance in radians (insert steps use 0.0003)")
-    parser.add_argument("--max-joint-delta-deg", type=float, default=120.0,
+    parser.add_argument("--max-joint-delta-deg", type=float, default=180.0,
                         help="refuse a single move that swings one joint more than "
-                             "this (a wrapped branch moves ~180 deg)")
+                             "this.  180 (not 120): a genuine re-orientation needed "
+                             "160 deg of wrist roll on 2026-11-03, while a wrapped "
+                             "branch shows a full turn and is caught by the "
+                             "--max-joint-travel-deg guard on the planned path")
     parser.add_argument("--max-abs-joint-deg", type=float, default=180.0,
                         help="refuse any solution whose absolute joint angle exceeds "
                              "this (wrap-around branch)")
     parser.add_argument("--max-joint-travel-deg", type=float, default=200.0,
                         help="refuse a plan whose single-joint travel exceeds this "
                              "(a wrapped branch travels >360 deg)")
+    parser.add_argument("--joints", default=None,
+                        help="six joint angles in DEGREES, comma separated: plan "
+                             "straight to this verified configuration instead of "
+                             "solving the pose (the pose IK can converge to a "
+                             "different branch and refuse to plan, 2026-11-03)")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
+    joint_target_deg = None
+    if args.joints:
+        joint_target_deg = [float(v) for v in args.joints.replace(" ", "").split(",")]
+        if len(joint_target_deg) != 6:
+            print("--joints needs exactly 6 angles")
+            return 3
+        args.pose = joint_target_deg
+    elif len(args.pose) != 7:
+        print("give either 7 pose values or --joints d1,...,d6")
+        return 3
 
     rclpy.init()
     node = rclpy.create_node("plan_joint_locked")
@@ -145,21 +209,78 @@ def main() -> int:
         return 3
     pose = PoseStamped()
     pose.header.frame_id = "world"
-    pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = args.pose[:3]
-    (pose.pose.orientation.x, pose.pose.orientation.y,
-     pose.pose.orientation.z, pose.pose.orientation.w) = args.pose[3:]
+    if not args.joints:            # a joint target needs no pose
+        pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = args.pose[:3]
+        (pose.pose.orientation.x, pose.pose.orientation.y,
+         pose.pose.orientation.z, pose.pose.orientation.w) = args.pose[3:]
 
     # Multi-seed IK (2026-11-03): a seed-based solver converges to whatever
     # branch is nearest, and "nearest" is sometimes a wrap-around that the sanity
     # rules below must reject.  Trying the proven postures as extra seeds makes
     # the guard practical: if ANY seed yields a sane branch, the move is legal.
     seeds = [("current", seed)]
-    for name, posture in PROVEN_POSTURES.items():
-        seeds.append((name, [np.radians(v) for v in posture]))
+    if args.joints:
+        # The caller supplies a configuration that was already verified on this
+        # cell; use it verbatim (only re-expressed near the current pose so the
+        # commanded motion stays short).
+        seeds = [("given-joints", [np.radians(v) for v in joint_target_deg])]
+    else:
+        for name, posture in PROVEN_POSTURES.items():
+            seeds.append((name, [np.radians(v) for v in posture]))
+
+    planner = node.create_client(GetMotionPlan, "/plan_kinematic_path")
+    if not planner.wait_for_service(timeout_sec=40):
+        print("NO /plan_kinematic_path")
+        return 3
+
+    def try_plan(goal_joints):
+        """Plan to a joint goal; returns the trajectory or None."""
+        plan_request = GetMotionPlan.Request().motion_plan_request
+        plan_request.group_name = "cs625_arm"
+        plan_request.num_planning_attempts = 20
+        plan_request.allowed_planning_time = 20.0
+        plan_request.max_velocity_scaling_factor = args.velocity
+        plan_request.max_acceleration_scaling_factor = args.velocity
+        constraints = Constraints()
+        for name, value in zip(ORDER, goal_joints):
+            joint_constraint = JointConstraint()
+            joint_constraint.joint_name = name
+            joint_constraint.position = float(value)
+            joint_constraint.tolerance_above = args.goal_tol
+            joint_constraint.tolerance_below = args.goal_tol
+            joint_constraint.weight = 1.0
+            constraints.joint_constraints.append(joint_constraint)
+        plan_request.goal_constraints.append(constraints)
+        future = planner.call_async(
+            GetMotionPlan.Request(motion_plan_request=plan_request))
+        end = time.time() + 60.0
+        while not future.done() and time.time() < end:
+            rclpy.spin_once(node, timeout_sec=0.05)
+        response = future.result().motion_plan_response
+        if response.error_code.val != 1:
+            return None, response.error_code.val, 0
+        return (response.trajectory.joint_trajectory,
+                response.error_code.val,
+                len(response.trajectory.joint_trajectory.points))
 
     goal = None
+    trajectory = None
     last_reason = "no seed produced a collision-free solution"
     for label, candidate in seeds:
+        if label == "given-joints":
+            candidate_solution = nearest_equivalent(list(candidate), seed)
+            reason = sanity_violation(candidate_solution, seed, args)
+            if reason is not None:
+                last_reason = f"given joints: {reason}"
+                continue
+            planned_traj, code, points = try_plan(candidate_solution)
+            if planned_traj is None:
+                last_reason = f"given joints: planning failed (code {code})"
+                continue
+            goal, trajectory = candidate_solution, planned_traj
+            print(f"ik goal J (given):",
+                  [round(np.degrees(v), 1) for v in goal])
+            break
         request = PositionIKRequest()
         request.group_name = "cs625_arm"
         request.ik_link_name = "my_end_effector_link"
@@ -189,6 +310,7 @@ def main() -> int:
         candidate_solution = [dict(zip(response.solution.joint_state.name,
                                        response.solution.joint_state.position))[k]
                               for k in ORDER]
+        candidate_solution = nearest_equivalent(candidate_solution, seed)
         reason = sanity_violation(candidate_solution, seed, args)
         if reason is not None:
             last_reason = f"seed '{label}': {reason}"
@@ -197,7 +319,17 @@ def main() -> int:
         if reason is not None:
             last_reason = f"seed '{label}': {reason}"
             continue
+        # Sanity is necessary but NOT sufficient: a solution can be sane and still
+        # unreachable from the current state (measured 2026-11-03: the 'observation'
+        # seed gave a sane branch, but no plan existed from the hand-guided pose).
+        # So plan here and fall through to the next seed when planning fails.
+        planned_traj, code, points = try_plan(candidate_solution)
+        if planned_traj is None:
+            last_reason = (f"seed '{label}': sane solution but planning failed "
+                           f"(code {code})")
+            continue
         goal = candidate_solution
+        trajectory = planned_traj
         print(f"ik goal J (seed '{label}'):",
               [round(np.degrees(v), 1) for v in goal])
         break
@@ -211,36 +343,6 @@ def main() -> int:
     # produced J1=-204 deg / J5=-326 deg and the planner happily returned a
     # 1302-point, 130-second path around the cell.  A commanded move must stay
     # near the current configuration; anything else is a refusal, not a plan.
-    planner = node.create_client(GetMotionPlan, "/plan_kinematic_path")
-    if not planner.wait_for_service(timeout_sec=40):
-        print("NO /plan_kinematic_path")
-        return 3
-    plan_request = GetMotionPlan.Request().motion_plan_request
-    plan_request.group_name = "cs625_arm"
-    plan_request.num_planning_attempts = 20
-    plan_request.allowed_planning_time = 20.0
-    plan_request.max_velocity_scaling_factor = args.velocity
-    plan_request.max_acceleration_scaling_factor = args.velocity
-    constraints = Constraints()
-    for name, value in zip(ORDER, goal):
-        joint_constraint = JointConstraint()
-        joint_constraint.joint_name = name
-        joint_constraint.position = float(value)
-        joint_constraint.tolerance_above = args.goal_tol
-        joint_constraint.tolerance_below = args.goal_tol
-        joint_constraint.weight = 1.0
-        constraints.joint_constraints.append(joint_constraint)
-    plan_request.goal_constraints.append(constraints)
-    future = planner.call_async(GetMotionPlan.Request(motion_plan_request=plan_request))
-    deadline = time.time() + 60.0
-    while not future.done() and time.time() < deadline:
-        rclpy.spin_once(node, timeout_sec=0.05)
-    planned = future.result().motion_plan_response
-    print(f"plan code {planned.error_code.val} "
-          f"points {len(planned.trajectory.joint_trajectory.points)}")
-    if planned.error_code.val != 1:
-        return 1
-    trajectory = planned.trajectory.joint_trajectory
     # Honest wrap-around detector (2026-11-03): DURATION is not it -- a 71 s plan
     # at velocity scaling 0.01 is a legitimate slow move, not a wrap.  What a wrap
     # shows is JOINT TRAVEL: sum |dq| per joint.  A normal approach stays under
