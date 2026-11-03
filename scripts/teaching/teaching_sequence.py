@@ -533,27 +533,41 @@ def resolve_slot_ambiguity(slot_xyz, slot_quat):
 
 
 def slot_pose_for_insert():
-    """Live R1 (the senior's source) with the ambiguity resolved.
+    """Insertion authority = the senior's proven values (owner ruling 2026-11-03).
 
-    The mechanical-calibration value is printed for information only -- it is NOT
-    used to replace R1 (owner 2026-11-03).
+    Decision (owner, 2026-11-03 after the fixture collisions): today's RVS slot
+    match (R1) is NOT trusted for insertion -- four sources disagree by 35-50 mm:
+
+        来源                     槽心 y (mm)   派生的 insert y (mm)
+        config/unload_real.yaml  181.7         -13.2      <- 师兄标定（权威）
+        2026-10-30 R1            192.7 / 196.0  -9.4 / -3.5
+        2026-11-03 R1            143.0 / 148.3  -50.6 / -45.2   <- 当天实测，判为不可用
+        六模式插入常量            --            -13.2      <- 10-27 程序用值
+
+    The senior's calibration and the six-mode constants agree (both give insert
+    y = -13.2 mm); today's R1 is 35-50 mm away from them and produced a 36 mm
+    lateral error that collided with the fixture.  So insertion is driven by the
+    senior's calibration, and R1 is only logged for the record.
+
+    Why the two groups disagree (RVS bias vs the fixture having moved) is NOT
+    settled; the owner decided today's insertion data is unusable and the senior's
+    values stand until a touch-probe measurement settles it.
     """
     import numpy as np
+    import yaml
+    calibration = yaml.safe_load((REPO / "config" / "unload_real.yaml").read_text())
+    position = [float(v) for v in calibration["slot_origin"]]
+    quat = [float(v) for v in calibration["slot_origin_q"]]
+    print(f"   [slot] insertion uses the SENIOR calibration "
+          f"({position[0]:.3f}, {position[1]:.3f}, {position[2]:.3f})")
     r1 = latest_capture("T1")
-    if r1 is None:
-        print("   [slot] no fresh R1; falling back to the proven six-mode slot pose")
-        return [1.2395, 0.1798, 0.4446], [0.0, 0.0, 0.0, 1.0], "six-mode constant"
-    try:
-        import yaml
-        scene = yaml.safe_load((REPO / "config" / "cs625_real_cell_scene.yaml").read_text())
-        fixture = scene["cs625_real_cell_scene"]["ros__parameters"]["fixture"]["pose_world"]
-        gap = float(np.linalg.norm(np.array(r1["position"]) - np.array(fixture[:3])) * 1000.0)
-        print(f"   [slot] R1 vs the old calibration record: {gap:.1f} mm (info only)")
-    except Exception:
-        pass
-    quat, label = resolve_slot_ambiguity(r1["position"], r1["orientation"])
-    return [float(v) for v in r1["position"]], quat, f"live R1 ({label})"
-
+    if r1 is not None:
+        gap = float(np.linalg.norm(np.array(r1["position"]) - np.array(position)) * 1000.0)
+        print(f"   [slot] live R1 sits {gap:.1f} mm away from it -- recorded, NOT used "
+              "(today's R1 is judged unusable; see the work log)")
+    else:
+        print("   [slot] no fresh R1 on disk (fine: insertion no longer consumes it)")
+    return position, quat, "senior calibration"
 
 
 def view_drift_mm(command: str, xyz, quat) -> float | None:
