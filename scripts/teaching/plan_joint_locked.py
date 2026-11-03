@@ -115,9 +115,9 @@ def main() -> int:
     parser.add_argument("--max-abs-joint-deg", type=float, default=180.0,
                         help="refuse any solution whose absolute joint angle exceeds "
                              "this (wrap-around branch)")
-    parser.add_argument("--max-plan-seconds", type=float, default=40.0,
-                        help="refuse a plan longer than this (a wrapped branch "
-                             "produces 100+ s paths)")
+    parser.add_argument("--max-joint-travel-deg", type=float, default=200.0,
+                        help="refuse a plan whose single-joint travel exceeds this "
+                             "(a wrapped branch travels >360 deg)")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
@@ -241,14 +241,20 @@ def main() -> int:
     if planned.error_code.val != 1:
         return 1
     trajectory = planned.trajectory.joint_trajectory
+    # Honest wrap-around detector (2026-11-03): DURATION is not it -- a 71 s plan
+    # at velocity scaling 0.01 is a legitimate slow move, not a wrap.  What a wrap
+    # shows is JOINT TRAVEL: sum |dq| per joint.  A normal approach stays under
+    # ~120 deg; a wrapped branch exceeds a full turn.
     if trajectory.points:
-        last = trajectory.points[-1].time_from_start
-        planned_seconds = last.sec + last.nanosec * 1e-9
-        if planned_seconds > args.max_plan_seconds:
-            print(f"PLAN_TOO_LONG: {planned_seconds:.1f} s > "
-                  f"{args.max_plan_seconds:.0f} s; this is a wrap-around path, "
-                  "refusing to plan")
-            return 1
+        positions = np.array([list(p.positions) for p in trajectory.points])
+        if len(positions) > 1:
+            travel = np.abs(np.diff(positions, axis=0)).sum(axis=0)
+            worst = int(np.argmax(travel))
+            if np.degrees(travel[worst]) > args.max_joint_travel_deg:
+                print(f"WRAPPED_PATH: {ORDER[worst]} travels "
+                      f"{np.degrees(travel[worst]):.0f} deg along this plan "
+                      f"(limit {args.max_joint_travel_deg:.0f}); refusing")
+                return 1
     points = [{"q": list(p.positions),
                "t": p.time_from_start.sec + p.time_from_start.nanosec * 1e-9}
               for p in trajectory.points]
