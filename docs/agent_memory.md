@@ -51,6 +51,14 @@
   `runtime/Model/environment_point_cloud/<时间戳>/environment_point_cloud.pcd`
 - T1/T3 的命令输入是法兰；S2 原值直接作 TCP 观测位，不要再转法兰。
 - RVS_AI 必须在线；T3 可能耗时数十秒，不要过早判失败。
+- **2026-11-03 所有者裁定（机器级事实，务必铭记）**：
+  RVS 界面报「TCP 等待连接时间超时」＝ **RVS_AI_Center 没连上**，
+  唯一处置是**以管理员方式重新启动 RVS_AI_Center**（不是重连相机、不是改端口）。
+  因果链：RVS_AI 掉线 → 粗匹配拿不到 2D 种子 → 流程回 `NG,POSE,0,0,0,0,0`
+  → 师兄的 `tcp_server` 只处理 S*/R* 开头的报文，NG 被 `WARN Unknown msg type`
+  丢弃 → 桥不发布任何话题 → 我们的客户端表现为「no answer after N s」。
+  所以：**客户端超时时，先去 RVS 界面确认 RVS_AI 是否在线**，
+  不要把「NG 被丢弃」误判成「RVS 没响应」或「TCP 连不上」。
 
 ## 5. 夹爪
 

@@ -200,6 +200,21 @@ def spread_report(frames: list[dict]) -> tuple[float, float]:
 # recomputes them per trigger, so no limit applies there.
 SPREAD_LIMITS = {"T1": (30.0, 3.0), "T3": (30.0, 3.0)}
 
+# 2026-11-03 (owner ruling): when RVS has no answer, the FIRST thing to check is
+# RVS_AI.  'NG,POSE,0,0,0,0,0' means the pose was not found, and RVS's coarse
+# matching needs the 2D detector (RVS_AI_Center, port 2024) for its seed.  The
+# senior's bridge only parses S*/R* messages, so an NG is logged as
+# "Unknown msg type" and dropped -- which reaches this client as a plain timeout.
+# Never diagnose it as "TCP cannot connect" or "camera offline".
+HINT_NO_ANSWER = (
+    "HINT: no answer usually means RVS replied NG (pose not found) and the bridge "
+    "dropped it.\n"
+    "      1) look at the RVS window: 'TCP wait connection timeout' = RVS_AI_Center "
+    "is not connected -> restart RVS_AI_Center AS ADMINISTRATOR;\n"
+    "      2) check the bridge log for 'NG,POSE' lines to confirm;\n"
+    "      3) only then suspect the camera or the network."
+)
+
 
 def spread_violation(command: str, max_mm: float, max_deg: float) -> str | None:
     """Reason string when the frame agreement is unacceptable, else None."""
@@ -269,6 +284,14 @@ def main() -> int:
                 "orientation": [q.x, q.y, q.z, q.w],
                 "cloud_main_tcp": 0.0,
                 "frame": answer.header.frame_id,
+                # Audit trail (2026-11-03): an R1 that disagrees with history by
+                # tens of mm must be traceable back to exactly what was asked and
+                # what came back, otherwise "wrong value" and "wrong parse" cannot
+                # be told apart afterwards.
+                "request": sent,
+                "request_flange_mm": [round(v, 3) for v in xyz_mm],
+                "request_rpy_deg": [round(v, 4) for v in rpy_deg],
+                "request_tcp_mm": [round(v, 3) for v in raw],
             }
             out = OUT_DIR / (f"{args.command}_{time.strftime('%Y%m%d_%H%M%S')}"
                              f"_a{attempt:02d}.json")
@@ -286,6 +309,7 @@ def main() -> int:
         if len(frames) < args.min_frames:
             print(f"INSUFFICIENT_VALID_FRAMES: {len(frames)}/{args.min_frames} "
                   f"after {attempt} attempts")
+            print(HINT_NO_ANSWER)
             return 3
         max_mm, max_deg = spread_report(frames)
         print(f"spread over {len(frames)} frames: {max_mm:.1f} mm / {max_deg:.2f} deg")
