@@ -173,7 +173,15 @@ def execute_plan(path: Path, time_scale: float, tail_fraction: float,
                 continue
             break
         if not ok:
-            print("   segment failed; refusing to continue the descent")
+            if code == 9:
+                print("   PROTECTIVE STOP during this segment: the sequence is "
+                      "HALTED.  Do not recover-and-retry -- inspect what the arm "
+                      "hit first (2026-11-03 rule).")
+            elif code == 11:
+                print("   TORQUE INTERFACE DEAD during this segment: the sequence "
+                      "is HALTED.  Restart the driver stack before any motion.")
+            else:
+                print("   segment failed; refusing to continue the descent")
             break
     return ok
 

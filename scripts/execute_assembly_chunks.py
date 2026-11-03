@@ -17,6 +17,8 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import math
+import pathlib
 import subprocess
 import sys
 import time
@@ -170,9 +172,39 @@ def main() -> int:
     from sensor_msgs.msg import JointState
 
     latest: dict[str, float] = {}
+    efforts: list[float] = []
 
     def _on_joints(msg: JointState) -> None:
         latest.update(dict(zip(msg.name, msg.position)))
+        effort = dict(zip(msg.name, msg.effort))
+        order = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+                 "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"]
+        if all(k in effort for k in order):
+            values = [effort[k] for k in order]
+            if all(math.isfinite(v) and abs(v) < 1.0e4 for v in values):
+                efforts.append(sum(abs(v) for v in values))
+        del efforts[:-64]  # keep only the newest window
+
+    def effort_alive() -> tuple[bool, float]:
+        """The torque interface must show a plausible load before any motion.
+
+        On 2026-11-03 a controller switch left the effort interface reading ~0 N
+        while the arm was carrying a 19 kg part; every contact detector would
+        then silently see nothing, and the run collided with the fixture.  A dead
+        stream reads < 1.0; a loaded arm reads >= 8 on joint 2 alone.
+
+        Spins to collect a real window first: the startup probe exits as soon as
+        POSITIONS arrive, which can leave the effort window empty at the first
+        chunk (measured: the gate fired with peak 0.000 although the stream was
+        alive at 15.9).
+        """
+        probe = time.time() + 0.8
+        while time.time() < probe:
+            rclpy.spin_once(node, timeout_sec=0.05)
+        if len(efforts) < 10:
+            return False, 0.0
+        recent = efforts[-16:]
+        return max(recent) >= 1.0, float(max(recent))
 
     node.create_subscription(JointState, "/joint_states", _on_joints, 10)
     probe_deadline = time.time() + 3.0
@@ -215,6 +247,23 @@ def main() -> int:
             latched)
     except Exception as exc:  # driver messages are an underlay dependency
         print(f"robot-state probe unavailable ({exc}); failures report raw status only")
+
+    # Protective-stop marker (2026-11-03 collision): a protective stop drops the
+    # reverse-control channel, so the NEXT move would look like NO_MOTION and the
+    # auto-recovery would silently resend the script and retry -- straight back
+    # into whatever just collided.  The marker makes the executor refuse to
+    # auto-recover within 60 s of a protective stop: the operator must look.
+    estop_marker = pathlib.Path("/tmp/teaching_estop_marker.json")
+    recent_estop = False
+    try:
+        if estop_marker.exists():
+            marker = json.loads(estop_marker.read_text())
+            if time.time() - float(marker.get("t", 0.0)) < 60.0:
+                recent_estop = True
+                print(f"recent protective stop ({marker.get('reason', '?')}); "
+                      "auto-recovery is disabled -- operator review required")
+    except (OSError, ValueError):
+        pass
 
     def robot_state_text() -> str:
         safety = state.get("safety", "?")
@@ -267,7 +316,17 @@ def main() -> int:
                 "refusing to execute a stale trajectory"
             )
             return 7
-        print(f"[{index}/{len(files)}] start {path} time_scale={args.time_scale}")
+        alive, peak = effort_alive()
+        if not alive:
+            print(
+                f"EFFORT_DEAD: the torque interface shows no plausible load "
+                f"(peak {peak:.3f}); every contact detector would be blind, so "
+                "this trajectory is refused.  Restart the driver stack and "
+                "re-check before moving again."
+            )
+            return 11
+        print(f"[{index}/{len(files)}] start {path} time_scale={args.time_scale} "
+              f"effort_peak={peak:.2f}")
         future = client.send_goal_async(goal)
         rclpy.spin_until_future_complete(node, future, timeout_sec=10)
         handle = future.result()
@@ -312,6 +371,14 @@ def main() -> int:
                 handle.cancel_goal_async()
                 print(f"ESTOP_OR_PROTECTIVE_STOP: {robot_state_text()}; "
                       "the trajectory was cancelled")
+                try:
+                    estop_marker.write_text(json.dumps({
+                        "t": time.time(),
+                        "reason": f"safety={safety_now} robot={robot_now}",
+                        "file": str(path),
+                    }))
+                except OSError:
+                    pass
                 return 9
             if not motion_seen and start_positions:
                 motion_seen = max(
@@ -332,6 +399,13 @@ def main() -> int:
                 # Auto-recovery (2026-11-03, owner request): health looks fine but
                 # the reverse-control channel silently dropped.  Re-send the
                 # external_control script and let the caller retry this chunk.
+                # EXCEPT right after a protective stop: the channel drop then is
+                # the stop's side effect, and retrying would drive straight back
+                # into whatever just collided.
+                if recent_estop:
+                    print("  a protective stop happened < 60 s ago; refusing to "
+                          "auto-recover -- operator must review first")
+                    return 8
                 if args.auto_recover and not reverse_ports_up():
                     print("  reverse-control ports are down; re-sending "
                           "external_control on the robot")
