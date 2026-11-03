@@ -177,3 +177,30 @@ def test_flange_conversion_shifts_353mm(teach):
     rotation = R.from_quat([0.0, 0.0, 0.0, 1.0]).as_matrix()
     shifted = np.array([0.0, 0.0, 0.0]) + rotation @ np.array(teach.FLANGE_TO_TCP)
     np.testing.assert_allclose(np.linalg.norm(shifted), 0.356, atol=0.005)
+
+
+# --- slot attitude ambiguity (2026-11-03) ---------------------------------------
+
+def test_slot_ambiguity_picks_the_reference_aligned_candidate(teach):
+    """A 180-deg-flipped R1 must be corrected, an aligned R1 must be kept.
+
+    The senior's own RVS projects contain both variants for the same fixed slot
+    (rpy ~180 and rpy ~0), i.e. the template match is ambiguous.  Seating the part
+    needs exactly one; the proven six-mode insert attitude decides which.
+    """
+    reference_quat = teach.REFERENCE_INSERT_QUAT
+    aligned_quat, label = teach.resolve_slot_ambiguity([1.2466, 0.1430, 0.4468],
+                                                       [0.0, 0.0, 0.0, 1.0])
+    assert label == "as-is", (
+        "an identity-attitude R1 is 1.3 deg from the reference and must be kept")
+    flipped_q = __import__("scipy.spatial.transform", fromlist=["Rotation"]).Rotation.from_quat(
+        [0.0, 0.0, 0.0, 1.0]) * __import__("scipy.spatial.transform", fromlist=["Rotation"]).Rotation.from_euler(
+        "z", 180.0, degrees=True)
+    corrected_quat, label2 = teach.resolve_slot_ambiguity([1.2466, 0.1430, 0.4468],
+                                                          list(flipped_q.as_quat()))
+    assert label2 == "flipped+180"
+    import numpy as np
+    from scipy.spatial.transform import Rotation as R
+    assert np.degrees((R.from_quat(corrected_quat).inv()
+                       * R.from_quat(aligned_quat)).magnitude()) < 1e-6
+    assert teach.REFERENCE_INSERT_QUAT == reference_quat

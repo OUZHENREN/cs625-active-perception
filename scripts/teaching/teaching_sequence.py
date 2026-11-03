@@ -451,54 +451,75 @@ def view_pose_to_tcp(xyz, quat) -> tuple[list[float], list[float]]:
 
 
 
-# --- slot pose authority (2026-11-03) -----------------------------------------
-# RVS's fine slot match (R1) carries a STANCE-DEPENDENT bias of tens of mm:
-#   measured going from 10-30 to 11-03, the commanded flange moved 42 mm in y and
-#   R1 moved 50 mm with it, while the slot is mechanically fixed.  Cross-checked
-#   against the mechanical calibration in config/cs625_real_cell_scene.yaml:
-#     six-mode constants   delta 1.9 mm   <- agrees with the calibration
-#     2026-10-30 R1        delta 15 mm
-#     2026-11-03 R1        delta 36 mm   <- caused a 30 mm "left" offset at the slot
-# So the insertion chain is derived from the CALIBRATED slot pose, and R1 is used
-# only as a health check: if it disagrees beyond --slot-check-mm, the run warns and
-# keeps the calibrated value instead of driving a 1 mm-clearance insertion with a
-# biased measurement.
-SLOT_CHECK_MM = 20.0
-SLOT_CHECK_DEG = 3.0
+# --- slot pose: the senior's rule, plus a 180-degree ambiguity guard ----------
+# The senior's chain derives the insertion from the LIVE slot pose:
+#     insert     = slot_pose x T_s_tcp
+#     rotated    = insert    x Ry(-10 deg)
+#     pre_insert = rotated   x translate(z -350 mm)
+# That stays as it is (owner 2026-11-03: copy his mode, do not substitute a
+# constant).  One thing his chain leaves unhandled is the template-matching
+# ambiguity: his own projects contain R1 records whose attitude differs by 180 deg
+# for the same fixed slot
+#     R1,1189.329,154.476,444.371  rpy(179.8,179.5,179.5)
+#     R1,1232.115,159.616,443.912  rpy(179.7,179.7,179.3)
+#     R1,1236.952,175.494,444.395  rpy( -0.2, -0.1,  0.1)   <- flipped
+# so RVS returns both solutions.  Seating a rectangular part into a fixed slot has
+# exactly ONE correct attitude, therefore the two candidates are scored against the
+# proven reference attitude from the six-mode program (POSE["insert"]) and the
+# closer one wins.  A 180 deg mistake here is what "the part attitude does not
+# match the slot mouth" looks like on the robot.
+REFERENCE_INSERT_QUAT = [-0.004, 0.997, -0.001, 0.083]   # POSE["insert"], tilted entry
+SLOT_AMBIGUITY_WARN_DEG = 30.0
 
 
-def calibrated_slot_pose():
-    """Slot pose from the mechanical calibration (fixture in the scene config)."""
+def resolve_slot_ambiguity(slot_xyz, slot_quat):
+    """Pick between the two template-matching solutions (as-is vs flipped 180)."""
     import numpy as np
-    import yaml
     from scipy.spatial.transform import Rotation as R
-    scene = yaml.safe_load((REPO / "config" / "cs625_real_cell_scene.yaml").read_text())
-    fixture = scene["cs625_real_cell_scene"]["ros__parameters"]["fixture"]
-    pose = fixture["pose_world"]
-    xyz = [float(v) for v in pose[:3]]
-    quat = [float(v) for v in R.from_euler("xyz", [float(v) for v in pose[3:6]]).as_quat()]
-    return xyz, quat
+    from pose_math import insert_from_slot
+
+    reference = R.from_quat(REFERENCE_INSERT_QUAT)
+    candidates = []
+    for label, flip in (("as-is", 0.0), ("flipped+180", 180.0)):
+        quat = slot_quat if flip == 0.0 else (
+            R.from_quat(slot_quat) * R.from_euler("z", flip, degrees=True)).as_quat()
+        _, tilted, _ = insert_from_slot(slot_xyz, [float(v) for v in quat])
+        angle = float(np.degrees((R.from_quat(tilted[1]).inv() * reference).magnitude()))
+        candidates.append((angle, label, [float(v) for v in quat]))
+    candidates.sort(key=lambda item: item[0])
+    best_angle, best_label, best_quat = candidates[0]
+    other_angle = candidates[1][0]
+    print(f"   [slot] attitude ambiguity: '{best_label}' is {best_angle:.1f} deg from the "
+          f"proven reference (other candidate {other_angle:.1f} deg)")
+    if min(best_angle, other_angle) > SLOT_AMBIGUITY_WARN_DEG and \
+            abs(best_angle - other_angle) < 15.0:
+        print("   [slot] WARN: neither candidate is close to the reference attitude; "
+              "the slot match may be unreliable today")
+    return best_quat, best_label
 
 
 def slot_pose_for_insert():
-    """(xyz, quat, source) for the insertion chain, plus the R1 cross-check."""
+    """Live R1 (the senior's source) with the ambiguity resolved.
+
+    The mechanical-calibration value is printed for information only -- it is NOT
+    used to replace R1 (owner 2026-11-03).
+    """
     import numpy as np
-    from scipy.spatial.transform import Rotation as R
-    calibrated = calibrated_slot_pose()
     r1 = latest_capture("T1")
     if r1 is None:
-        print("   [slot] no fresh R1; using the mechanical calibration")
-        return calibrated[0], calibrated[1], "calibration"
-    gap_mm = float(np.linalg.norm(np.array(r1["position"]) - np.array(calibrated[0])) * 1000.0)
-    gap_deg = float(np.degrees((R.from_quat(r1["orientation"]).inv()
-                                * R.from_quat(calibrated[1])).magnitude()))
-    print(f"   [slot] R1 vs mechanical calibration: {gap_mm:.1f} mm / {gap_deg:.2f} deg")
-    if gap_mm > SLOT_CHECK_MM or gap_deg > SLOT_CHECK_DEG:
-        print(f"   [slot] WARN: R1 deviates beyond {SLOT_CHECK_MM:.0f} mm / "
-              f"{SLOT_CHECK_DEG:.1f} deg; the slot is mechanically fixed, so RVS's "
-              "match is biased today -- keeping the CALIBRATED pose for insertion")
-        return calibrated[0], calibrated[1], "calibration (R1 rejected)"
-    return r1["position"], r1["orientation"], "R1"
+        print("   [slot] no fresh R1; falling back to the proven six-mode slot pose")
+        return [1.2395, 0.1798, 0.4446], [0.0, 0.0, 0.0, 1.0], "six-mode constant"
+    try:
+        import yaml
+        scene = yaml.safe_load((REPO / "config" / "cs625_real_cell_scene.yaml").read_text())
+        fixture = scene["cs625_real_cell_scene"]["ros__parameters"]["fixture"]["pose_world"]
+        gap = float(np.linalg.norm(np.array(r1["position"]) - np.array(fixture[:3])) * 1000.0)
+        print(f"   [slot] R1 vs the old calibration record: {gap:.1f} mm (info only)")
+    except Exception:
+        pass
+    quat, label = resolve_slot_ambiguity(r1["position"], r1["orientation"])
+    return [float(v) for v in r1["position"]], quat, f"live R1 ({label})"
+
 
 def aim_target():
     """Where the fine-view camera should look: the freshest plausible part pose.
