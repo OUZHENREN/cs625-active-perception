@@ -97,3 +97,15 @@ time-scale 语义；TCP 迭代微调；"同帧采样才可对比"；桌面/工�
 4. 六模式同步新防护（至少 time-scale 守护与 plan_joint_locked 分支锁定）
 5. git 提交 + README 更新 + /tmp 脚本入库
 ```
+
+## 四、分支归档（2026-11-03）
+
+```text
+分支  teaching-rvs-mode（基于 main cf54936 创建，未并入 main）
+提交  cafeda2  27 files changed, +4175/-46
+内容  示教链路 + 三大专项 + 真机描述修复 + 安全守护 + 测试 + 全部 worklog/方案
+      （含 10-27 环境模型再生成的 scene yaml/sdf）
+不包含 runtime/、build/、install/、log/（按仓库规则不提交）
+```
+
+后续顺序（待硬件开机）：重采环境模型 → 力控 A 期基线 → 步骤 6/7 实跑 → 六模式同步防护。
