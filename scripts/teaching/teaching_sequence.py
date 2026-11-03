@@ -254,10 +254,19 @@ def verify_pose_gate(xyz, quat, pos_tol_mm: float = 0.1,
 # must never silently drive a grasp.
 MAX_CAPTURE_AGE_H = 6.0
 WORKSPACE_BOX = {"x": (-0.6, 1.8), "y": (-1.2, 1.6), "z": (-0.9, 1.6)}
-# per-command z plausibility: target poses (R1/S3) sit on the cell, view poses
-# (S0/S2) sit above the tables.
-Z_LIMITS = {"T1": (-0.5, 1.2), "T3": (-0.35, 1.0),
-            "T0": (-0.9, 1.6), "T2": (-0.9, 1.6)}
+# per-command z plausibility, calibrated against every capture on disk
+# (2026-11-03 verification):
+#   T1 slot pose        9 real answers: 0.4391 / 0.4427; six-mode reference 0.4446
+#   T3 workpiece pose   every ACCEPTED answer: 0.3539-0.3558 (nine frames)
+#                       the two rejected ones: -0.067 (2026-10-30 garbage),
+#                       0.192 at y=1.05 (a bad 10-27 match)
+#   T0/T2 view poses    accepted answers: 0.3353-0.6432
+#                       the garbage ones: -0.0666 / -0.0771 (below the table!)
+# The windows below accept every good capture and reject every known-bad one.
+# They are plausibility heuristics for THIS cell, not a physics proof: if the
+# cell geometry ever changes, re-derive them from the new captures.
+Z_LIMITS = {"T1": (0.30, 0.70), "T3": (0.20, 0.60),
+            "T0": (0.20, 1.40), "T2": (0.20, 1.40)}
 
 
 def validate_capture(record: dict, command: str) -> str | None:

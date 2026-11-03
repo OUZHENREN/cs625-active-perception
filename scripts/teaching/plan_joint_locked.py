@@ -38,6 +38,39 @@ ORDER = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
          "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"]
 
 
+
+# Proven postures (degrees) used as extra IK seeds and as the reference for the
+# configuration sanity rules.  Every one of these has executed on the real cell.
+PROVEN_POSTURES = {
+    "observation":  [43.1, -57.4, -146.3, 14.3, 92.8, 89.8],
+    "pre_grasp":    [37.1, -120.3, -107.2, -42.4, 90.8, 32.6],
+    "grasp":        [43.0, -123.0, -101.7, -45.0, 90.7, 38.4],
+    "baseline":     [6.8, -87.9, -91.9, -50.5, 94.4, 91.2],
+}
+
+
+def sanity_violation(candidate: list[float], seed: list[float], args) -> str | None:
+    """Why this IK solution must not be executed, or None when it is sane.
+
+    Two rules, both calibrated on 2026-11-03 on this cell:
+      * an absolute joint angle past +-max_abs is a wrap-around branch
+        (the RVS fine-view pose only solves to J1=-204 / wrist_3=+332 deg);
+      * a single move that swings one joint past max_delta is not an approach
+        (a wrapped branch shows ~180-250 deg jumps).
+    """
+    goal_deg = np.degrees(np.array(candidate))
+    delta_deg = goal_deg - np.degrees(np.array(seed))
+    if np.max(np.abs(goal_deg)) > args.max_abs_joint_deg:
+        worst = int(np.argmax(np.abs(goal_deg)))
+        return (f"{ORDER[worst]} = {goal_deg[worst]:+.0f} deg is past "
+                f"+-{args.max_abs_joint_deg:.0f} deg (wrapped branch)")
+    if np.max(np.abs(delta_deg)) > args.max_joint_delta_deg:
+        worst = int(np.argmax(np.abs(delta_deg)))
+        return (f"{ORDER[worst]} would move {delta_deg[worst]:+.0f} deg "
+                f"(limit +-{args.max_joint_delta_deg:.0f})")
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("pose", nargs=7, type=float, metavar=("X", "Y", "Z", "QX", "QY", "QZ", "QW"))
@@ -45,6 +78,15 @@ def main() -> int:
                         help="velocity AND acceleration scaling for the plan")
     parser.add_argument("--goal-tol", type=float, default=0.004,
                         help="joint-space goal tolerance in radians (insert steps use 0.0003)")
+    parser.add_argument("--max-joint-delta-deg", type=float, default=120.0,
+                        help="refuse a single move that swings one joint more than "
+                             "this (a wrapped branch moves ~180 deg)")
+    parser.add_argument("--max-abs-joint-deg", type=float, default=180.0,
+                        help="refuse any solution whose absolute joint angle exceeds "
+                             "this (wrap-around branch)")
+    parser.add_argument("--max-plan-seconds", type=float, default=40.0,
+                        help="refuse a plan longer than this (a wrapped branch "
+                             "produces 100+ s paths)")
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
 
@@ -66,37 +108,64 @@ def main() -> int:
     if not ik.wait_for_service(timeout_sec=40):
         print("NO /compute_ik")
         return 3
-    request = PositionIKRequest()
-    request.group_name = "cs625_arm"
-    request.ik_link_name = "my_end_effector_link"
-    request.avoid_collisions = True
     pose = PoseStamped()
     pose.header.frame_id = "world"
     pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = args.pose[:3]
     (pose.pose.orientation.x, pose.pose.orientation.y,
      pose.pose.orientation.z, pose.pose.orientation.w) = args.pose[3:]
-    request.pose_stamped = pose
-    state = RobotState()
-    joints = JointState()
-    joints.name = ORDER
-    joints.position = seed
-    state.joint_state = joints
-    request.robot_state = state
-    future = ik.call_async(GetPositionIK.Request(ik_request=request))
-    deadline = time.time() + 20.0
-    while not future.done() and time.time() < deadline:
-        rclpy.spin_once(node, timeout_sec=0.05)
-    response = future.result()
-    if response is None or response.error_code.val != 1:
-        code = response.error_code.val if response else -1
-        print(f"NO_COLLISION_FREE_IK (code={code}): this pose cannot be adopted "
-              "without self-collision; refusing to plan")
-        return 2
-    solution = dict(zip(response.solution.joint_state.name,
-                        response.solution.joint_state.position))
-    goal = [solution[k] for k in ORDER]
-    print("ik goal J:", [round(np.degrees(v), 1) for v in goal])
 
+    # Multi-seed IK (2026-11-03): a seed-based solver converges to whatever
+    # branch is nearest, and "nearest" is sometimes a wrap-around that the sanity
+    # rules below must reject.  Trying the proven postures as extra seeds makes
+    # the guard practical: if ANY seed yields a sane branch, the move is legal.
+    seeds = [("current", seed)]
+    for name, posture in PROVEN_POSTURES.items():
+        seeds.append((name, [np.radians(v) for v in posture]))
+
+    goal = None
+    last_reason = "no seed produced a collision-free solution"
+    for label, candidate in seeds:
+        request = PositionIKRequest()
+        request.group_name = "cs625_arm"
+        request.ik_link_name = "my_end_effector_link"
+        request.avoid_collisions = True
+        request.pose_stamped = pose
+        state = RobotState()
+        joints = JointState()
+        joints.name = ORDER
+        joints.position = list(candidate)
+        state.joint_state = joints
+        request.robot_state = state
+        future = ik.call_async(GetPositionIK.Request(ik_request=request))
+        deadline = time.time() + 20.0
+        while not future.done() and time.time() < deadline:
+            rclpy.spin_once(node, timeout_sec=0.05)
+        response = future.result()
+        if response is None or response.error_code.val != 1:
+            last_reason = f"no collision-free IK from seed '{label}' " \
+                          f"(code={response.error_code.val if response else -1})"
+            continue
+        candidate_solution = [dict(zip(response.solution.joint_state.name,
+                                       response.solution.joint_state.position))[k]
+                              for k in ORDER]
+        reason = sanity_violation(candidate_solution, seed, args)
+        if reason is not None:
+            last_reason = f"seed '{label}': {reason}"
+            continue
+        goal = candidate_solution
+        print(f"ik goal J (seed '{label}'):",
+              [round(np.degrees(v), 1) for v in goal])
+        break
+    if goal is None:
+        print(f"REFUSED: {last_reason}; refusing to plan")
+        return 2
+
+    # Configuration sanity gate (2026-11-03, completing audit hole 1).
+    # Locking the plan to the IK solution is not enough when the IK solution
+    # itself is a wrapped branch: verified on 2026-11-03, the pose RVS asks for
+    # produced J1=-204 deg / J5=-326 deg and the planner happily returned a
+    # 1302-point, 130-second path around the cell.  A commanded move must stay
+    # near the current configuration; anything else is a refusal, not a plan.
     planner = node.create_client(GetMotionPlan, "/plan_kinematic_path")
     if not planner.wait_for_service(timeout_sec=40):
         print("NO /plan_kinematic_path")
@@ -127,6 +196,14 @@ def main() -> int:
     if planned.error_code.val != 1:
         return 1
     trajectory = planned.trajectory.joint_trajectory
+    if trajectory.points:
+        last = trajectory.points[-1].time_from_start
+        planned_seconds = last.sec + last.nanosec * 1e-9
+        if planned_seconds > args.max_plan_seconds:
+            print(f"PLAN_TOO_LONG: {planned_seconds:.1f} s > "
+                  f"{args.max_plan_seconds:.0f} s; this is a wrap-around path, "
+                  "refusing to plan")
+            return 1
     points = [{"q": list(p.positions),
                "t": p.time_from_start.sec + p.time_from_start.nanosec * 1e-9}
               for p in trajectory.points]

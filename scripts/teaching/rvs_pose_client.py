@@ -195,6 +195,24 @@ def spread_report(frames: list[dict]) -> tuple[float, float]:
     return max_mm, max_deg
 
 
+# Target poses (R1/S3) describe FIXED objects, so their frames must agree
+# (2026-11-02 audit, hole 6).  View poses (S0/S2) legitimately vary because RVS
+# recomputes them per trigger, so no limit applies there.
+SPREAD_LIMITS = {"T1": (30.0, 3.0), "T3": (30.0, 3.0)}
+
+
+def spread_violation(command: str, max_mm: float, max_deg: float) -> str | None:
+    """Reason string when the frame agreement is unacceptable, else None."""
+    limit = SPREAD_LIMITS.get(command)
+    if limit is None:
+        return None
+    if max_mm <= limit[0] and max_deg <= limit[1]:
+        return None
+    return (f"SPREAD_TOO_LARGE for {command}: {max_mm:.1f} mm / {max_deg:.2f} deg "
+            f"exceeds {limit[0]:.0f} mm / {limit[1]:.1f} deg; "
+            "the target may have moved between triggers")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("command", choices=sorted(ANSWER_TOPIC))
@@ -271,14 +289,9 @@ def main() -> int:
             return 3
         max_mm, max_deg = spread_report(frames)
         print(f"spread over {len(frames)} frames: {max_mm:.1f} mm / {max_deg:.2f} deg")
-        # Target poses (R1/S3) describe FIXED objects, so their frames must agree
-        # (2026-11-02 audit, hole 6).  View poses (S0/S2) legitimately vary because
-        # RVS recomputes them per trigger, so no limit applies there.
-        target_limit = {"T1": (30.0, 3.0), "T3": (30.0, 3.0)}.get(args.command)
-        if target_limit and (max_mm > target_limit[0] or max_deg > target_limit[1]):
-            print(f"SPREAD_TOO_LARGE for {args.command}: {max_mm:.1f} mm / {max_deg:.2f} deg "
-                  f"exceeds {target_limit[0]:.0f} mm / {target_limit[1]:.1f} deg; "
-                  "the target may have moved between triggers")
+        reason = spread_violation(args.command, max_mm, max_deg)
+        if reason is not None:
+            print(reason)
             return 4
         last = frames[-1]
         print("answer:", [round(v, 4) for v in last["position"]],
