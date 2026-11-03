@@ -73,11 +73,17 @@ def controller_active(node: Node) -> bool:
 
 def modes_ok(node: Node, timeout: float = 6.0) -> bool:
     from eli_common_interface.msg import RobotMode, SafetyMode
+    from rclpy.qos import DurabilityPolicy, QoSProfile
+
+    # These two topics are latched (TRANSIENT_LOCAL) and published only on
+    # change; a volatile subscription never receives the current value and the
+    # check then reports safety_mode=None forever (measured 2026-11-03).
+    latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
     modes: dict = {}
     node.create_subscription(SafetyMode, "/io_and_status_controller/safety_mode",
-                             lambda m: modes.__setitem__("safety", m.mode), 10)
+                             lambda m: modes.__setitem__("safety", m.mode), latched)
     node.create_subscription(RobotMode, "/io_and_status_controller/robot_mode",
-                             lambda m: modes.__setitem__("robot", m.mode), 10)
+                             lambda m: modes.__setitem__("robot", m.mode), latched)
     deadline = time.time() + timeout
     while len(modes) < 2 and time.time() < deadline:
         rclpy.spin_once(node, timeout_sec=0.1)
