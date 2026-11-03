@@ -356,6 +356,85 @@ def latest_capture(command: str) -> dict | None:
     return None
 
 
+
+# --- coarse-observation failover (owner, 2026-11-03) ---------------------------
+# Two baselines cover ~95 % of the owner's workpiece placements (A: handle face
+# toward the arm; B: workpiece rotated ~+45 deg).  RVS refuses the wrong one with
+# NG, so the chain switches baselines instead of giving up:
+#   per baseline: up to FAILOVER_ATTEMPTS triggers, each waiting FAILOVER_TIMEOUT
+#   switch when: three triggers all come back NG, or the trigger produces no data
+#                for a full timeout
+#   after both:  the task PAUSES (return None) -- no silent continuation
+FAILOVER_ATTEMPTS = 3
+FAILOVER_TIMEOUT = 60.0
+
+
+def load_observation_baselines() -> dict:
+    """Both coarse-observation baselines from config, in A-then-B order."""
+    import yaml
+    try:
+        config = yaml.safe_load((REPO / "config" / "tasks" / "common.yaml").read_text())
+        raw = config.get("teaching_observation_baselines") or {}
+    except Exception:
+        raw = {}
+    result = {}
+    for name in ("A", "B"):
+        entry = raw.get(name) or {}
+        if entry.get("position") and entry.get("quat"):
+            result[name] = ([float(v) for v in entry["position"]],
+                            [float(v) for v in entry["quat"]])
+    return result
+
+
+def trigger_once(command: str, timeout: float) -> bool:
+    """One trigger with a hard per-trigger timeout; True when 3 frames agree."""
+    code, text = run([sys.executable, "-u", str(RVS_CLIENT), command,
+                      "--timeout", str(timeout),
+                      "--min-frames", "3", "--max-attempts", "1"],
+                     timeout=timeout + 120.0)
+    answer = [line for line in text.splitlines() if line.startswith("answer:")]
+    for line in answer:
+        print("   ", line)
+    if code == 0 and answer:
+        return True
+    reason = next((line.strip() for line in text.splitlines()
+                   if "no answer" in line or "INSUFFICIENT" in line), "failed")
+    print(f"   trigger {command} failed: {reason}")
+    return False
+
+
+def observe_workpiece_coarse() -> str | None:
+    """Move to a coarse baseline and get T2; switch baselines on failure.
+
+    Returns the baseline name that worked, or None when both failed (the caller
+    must pause the task).
+    """
+    baselines = load_observation_baselines()
+    if not baselines:
+        print("   no coarse-observation baselines in config")
+        return None
+    for name, (position, quat) in baselines.items():
+        print(f"\n[3] workpiece coarse observation at baseline {name} "
+              f"{[round(v, 4) for v in position]}")
+        if not move("observe", position, quat, f"workpiece_coarse_{name}"):
+            print(f"   cannot move to baseline {name}; trying the next one")
+            continue
+        for attempt in range(1, FAILOVER_ATTEMPTS + 1):
+            print(f"   T2 attempt {attempt}/{FAILOVER_ATTEMPTS} at baseline {name} "
+                  f"(timeout {FAILOVER_TIMEOUT:.0f} s)")
+            if trigger_once("T2", FAILOVER_TIMEOUT):
+                capture = latest_capture("T2")
+                if capture is not None:
+                    print(f"   baseline {name} recognised the workpiece")
+                    return name
+            print(f"   baseline {name} produced no usable pose")
+        print(f"   switching away from baseline {name}")
+    print("\n   BOTH baselines failed to recognise the workpiece: PAUSING the task.\n"
+          "   Check RVS_AI_Center, the workpiece placement, and the streaming camera "
+          "before restarting.")
+    return None
+
+
 def rvs(command: str) -> dict | None:
     # Owner, 2026-10-30: one trigger rarely succeeds, so rvs_pose_client collects
     # >= 3 plausible frames (never more than 10 attempts) and reports the spread.
@@ -719,11 +798,9 @@ def main() -> int:
             return 3
         check_slot_history()
 
-        print("\n[3] workpiece coarse observation")
-        if not move("observe", *POSE["workpiece_coarse"], "workpiece_coarse"):
-            return 2
-        if not rvs("T2"):
-            return 3
+        baseline_used = observe_workpiece_coarse()
+        if baseline_used is None:
+            return 6          # both baselines NG -> pause, do not continue blindly
 
         # Same contract for the workpiece: T2 answers with S2, the fine view pose.
         box_view = latest_capture("T2")
