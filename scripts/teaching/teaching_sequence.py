@@ -82,9 +82,33 @@ SPEED = {
 # Fixed constants: ONLY the two coarse observation poses (owner, 2026-10-30).
 # The fine view poses (S0/S2) and the grasp pose come from RVS at run time;
 # keeping fixed fine-pose constants here is what made T1 answer NG on 2026-10-30.
+def _observation_pose(name: str, fallback):
+    """Coarse-observation baseline, from config when present (owner workflow).
+
+    These two poses are constants, but their VALUES are re-registered whenever the
+    workpiece is placed where the old pose cannot see it (2026-11-03):
+        python3 scripts/teaching/set_observation_pose.py --name <name> --from-current
+    Config wins; the literal below is the fallback so the file still runs standalone.
+    """
+    try:
+        import yaml
+        config = yaml.safe_load((REPO / "config" / "tasks" / "common.yaml").read_text())
+        entry = (config.get("teaching_observation_poses") or {}).get(name) or {}
+        if entry.get("position") and entry.get("quat"):
+            return ([float(v) for v in entry["position"]],
+                    [float(v) for v in entry["quat"]])
+    except Exception:
+        pass
+    return fallback
+
+
 POSE = {
-    "workpiece_coarse": ([0.5886, 0.3482, 0.7075], [0.2954, -0.7023, -0.2539, -0.5958]),
-    "slot_coarse": ([0.7802, -0.1458, 0.7986], [0.1834, -0.8502, -0.1133, -0.4803]),
+    "workpiece_coarse": _observation_pose(
+        "workpiece_coarse",
+        ([0.5886, 0.3482, 0.7075], [0.2954, -0.7023, -0.2539, -0.5958])),
+    "slot_coarse": _observation_pose(
+        "slot_coarse",
+        ([0.7802, -0.1458, 0.7986], [0.1834, -0.8502, -0.1133, -0.4803])),
     "transit": ([0.95, 0.45, 0.55], [-0.5412, 0.8408, 0.0069, 0.0022]),
     "staging": ([1.0748, -0.0122, 0.5252], [-0.5412, 0.8408, 0.0069, 0.0022]),
     "pre_insert": ([1.0996, -0.0125, 0.3773], [-0.004, 0.997, -0.001, 0.083]),

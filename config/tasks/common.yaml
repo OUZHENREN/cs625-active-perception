@@ -214,3 +214,17 @@ rvs_taught_views:
        quat: [-0.5935, 0.6472, 0.2667, 0.3971]}
 rvs_view_drift_warn_mm: 10.0
 rvs_view_drift_refuse_mm: 20.0
+
+# ---- 示教链路的"粗观测基准点"（所有者手动摆位后登记） ----------------------
+# 这两个点是固定常量，但位置会随工件摆放/工位调整而需要重新登记。
+# 登记方式（所有者手动把机械臂摆到"RVS 能认出工件"的位置后）：
+#     python3 scripts/teaching/set_observation_pose.py --name workpiece_coarse --from-current
+# 脚本会把旧值写进本文件的历史注释并更新下面这两项。
+teaching_observation_poses:
+  slot_coarse:
+    position: [0.7802, -0.1458, 0.7986]
+    quat: [0.1834, -0.8502, -0.1133, -0.4803]
+  # 2026-11-03 19:48 replaced workpiece_coarse: was [0.5886, 0.3482, 0.7075] / [0.2954, -0.7023, -0.2539, -0.5958]
+  workpiece_coarse:
+    position: [0.3434, 0.5604, 0.5960]
+    quat: [0.2189, -0.7517, -0.2087, -0.5860]
