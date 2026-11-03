@@ -394,6 +394,47 @@ def check_slot_history(newest_r1: dict | None = None) -> None:
         print("     PASS (within the usual small drift)")
 
 
+
+def aim_target():
+    """Where the fine-view camera should look: the freshest plausible part pose.
+
+    The 6 h freshness rule that guards a GRASP is deliberately relaxed here: an
+    aim hint only has to be good enough to keep the camera on the part (the
+    search tolerates 12 deg, and the part moves decimetres at most).  The newest
+    T3 that passes the workspace / z plausibility checks is used, and its age is
+    printed so a stale hint is visible rather than silent.
+    """
+    folder = REPO / "runtime" / "rvs_teaching"
+    files = sorted(folder.glob("T3_*.json"), key=lambda q: q.stat().st_mtime)
+    for path in reversed(files):
+        try:
+            record = json.loads(path.read_text())
+        except (OSError, ValueError):
+            continue
+        reason = validate_capture(record, "T3")
+        if reason is not None and "old" not in reason:
+            continue
+        try:
+            stamp = time.strptime(record.get("stamp", ""), "%Y-%m-%dT%H:%M:%S")
+            age_h = (time.time() - time.mktime(stamp)) / 3600.0
+        except (TypeError, ValueError):
+            age_h = float("nan")
+        if age_h > 6.0:
+            print(f"   [aim] hint from {path.name} is {age_h:.1f} h old "
+                  "(fine for aiming, not for a grasp)")
+        return [float(v) for v in record["position"]]
+    model_path = REPO / "runtime" / "environment" / "latest" / "model.json"
+    try:
+        model = json.loads(model_path.read_text())
+        workpiece = model.get("workpiece") or {}
+        if workpiece.get("xyz"):
+            print("   [aim] no T3 capture on disk; using the environment model")
+            return [float(v) for v in workpiece["xyz"]]
+    except (OSError, ValueError):
+        pass
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--confirm", action="store_true",
@@ -477,7 +518,30 @@ def main() -> int:
         print(f"\n[4] workpiece fine observation at the pose RVS asked for "
               f"{[round(v, 4) for v in box_view['position']]}")
         if not move("observe", box_view["position"], box_view["orientation"], "workpiece_fine"):
-            return 2
+            # The requested stance may be unadoptable with the real tool (2026-11-03:
+            # the RVS fine-view pose folds the 294.6 mm gripper into the forearm by
+            # 8.1 mm) or stale (it aimed 22.7 deg off the part).  Ask the
+            # aim-based search for the nearest stance that still looks at the part.
+            aim = aim_target()
+            if aim is None:
+                print("   no aim target (no fresh T3, no workpiece in the model); "
+                      "cannot substitute a viewing stance")
+                return 2
+            print(f"   substituting a stance that aims at {[round(v, 4) for v in aim]}")
+            code, text = run([sys.executable, "-u",
+                              str(REPO / "scripts" / "teaching" / "nearest_feasible_view.py"),
+                              *[f"{v:.6f}" for v in (*box_view["position"], *box_view["orientation"])],
+                              "--target", *[f"{v:.6f}" for v in aim],
+                              "--json", "/tmp/teach_substitute_view.json"], timeout=600.0)
+            for line in text.splitlines():
+                print("   ", line)
+            if code != 0:
+                print("   no adoptable stance found; stopping")
+                return 2
+            substitute = json.loads(pathlib.Path("/tmp/teach_substitute_view.json").read_text())
+            if not move("observe", substitute["xyz"], substitute["quat"],
+                        "workpiece_fine(substitute)"):
+                return 2
         if not rvs("T3"):
             return 3
 
