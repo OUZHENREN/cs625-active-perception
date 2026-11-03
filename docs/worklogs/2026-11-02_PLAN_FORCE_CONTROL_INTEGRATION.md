@@ -98,3 +98,32 @@ safety 阈值初值与单位需开工后实测标定（见 §5 决策点）。
 - 插入目标姿态已由"实时 R1 链"修正（13 mm 常量偏差，10-31 已改）；工件偏转导致
   的姿态失配仍是 open question——接触/卡死检测是兜底保护，不是对齐解法。
 - 10-27 的过载根因（固定插入位 + 工件被转 7.71°）在 A 期验收第 4 条直接复现验证。
+
+## 7. A 期实施记录（2026-11-03）
+
+```text
+基线标定（scripts/measure_effort_baseline.py，已入库）
+  still   n=996  Σ|effort| mean=16.001 std=0.022 p2p=0.094
+  motion  n=262  mean=16.061 std=0.022 p2p=0.136（wrist_3 ±4°，慢速）
+  阈值（所有者确认）：contact=16.68  safety=17.63（绝对值，Σ|effort|）
+
+信号速率实测（回答"能否 100 Hz"）
+  /joint_states 载体 125.0 Hz；运动中 Σ|effort| 有效刷新 ≈72 次/秒
+  → 监测循环按 100 Hz 设计（与 B 期 F/T 对齐），接触检测总延迟 ≈100-150 ms
+    （0.005 m/s 下 <1 mm 行程，可行）
+
+实施（scripts/compliant_insert.py，已入库并接入 teaching_sequence 步骤 14）
+  · plan_joint_locked 规划（0.005 缩放、goal-tol 0.0003，锁分支）
+  · 1 s 静止基线播种；100 Hz 评估循环：slow α=0.01 / fast α=0.2
+    fast ≥ contact → 下一段 time_scale 加倍（封顶 8.0）
+    fast ≥ safety → cancel_goal（CancelGoal 空 goal_info 全取消）
+                    + 沿工具轴反向退 20 mm（原路反退，不重规划——10-27 教训）
+  · 分段执行（共用缝合点、t=0 重计时）、每段 verify 0.0003
+  · DONE = 实测 TCP ≤3 mm；dry-run 只规划
+  退出码：0 DONE / 1 未达 / 2 规划拒 / 3 安全中止(已反退) / 4 执行失败 / 5 无 effort 流
+
+待验收（下次实跑步骤 14 时）：
+  · 正常插入不误触发（≤DONE）
+  · 工件偏转 7.71° 复现：必须在机器人 FAULT 之前由 safety 拦截并反退
+  · 环境场景（含夹具网格）下插入轨迹的可规划性（空场景 dry-run 已过）
+```

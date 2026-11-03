@@ -163,3 +163,12 @@ tool_safety_note: >-
   z drops below (table_top + 0.15) must run the envelope check
   scripts/check_tool_envelope.py against BOTH measured table footprints and be
   executed slowly, in segments with verification (2026-10-30 accident lesson).
+
+# ---- RVS 视角位姿的参考系（所有者 2026-11-03 裁定，不要再搞错） --------------
+# RVS 给出的视角位姿 S0 / S2 是【法兰位姿】，不是我们的 TCP 位姿。
+# 依据：RVS 的手眼标定 DepthToRobotTCP 以法兰为参照（config/handeye 里
+#       T_flange_cam 与 RVS DepthToRobotTCP 四位小数一致）。
+# 直接当成 TCP 使用会整体偏 353 mm（沿工具轴）。
+# 移动前必须转换：TCP = 法兰 + R_flange * (-0.046, 0, 0.353)。
+# 目标位姿（R1 插槽 / S3 工件）不受此规则影响——它们是物体位姿，经 pose_math 换算。
+rvs_view_pose_frame: "flange"

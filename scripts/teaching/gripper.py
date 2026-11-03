@@ -56,8 +56,26 @@ def call(command: str, value: float | None = None,
     raise RuntimeError(f"gripper {command} failed: {last}")
 
 
+MAX_PLAUSIBLE_CURRENT_A = 10.0   # the EFG80 runs at 0.1 A; anything larger is
+                                 # broken telemetry (measured 2026-11-03: the
+                                 # bridge returned -1.4e15 .. 2.6e10)
+
+
 def status() -> dict:
-    return call("status")
+    """Gripper status with telemetry sanity applied.
+
+    The bridge's ``current_a`` has returned garbage (overflow / NaN) since
+    2026-11-03.  The GRASP decision must rest on ``position_mm`` only, so a
+    non-finite or absurd current is replaced by None instead of being passed on.
+    """
+    import math
+    data = call("status")
+    current = data.get("current_a")
+    if not isinstance(current, (int, float)) or not math.isfinite(current) \
+            or abs(current) > MAX_PLAUSIBLE_CURRENT_A:
+        data["current_a"] = None
+        data["current_a_note"] = "implausible telemetry (ignored)"
+    return data
 
 
 def initialise(timeout_sec: float = 30.0) -> dict:

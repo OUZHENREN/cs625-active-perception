@@ -395,6 +395,23 @@ def check_slot_history(newest_r1: dict | None = None) -> None:
 
 
 
+
+# --- RVS view poses are FLANGE poses (owner ruling 2026-11-03) -----------------
+# S0/S2 describe where the FLANGE must go; our MoveIt target is the TCP, which
+# sits (-0.046, 0, 0.353) in the flange frame.  Using them unchanged moves the arm
+# 353 mm off along the tool axis (the mistake made on 2026-10-30/11-02).
+FLANGE_TO_TCP = (-0.046, 0.0, 0.353)
+
+
+def view_pose_to_tcp(xyz, quat) -> tuple[list[float], list[float]]:
+    """Convert an RVS view pose (flange) into a TCP pose for MoveIt."""
+    import numpy as np
+    from scipy.spatial.transform import Rotation as R
+    rotation = R.from_quat(quat).as_matrix()
+    tcp = np.asarray(xyz, dtype=float) + rotation @ np.array(FLANGE_TO_TCP)
+    return [float(v) for v in tcp], [float(v) for v in quat]
+
+
 def aim_target():
     """Where the fine-view camera should look: the freshest plausible part pose.
 
@@ -496,9 +513,12 @@ def main() -> int:
         if slot_view is None:
             print("missing T0 capture; cannot tell where RVS wants the fine slot view")
             return 4
-        print(f"\n[2] slot fine observation at the pose RVS asked for "
-              f"{[round(v, 4) for v in slot_view['position']]}")
-        if not move("observe", slot_view["position"], slot_view["orientation"], "slot_fine"):
+        slot_tcp, slot_quat = view_pose_to_tcp(slot_view["position"],
+                                               slot_view["orientation"])
+        print(f"\n[2] slot fine observation: RVS S0 (flange) "
+              f"{[round(v, 4) for v in slot_view['position']]} "
+              f"-> TCP {[round(v, 4) for v in slot_tcp]}")
+        if not move("observe", slot_tcp, slot_quat, "slot_fine"):
             return 2
         if not rvs("T1"):
             return 3
@@ -515,9 +535,12 @@ def main() -> int:
         if box_view is None:
             print("missing T2 capture; cannot tell where RVS wants the fine box view")
             return 4
-        print(f"\n[4] workpiece fine observation at the pose RVS asked for "
-              f"{[round(v, 4) for v in box_view['position']]}")
-        if not move("observe", box_view["position"], box_view["orientation"], "workpiece_fine"):
+        box_tcp, box_quat = view_pose_to_tcp(box_view["position"],
+                                             box_view["orientation"])
+        print(f"\n[4] workpiece fine observation: RVS S2 (flange) "
+              f"{[round(v, 4) for v in box_view['position']]} "
+              f"-> TCP {[round(v, 4) for v in box_tcp]}")
+        if not move("observe", box_tcp, box_quat, "workpiece_fine"):
             # The requested stance may be unadoptable with the real tool (2026-11-03:
             # the RVS fine-view pose folds the 294.6 mm gripper into the forearm by
             # 8.1 mm) or stale (it aimed 22.7 deg off the part).  Ask the

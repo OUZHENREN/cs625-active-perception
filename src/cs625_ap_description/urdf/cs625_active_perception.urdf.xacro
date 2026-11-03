@@ -313,20 +313,31 @@
        cs625_parallel_gripper.xacro 提供（与上一段对话结束时的状态一致）。
        2026-11-02：手指碰撞已移除（真机无 77 mm 占位实体）；Gazebo 的
        ros2_control 块改由 sim 标志门控，真机加载不再尝试 Gazebo 插件。 -->
-  <xacro:cs625_parallel_gripper parent="$(arg prefix)tool0" prefix="$(arg prefix)"
-      sim_gazebo="$(arg sim_gazebo)" sim_ignition="$(arg sim_ignition)"/>
+  <!-- 2026-11-03: the gripper macro is SIMULATION-ONLY.
+       It defines gripper_right/left_finger_joint, which the real robot never
+       publishes (the HITBOT gripper is driven through the Windows bridge, not
+       ros2_control).  Keeping those joints in the real description made MoveIt
+       report "The complete state of the robot is not yet known. Missing
+       gripper_right_finger_joint" on every cycle, i.e. collision checking and
+       planning ran on an incomplete robot state.
+       The simulation profiles still instantiate it (the Gazebo controllers need
+       the joints), together with the p7 grasp-centre frame that hangs off it. -->
+  <xacro:if value="${('$(arg sim_gazebo)' == 'true') or ('$(arg sim_ignition)' == 'true')}">
+    <xacro:cs625_parallel_gripper parent="$(arg prefix)tool0" prefix="$(arg prefix)"
+        sim_gazebo="$(arg sim_gazebo)" sim_ignition="$(arg sim_ignition)"/>
 
-  <!-- Grasp centre between the two support arms.  Massless and collision-free.
-       The arms are 146 mm tall centred on Z = 77 mm, so this frame sits at the
-       middle of the contact area on the tool axis. -->
-  <link name="$(arg prefix)p7_grasp_center_link"/>
-  <joint name="$(arg prefix)gripper_base_to_p7_grasp_center" type="fixed">
-    <parent link="$(arg prefix)gripper_base_link"/>
-    <child link="$(arg prefix)p7_grasp_center_link"/>
-    <!-- Between the two support arms, on the tool axis.  The old 0.080 m along X
-         was the placeholder jaw's pad centre and pointed along the wrong axis. -->
-    <origin xyz="0 0 0.077" rpy="0 0 0"/>
-  </joint>
+    <!-- Grasp centre between the two support arms.  Massless and collision-free.
+         The arms are 146 mm tall centred on Z = 77 mm, so this frame sits at the
+         middle of the contact area on the tool axis. -->
+    <link name="$(arg prefix)p7_grasp_center_link"/>
+    <joint name="$(arg prefix)gripper_base_to_p7_grasp_center" type="fixed">
+      <parent link="$(arg prefix)gripper_base_link"/>
+      <child link="$(arg prefix)p7_grasp_center_link"/>
+      <!-- Between the two support arms, on the tool axis.  The old 0.080 m along X
+           was the placeholder jaw's pad centre and pointed along the wrong axis. -->
+      <origin xyz="0 0 0.077" rpy="0 0 0"/>
+    </joint>
+  </xacro:if>
 
   <xacro:cs625_eye_in_hand_camera
     parent="$(arg prefix)tool0"

@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import subprocess
 import sys
 import time
 
@@ -94,6 +95,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="seconds to wait for the first real joint motion before "
                              "reporting NO_MOTION; only applies to a trajectory that "
                              "actually asks the arm to move")
+    parser.add_argument("--auto-recover", action="store_true", default=True,
+                        help="when a chunk shows NO_MOTION while safety/robot modes "
+                             "are healthy, re-send the external_control script once "
+                             "and retry (2026-11-03: the reverse-control channel drops "
+                             "silently and the arm then ignores accepted goals)")
+    parser.add_argument("--no-auto-recover", dest="auto_recover", action="store_false")
     parser.add_argument("--action", default=DEFAULT_ACTION,
                         help="FollowJointTrajectory action name; the real-arm "
                              "controller by default, overridden for simulation "
@@ -110,6 +117,36 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
             "larger is slower."
         )
     return args
+
+
+def resend_external_script(timeout: float = 30.0) -> bool:
+    """Re-send the robot's external_control script (restores the reverse ports).
+
+    Measured 2026-11-03 (twice): after a protective stop the three reverse-control
+    connections are gone while safety_mode/robot_mode still look healthy; the
+    controller accepts goals and the arm never moves.  The service that fixes it
+    is /io_and_status_controller/resend_external_script.
+    """
+    command = ["ros2", "service", "call",
+               "/io_and_status_controller/resend_external_script",
+               "std_srvs/srv/Trigger", "{}"]
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    text = (done.stdout or "") + (done.stderr or "")
+    return "success=True" in text
+
+
+def reverse_ports_up() -> bool:
+    try:
+        out = subprocess.run(["ss", "-tn"], capture_output=True, text=True,
+                             timeout=5).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+    return any(f":{port}" in line and "ESTAB" in line
+               for line in out.splitlines()
+               for port in ("50001", "50003", "50004"))
 
 
 def main() -> int:
@@ -292,6 +329,17 @@ def main() -> int:
                     "the robot on at the teach pendant, then run "
                     "scripts/recover_control.sh."
                 )
+                # Auto-recovery (2026-11-03, owner request): health looks fine but
+                # the reverse-control channel silently dropped.  Re-send the
+                # external_control script and let the caller retry this chunk.
+                if args.auto_recover and not reverse_ports_up():
+                    print("  reverse-control ports are down; re-sending "
+                          "external_control on the robot")
+                    if resend_external_script():
+                        time.sleep(2.0)
+                        print("  resend succeeded; the caller may retry this chunk")
+                        return 10
+                    print("  resend FAILED; owner intervention needed")
                 return 8
         if not result_future.done():
             print(f"TIMEOUT after {wait_budget:.0f} s; {robot_state_text()}")

@@ -90,6 +90,8 @@ class Monitor(Node):
         self.contact = contact
         self.safety = safety
         self.tripped: str | None = None
+        self.bad_samples = 0
+        self.last_log = 0.0
         self.create_subscription(JointState, "/joint_states", self._on_state, 10)
         self.create_subscription(PoseStamped, "/tcp_pose_broadcaster/pose",
                                  self._on_tcp, 10)
@@ -97,8 +99,16 @@ class Monitor(Node):
     def _on_state(self, msg: JointState) -> None:
         pos = dict(zip(msg.name, msg.position))
         eff = dict(zip(msg.name, msg.effort))
-        if all(k in pos and k in eff for k in ORDER):
-            self.latest_effort = float(sum(abs(eff[k]) for k in ORDER))
+        if not all(k in pos and k in eff for k in ORDER):
+            return
+        # 2026-11-03: a broken driver can publish garbage on one interface; a
+        # single non-finite or absurd effort must not seed the filters, or the
+        # watchdog trips on noise instead of contact.
+        values = [eff[k] for k in ORDER]
+        if not all(math.isfinite(v) and abs(v) < 1.0e4 for v in values):
+            self.bad_samples += 1
+            return
+        self.latest_effort = float(sum(abs(v) for v in values))
 
     def _on_tcp(self, msg: PoseStamped) -> None:
         self.latest_tcp = msg
@@ -124,6 +134,13 @@ class Monitor(Node):
         x = self.latest_effort
         self.slow += 0.01 * (x - self.slow)
         self.fast += 0.2 * (x - self.fast)
+        now = time.time()
+        if now - self.last_log > 5.0:
+            self.last_log = now
+            print(f"   [effort] fast={self.fast:7.3f} slow={self.slow:7.3f} "
+                  f"residual={self.fast - self.slow:+6.3f} "
+                  f"contact={self.contact:.2f} safety={self.safety:.2f} "
+                  f"bad={self.bad_samples}")
         return self.fast >= self.contact, self.fast >= self.safety, self.fast
 
     def cancel_goal(self) -> bool:
