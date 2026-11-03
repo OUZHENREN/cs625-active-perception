@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
-# Mirror a tracked work log into the personal Obsidian vault.
+# Mirror a tracked document into the personal Obsidian vault.
 #
 # Usage:
 #   scripts/sync_worklog.sh docs/worklogs/2026-09-16_WORKLOG_<TOPIC>.md
+#   scripts/sync_worklog.sh docs/plans/<file>.md --to 01_研究规划
+#
+# --to <folder> redirects the copy to a SIBLING folder of the project folder that
+# holds the work-log directory (e.g. 01_研究规划 next to 02_CS625项目).  Plans and
+# manuals live there so they are not mixed in with the daily work logs.
 #
 # Destination resolution order:
 #   1. $CS625_OBSIDIAN_WORKLOG_DIR from the environment;
@@ -22,13 +27,18 @@ die() {
   exit 1
 }
 
-if [[ $# -ne 1 ]]; then
-  echo "Usage: $0 <work-log-file>" >&2
+target_sibling=""
+if [[ $# -eq 3 && "$2" == "--to" ]]; then
+  source_file="$1"
+  target_sibling="$3"
+elif [[ $# -eq 1 ]]; then
+  source_file="$1"
+else
+  echo "Usage: $0 <file> [--to <sibling-folder>]" >&2
   echo "  e.g. $0 docs/worklogs/2026-09-16_WORKLOG_GAZEBO_VISUALS_AND_SIM_REAL_BASES.md" >&2
+  echo "       $0 docs/plans/2026-11-03_PLAN_X.md --to 01_研究规划" >&2
   exit 2
 fi
-
-source_file="$1"
 [[ -f "${source_file}" ]] || die "work log not found: ${source_file}"
 
 base_name="$(basename "${source_file}")"
@@ -42,7 +52,14 @@ if [[ -z "${CS625_OBSIDIAN_WORKLOG_DIR:-}" && -f "${env_file}" ]]; then
   . "${env_file}"
 fi
 
-destination_directory="${CS625_OBSIDIAN_WORKLOG_DIR:-}"
+# A sibling target is resolved against the folder that CONTAINS the project
+# folder, so it stays correct wherever the vault is mounted.
+if [[ -n "${target_sibling}" ]]; then
+  project_folder="$(dirname "${CS625_OBSIDIAN_WORKLOG_DIR%/}")"       # .../02_CS625项目
+  destination_directory="$(dirname "${project_folder}")/${target_sibling}"
+else
+  destination_directory="${CS625_OBSIDIAN_WORKLOG_DIR:-}"
+fi
 if [[ -z "${destination_directory}" ]]; then
   {
     echo "ERROR: CS625_OBSIDIAN_WORKLOG_DIR is not set."
