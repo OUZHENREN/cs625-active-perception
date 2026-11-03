@@ -213,6 +213,15 @@
 两套基准已登记在 config/tasks/common.yaml 的 teaching_observation_baselines
 ```
 
+**2026-11-03 21:20 补充结论（所有者实测）**：
+
+```text
+工件在 −60° 以内、几乎任意位置都能被识别，但【靠近 0° 放置识别不了】。
+→ 识别率不是"离基准位多近"的函数，而是"工件呈现给相机的是哪个面/哪个角度"的函数。
+→ 因此基准位不能按"角度等分"设计，必须按实测识别窗口划界（详见
+  docs/worklogs/2026-11-03_WORKLOG_OBSERVATION_BASELINES_AND_ACCURACY.md）。
+```
+
 **踩坑记录（重要）**：曾试图把 J6 从 +171.6° 改到 −8.4°（两者相差 180°）。
 实测这两支解对应同一相机位置，但 −8.4° 那支在本机模型里**自碰撞**
 （tool0↔forearm_link、forearm_link↔wrist_2_link），且因腕部非球形，
