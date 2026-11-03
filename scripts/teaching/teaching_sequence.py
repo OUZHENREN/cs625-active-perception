@@ -610,9 +610,17 @@ def main() -> int:
         print("   part no longer gripped; aborting")
         return 6
 
-    print("\n[14] insert along the tilted axis (0.005 m/s)")
-    if not move("insert", *insert_tilted, "insert", goal_tol=0.0003):
-        return 2
+    print("\n[14] insert along the tilted axis (effort-supervised, 专项 3 A 期)")
+    code, text = run([sys.executable, "-u",
+                      str(REPO / "scripts" / "compliant_insert.py"),
+                      *[f"{v:.6f}" for v in (*insert_tilted[0], *insert_tilted[1])],
+                      "--segments", "6", "--tol-mm", "3.0",
+                      "--contact", "16.68", "--safety", "17.63"], timeout=1800.0)
+    for line in text.splitlines():
+        print("   ", line)
+    if code != 0:
+        print("   insert aborted/incomplete; stopping the sequence")
+        return 8
 
     print("\n[15] straighten (0.1 m/s)")
     if not move("straighten", insert_xyz, insert_flat_q, "straighten",
