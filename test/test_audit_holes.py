@@ -204,3 +204,48 @@ def test_slot_ambiguity_picks_the_reference_aligned_candidate(teach):
     assert np.degrees((R.from_quat(corrected_quat).inv()
                        * R.from_quat(aligned_quat)).magnitude()) < 1e-6
     assert teach.REFERENCE_INSERT_QUAT == reference_quat
+
+
+# --- load-adaptive effort thresholds (2026-11-03, owner corrections) ------------
+
+def test_effort_thresholds_are_margins_over_the_live_baseline():
+    """Absolute |effort| cutoffs trip falsely as soon as the payload changes.
+
+    Owner data: empty pre-grasp baseline 16.001 -> confirmed cutoffs
+    16.68/17.63 (margins 0.68/1.63); carrying the 6.8 kg workpiece the baseline
+    measured 19.7, where the old absolute cutoffs would fire at motion start.
+    """
+    mod = _load("compliant_insert_test", REPO / "scripts" / "compliant_insert.py")
+    monitor = object.__new__(mod.Monitor)          # no ROS in this test
+    monitor.contact_margin = 0.68
+    monitor.safety_margin = 1.63
+    monitor.slow = monitor.fast = 0.0
+    monitor.seeded = False
+
+    monitor._apply_baseline(16.001)
+    assert monitor.contact == pytest.approx(16.681, abs=1e-9)
+    assert monitor.safety == pytest.approx(17.631, abs=1e-9)
+
+    monitor._apply_baseline(19.7)
+    assert monitor.contact == pytest.approx(20.38, abs=1e-9)
+    assert monitor.safety == pytest.approx(21.33, abs=1e-9)
+    assert monitor.seeded
+
+
+# --- coarse-match drift gate (2026-11-03 RVS forensics) -------------------------
+
+def test_view_drift_matches_session_bias(teach):
+    """The same fixed slot's coarse output drifted 39 mm between sessions.
+
+    Historical replay: 10-30's T0 sits 0.5 mm from the taught S0 (pass);
+    2026-11-03's T0 sits 39.4 mm (must trip the >20 mm refusal).  The refusal
+    itself lives at the S0 call site in the sequence.
+    """
+    ok = teach.view_drift_mm("S0", [1.0841, 0.0490, 0.6145],
+                             [-0.0266, -0.9304, 0.0535, -0.3617])
+    bad = teach.view_drift_mm("S0", [1.0785, 0.0101, 0.6172],
+                              [-0.0404, -0.9275, 0.0572, -0.3671])
+    assert ok < 1.0
+    assert bad > 20.0
+    # unknown command -> no reference -> None (not a crash)
+    assert teach.view_drift_mm("S9", [0, 0, 0], [0, 0, 0, 1]) is None

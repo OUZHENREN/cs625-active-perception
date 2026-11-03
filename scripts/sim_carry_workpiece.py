@@ -24,7 +24,7 @@ poseParent.inverse()*poseChild，两侧都是当前世界位姿），所以不�
 
 插件启动就是"已吸附"
 --------------------
-gz-sim8 的 DetachableJoint `attachRequested{true}`：机器人一 spawn 就会把 19 kg
+gz-sim8 的 DetachableJoint `attachRequested{true}`：机器人一 spawn 就会把 6.8 kg
 工件焊到腕上。所以本节点启动第一件事必须是发 detach 并确认 `detached`，否则
 第一次观测运动就会把工件从桌上拖走。启动顺序必须是：仿真 → 本节点 → run_task。
 

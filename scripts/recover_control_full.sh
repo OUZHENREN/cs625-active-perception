@@ -1,7 +1,7 @@
 #!/bin/bash
 # FULL controller recovery -- DANGEROUS WITH A PAYLOAD.
 # Deactivates and re-activates arm_controller.  This releases the servo briefly;
-# on 2026-11-03 the arm sagged 16 mm in Z while carrying a 19 kg part.
+# on 2026-11-03 the arm sagged 16 mm in Z while carrying a 6.8 kg part.
 # Run only when scripts/recover_control.sh is not enough AND the arm carries no
 # payload (or the owner explicitly approves it).
 # Usage: source_env; bash scripts/recover_control_full.sh

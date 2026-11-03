@@ -2,7 +2,7 @@
 # Light controller recovery (2026-11-03 split).
 # ONLY re-sends the external_control script and restores the speed slider.
 # It NEVER deactivates the controller: a deactivate/activate cycle releases the
-# servo for a moment, which let the arm drop 16 mm under a 19 kg payload on
+# servo for a moment, which let the arm drop 16 mm under a 6.8 kg payload on
 # 2026-11-03.  When this light recovery is not enough, the operator must decide
 # whether to run scripts/recover_control_full.sh.
 # Usage: source_env; bash scripts/recover_control.sh

@@ -6,7 +6,7 @@ must not send a trajectory:
 
   * the effort stream is ALIVE and plausible -- after today's controller switches
     the effort interface read ~0 N across the board while the arm was carrying a
-    19 kg part (a dead stream: any contact detector silently sees nothing);
+    6.8 kg part (a dead stream: any contact detector silently sees nothing);
   * the three reverse-control ports are ESTAB (the channel dropped six times on
     2026-11-03 and the controller then accepts goals it never executes);
   * arm_controller is active and safety_mode=1 / robot_mode=7.

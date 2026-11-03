@@ -189,7 +189,7 @@ def main() -> int:
         """The torque interface must show a plausible load before any motion.
 
         On 2026-11-03 a controller switch left the effort interface reading ~0 N
-        while the arm was carrying a 19 kg part; every contact detector would
+        while the arm was carrying a 6.8 kg part; every contact detector would
         then silently see nothing, and the run collided with the fixture.  A dead
         stream reads < 1.0; a loaded arm reads >= 8 on joint 2 alone.
 

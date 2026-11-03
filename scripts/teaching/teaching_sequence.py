@@ -529,6 +529,30 @@ def slot_pose_for_insert():
     return [float(v) for v in r1["position"]], quat, f"live R1 ({label})"
 
 
+
+def view_drift_mm(command: str, xyz, quat) -> float | None:
+    """Deviation of a coarse-match OUTPUT from the taught reference, in mm.
+
+    The same fixed target returns coarse matches that drift 21-39 mm between
+    sessions (T0: 39 mm on 2026-11-03; T2: 21 mm).  Standing away from the
+    taught stance then biases the fine match (R1 by ~50 mm).  Returns None when
+    no reference exists for the command.
+    """
+    import numpy as np
+    import yaml
+    from scipy.spatial.transform import Rotation as R
+    try:
+        config = yaml.safe_load((REPO / "config" / "tasks" / "common.yaml").read_text())
+        taught = (config.get("rvs_taught_views") or {}).get(command)
+    except Exception:
+        taught = None
+    if not taught or "position" not in taught:
+        return None
+    position = float(np.linalg.norm(np.asarray(xyz) - np.asarray(taught["position"])) * 1000.0)
+    angle = float(np.degrees((R.from_quat(quat).inv() * R.from_quat(taught["quat"])).magnitude()))
+    print(f"   [view] {command} vs taught: {position:.1f} mm / {angle:.2f} deg")
+    return position
+
 def aim_target():
     """Where the fine-view camera should look: the freshest plausible part pose.
 
@@ -630,6 +654,16 @@ def main() -> int:
         if slot_view is None:
             print("missing T0 capture; cannot tell where RVS wants the fine slot view")
             return 4
+        # 2026-11-03: the coarse match drifts 21-39 mm between sessions, and
+        # standing off the taught stance biases the fine match by the same
+        # amount (41 mm off taught -> R1 biased ~50 mm).  Refuse to build the
+        # fine-view stance on a drifted coarse match.
+        drift = view_drift_mm("S0", slot_view["position"], slot_view["orientation"])
+        if drift is not None and drift > 20.0:
+            print(f"   [view] S0 drifts {drift:.1f} mm from the taught stance "
+                  "(> 20 mm): the coarse slot match locked the wrong feature. "
+                  "Stop and re-teach / inspect the RVS project.")
+            return 4
         slot_tcp, slot_quat = view_pose_to_tcp(slot_view["position"],
                                                slot_view["orientation"])
         print(f"\n[2] slot fine observation: RVS S0 (flange) "
@@ -652,6 +686,9 @@ def main() -> int:
         if box_view is None:
             print("missing T2 capture; cannot tell where RVS wants the fine box view")
             return 4
+        # Same drift check as S0, but warn-only here: the workpiece side
+        # tolerated 21 mm on 2026-11-03 (S3 still came out 3 mm from 11-02).
+        view_drift_mm("S2", box_view["position"], box_view["orientation"])
         box_tcp, box_quat = view_pose_to_tcp(box_view["position"],
                                              box_view["orientation"])
         print(f"\n[4] workpiece fine observation: RVS S2 (flange) "

@@ -27,12 +27,15 @@ Flow:
                              of the failed path -- 10-27 lesson)
   4. DONE when the measured TCP is within --tol-mm of the target
 
-Defaults are the 2026-11-03 measured baseline proposals (owner-confirmed):
-contact = 16.68, safety = 17.63 (sum of |joint effort|).
+Defaults are the 2026-11-03 owner-confirmed MARGINS: contact 0.68 / safety 1.63
+(sum of |joint effort| above the baseline seeded at run start -- the 16.68/17.63
+cutoffs over the measured 16.001 empty-arm baseline).  Margins, not absolutes,
+because the baseline moves with pose and payload (measured 16.0 empty, 19.7
+carrying the workpiece).
 
 Usage:
     python3 scripts/compliant_insert.py X Y Z QX QY QZ QW \
-        [--segments 6] [--tol-mm 3] [--contact 16.68] [--safety 17.63] \
+        [--segments 6] [--tol-mm 3] [--contact 0.68] [--safety 1.63] \
         [--retreat-mm 20] [--dry-run]
 
 Exit codes: 0 DONE; 1 target not reached; 2 plan refused; 3 safety abort
@@ -80,15 +83,22 @@ def run(args: list[str], timeout: float = 600.0) -> tuple[int, str]:
 class Monitor(Node):
     """100 Hz effort watchdog + TCP reader + goal canceller."""
 
-    def __init__(self, contact: float, safety: float) -> None:
+    def __init__(self, contact_margin: float, safety_margin: float) -> None:
         super().__init__("compliant_insert_monitor")
         self.latest_effort: float | None = None
         self.latest_tcp: PoseStamped | None = None
         self.slow = 0.0
         self.fast = 0.0
         self.seeded = False
-        self.contact = contact
-        self.safety = safety
+        # MARGINS above the live baseline, not absolute thresholds (2026-11-03):
+        # the sum of |effort| depends on pose and payload (empty pre-grasp 16.0,
+        # carrying 19.7), so absolute cutoffs trip falsely the moment the run
+        # starts carrying.  The owner-confirmed numbers 16.68 / 17.63 over the
+        # 16.001 measured baseline are exactly margins 0.68 / 1.63.
+        self.contact_margin = contact_margin
+        self.safety_margin = safety_margin
+        self.contact: float | None = None
+        self.safety: float | None = None
         self.tripped: str | None = None
         self.bad_samples = 0
         self.last_log = 0.0
@@ -113,6 +123,13 @@ class Monitor(Node):
     def _on_tcp(self, msg: PoseStamped) -> None:
         self.latest_tcp = msg
 
+    def _apply_baseline(self, mean: float) -> None:
+        """Set the absolute cutoffs from the measured baseline + margins."""
+        self.slow = self.fast = mean
+        self.contact = mean + self.contact_margin
+        self.safety = mean + self.safety_margin
+        self.seeded = True
+
     def seed(self, seconds: float = 1.0) -> bool:
         values: list[float] = []
         deadline = time.time() + seconds
@@ -122,9 +139,10 @@ class Monitor(Node):
                 values.append(self.latest_effort)
         if not values:
             return False
-        self.slow = self.fast = float(np.mean(values))
-        self.seeded = True
-        print(f"   effort baseline seeded: {self.slow:.3f} ({len(values)} samples)")
+        mean = float(np.mean(values))
+        self._apply_baseline(mean)
+        print(f"   effort baseline seeded: {mean:.3f} ({len(values)} samples) -> "
+              f"contact {self.contact:.3f} / safety {self.safety:.3f}")
         return True
 
     def evaluate(self) -> tuple[bool, bool, float]:
@@ -231,8 +249,10 @@ def main() -> int:
     parser.add_argument("target", nargs=7, type=float, metavar=("X", "Y", "Z", "QX", "QY", "QZ", "QW"))
     parser.add_argument("--segments", type=int, default=6)
     parser.add_argument("--tol-mm", type=float, default=3.0)
-    parser.add_argument("--contact", type=float, default=16.68)
-    parser.add_argument("--safety", type=float, default=17.63)
+    parser.add_argument("--contact", type=float, default=0.68,
+                        help="contact MARGIN over the seeded baseline (sum |effort|)")
+    parser.add_argument("--safety", type=float, default=1.63,
+                        help="safety MARGIN over the seeded baseline (sum |effort|)")
     parser.add_argument("--retreat-mm", type=float, default=20.0)
     parser.add_argument("--no-retreat", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
@@ -241,7 +261,8 @@ def main() -> int:
     target_xyz = np.array(args.target[:3])
     target_quat = np.array(args.target[3:])
     print(f"target TCP {np.round(target_xyz, 4).tolist()} "
-          f"contact={args.contact} safety={args.safety} tol={args.tol_mm} mm")
+          f"contact_margin={args.contact} safety_margin={args.safety} "
+          f"tol={args.tol_mm} mm")
 
     code, text = plan_insert(target_xyz, target_quat)
     if code != 0:
