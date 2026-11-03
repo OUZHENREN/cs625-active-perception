@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+"""Pose math shared by the teaching chain (mirrors the senior's tcp_server).
+
+The senior's ``tcp_server`` converts the object poses that RVS returns into the
+tool poses the robot needs.  The same numbers are reproduced here so the teaching
+program does not have to guess or copy constants by hand:
+
+    T_b_tcp = diag(-1, 1, -1) + (-0.004, -0.215, -0.411)   box frame  -> grasp TCP
+    T_s_tcp = diag(-1, 1, -1) + (-0.082, -0.193, -0.4125)  slot frame -> insert TCP
+
+Derived poses
+-------------
+    grasp     = box_pose      * T_b_tcp
+    pre_grasp = grasp         * translate(+120 mm in TCP x)      (senior: T_offset)
+    insert    = slot_pose     * T_s_tcp
+    rotated   = insert        * Ry(-10 deg)                      (the tilted entry)
+    pre_insert= rotated       * translate(-350 mm in TCP z)
+
+Everything is expressed in the base frame, metres, quaternion (x, y, z, w).
+"""
+
+from __future__ import annotations
+
+import numpy as np
+from scipy.spatial.transform import Rotation as R
+
+T_B_TCP = np.array([
+    [-1.0, 0.0, 0.0, -0.004],
+    [0.0, 1.0, 0.0, -0.215],
+    [0.0, 0.0, -1.0, -0.411],
+    [0.0, 0.0, 0.0, 1.0],
+])
+
+T_S_TCP = np.array([
+    [-1.0, 0.0, 0.0, -0.082],
+    [0.0, 1.0, 0.0, -0.193],
+    [0.0, 0.0, -1.0, -0.4125],
+    [0.0, 0.0, 0.0, 1.0],
+])
+
+PRE_GRASP_OFFSET_M = 0.120      # senior: box_pre_grasp = grasp * (x + 120 mm)
+PRE_INSERT_BACKOFF_M = 0.350    # senior: pre_insert = rotated * (z - 350 mm)
+TILT_DEG = -10.0                # senior: insert is entered with a 10 deg tilt
+
+
+def to_matrix(xyz, quat) -> np.ndarray:
+    matrix = np.eye(4)
+    matrix[:3, :3] = R.from_quat(quat).as_matrix()
+    matrix[:3, 3] = xyz
+    return matrix
+
+
+def to_pose(matrix: np.ndarray) -> tuple[list[float], list[float]]:
+    xyz = [float(v) for v in matrix[:3, 3]]
+    quat = [float(v) for v in R.from_matrix(matrix[:3, :3]).as_quat()]
+    return xyz, quat
+
+
+def translation(matrix: np.ndarray, dx: float, dy: float, dz: float) -> np.ndarray:
+    """Offset in the frame of ``matrix`` (i.e. matrix * T(dx, dy, dz))."""
+    offset = np.eye(4)
+    offset[:3, 3] = [dx, dy, dz]
+    return matrix @ offset
+
+
+def grasp_from_box(box_xyz, box_quat):
+    grasp = to_matrix(box_xyz, box_quat) @ T_B_TCP
+    pre_grasp = translation(grasp, PRE_GRASP_OFFSET_M, 0.0, 0.0)
+    return to_pose(grasp), to_pose(pre_grasp)
+
+
+def insert_from_slot(slot_xyz, slot_quat):
+    insert = to_matrix(slot_xyz, slot_quat) @ T_S_TCP
+    tilt = np.eye(4)
+    tilt[:3, :3] = R.from_euler("y", TILT_DEG, degrees=True).as_matrix()
+    rotated = insert @ tilt
+    pre_insert = translation(rotated, 0.0, 0.0, -PRE_INSERT_BACKOFF_M)
+    return to_pose(insert), to_pose(rotated), to_pose(pre_insert)
+
+
+if __name__ == "__main__":
+    # sanity check against the values the senior's tcp_server printed on 2026-10-27
+    box = ([0.5957, 0.7492, 0.3554], [0.0069, -0.0022, 0.5412, 0.8408])
+    grasp, pre_grasp = grasp_from_box(*box)
+    print("grasp    ", [round(v, 4) for v in grasp[0]])
+    print("pre_grasp", [round(v, 4) for v in pre_grasp[0]])

@@ -140,3 +140,26 @@ observe:
 gripper_max_opening_mm: 50.0
 gripper_span_min_mm: 204.0
 gripper_span_max_mm: 246.57
+
+# ---- 工具几何基准（2026-10-31 所有者确认） -------------------------
+# TCP 在法兰前方 353 mm（控制器设定，实测与 tcp_pose_broadcaster 差 0.0 mm）。
+# 工具【静止实体】是 SolidWorks 导出的同一刚体 gripper_0920.stl
+# （cs625_active_perception.urdf.xacro 的 tool0 碰撞几何，单位米、法兰坐标系）：
+#   X 对称 -147.285..+147.285（宽轴 294.6 mm，装配时绕工具轴 +90°）
+#   Y ±42.5 mm，Z -7.0（安装面后方定位凸台）.. +207.0 mm
+# 电机保护座就是这个刚体的一部分（2026-10-31 所有者确认），不在任何"缺失件"之列。
+# 张开时支撑臂会向前伸出 146–203 mm，这部分连杆无模型。
+#
+# 2026-10-30 事故：夹爪下方的电机保护座扫到插槽桌面（slot_table 足迹
+# x∈[1.01,1.70] y∈[-0.45,0.40]）。模型按上述刚体包络逐点检查时，规划路径
+# 离两张桌最近约 189 mm——即规划路径本身无接触，事故高度怀疑为 2 倍速执行
+# 偏离规划路径所致（待复验确认）。因此下降段必须分段慢速执行 + 每段实测校验。
+tool_flange_to_tcp_mm: 353.0
+tool_body_forward_from_flange_mm: 207.0
+tool_body_half_extent_xy_m: 0.1473
+tool_safety_note: >-
+  The tool rigid body (incl. the motor protection seat) spans flange-frame
+  Z -7..+207 mm and X +/-147.3 mm after mounting rotation. Any TCP path whose
+  z drops below (table_top + 0.15) must run the envelope check
+  scripts/check_tool_envelope.py against BOTH measured table footprints and be
+  executed slowly, in segments with verification (2026-10-30 accident lesson).

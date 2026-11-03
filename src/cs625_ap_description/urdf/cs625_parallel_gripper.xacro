@@ -96,7 +96,7 @@
     force to the solver.  The second is what is modelled, and it is recorded as a
     known limitation in config/cs625_task_scene.yaml rather than hidden.
   -->
-  <xacro:macro name="cs625_parallel_gripper" params="parent prefix">
+  <xacro:macro name="cs625_parallel_gripper" params="parent prefix sim_gazebo sim_ignition">
     <!-- Frame at the tool mounting face.  Kept so the joint name survives. -->
     <link name="${prefix}gripper_base_link">
       <inertial>
@@ -126,10 +126,11 @@
         <geometry><box size="0.055 0.058 0.146"/></geometry>
         <material name="gripper_arm"><color rgba="0.55 0.55 0.58 1"/></material>
       </visual>
-      <collision>
-        <origin xyz="-0.0275 0 0"/>
-        <geometry><box size="0.055 0.058 0.146"/></geometry>
-      </collision>
+      <!-- 2026-11-02: the collision box is REMOVED on purpose.  These slabs sit
+           at 77 mm where the real fingers do not exist (the real TCP is at
+           353 mm); keeping them collidable makes MoveIt plan around a phantom
+           and was one of the reasons this model was dropped for the real cell.
+           The visual stays so the simulation profile keeps its links. -->
       <inertial>
         <!-- ESTIMATED, needs CAD mass/CoG.  Not measured.  CoM at the slab
              centre; inertia is the solid-box value for 0.020 kg over
@@ -158,10 +159,7 @@
         <geometry><box size="0.055 0.058 0.146"/></geometry>
         <material name="gripper_arm_left"><color rgba="0.55 0.55 0.58 1"/></material>
       </visual>
-      <collision>
-        <origin xyz="0.0275 0 0"/>
-        <geometry><box size="0.055 0.058 0.146"/></geometry>
-      </collision>
+      <!-- 2026-11-02: collision removed, same reason as the right arm. -->
       <inertial>
         <!-- ESTIMATED, needs CAD mass/CoG.  Mirror of the right arm. -->
         <origin xyz="0.0275 0 0"/>
@@ -178,6 +176,12 @@
       <limit lower="0.0" upper="0.021285" effort="80" velocity="0.02"/>
     </joint>
 
+    <!-- 2026-11-02: the Gazebo ros2_control block must ONLY exist in a
+         simulation description.  It used to be unconditional, so feeding this
+         wrapper to the real eli_ros2_control_node made the driver try to load
+         gz_ros2_control/GazeboSimSystem (which does not exist on the real
+         stack) and crash.  Guarded by the wrapper's sim flags. -->
+    <xacro:if value="${('$(arg sim_gazebo)' == 'true') or ('$(arg sim_ignition)' == 'true')}">
     <ros2_control name="${prefix}cs625_parallel_gripper" type="system">
       <hardware><plugin>gz_ros2_control/GazeboSimSystem</plugin></hardware>
       <joint name="${prefix}gripper_right_finger_joint">
@@ -189,5 +193,6 @@
         <state_interface name="position"/><state_interface name="velocity"/><state_interface name="effort"/>
       </joint>
     </ros2_control>
+    </xacro:if>
   </xacro:macro>
 </robot>

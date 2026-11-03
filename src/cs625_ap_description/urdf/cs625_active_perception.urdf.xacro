@@ -310,8 +310,11 @@
   </joint>
 
   <!-- 夹爪（gripper_0920 对称网格）挂在 tool0 上；占位手指/底板由
-       cs625_parallel_gripper.xacro 提供（与上一段对话结束时的状态一致）。 -->
-  <xacro:cs625_parallel_gripper parent="$(arg prefix)tool0" prefix="$(arg prefix)"/>
+       cs625_parallel_gripper.xacro 提供（与上一段对话结束时的状态一致）。
+       2026-11-02：手指碰撞已移除（真机无 77 mm 占位实体）；Gazebo 的
+       ros2_control 块改由 sim 标志门控，真机加载不再尝试 Gazebo 插件。 -->
+  <xacro:cs625_parallel_gripper parent="$(arg prefix)tool0" prefix="$(arg prefix)"
+      sim_gazebo="$(arg sim_gazebo)" sim_ignition="$(arg sim_ignition)"/>
 
   <!-- Grasp centre between the two support arms.  Massless and collision-free.
        The arms are 146 mm tall centred on Z = 77 mm, so this frame sits at the

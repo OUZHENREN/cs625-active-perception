@@ -66,11 +66,25 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("pattern")
-    parser.add_argument("--time-scale", type=float, default=2.0)
+    parser.add_argument("--time-scale", type=float, default=2.0,
+                        help="MULTIPLIES the trajectory timestamps: >1 plays SLOWER, "
+                             "<1 plays FASTER and is refused.  2026-10-30: time-scale "
+                             "0.5 was passed believing it meant 'half speed'; it meant "
+                             "double speed and the arm hit the workpiece table.")
+    parser.add_argument("--tail-fraction", type=float, default=0.0,
+                        help="last fraction of the trajectory to run slower (0 disables)")
+    parser.add_argument("--tail-scale", type=float, default=2.0,
+                        help="extra time factor applied to the tail section")
+    parser.add_argument("--verify-final", type=float, default=0.0,
+                        help="rad; after success compare the measured joints to the last point")
     parser.add_argument("--dwell", type=float, default=1.0)
     parser.add_argument("--goal-tolerance", type=float, default=0.02)
     parser.add_argument("--max-start-offset", type=float, default=0.03,
                         help="refuse to execute if the trajectory start is far from the measured state")
+    parser.add_argument("--max-wait", type=float, default=0.0,
+                        help="optional hard cap (s); 0 = disabled, wait for the controller verdict")
+    parser.add_argument("--fault-poll", type=float, default=0.2,
+                        help="safety/robot mode polling period for early abort (s)")
     parser.add_argument("--wait-scale", type=float, default=1.0,
                         help="Multiply the wait budget. Gazebo on a CPU renderer "
                              "advances slower than wall time, so a simulation run "
@@ -88,7 +102,14 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    return build_parser().parse_args(argv)
+    args = build_parser().parse_args(argv)
+    if args.time_scale < 1.0:
+        raise SystemExit(
+            f"REFUSED: --time-scale {args.time_scale} would play the trajectory "
+            "FASTER than planned (<1 multiplies timestamps down). Use >= 1.0; "
+            "larger is slower."
+        )
+    return args
 
 
 def main() -> int:
@@ -176,6 +197,20 @@ def main() -> int:
                 sec=int(scaled), nanosec=int((scaled - int(scaled)) * 1e9)
             )
             goal.trajectory.points.append(message)
+        # Slow the final approach instead of splitting the trajectory into
+        # chunks: the tail keeps the same geometry (smooth) but has more time, so
+        # contact and settling happen at low speed while the path stays single.
+        if args.tail_fraction > 0.0 and args.tail_scale > 1.0:
+            last_time = (goal.trajectory.points[-1].time_from_start.sec
+                         + goal.trajectory.points[-1].time_from_start.nanosec * 1e-9)
+            tail_start = last_time * (1.0 - args.tail_fraction)
+            for message in goal.trajectory.points:
+                now = (message.time_from_start.sec
+                       + message.time_from_start.nanosec * 1e-9)
+                if now > tail_start:
+                    stretched = tail_start + (now - tail_start) * args.tail_scale
+                    message.time_from_start = Duration(
+                        sec=int(stretched), nanosec=int((stretched - int(stretched)) * 1e9))
         for name in data["joint_names"]:
             tolerance = JointTolerance()
             tolerance.name = name
@@ -214,7 +249,13 @@ def main() -> int:
         # arrive instead of 2*duration + 40 (a failed 60 s insert used to keep the
         # caller blind for almost two minutes while the Qt panel already showed
         # the failure).
+        # The FIRST goal-timeout (controller deadline) is duration + 5 s, so wait
+        # for the verdict, not a wall clock: long inserts legitimately run for
+        # minutes.  --max-wait remains as an optional hard stop for a call that
+        # has already timed out once, not for normal execution.
         wait_budget = (duration + 20.0) * args.wait_scale
+        if args.max_wait > 0 and args.max_wait < wait_budget:
+            wait_budget = args.max_wait
         expected_span = max(
             (abs(a - b) for a, b in zip(data["points"][-1]["q"], data["points"][0]["q"])),
             default=0.0,
@@ -225,7 +266,7 @@ def main() -> int:
         # moving, otherwise the robot is not executing what it accepted.
         motion_seen = expected_span <= 0.02
         while not result_future.done() and time.time() - started < wait_budget:
-            rclpy.spin_once(node, timeout_sec=0.05)
+            rclpy.spin_once(node, timeout_sec=args.fault_poll)
             # An E-stop / protective stop ends the trajectory immediately; report
             # it as such instead of waiting for the controller's timeout.
             safety_now = state.get("safety")
@@ -276,6 +317,19 @@ def main() -> int:
             except Exception as exc:  # noqa: BLE001 - diagnostics must not mask it
                 print(f"terminal error unavailable: {type(exc).__name__}: {exc}")
             return 6
+        if args.verify_final > 0.0:
+            target = data["points"][-1]["q"]
+            names = data["joint_names"]
+            worst = sorted(
+                ((abs(q - latest.get(name, q)), name)
+                 for name, q in zip(names, target)), reverse=True)[:3]
+            deviation = worst[0][0] if worst else 0.0
+            print("measured deviation (rad): "
+                  + ", ".join(f"{name}={err:.4f}" for err, name in worst))
+            if deviation > args.verify_final:
+                print(f"FINAL_CHECK_FAILED deviation={deviation:.4f} rad "
+                      f"> {args.verify_final}")
+                return 10
         if args.dwell > 0:
             time.sleep(args.dwell)
 

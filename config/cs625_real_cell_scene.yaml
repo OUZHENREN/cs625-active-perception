@@ -2,7 +2,7 @@
 # 重新生成（会覆盖本文件）：
 #   python3 scripts/build_sim_world.py --out-world <world.sdf> --out-config <本文件>
 #
-# 数据来源：环境模型 runtime/environment/20261025_091250/model.json（真机实测点云拟合）
+# 数据来源：环境模型 runtime/environment/20261027_024430/model.json（真机实测点云拟合）
 #           + config/tasks/common.yaml 的 slot_origin / slot_origin_q（机械固定槽位标定）
 #           + 两个模型 STL 的顶点极值（bbox）
 # 世界文件：src/cs625_simulation/worlds/cs625_real_cell.sdf
@@ -20,23 +20,23 @@ cs625_real_cell_scene:
     # --- 生成信息 ---------------------------------------------------------
     generated_by: "scripts/build_sim_world.py"
     world_file: "src/cs625_simulation/worlds/cs625_real_cell.sdf"
-    env_model: "runtime/environment/20261025_091250/model.json"
+    env_model: "runtime/environment/20261027_024430/model.json"
     warn_threshold_m: 0.020
 
     # --- 实测桌面（世界系） -----------------------------------------------
     tables:
       workpiece_table:
-        top_z: -0.090970
+        top_z: -0.103060
         xy_min: [0.300000, 0.300000]
         xy_max: [0.990000, 0.900000]
-        box_centre: [0.645000, 0.600000, -0.145485]
-        box_size: [0.690000, 0.600000, 0.109030]
+        box_centre: [0.645000, 0.600000, -0.151530]
+        box_size: [0.690000, 0.600000, 0.096940]
       slot_table:
-        top_z: -0.040730
+        top_z: -0.106220
         xy_min: [1.010000, -0.450000]
         xy_max: [1.700000, 0.400000]
-        box_centre: [1.355000, -0.025000, -0.120365]
-        box_size: [0.690000, 0.850000, 0.159270]
+        box_centre: [1.355000, -0.025000, -0.153110]
+        box_size: [0.690000, 0.850000, 0.093780]
     floor_top_z: -0.200000
 
     # --- 夹具（静态） -----------------------------------------------------
@@ -50,22 +50,22 @@ cs625_real_cell_scene:
       bbox_centre_offset_world_m: [-0.076016, -0.193518, -0.253850]
       reference_slot_origin_m: [1.241629, 0.181709, 0.443245]
       deviation_m: 0.000000
-      bottom_below_slot_table_m: -0.023725
+      bottom_below_slot_table_m: 0.041765
 
     # --- 工件（实测 CAD 位姿原样） ---------------------------------------
     module:
       model_uri: "model://cs625_task/shielding_module"
-      pose_world: [0.502900, 0.635100, 0.125400, 3.140460, -0.014075, 2.757243]
+      pose_world: [0.586200, 0.717500, 0.121100, -3.140761, -0.009440, 2.711887]
       alignment: measured_cad_pose
       pose_source: measured_cad_pose_verbatim
-      measured_quat_xyzw: [0.191000, 0.981600, 0.001900, -0.006800]
+      measured_quat_xyzw: [0.213200, 0.977000, 0.000600, -0.004700]
       bbox_min_m: [-0.435800, -0.021993, -0.240000]
       bbox_max_m: [0.018800, 0.109000, 0.225000]
-      bbox_centre_world_m: [0.712576, 0.597211, 0.130014]
-      reference_cad_centre_m: [0.720593, 0.618232, 0.133546]
-      deviation_m: 0.022773
-      frame_deviation_m: 0.022773
+      bbox_centre_world_m: [0.793927, 0.670167, 0.126595]
+      reference_cad_centre_m: [0.802876, 0.690815, 0.130081]
+      deviation_m: 0.022772
+      frame_deviation_m: 0.022772
 
     # --- 拟合报告（完整表格由脚本打印；这里只留两条汇总） -----------------
     fit:
-      max_deviation_m: 0.022773
+      max_deviation_m: 0.022772
