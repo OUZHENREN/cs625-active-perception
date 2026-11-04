@@ -65,12 +65,12 @@ from pose_math import grasp_from_box, insert_from_slot  # noqa: E402
 
 # --- speeds: (velocity, time_scale, tail_fraction, tail_scale) ------------------
 SPEED = {
-    # Owner 2026-11-04: slow only the FINAL approach; the rest may be faster.
-    # Cruise raised 50 % over the previous conservative values (0.008->0.012,
-    # 0.004->0.006) while the tail keeps the last 30/40 % of the path at a quarter
-    # of that cruise speed (tail_scale 4.0).
-    "pre_grasp":  (0.012, 1.5, 0.3, 4.0),
-    "grasp":      (0.006, 2.0, 0.4, 4.0),
+    # Owner 2026-11-04 (corrected): slow only the FINAL approach, and the cruise must
+    # be at least TWICE the conservative setting that felt too slow
+    # (0.008 -> 0.016, 0.004 -> 0.008).  The tail keeps the last 30/40 % of the path at
+    # a quarter of that cruise (tail_scale 4.0), so only the last centimetres creep.
+    "pre_grasp":  (0.016, 1.5, 0.3, 4.0),
+    "grasp":      (0.008, 2.0, 0.4, 4.0),
     "lift":       (0.03, 1.5, 0.0, 1.0),
     "transit":    (0.08, 1.0, 0.0, 1.0),
     "staging":    (0.05, 1.5, 0.0, 1.0),
