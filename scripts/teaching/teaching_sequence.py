@@ -1179,6 +1179,32 @@ def main() -> int:
                 "rotate only", goal_tol=0.0003):
         return 2
 
+    # TARGET CORRECTNESS CHECK (owner 2026-11-04: "你不检查位姿是否正确吗？当前明显
+    # 又对不上").  The 13b gate only proves the TCP sits on the COMPUTED target; it
+    # cannot notice that the target itself is in the wrong place.  So the target is
+    # compared against today's freshest slot measurement before anything descends:
+    # a lateral disagreement beyond SLOT_AGREEMENT_MM means one of the two is wrong
+    # and the insert must not start.
+    SLOT_AGREEMENT_MM = 10.0
+    fresh = latest_capture("T1")
+    if fresh is not None:
+        today_flat, _, today_pre = insert_from_slot(fresh["position"],
+                                                    fresh["orientation"])
+        import numpy as _np
+        gap = float(_np.linalg.norm(_np.array(today_pre[0]) - _np.array(pre_insert_xyz)) * 1000.0)
+        print(f"\n   [target check] pre_insert used   {[round(v, 4) for v in pre_insert_xyz]}")
+        print(f"   [target check] from today's R1   {[round(v, 4) for v in today_pre[0]]}")
+        print(f"   [target check] lateral disagreement {gap:.1f} mm "
+              f"(limit {SLOT_AGREEMENT_MM:.0f} mm)")
+        if gap > SLOT_AGREEMENT_MM:
+            print("   TARGET SUSPECT: the pose this chain is about to insert into does "
+                  "NOT agree with today's slot measurement.\n"
+                  "   Refusing to descend.  Either re-measure the slot (touch probe) or "
+                  "decide which source is authoritative; do not insert blindly.")
+            return 6
+    else:
+        print("   [target check] no fresh R1 on disk; cannot cross-check the target")
+
     if args.start_from < 13:
         print("\n[13] descend vertically to the pre-insert height")
     if not move("pre_insert", pre_insert_xyz, pre_insert_q, "descend only",
