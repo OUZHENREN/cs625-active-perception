@@ -163,7 +163,7 @@ def main() -> int:
         handle.write("step,z,mean_effort,peak_effort,residual,note\n")
         for row in rows:
             handle.write(",".join(str(v) for v in row) + "\n")
-    print(f"\ntable written to {out.relative_to(REPO)}")
+    print(f"\ntable written to {out}")
     node.destroy_node()
     rclpy.shutdown()
     return 0 if all(r[5] != "STOPPED" for r in rows) else 1

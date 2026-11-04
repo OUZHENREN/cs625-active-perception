@@ -261,8 +261,14 @@ def main() -> int:
     parser.add_argument("--tol-mm", type=float, default=3.0)
     parser.add_argument("--contact", type=float, default=0.68,
                         help="contact MARGIN over the seeded baseline (sum |effort|)")
-    parser.add_argument("--safety", type=float, default=1.63,
-                        help="safety MARGIN over the seeded baseline (sum |effort|)")
+    parser.add_argument("--safety", type=float, default=3.5,
+                        help="absolute CEILING of the residual (fallback brake): the insert "
+                             "normally runs at a rising but smooth residual (measured 2026-11-04: "
+                             "-0.12 -> +1.08 -> +1.64 over 75 mm), so a tight 1.63 ceiling "
+                             "aborted a healthy insertion")
+    parser.add_argument("--jump-margin", type=float, default=0.8,
+                        help="primary jam criterion: residual rising more than this between "
+                             "consecutive segments means the part is wedging")
     parser.add_argument("--retreat-mm", type=float, default=0.0,
                         help="kept for compatibility; the owner removed the automatic "
                              "retreat on 2026-11-04, so nothing is withdrawn")
@@ -299,6 +305,7 @@ def main() -> int:
     time_scale = 2.0
     current: subprocess.Popen | None = None
     result = 0
+    previous_residual: float | None = None
     for index, path in enumerate(paths):
         print(f"segment {index + 1}/{len(paths)}  time_scale={time_scale}")
         current = subprocess.Popen(
@@ -309,10 +316,12 @@ def main() -> int:
             cwd=str(REPO))
         safety_hit = False
         contact_hit = False
+        residual_samples: list[float] = []
         period = 1.0 / MONITOR_HZ
         while current.poll() is None:
             deadline = time.time() + period
             contact_now, safety_now, fast = monitor.evaluate()
+            residual_samples.append(fast - monitor.slow)
             if safety_now:
                 safety_hit = True
                 print(f"   [monitor] SAFETY trip: fast={fast:.3f} >= {args.safety}")
@@ -335,6 +344,20 @@ def main() -> int:
             print("   segment FAILED; stopping")
             result = 4
             break
+        # Jam detection (owner chose this criterion on 2026-11-04): insertion needs
+        # sustained friction, so what matters is a STEP in the residual, not its level.
+        segment_residual = float(sum(residual_samples) / len(residual_samples)) \
+            if residual_samples else 0.0
+        print(f"   segment residual mean {segment_residual:+.2f}"
+              + (f"  (previous {previous_residual:+.2f})" if previous_residual is not None else ""))
+        if previous_residual is not None and \
+                segment_residual - previous_residual > args.jump_margin:
+            print(f"   JAM DETECTED: residual jumped "
+                  f"{segment_residual - previous_residual:+.2f} > {args.jump_margin}; "
+                  "stopping (no retreat by design)")
+            result = 3
+            break
+        previous_residual = segment_residual
         for line in output.splitlines()[-1:]:
             print("   ", line)
         if contact_hit:
