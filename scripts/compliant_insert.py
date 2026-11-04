@@ -173,11 +173,17 @@ class Monitor(Node):
         while not future.done() and time.time() < deadline:
             rclpy.spin_once(self, timeout_sec=0.05)
         result = future.result()
-        ok = bool(result is not None
-                  and all(r.return_code == 0 for r in result.return_codes)) \
-            if result is not None else False
+        # cancel_goal_async returns ONE response with return_code/goals_canceling; there
+        # is no per-goal return_codes list (2026-11-04: the wrong attribute raised
+        # AttributeError exactly when a safety abort needed the cancel most).
+        if result is None:
+            print("   [monitor] cancel_goal -> TIMEOUT")
+            return False
+        code = int(result.return_code)
+        cancelled = len(result.goals_canceling) if hasattr(result, "goals_canceling") else 0
+        ok = code == 0
         print(f"   [monitor] cancel_goal -> {'OK' if ok else 'FAILED'} "
-              f"({result.return_codes if result else 'timeout'})")
+              f"(return_code={code}, goals_cancelling={cancelled})")
         return ok
 
     def mean_tcp(self, samples: int = 20) -> tuple[np.ndarray, np.ndarray] | None:
