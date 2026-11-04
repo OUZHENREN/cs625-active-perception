@@ -275,13 +275,16 @@ teaching_observation_baselines:
 # is where the pendant-side protective stop fires, not where the formula says.  The owner
 # confirmed this pose as the true insert end after the first complete vertical insert.
 teaching_insert_end:
-  tcp: [1.1471, -0.0551, 0.0721]
+  tcp: [1.1471, -0.0551, 0.0721]      # 2026-11-04 16:42 measurement
+  tcp_repeat: [1.1419, -0.0561, 0.0710]  # repeated attempt, same depth within 1 mm
   quat: [-0.0047, -0.9961, 0.0021, -0.0881]      # tilted entry attitude (-10 deg)
   flat_quat: [0.0048, 1.0, -0.0017, 0.0008]      # straightened attitude after seating
   formula_end_tcp: [1.1362, -0.0547, 0.0324]     # what the chain computes; 39.7 mm deeper
   depth_below_fixture_mm: 371
   travel_along_tool_mm: 352
   verdict: "protective stop at the seat; do not drive to the formula end point"
+  repeatability_mm: 1.1               # three independent attempts stopped at 371-372 mm
+  obstructions: "workpiece touches the slot bottom AND two side walls at this depth"
   stamp: "2026-11-04T16:42:00"
 
 # Lateral correction the owner applied to the whole insert chain on 2026-11-04, in
@@ -292,3 +295,13 @@ teaching_insert_lateral_shift:
   increments_mm: [8.0, 5.0, 27.5, 5.0]
   axis: "world -x (toward the robot base)"
   stamp: "2026-11-04T16:20:00"
+
+# Partial straightening while a part is inside the slot (owner, 2026-11-04).
+# Rotating the tool inside the slot is the only way to free clearance, but too much at
+# once jams against the walls: 2 deg completed but cost +7.2 effort, 1 deg at full depth
+# tripped the protective stop instantly.  The owner's rule: 1.5 deg per step, never 2.
+teaching_rotation_policy:
+  step_deg: 1.5
+  max_step_deg: 1.5
+  note: "rotate only after backing the gripper out of the slot; 2 deg was already too much"
+  stamp: "2026-11-04T17:00:00"
