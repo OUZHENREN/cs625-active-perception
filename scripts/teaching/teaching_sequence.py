@@ -1136,6 +1136,18 @@ def main() -> int:
     pre_insert_xyz, pre_insert_q = pre_insert_pose
     insert_xyz, tilted_q = insert_tilted            # tilted entry attitude
     insert_flat_q = insert_flat[1]                  # straightened attitude
+    # A resumed run (start-from 10/12/13/14) skips step 7c, so the environment voxels
+    # may still be loaded while the part is in the jaws -- and then NO path exists
+    # (measured 2026-11-04: rotation goal valid, planning returned 99999 with 2818
+    # voxels present).  Clear them here whenever the part is held.
+    if args.start_from > 5 and grip_still_holding():
+        print("\n[7c-resume] clearing the environment scene (carried part needs a free path)")
+        code, text = run([sys.executable, "-u",
+                          str(REPO / "scripts" / "apply_environment_collision.py"),
+                          "--remove"], timeout=180.0)
+        for line in text.splitlines():
+            print("   ", line)
+
     if args.start_from >= 12:
         print("\n[10-11] transit/staging SKIPPED (resumed at the rotation step)")
     else:
