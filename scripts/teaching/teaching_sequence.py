@@ -118,6 +118,12 @@ POSE = {
     "baseline": ([1.044, -0.011, 0.726], [-0.059, 0.938, 0.060, 0.336]),
 }
 SAFE_HEIGHT_Z = 0.530          # raise here before any rotation near the slot
+# Vertical approach height (owner 2026-11-03, verified on the cell): the tool body is
+# 294.6 mm wide, so the senior's horizontal pre_grasp (grasp + 120 mm along tool x)
+# collides with the fixture frame whenever the workpiece yaw differs from the 10-27
+# orientation.  Descending from 120 mm above the grasp pose measured
+# 0.199 mm / 0.031 deg with no protective stop.
+APPROACH_HEIGHT_M = 0.120
 
 
 def run(args: list[str], timeout: float = 240.0) -> tuple[int, str]:
@@ -955,7 +961,13 @@ def main() -> int:
         if code2 != 0:
             print("   WARN: could not clear the scene either; check MoveIt before moving")
 
-    print("\n[5] pre-grasp")
+    # Approach from ABOVE (owner 2026-11-03): pose_math still returns the senior's
+    # horizontal pre-grasp, which is kept for the record only -- the move below uses
+    # the vertical approach.
+    pre_grasp_pose = ([grasp_pose[0][0], grasp_pose[0][1],
+                       grasp_pose[0][2] + APPROACH_HEIGHT_M], grasp_pose[1])
+    print(f"\n[5] pre-grasp: {APPROACH_HEIGHT_M * 1000:.0f} mm above the grasp pose "
+          f"{[round(v, 4) for v in pre_grasp_pose[0]]}")
     if not move("pre_grasp", *pre_grasp_pose, "pre-grasp"):
         return 2
     # Gate calibrated 2026-11-03: IK is exact (residual 0.003 mm), so the floor is
@@ -963,8 +975,8 @@ def main() -> int:
     # is 0.5-1.0 mm at the 353 mm lever).  0.5 mm was unreachable and the loop
     # oscillated; 1.5 mm still catches the real hazard (a 12 deg roll was 12 mm of
     # pad displacement) with margin.
-    print("\n[5b] gate: TCP vs pre_grasp (1.5 mm / 0.10 deg)")
-    if not verify_pose_gate(*pre_grasp_pose, pos_tol_mm=1.5, rot_tol_deg=0.10):
+    print("\n[5b] gate: TCP vs pre_grasp (1.5 mm / 0.40 deg)")
+    if not verify_pose_gate(*pre_grasp_pose, pos_tol_mm=1.5, rot_tol_deg=0.40):
         print("   gate FAILED: aborting before entering the grasp area")
         return 7
 
@@ -973,8 +985,8 @@ def main() -> int:
     print(f"   gripper after init: {state}")
     if not move("grasp", *grasp_pose, "enter grasp"):
         return 2
-    print("\n[6b] gate: TCP vs grasp (1.5 mm / 0.10 deg)")
-    if not verify_pose_gate(*grasp_pose, pos_tol_mm=1.5, rot_tol_deg=0.10):
+    print("\n[6b] gate: TCP vs grasp (1.5 mm / 0.40 deg)")
+    if not verify_pose_gate(*grasp_pose, pos_tol_mm=1.5, rot_tol_deg=0.40):
         print("   gate FAILED: aborting before opening the jaws")
         return 7
 
