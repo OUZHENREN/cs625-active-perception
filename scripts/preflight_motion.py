@@ -118,7 +118,7 @@ def main() -> int:
             samples.append([effort[k] for k in ORDER])
 
     node.create_subscription(JointState, "/joint_states", on_state, 10)
-    deadline = time.time() + 1.2
+    deadline = time.time() + 3.0
     while time.time() < deadline:
         rclpy.spin_once(node, timeout_sec=0.05)
 

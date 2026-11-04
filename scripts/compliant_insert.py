@@ -133,7 +133,7 @@ class Monitor(Node):
         self.safety = mean + self.safety_margin
         self.seeded = True
 
-    def seed(self, seconds: float = 1.0) -> bool:
+    def seed(self, seconds: float = 3.0) -> bool:
         values: list[float] = []
         deadline = time.time() + seconds
         while time.time() < deadline:
@@ -322,9 +322,14 @@ def main() -> int:
 
     rclpy.init()
     monitor = Monitor(args.contact, args.safety)
-    if not monitor.seed(1.0):
-        print("no effort stream; aborting")
-        return 5
+    if not monitor.seed(3.0):
+        # The driver keeps publishing at ~125 Hz, but a freshly started subscriber needs
+        # a moment to connect; a 1 s window was too short and aborted a valid run
+        # (2026-11-04: "no effort stream" while /joint_states was healthy at 125 Hz).
+        print("   effort stream not connected yet; waiting one more window")
+        if not monitor.seed(3.0):
+            print("no effort stream; aborting")
+            return 5
 
     paths = segment_plan(pathlib.Path("/tmp/compliant_insert_plan.json"),
                          args.segments, 2.0)
