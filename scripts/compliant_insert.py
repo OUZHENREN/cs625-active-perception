@@ -22,7 +22,7 @@ Flow:
      while a 100 Hz loop watches the FAST-filtered sum |effort|:
        fast >= --contact  -> slow the NEXT segment (time_scale doubles)
        fast >= --safety   -> cancel the controller goal immediately, then
-                             retreat --retreat-mm mm back along the tool axis
+                             STOP (no retreat: the owner decides what happens next)
                              (reverse of the insertion direction, no replanning
                              of the failed path -- 10-27 lesson)
   4. DONE when the measured TCP is within --tol-mm of the target
@@ -263,8 +263,10 @@ def main() -> int:
                         help="contact MARGIN over the seeded baseline (sum |effort|)")
     parser.add_argument("--safety", type=float, default=1.63,
                         help="safety MARGIN over the seeded baseline (sum |effort|)")
-    parser.add_argument("--retreat-mm", type=float, default=20.0)
-    parser.add_argument("--no-retreat", action="store_true")
+    parser.add_argument("--retreat-mm", type=float, default=0.0,
+                        help="kept for compatibility; the owner removed the automatic "
+                             "retreat on 2026-11-04, so nothing is withdrawn")
+    parser.add_argument("--no-retreat", action="store_true", default=True)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -323,8 +325,10 @@ def main() -> int:
         ok = "ALL_ASSEMBLY_CHUNKS_OK" in output
         if safety_hit:
             monitor.cancel_goal()
-            if not args.no_retreat:
-                retreat_along_tool(args.retreat_mm, monitor, args.velocity)
+            # Owner, 2026-11-04: there is NO automatic retreat.  A safety trip cancels
+            # the trajectory and stops; where the arm goes next is the operator's
+            # decision, not a scripted withdrawal.  (retreat_along_tool() is kept in the
+            # file for manual use but is never called from here.)
             result = 3
             break
         if not ok:
