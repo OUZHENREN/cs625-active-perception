@@ -37,8 +37,8 @@ sys.stdout.reconfigure(line_buffering=True)
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 CONFIG = REPO / "config" / "tasks" / "common.yaml"
-NAMES = ("slot_coarse", "workpiece_coarse")
-BLOCK_KEY = "teaching_observation_poses:"
+NAMES = ("A", "B")
+BLOCK_KEY = "teaching_observation_baselines:"
 
 
 def current_tcp(timeout: float = 8.0):
@@ -61,7 +61,7 @@ def current_tcp(timeout: float = 8.0):
              pose.orientation.z, pose.orientation.w])
 
 
-def rewrite_block(text: str, name: str, position, quat) -> str:
+def rewrite_block(text: str, name: str, position, quat, joints_deg) -> str:
     """Rewrite <name>'s position/quat inside the teaching_observation_poses block.
 
     Scoped on purpose: the file holds many other position lists, so a global
@@ -78,7 +78,8 @@ def rewrite_block(text: str, name: str, position, quat) -> str:
 
     stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
     entry_pattern = re.compile(
-        rf"(  {name}:\n    position: \[)([^\]]*)(\]\n    quat: \[)([^\]]*)(\])")
+        rf"(  {name}:\n(?:    note:[^\n]*\n)?    position: \[)([^\]]*)"
+        rf"(\]\n    quat: \[)([^\]]*)(\])")
     entry = entry_pattern.search(block)
     if not entry:
         raise SystemExit(f"cannot locate {name} inside {BLOCK_KEY}")
@@ -86,10 +87,32 @@ def rewrite_block(text: str, name: str, position, quat) -> str:
 
     new_entry = (f"  {name}:\n"
                  f"    position: [{', '.join(f'{v:.4f}' for v in position)}]\n"
-                 f"    quat: [{', '.join(f'{v:.4f}' for v in quat)}]")
+                 f"    quat: [{', '.join(f'{v:.4f}' for v in quat)}]\n"
+                 f"    joints_deg: [{', '.join(f'{v:.1f}' for v in joints_deg)}]")
     history = (f"  # {stamp} replaced {name}: was [{old_position}] / [{old_quat}]\n")
     new_block = entry_pattern.sub(history + new_entry, block, count=1)
     return text[:start] + new_block + text[end:]
+
+
+def read_joints_deg(timeout: float = 8.0):
+    """Live joint angles in degrees (stored alongside the pose for reproducibility)."""
+    import numpy as np
+    from sensor_msgs.msg import JointState
+    ORDER = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+             "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"]
+    if not rclpy.ok():          # current_tcp() shuts the context down
+        rclpy.init()
+    node = Node("set_observation_pose_joints")
+    values: dict = {}
+    node.create_subscription(JointState, "/joint_states",
+                             lambda m: values.update(dict(zip(m.name, m.position))), 10)
+    end = time.time() + timeout
+    while len([k for k in ORDER if k in values]) < 6 and time.time() < end:
+        rclpy.spin_once(node, timeout_sec=0.1)
+    node.destroy_node()
+    if len([k for k in ORDER if k in values]) < 6:
+        return [0.0] * 6
+    return [float(np.degrees(values[k])) for k in ORDER]
 
 
 def main() -> int:
@@ -100,11 +123,13 @@ def main() -> int:
                         help="read the pose from the live TCP topic")
     parser.add_argument("--position", nargs=3, type=float)
     parser.add_argument("--quat", nargs=4, type=float)
+    parser.add_argument("--joints", nargs=6, type=float,
+                        help="joint angles to store (default: read the live ones)")
     parser.add_argument("--show", action="store_true", help="print the stored value")
     args = parser.parse_args()
 
     text = CONFIG.read_text()
-    stored = (yaml.safe_load(text).get("teaching_observation_poses") or {})
+    stored = (yaml.safe_load(text).get("teaching_observation_baselines") or {})
     if args.show or not (args.from_current or args.position):
         entry = stored.get(args.name, {})
         print(f"{args.name}: position {entry.get('position')} quat {entry.get('quat')}")
@@ -122,9 +147,10 @@ def main() -> int:
             return 3
         position, quat = args.position, args.quat
 
-    CONFIG.write_text(rewrite_block(text, args.name, position, quat))
+    joints_deg = args.joints if args.joints else read_joints_deg()
+    CONFIG.write_text(rewrite_block(text, args.name, position, quat, joints_deg))
     # Read back through YAML so a malformed edit fails loudly here, not later.
-    check = yaml.safe_load(CONFIG.read_text())["teaching_observation_poses"][args.name]
+    check = yaml.safe_load(CONFIG.read_text())["teaching_observation_baselines"][args.name]
     print(f"registered {args.name}:")
     print(f"  position [{', '.join(f'{v:.4f}' for v in position)}]")
     print(f"  quat     [{', '.join(f'{v:.4f}' for v in quat)}]")
