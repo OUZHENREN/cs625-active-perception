@@ -968,7 +968,11 @@ def main() -> int:
                        grasp_pose[0][2] + APPROACH_HEIGHT_M], grasp_pose[1])
     print(f"\n[5] pre-grasp: {APPROACH_HEIGHT_M * 1000:.0f} mm above the grasp pose "
           f"{[round(v, 4) for v in pre_grasp_pose[0]]}")
-    if not move("pre_grasp", *pre_grasp_pose, "pre-grasp"):
+    # Tight joint tolerance: the default 0.008 rad is ~6 mm at the 353 mm lever and
+    # the 5b gate is 1.5 mm, so the move itself has to be tighter than the gate
+    # (measured 2026-11-04: default tolerance reached the pose 6.9 mm off and the
+    # gate then aborted a perfectly good approach).
+    if not move("pre_grasp", *pre_grasp_pose, "pre-grasp", goal_tol=0.0005):
         return 2
     # Gate calibrated 2026-11-03: IK is exact (residual 0.003 mm), so the floor is
     # the controller's joint tracking error (~0.0005-0.0008 rad under load, which
@@ -983,7 +987,7 @@ def main() -> int:
     print("\n[6] init + enter grasp (jaws closed)")
     state = gripper("init")
     print(f"   gripper after init: {state}")
-    if not move("grasp", *grasp_pose, "enter grasp"):
+    if not move("grasp", *grasp_pose, "enter grasp", goal_tol=0.0004):
         return 2
     print("\n[6b] gate: TCP vs grasp (1.5 mm / 0.40 deg)")
     if not verify_pose_gate(*grasp_pose, pos_tol_mm=1.5, rot_tol_deg=0.40):
