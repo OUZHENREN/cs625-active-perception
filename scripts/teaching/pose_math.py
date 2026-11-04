@@ -69,10 +69,18 @@ def grasp_from_box(box_xyz, box_quat):
     return to_pose(grasp), to_pose(pre_grasp)
 
 
-def insert_from_slot(slot_xyz, slot_quat):
+def insert_from_slot(slot_xyz, slot_quat, tilt_deg=None):
+    """Insert chain from the slot pose.
+
+    tilt_deg defaults to the senior's -10 deg entry tilt.  The owner chose to derive
+    everything from TODAY's slot measurement (2026-11-04), so teaching_sequence passes
+    tilt_deg=0.0: the entry attitude then comes purely from the R1 orientation instead
+    of carrying an extra -10 deg that was tuned for the senior's own setup.
+    """
     insert = to_matrix(slot_xyz, slot_quat) @ T_S_TCP
     tilt = np.eye(4)
-    tilt[:3, :3] = R.from_euler("y", TILT_DEG, degrees=True).as_matrix()
+    angle = TILT_DEG if tilt_deg is None else tilt_deg
+    tilt[:3, :3] = R.from_euler("y", angle, degrees=True).as_matrix()
     rotated = insert @ tilt
     pre_insert = translation(rotated, 0.0, 0.0, -PRE_INSERT_BACKOFF_M)
     return to_pose(insert), to_pose(rotated), to_pose(pre_insert)

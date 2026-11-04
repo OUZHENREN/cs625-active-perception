@@ -1132,7 +1132,12 @@ def main() -> int:
     if slot_result is None:
         return 6
     slot_xyz, slot_quat, slot_source = slot_result
-    insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(slot_xyz, slot_quat)
+    # Owner 2026-11-04: derive the entry attitude from TODAY's R1 only -- no extra
+    # senior -10 deg tilt (that tilt was tuned for the senior's own cell; carrying it
+    # here produced a 9.9 deg attitude offset against today's measurement).
+    SLOT_TILT_DEG = 0.0
+    insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(
+        slot_xyz, slot_quat, tilt_deg=SLOT_TILT_DEG)
     print(f"\n   insert chain from {slot_source}:")
     print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
     print(f"     tilted     {[round(v, 4) for v in insert_tilted[0]]}")
