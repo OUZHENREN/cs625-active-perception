@@ -1132,10 +1132,16 @@ def main() -> int:
     if slot_result is None:
         return 6
     slot_xyz, slot_quat, slot_source = slot_result
-    # Owner 2026-11-04: derive the entry attitude from TODAY's R1 only -- no extra
-    # senior -10 deg tilt (that tilt was tuned for the senior's own cell; carrying it
-    # here produced a 9.9 deg attitude offset against today's measurement).
-    SLOT_TILT_DEG = 0.0
+    # The -10 deg ENTRY TILT IS REQUIRED (owner correction 2026-11-04, after my "no
+    # tilt" descent collided with the slot mouth).  The senior's chain, read from
+    # ~/cs625_legacy_underlay_jazzy/src/tcp_bridge/tcp_bridge/tcp_server.py, is:
+    #     insert     = slot x T_s_tcp                      (flat, the final placement)
+    #     rotated    = insert x Ry(-10 deg)                 (the entry attitude)
+    #     pre_insert = rotated x translate(z -350 mm)
+    # and the motion order is pre_insert (tilted) -> insert (tilted) -> STRAIGHTEN
+    # (flat) -> release.  Txz_R1 only supplies the slot pose; the tilt is what makes
+    # entry possible.  Our T_S_TCP / tilt / backoff match his constants exactly.
+    SLOT_TILT_DEG = -10.0
     insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(
         slot_xyz, slot_quat, tilt_deg=SLOT_TILT_DEG)
     print(f"\n   insert chain from {slot_source}:")

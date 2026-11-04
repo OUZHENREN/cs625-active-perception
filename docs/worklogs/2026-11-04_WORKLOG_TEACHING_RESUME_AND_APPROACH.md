@@ -73,3 +73,47 @@
 用 --start-from 5 接着跑：预抓取(竖直) → 5b 门 → 进入抓取 → 抓取 → 抬升
                         → 转运 → 预插入 → 13b 门 → 插入
 ```
+
+
+## 5. 重要更正：−10° 插入倾斜是必需策略（2026-11-04 13:40）
+
+**我的错误**：为了让插入姿态"完全来自今天的 R1"，我把师兄的 −10° 入口倾斜去掉了
+（`SLOT_TILT_DEG = 0`），并按平姿态下降 —— 结果工件与槽口发生轻微碰撞（所有者当场制止）。
+
+**师兄代码复验**（`~/cs625_legacy_underlay_jazzy/src/tcp_bridge/tcp_bridge/tcp_server.py`）：
+
+```python
+compute_slot_insert_tcp:            T_world_tcp = T_world_slot @ T_s_tcp
+compute_slot_pre_insert_rotated_tcp: T_rot = R.from_euler('y', -10.0, degrees=True)
+                                    T_world_rotated = T_world_insert @ T_rot    # 只改姿态
+compute_slot_pre_insert_tcp:        T_trans[2,3] = -350/1000
+                                    T_world_pre = T_world_rotated @ T_trans
+```
+
+逐位核对我们与他的常量：
+
+| 项 | 师兄 | 我们 | 一致 |
+|---|---|---|---|
+| T_s_tcp | diag(−1,1,−1)，t=(−82, −193, −412.5) mm | 同 | ✅ |
+| 入口倾斜 | Ry(−10°) | TILT_DEG = −10.0 | ✅ |
+| 预插入后撤 | 沿旋转后 z −350 mm | PRE_INSERT_BACKOFF_M = 0.35 | ✅ |
+
+**正确动作顺序（师兄策略）**：
+
+```text
+① pre_insert（倾斜 −10°）        ← 已经带倾斜地站在槽口上方
+② insert（倾斜 −10°）            ← 带倾斜插到底
+③ straighten（转平）             ← 插入完成后再转平，才到正式放置姿态
+④ release
+```
+
+**结论**：倾斜属于"进入策略"，不是"姿态误差"；R1 只提供插槽位姿，
+倾斜必须叠加在 R1 之上。已恢复 `SLOT_TILT_DEG = -10.0` 并在代码注释里引用师兄原文。
+
+**当前链条（今天的 R1）**：
+
+```text
+insert(终点,平的) (1.1601, −0.0451, 0.0319)  quat (0.0048, 1.0, −0.0022, −0.0032)
+rotated(插入姿态) (1.1601, −0.0451, 0.0319)  quat (0.0046, 0.9965, −0.0026, 0.0839)
+pre_insert        (1.1016, −0.0430, 0.3770)  quat 同上
+```
