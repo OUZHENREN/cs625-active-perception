@@ -386,11 +386,19 @@ def load_observation_baselines() -> dict:
     return result
 
 
-def trigger_once(command: str, timeout: float) -> bool:
-    """One trigger with a hard per-trigger timeout; True when 3 frames agree."""
+def trigger_once(command: str, timeout: float, min_frames: int = 1) -> bool:
+    """ONE trigger with a hard timeout; True when a plausible answer came back.
+
+    min_frames defaults to 1 on purpose (2026-11-04 bug): the coarse trigger
+    answers with a VIEW pose (S2), which only has to decide where the camera
+    stands next -- it is not a millimetre-critical object pose.  The earlier
+    version demanded three frames while allowing a single attempt, so it could
+    never succeed and the failover kept walking the arm to the other baseline
+    even though RVS had answered correctly.
+    """
     code, text = run([sys.executable, "-u", str(RVS_CLIENT), command,
                       "--timeout", str(timeout),
-                      "--min-frames", "3", "--max-attempts", "1"],
+                      "--min-frames", str(min_frames), "--max-attempts", "1"],
                      timeout=timeout + 120.0)
     answer = [line for line in text.splitlines() if line.startswith("answer:")]
     for line in answer:

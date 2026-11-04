@@ -46,6 +46,11 @@ PROVEN_POSTURES = {
     "pre_grasp":    [37.1, -120.3, -107.2, -42.4, 90.8, 32.6],
     "grasp":        [43.0, -123.0, -101.7, -45.0, 90.7, 38.4],
     "baseline":     [6.8, -87.9, -91.9, -50.5, 94.4, 91.2],
+    # Slot coarse-observation configuration verified 2026-11-03.  Without it the
+    # pose solves to the flipped-elbow branch (elbow +111 instead of -111) and the
+    # wrap guard refuses the 230 deg travel (hit on 2026-11-04 with baseline A as
+    # the seed).
+    "slot_coarse":  [-21.1, -72.7, -111.0, -37.5, 128.5, 62.7],
     # Coarse-observation baselines found by the 2026-11-03 geometry search.  They
     # double as IK seeds: solving these poses from other seeds converges to a
     # forearm<->tool0 collision, so the proven configuration must be available.
