@@ -82,7 +82,9 @@ SPEED = {
     "transit":    (0.013, 2.0, 0.0, 1.0),
     "staging":    (0.013, 2.0, 0.0, 1.0),
     "pre_insert": (0.012, 2.0, 0.4, 2.0),
-    "insert":     (0.005, 3.0, 0.0, 1.0),   # tight clearance: do not change
+    # Owner 2026-11-04: the slot clearance is only 1-2 mm, so the true insert segment
+    # runs at 0.002 m/s (2 mm/s) instead of 0.005.  Do not raise this without the owner.
+    "insert":     (0.002, 3.0, 0.0, 1.0),
     "straighten": (0.1, 1.0, 0.0, 1.0),     # owner: 0.1 is allowed here
     "withdraw":   (0.012, 2.0, 0.0, 1.0),
     "baseline":   (0.08, 1.0, 0.0, 1.0),

@@ -198,7 +198,7 @@ class Monitor(Node):
 
 def plan_insert(target_xyz, target_quat) -> tuple[int, str]:
     return run([str(PLAN_LOCKED), *[f"{v:.6f}" for v in (*target_xyz, *target_quat)],
-                "--velocity", "0.005", "--goal-tol", "0.0003",
+                "--velocity", str(args.velocity), "--goal-tol", "0.0003",
                 "--output", "/tmp/compliant_insert_plan.json"], timeout=300.0)
 
 
@@ -230,7 +230,7 @@ def retreat_along_tool(retreat_mm: float, monitor: Monitor) -> bool:
     print(f"   [retreat] moving {retreat_mm} mm back along the tool axis to "
           f"{np.round(target, 4).tolist()}")
     code, text = run([str(PLAN_LOCKED), *[f"{v:.6f}" for v in (*target, *quat)],
-                      "--velocity", "0.005", "--goal-tol", "0.004",
+                      "--velocity", str(args.velocity), "--goal-tol", "0.004",
                       "--output", "/tmp/compliant_retreat.json"], timeout=300.0)
     if code != 0:
         print("   [retreat] plan refused; the arm stays put (owner intervention)")
@@ -248,6 +248,10 @@ def main() -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("target", nargs=7, type=float, metavar=("X", "Y", "Z", "QX", "QY", "QZ", "QW"))
     parser.add_argument("--segments", type=int, default=6)
+    parser.add_argument("--velocity", type=float, default=0.002,
+                        help="planning velocity scaling for the insert move; owner lowered "
+                             "it from 0.005 to 0.002 m/s (2 mm/s) on 2026-11-04 because the "
+                             "slot clearance is only 1-2 mm")
     parser.add_argument("--tol-mm", type=float, default=3.0)
     parser.add_argument("--contact", type=float, default=0.68,
                         help="contact MARGIN over the seeded baseline (sum |effort|)")
