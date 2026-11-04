@@ -102,6 +102,9 @@ class Monitor(Node):
         self.tripped: str | None = None
         self.bad_samples = 0
         self.last_log = 0.0
+        self.last_csv = 0.0
+        self.csv_rows: list[tuple] = []
+        self.csv_start = time.time()
         self.create_subscription(JointState, "/joint_states", self._on_state, 10)
         self.create_subscription(PoseStamped, "/tcp_pose_broadcaster/pose",
                                  self._on_tcp, 10)
@@ -153,7 +156,14 @@ class Monitor(Node):
         self.slow += 0.01 * (x - self.slow)
         self.fast += 0.2 * (x - self.fast)
         now = time.time()
-        if now - self.last_log > 5.0:
+        # Detection runs at MONITOR_HZ (100 Hz); only the CONSOLE is throttled.  The CSV
+        # gets ~10 Hz rows so the torque curve is usable for analysis (owner, 2026-11-04:
+        # "isn't my torque detection 100 Hz?").
+        if now - self.last_csv > 0.1:
+            self.last_csv = now
+            self.csv_rows.append((round(now - self.csv_start, 3), round(self.fast, 4),
+                                  round(self.slow, 4), round(self.fast - self.slow, 4)))
+        if now - self.last_log > 1.0:
             self.last_log = now
             print(f"   [effort] fast={self.fast:7.3f} slow={self.slow:7.3f} "
                   f"residual={self.fast - self.slow:+6.3f} "
@@ -200,6 +210,22 @@ class Monitor(Node):
             return None
         mean = np.array(rows).mean(axis=0)
         return mean[:3], mean[3:]
+
+
+def write_effort_csv(monitor: "Monitor", path: pathlib.Path = pathlib.Path(
+        "/tmp/compliant_insert_effort.csv")) -> None:
+    """Dump the high-rate effort curve collected during the run."""
+    if not monitor.csv_rows:
+        print("   [effort] no samples collected")
+        return
+    with path.open("w", encoding="utf-8") as handle:
+        handle.write("t,fast,slow,residual\n")
+        for row in monitor.csv_rows:
+            handle.write(",".join(str(v) for v in row) + "\n")
+    peak = max(row[3] for row in monitor.csv_rows)
+    trough = min(row[3] for row in monitor.csv_rows)
+    print(f"   [effort] {len(monitor.csv_rows)} samples ({0.1:.1f} Hz) -> {path}")
+    print(f"   [effort] residual range {trough:+.3f} .. {peak:+.3f}")
 
 
 def plan_insert(target_xyz, target_quat, velocity: float) -> tuple[int, str]:
@@ -338,6 +364,7 @@ def main() -> int:
             # the trajectory and stops; where the arm goes next is the operator's
             # decision, not a scripted withdrawal.  (retreat_along_tool() is kept in the
             # file for manual use but is never called from here.)
+            write_effort_csv(monitor)
             result = 3
             break
         if not ok:
@@ -364,6 +391,7 @@ def main() -> int:
             time_scale = min(time_scale * 2.0, 8.0)
             print(f"   contact detected during segment; next time_scale={time_scale}")
     if result:
+        write_effort_csv(monitor)     # also on an executed-stop path
         monitor.destroy_node()
         rclpy.shutdown()
         return result
@@ -379,6 +407,7 @@ def main() -> int:
                          * R.from_quat(target_quat)).magnitude() * 180 / np.pi)
         print(f"final TCP err {pos_err:.2f} mm / {rot_err:.2f} deg (tol {args.tol_mm} mm)")
         result = 0 if pos_err <= args.tol_mm else 1
+    write_effort_csv(monitor)         # dump the curve on success too
     monitor.destroy_node()
     rclpy.shutdown()
     print("INSERT_DONE" if result == 0 else f"INSERT_INCOMPLETE (code {result})")
