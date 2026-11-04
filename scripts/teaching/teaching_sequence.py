@@ -1011,103 +1011,112 @@ def main() -> int:
         # negative control refused).  The workpiece region is subtracted at the
         # current S3; the carried part after the grasp is guarded by the offline
         # carried-box gate on transit/staging until the attach 专项 lands.
-    print("\n[4b] apply the environment collision scene")
-    env_cmd = [sys.executable, "-u",
-               str(REPO / "scripts" / "apply_environment_collision.py"),
-               "--workpiece-xyz", *[f"{v:.4f}" for v in box["position"]],
-               "--workpiece-quat", *[f"{v:.4f}" for v in box["orientation"]]]
-    code, text = run(env_cmd, timeout=120.0)
-    for line in text.splitlines():
-        print("   ", line)
-    if code != 0:
-        print("   WARN: scene apply failed; falling back to the empty scene "
-              "(offline envelope gates still guard every descent)")
-        code2, text2 = run([sys.executable, "-u",
-                            str(REPO / "scripts" / "apply_environment_collision.py"),
-                            "--remove"], timeout=120.0)
-        for line in text2.splitlines():
+    if args.start_from <= 5:
+        print("\n[4b] apply the environment collision scene")
+        env_cmd = [sys.executable, "-u",
+                   str(REPO / "scripts" / "apply_environment_collision.py"),
+                   "--workpiece-xyz", *[f"{v:.4f}" for v in box["position"]],
+                   "--workpiece-quat", *[f"{v:.4f}" for v in box["orientation"]]]
+        code, text = run(env_cmd, timeout=120.0)
+        for line in text.splitlines():
             print("   ", line)
-        if code2 != 0:
-            print("   WARN: could not clear the scene either; check MoveIt before moving")
+        if code != 0:
+            print("   WARN: scene apply failed; falling back to the empty scene "
+                  "(offline envelope gates still guard every descent)")
+            code2, text2 = run([sys.executable, "-u",
+                                str(REPO / "scripts" / "apply_environment_collision.py"),
+                                "--remove"], timeout=120.0)
+            for line in text2.splitlines():
+                print("   ", line)
+            if code2 != 0:
+                print("   WARN: could not clear the scene either; check MoveIt before moving")
 
-    # Approach from ABOVE (owner 2026-11-03): pose_math still returns the senior's
-    # horizontal pre-grasp, which is kept for the record only -- the move below uses
-    # the vertical approach.
-    pre_grasp_pose = ([grasp_pose[0][0], grasp_pose[0][1],
-                       grasp_pose[0][2] + APPROACH_HEIGHT_M], grasp_pose[1])
-    print(f"\n[5] pre-grasp: {APPROACH_HEIGHT_M * 1000:.0f} mm above the grasp pose "
-          f"{[round(v, 4) for v in pre_grasp_pose[0]]}")
-    # Tight joint tolerance: the default 0.008 rad is ~6 mm at the 353 mm lever and
-    # the 5b gate is 1.5 mm, so the move itself has to be tighter than the gate
-    # (measured 2026-11-04: default tolerance reached the pose 6.9 mm off and the
-    # gate then aborted a perfectly good approach).
-    if not move("pre_grasp", *pre_grasp_pose, "pre-grasp", goal_tol=0.0005):
-        return 2
-    # Gate calibrated 2026-11-03: IK is exact (residual 0.003 mm), so the floor is
-    # the controller's joint tracking error (~0.0005-0.0008 rad under load, which
-    # is 0.5-1.0 mm at the 353 mm lever).  0.5 mm was unreachable and the loop
-    # oscillated; 1.5 mm still catches the real hazard (a 12 deg roll was 12 mm of
-    # pad displacement) with margin.
-    print("\n[5b] gate: TCP vs pre_grasp (1.5 mm / 0.40 deg), corrected if needed")
-    if not verify_and_correct("pre_grasp", *pre_grasp_pose,
-                              pos_tol_mm=1.5, rot_tol_deg=0.40):
-        print("   gate FAILED: aborting before entering the grasp area")
-        return 7
+        # Approach from ABOVE (owner 2026-11-03): pose_math still returns the senior's
+        # horizontal pre-grasp, which is kept for the record only -- the move below uses
+        # the vertical approach.
+        pre_grasp_pose = ([grasp_pose[0][0], grasp_pose[0][1],
+                           grasp_pose[0][2] + APPROACH_HEIGHT_M], grasp_pose[1])
+        print(f"\n[5] pre-grasp: {APPROACH_HEIGHT_M * 1000:.0f} mm above the grasp pose "
+              f"{[round(v, 4) for v in pre_grasp_pose[0]]}")
+        # Tight joint tolerance: the default 0.008 rad is ~6 mm at the 353 mm lever and
+        # the 5b gate is 1.5 mm, so the move itself has to be tighter than the gate
+        # (measured 2026-11-04: default tolerance reached the pose 6.9 mm off and the
+        # gate then aborted a perfectly good approach).
+        if not move("pre_grasp", *pre_grasp_pose, "pre-grasp", goal_tol=0.0005):
+            return 2
+        # Gate calibrated 2026-11-03: IK is exact (residual 0.003 mm), so the floor is
+        # the controller's joint tracking error (~0.0005-0.0008 rad under load, which
+        # is 0.5-1.0 mm at the 353 mm lever).  0.5 mm was unreachable and the loop
+        # oscillated; 1.5 mm still catches the real hazard (a 12 deg roll was 12 mm of
+        # pad displacement) with margin.
+        print("\n[5b] gate: TCP vs pre_grasp (1.5 mm / 0.40 deg), corrected if needed")
+        if not verify_and_correct("pre_grasp", *pre_grasp_pose,
+                                  pos_tol_mm=1.5, rot_tol_deg=0.40):
+            print("   gate FAILED: aborting before entering the grasp area")
+            return 7
 
-    print("\n[6] init + enter grasp (jaws closed)")
-    state = gripper("init")
-    print(f"   gripper after init: {state}")
-    if not move("grasp", *grasp_pose, "enter grasp", goal_tol=0.0004):
-        return 2
-    print("\n[6b] gate: TCP vs grasp (1.5 mm / 0.40 deg), corrected if needed")
-    if not verify_and_correct("grasp", *grasp_pose,
-                              pos_tol_mm=1.5, rot_tol_deg=0.40):
-        print("   gate FAILED: aborting before opening the jaws")
-        return 7
+        print("\n[6] init + enter grasp (jaws closed)")
+        state = gripper("init")
+        print(f"   gripper after init: {state}")
+        if not move("grasp", *grasp_pose, "enter grasp", goal_tol=0.0004):
+            return 2
+        print("\n[6b] gate: TCP vs grasp (1.5 mm / 0.40 deg), corrected if needed")
+        if not verify_and_correct("grasp", *grasp_pose,
+                                  pos_tol_mm=1.5, rot_tol_deg=0.40):
+            print("   gate FAILED: aborting before opening the jaws")
+            return 7
 
-    print("\n[7] open to grip width")
-    print(f"   {gripper('grip')}")
-    if not grip_still_holding():
-        print("   jaws did not reach the grip width; aborting before the lift")
-        return 6
+        print("\n[7] open to grip width")
+        print(f"   {gripper('grip')}")
+        if not grip_still_holding():
+            print("   jaws did not reach the grip width; aborting before the lift")
+            return 6
 
-    # 专项 2 (2026-11-02): attach the carried workpiece so MoveIt checks it
-    # against the environment scene during lift/transit/staging.  On failure the
-    # offline carried-box gates still guard the transport.
-    print("\n[7b] attach the carried workpiece in the planning scene")
-    code, text = run([sys.executable, "-u",
-                      str(REPO / "scripts" / "attach_workpiece.py"),
-                      "--attach"], timeout=120.0)
-    for line in text.splitlines():
-        print("   ", line)
-    if code != 0:
-        print("   WARN: attach failed; offline carried-box gates still guard "
-              "lift/transit/staging")
+        # 专项 2 (2026-11-02): attach the carried workpiece so MoveIt checks it
+        # against the environment scene during lift/transit/staging.  On failure the
+        # offline carried-box gates still guard the transport.
+        print("\n[7b] attach the carried workpiece in the planning scene")
+        code, text = run([sys.executable, "-u",
+                          str(REPO / "scripts" / "attach_workpiece.py"),
+                          "--attach"], timeout=120.0)
+        for line in text.splitlines():
+            print("   ", line)
+        if code != 0:
+            print("   WARN: attach failed; offline carried-box gates still guard "
+                  "lift/transit/staging")
 
-    # The environment voxels exist to keep the GRASP APPROACH honest.  Once the part
-    # is attached they also collide with the carried box, and no path exists to lift
-    # it clear (measured 2026-11-04: every IK seed sane, planning returned 99999).
-    # So the scene is removed here; the carried-box envelope gate keeps guarding
-    # transit/staging offline.
-    print("\n[7c] clear the environment scene (the carried part needs a free path)")
-    code, text = run([sys.executable, "-u",
-                      str(REPO / "scripts" / "apply_environment_collision.py"),
-                      "--remove"], timeout=180.0)
-    for line in text.splitlines():
-        print("   ", line)
-    if code != 0:
-        print("   WARN: could not clear the scene; the lift may refuse to plan")
+        # The environment voxels exist to keep the GRASP APPROACH honest.  Once the part
+        # is attached they also collide with the carried box, and no path exists to lift
+        # it clear (measured 2026-11-04: every IK seed sane, planning returned 99999).
+        # So the scene is removed here; the carried-box envelope gate keeps guarding
+        # transit/staging offline.
+        print("\n[7c] clear the environment scene (the carried part needs a free path)")
+        code, text = run([sys.executable, "-u",
+                          str(REPO / "scripts" / "apply_environment_collision.py"),
+                          "--remove"], timeout=180.0)
+        for line in text.splitlines():
+            print("   ", line)
+        if code != 0:
+            print("   WARN: could not clear the scene; the lift may refuse to plan")
 
-    print("\n[8] lift 0.15 m")
-    lifted = [grasp_pose[0][0], grasp_pose[0][1], grasp_pose[0][2] + 0.15]
-    if not move("lift", lifted, grasp_pose[1], "lift"):
-        return 2
+        print("\n[8] lift 0.15 m")
+        lifted = [grasp_pose[0][0], grasp_pose[0][1], grasp_pose[0][2] + 0.15]
+        if not move("lift", lifted, grasp_pose[1], "lift"):
+            return 2
 
-    print("\n[9] raise to safe height")
-    raised = [lifted[0], lifted[1], SAFE_HEIGHT_Z]
-    if not move("lift", raised, grasp_pose[1], "raise to 0.53"):
-        return 2
+        print("\n[9] raise to safe height")
+        raised = [lifted[0], lifted[1], SAFE_HEIGHT_Z]
+        if not move("lift", raised, grasp_pose[1], "raise to 0.53"):
+            return 2
 
+    else:
+        print("\n[5-9] grasp sequence SKIPPED (resumed with the part already held)")
+    if args.start_from >= 10:
+        if not grip_still_holding():
+            print("\nREFUSED: --start-from 10 needs the workpiece in the gripper, "
+                  "but the grip check failed")
+            return 6
+        print(f"\n   [resume] part confirmed in the gripper before step 10")
     print("\n[10] transit")
     if not move("transit", POSE["transit"][0], grasp_pose[1], "transit"):
         return 2
@@ -1133,7 +1142,12 @@ def main() -> int:
     insert_flat_q = insert_flat[1]                  # straightened attitude
 
     start = args.start_from
-    if start >= 10:
+    if start <= 5 and grip_still_holding():
+        print("\nREFUSED: the workpiece is already gripped, but --start-from "
+              f"{start} would replay the grasp sequence.  Use --start-from 10 "
+              "(transit) to continue with the part in hand, or release it first.")
+        return 6
+    if start >= 13:
         print(f"\nRESUMING from step {start}: the part must already be gripped")
         if not grip_still_holding():
             print("   grip check FAILED (position_mm below the holding threshold); "
