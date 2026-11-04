@@ -154,7 +154,15 @@ def collision_violation(client, node, candidate: list[float]) -> str | None:
 
 
 
-def straight_line_plan(start, goal, duration: float = 4.0, samples: int = 24):
+# Nominal joint speed at 100 % velocity scaling, used to give the straight-line plan a
+# duration that HONOURS --velocity.  Without this the interpolation always took a fixed
+# 4 s, so a 445 mm insert descent executed at ~55 mm/s no matter what --velocity said
+# (owner, 2026-11-04: "the speed clearly exceeded the threshold, absolutely not allowed").
+NOMINAL_JOINT_SPEED = 2.0   # rad/s
+
+
+def straight_line_plan(start, goal, velocity: float = 0.05,
+                       samples: int = 24, min_duration: float = 2.0):
     """Linear joint-space interpolation between two близ configurations.
 
     Why (2026-11-04): for a short move (tens of degrees) OMPL sometimes returned a
@@ -166,6 +174,11 @@ def straight_line_plan(start, goal, duration: float = 4.0, samples: int = 24):
     import numpy as np
     start = np.asarray(start, dtype=float)
     goal = np.asarray(goal, dtype=float)
+    span = float(np.max(np.abs(goal - start)))
+    speed = max(float(velocity), 1e-6) * NOMINAL_JOINT_SPEED
+    duration = max(min_duration, span / speed)
+    print(f"  straight-line plan: span {np.degrees(span):.1f} deg, "
+          f"velocity {velocity:.3f} -> {speed:.4f} rad/s -> duration {duration:.1f} s")
     points = []
     for i in range(samples + 1):
         fraction = i / samples
@@ -276,7 +289,7 @@ def main() -> int:
         import numpy as _np
         span = float(_np.max(_np.abs(_np.asarray(goal_joints) - _np.asarray(seed))))
         if span <= _np.radians(100.0) and straight_line_ok(seed, goal_joints):
-            points = straight_line_plan(seed, goal_joints)
+            points = straight_line_plan(seed, goal_joints, velocity=args.velocity)
             class _Traj:
                 pass
             traj = _Traj()
@@ -416,6 +429,31 @@ def main() -> int:
     points = [{"q": list(p.positions),
                "t": p.time_from_start.sec + p.time_from_start.nanosec * 1e-9}
               for p in trajectory.points]
+
+    # SPEED CONTRACT GATE (owner, 2026-11-04: "the speed clearly exceeded the threshold,
+    # absolutely not allowed").  A previous straight-line path ignored --velocity and
+    # executed a 445 mm insert descent at ~55 mm/s instead of 2 mm/s.  Every plan is now
+    # checked against the requested scaling before it is handed out, so any future path
+    # generator that forgets the velocity is refused here instead of on the robot.
+    if len(points) > 1:
+        allowed = args.velocity * NOMINAL_JOINT_SPEED * 1.5
+        worst_speed = 0.0
+        worst_joint = 0
+        for index in range(1, len(points)):
+            dt = points[index]["t"] - points[index - 1]["t"]
+            if dt <= 1e-6:
+                continue
+            dq = np.abs(np.array(points[index]["q"]) - np.array(points[index - 1]["q"]))
+            speed = float(np.max(dq)) / dt
+            if speed > worst_speed:
+                worst_speed, worst_joint = speed, int(np.argmax(dq))
+        if worst_speed > allowed:
+            print(f"SPEED_VIOLATION: {ORDER[worst_joint]} would move at "
+                  f"{worst_speed:.4f} rad/s but --velocity {args.velocity:.3f} allows "
+                  f"{allowed:.4f} rad/s; refusing to hand out this plan")
+            return 1
+        print(f"speed check: worst {worst_speed:.4f} rad/s <= allowed {allowed:.4f}")
+
     json.dump({"joint_names": list(trajectory.joint_names), "points": points},
               open(args.output, "w"))
     print("duration:", round(points[-1]["t"], 2),
