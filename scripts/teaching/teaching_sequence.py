@@ -709,17 +709,11 @@ def resolve_slot_ambiguity(slot_xyz, slot_quat):
 def slot_pose_for_insert():
     """Insertion authority = TODAY's slot measurement (owner decision 2026-11-04).
 
-    The owner settled the disagreement between the senior calibration and the live RVS
-    measurement in favour of the MEASUREMENT (option A):
+    Insertion is driven ONLY by today's RVS slot measurement (owner, 2026-11-04).
+    The 2026-10-22 stored calibration is obsolete and is not consulted at all:
 
-        当前使用（师兄标定）  pre_insert (1.0996, -0.0125, 0.3773)
-        当天 R1 推出          pre_insert (1.1016, -0.0430, 0.3770)   <- 采用
-        横向分歧              30.5 mm
-
-    Reasons recorded by the owner: twice on 2026-11-04 the arm was observed to sit
-    3-5 cm to one side of the slot, which matches the live measurement and not the
-    calibration; and the collision on 2026-11-03 happened while a 74-hour-old R1 / the
-    calibration was driving the insert.
+        pre_insert comes from today's R1: (1.1016, -0.0430, 0.3770)
+        (the obsolete 2026-10-22 calibration would have given (1.0996, -0.0125, 0.3773))
 
     Consequence: a fresh R1 is now REQUIRED.  There is no fallback -- if no T1 capture
     within the freshness window exists, the chain refuses to compute an insert target
@@ -731,17 +725,7 @@ def slot_pose_for_insert():
         print("   [slot] NO FRESH R1: refusing to derive an insert target from stale "
               "data.  Re-run the slot fine observation (T1) first.")
         return None
-    print(f"   [slot] insertion uses TODAY's R1 ({r1['stamp']})")
-    try:
-        import yaml
-        import numpy as np
-        calibration = yaml.safe_load((REPO / "config" / "unload_real.yaml").read_text())
-        gap = float(np.linalg.norm(np.array(r1["position"])
-                                   - np.array(calibration["slot_origin"])) * 1000.0)
-        print(f"   [slot] today's R1 sits {gap:.1f} mm from the stored calibration "
-              "(recorded; the measurement wins)")
-    except Exception:
-        pass
+    print(f"   [slot] insertion uses TODAY's R1 ({r1['stamp']}); no other source")
     return ([float(v) for v in r1["position"]],
             [float(v) for v in r1["orientation"]],
             "today's R1")
@@ -1202,16 +1186,6 @@ def main() -> int:
     # a lateral disagreement beyond SLOT_AGREEMENT_MM means one of the two is wrong
     # and the insert must not start.
     SLOT_AGREEMENT_MM = 10.0
-    import numpy as _np
-    import yaml as _yaml
-    calibration = _yaml.safe_load((REPO / "config" / "unload_real.yaml").read_text())
-    ref_flat, _, ref_pre = insert_from_slot(list(calibration["slot_origin"]),
-                                            list(calibration["slot_origin_q"]))
-    gap = float(_np.linalg.norm(_np.array(ref_pre[0]) - _np.array(pre_insert_xyz)) * 1000.0)
-    print(f"\n   [target check] pre_insert in use  {[round(v, 4) for v in pre_insert_xyz]}")
-    print(f"   [target check] senior calibration {[round(v, 4) for v in ref_pre[0]]}")
-    print(f"   [target check] they differ by {gap:.1f} mm (recorded; the measurement wins)")
-
     if args.start_from < 13:
         print("\n[13] descend vertically to the pre-insert height")
     if not move("pre_insert", pre_insert_xyz, pre_insert_q, "descend only",
