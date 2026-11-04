@@ -65,8 +65,12 @@ from pose_math import grasp_from_box, insert_from_slot  # noqa: E402
 
 # --- speeds: (velocity, time_scale, tail_fraction, tail_scale) ------------------
 SPEED = {
-    "pre_grasp":  (0.02, 1.0, 0.0, 1.0),
-    "grasp":      (0.01, 1.5, 0.2, 2.0),
+    # Owner, repeated: the approach to the workpiece must be slow.  These were
+    # 0.02 / 0.01 with time_scale 1.0 / 1.5, which the owner judged "too fast near
+    # the part".  Halved again on 2026-11-04 and the tail is stretched as well, so
+    # the last 20 % of the approach runs at a fifth of the cruise speed.
+    "pre_grasp":  (0.008, 2.0, 0.2, 3.0),
+    "grasp":      (0.004, 2.5, 0.3, 3.0),
     "lift":       (0.03, 1.5, 0.0, 1.0),
     "transit":    (0.08, 1.0, 0.0, 1.0),
     "staging":    (0.05, 1.5, 0.0, 1.0),
@@ -282,6 +286,40 @@ def grip_still_holding(min_open_mm: float = 40.0) -> bool:
     print(f"   gripper hold: position={position} mm (need >= {min_open_mm}) -> "
           f"{'HELD' if held else 'NOT HELD'}")
     return held
+
+
+
+def verify_and_correct(label: str, xyz, quat, pos_tol_mm: float,
+                       rot_tol_deg: float, rounds: int = 3) -> bool:
+    """Gate the pose, and CORRECT it iteratively when the gate fails.
+
+    Owner requirement (raised repeatedly, finally implemented 2026-11-04): a
+    grasp-critical pose must be verified, not merely commanded.  A joint-space plan
+    stops inside its joint tolerance, which at the 353 mm lever can be several
+    millimetres of TCP error; the gate then rejects the pose and the run aborts even
+    though a small correction would have made it exact.
+
+    So: verify -> if out of tolerance, run scripts/teaching/adjust_tcp.py (IK + plan +
+    segmented slow execution, closed loop) -> verify again, up to `rounds` times.
+    """
+    for attempt in range(1, rounds + 1):
+        print(f"   [{label}] gate check {attempt}/{rounds}")
+        if verify_pose_gate(xyz, quat, pos_tol_mm=pos_tol_mm, rot_tol_deg=rot_tol_deg):
+            return True
+        if attempt == rounds:
+            break
+        print(f"   [{label}] out of tolerance; correcting the TCP pose")
+        code, text = run([sys.executable, "-u",
+                          str(REPO / "scripts" / "teaching" / "adjust_tcp.py"),
+                          *[f"{v:.6f}" for v in (*xyz, *quat)],
+                          "--pos-tol-mm", str(pos_tol_mm),
+                          "--rot-tol-deg", str(rot_tol_deg),
+                          "--iterations", "2", "--boost", "0.6"], timeout=900.0)
+        for line in text.splitlines()[-4:]:
+            print("     ", line)
+        if code != 0 and "TCP_GATE_OK" not in text:
+            print(f"   [{label}] correction did not converge; re-checking once more")
+    return False
 
 
 def verify_pose_gate(xyz, quat, pos_tol_mm: float = 1.0,
@@ -979,8 +1017,9 @@ def main() -> int:
     # is 0.5-1.0 mm at the 353 mm lever).  0.5 mm was unreachable and the loop
     # oscillated; 1.5 mm still catches the real hazard (a 12 deg roll was 12 mm of
     # pad displacement) with margin.
-    print("\n[5b] gate: TCP vs pre_grasp (1.5 mm / 0.40 deg)")
-    if not verify_pose_gate(*pre_grasp_pose, pos_tol_mm=1.5, rot_tol_deg=0.40):
+    print("\n[5b] gate: TCP vs pre_grasp (1.5 mm / 0.40 deg), corrected if needed")
+    if not verify_and_correct("pre_grasp", *pre_grasp_pose,
+                              pos_tol_mm=1.5, rot_tol_deg=0.40):
         print("   gate FAILED: aborting before entering the grasp area")
         return 7
 
@@ -989,8 +1028,9 @@ def main() -> int:
     print(f"   gripper after init: {state}")
     if not move("grasp", *grasp_pose, "enter grasp", goal_tol=0.0004):
         return 2
-    print("\n[6b] gate: TCP vs grasp (1.5 mm / 0.40 deg)")
-    if not verify_pose_gate(*grasp_pose, pos_tol_mm=1.5, rot_tol_deg=0.40):
+    print("\n[6b] gate: TCP vs grasp (1.5 mm / 0.40 deg), corrected if needed")
+    if not verify_and_correct("grasp", *grasp_pose,
+                              pos_tol_mm=1.5, rot_tol_deg=0.40):
         print("   gate FAILED: aborting before opening the jaws")
         return 7
 
