@@ -196,9 +196,9 @@ class Monitor(Node):
         return mean[:3], mean[3:]
 
 
-def plan_insert(target_xyz, target_quat) -> tuple[int, str]:
+def plan_insert(target_xyz, target_quat, velocity: float) -> tuple[int, str]:
     return run([str(PLAN_LOCKED), *[f"{v:.6f}" for v in (*target_xyz, *target_quat)],
-                "--velocity", str(args.velocity), "--goal-tol", "0.0003",
+                "--velocity", str(velocity), "--goal-tol", "0.0003",
                 "--output", "/tmp/compliant_insert_plan.json"], timeout=300.0)
 
 
@@ -219,7 +219,7 @@ def segment_plan(plan_path: pathlib.Path, segments: int,
     return paths
 
 
-def retreat_along_tool(retreat_mm: float, monitor: Monitor) -> bool:
+def retreat_along_tool(retreat_mm: float, monitor: Monitor, velocity: float) -> bool:
     measured = monitor.mean_tcp()
     if measured is None:
         print("   [retreat] cannot read the TCP; leaving the arm where it is")
@@ -230,7 +230,7 @@ def retreat_along_tool(retreat_mm: float, monitor: Monitor) -> bool:
     print(f"   [retreat] moving {retreat_mm} mm back along the tool axis to "
           f"{np.round(target, 4).tolist()}")
     code, text = run([str(PLAN_LOCKED), *[f"{v:.6f}" for v in (*target, *quat)],
-                      "--velocity", str(args.velocity), "--goal-tol", "0.004",
+                      "--velocity", str(velocity), "--goal-tol", "0.004",
                       "--output", "/tmp/compliant_retreat.json"], timeout=300.0)
     if code != 0:
         print("   [retreat] plan refused; the arm stays put (owner intervention)")
@@ -268,7 +268,7 @@ def main() -> int:
           f"contact_margin={args.contact} safety_margin={args.safety} "
           f"tol={args.tol_mm} mm")
 
-    code, text = plan_insert(target_xyz, target_quat)
+    code, text = plan_insert(target_xyz, target_quat, args.velocity)
     if code != 0:
         for line in text.splitlines():
             print("   ", line)
@@ -318,7 +318,7 @@ def main() -> int:
         if safety_hit:
             monitor.cancel_goal()
             if not args.no_retreat:
-                retreat_along_tool(args.retreat_mm, monitor)
+                retreat_along_tool(args.retreat_mm, monitor, args.velocity)
             result = 3
             break
         if not ok:
