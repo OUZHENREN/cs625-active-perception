@@ -707,42 +707,44 @@ def resolve_slot_ambiguity(slot_xyz, slot_quat):
 
 
 def slot_pose_for_insert():
-    """Insertion authority = the senior's proven values (owner ruling 2026-11-03).
+    """Insertion authority = TODAY's slot measurement (owner decision 2026-11-04).
 
-    Decision (owner, 2026-11-03 after the fixture collisions): today's RVS slot
-    match (R1) is NOT trusted for insertion -- four sources disagree by 35-50 mm:
+    The owner settled the disagreement between the senior calibration and the live RVS
+    measurement in favour of the MEASUREMENT (option A):
 
-        来源                     槽心 y (mm)   派生的 insert y (mm)
-        config/unload_real.yaml  181.7         -13.2      <- 师兄标定（权威）
-        2026-10-30 R1            192.7 / 196.0  -9.4 / -3.5
-        2026-11-03 R1            143.0 / 148.3  -50.6 / -45.2   <- 当天实测，判为不可用
-        六模式插入常量            --            -13.2      <- 10-27 程序用值
+        当前使用（师兄标定）  pre_insert (1.0996, -0.0125, 0.3773)
+        当天 R1 推出          pre_insert (1.1016, -0.0430, 0.3770)   <- 采用
+        横向分歧              30.5 mm
 
-    The senior's calibration and the six-mode constants agree (both give insert
-    y = -13.2 mm); today's R1 is 35-50 mm away from them and produced a 36 mm
-    lateral error that collided with the fixture.  So insertion is driven by the
-    senior's calibration, and R1 is only logged for the record.
+    Reasons recorded by the owner: twice on 2026-11-04 the arm was observed to sit
+    3-5 cm to one side of the slot, which matches the live measurement and not the
+    calibration; and the collision on 2026-11-03 happened while a 74-hour-old R1 / the
+    calibration was driving the insert.
 
-    Why the two groups disagree (RVS bias vs the fixture having moved) is NOT
-    settled; the owner decided today's insertion data is unusable and the senior's
-    values stand until a touch-probe measurement settles it.
+    Consequence: a fresh R1 is now REQUIRED.  There is no fallback -- if no T1 capture
+    within the freshness window exists, the chain refuses to compute an insert target
+    instead of silently substituting an old value (that is what caused the 2026-11-03
+    collision).
     """
-    import numpy as np
-    import yaml
-    calibration = yaml.safe_load((REPO / "config" / "unload_real.yaml").read_text())
-    position = [float(v) for v in calibration["slot_origin"]]
-    quat = [float(v) for v in calibration["slot_origin_q"]]
-    print(f"   [slot] insertion uses the SENIOR calibration "
-          f"({position[0]:.3f}, {position[1]:.3f}, {position[2]:.3f})")
     r1 = latest_capture("T1")
-    if r1 is not None:
-        gap = float(np.linalg.norm(np.array(r1["position"]) - np.array(position)) * 1000.0)
-        print(f"   [slot] live R1 sits {gap:.1f} mm away from it -- recorded, NOT used "
-              "(today's R1 is judged unusable; see the work log)")
-    else:
-        print("   [slot] no fresh R1 on disk (fine: insertion no longer consumes it)")
-    return position, quat, "senior calibration"
-
+    if r1 is None:
+        print("   [slot] NO FRESH R1: refusing to derive an insert target from stale "
+              "data.  Re-run the slot fine observation (T1) first.")
+        return None
+    print(f"   [slot] insertion uses TODAY's R1 ({r1['stamp']})")
+    try:
+        import yaml
+        import numpy as np
+        calibration = yaml.safe_load((REPO / "config" / "unload_real.yaml").read_text())
+        gap = float(np.linalg.norm(np.array(r1["position"])
+                                   - np.array(calibration["slot_origin"])) * 1000.0)
+        print(f"   [slot] today's R1 sits {gap:.1f} mm from the stored calibration "
+              "(recorded; the measurement wins)")
+    except Exception:
+        pass
+    return ([float(v) for v in r1["position"]],
+            [float(v) for v in r1["orientation"]],
+            "today's R1")
 
 
 def taught_view_pose(name: str):
@@ -1126,7 +1128,10 @@ def main() -> int:
     # fine slot match carries a stance-dependent bias of tens of mm (36 mm on
     # 2026-11-03), which is far too coarse for a 1 mm-clearance insertion; the
     # calibrated pose agrees with the proven six-mode constants to 2 mm.
-    slot_xyz, slot_quat, slot_source = slot_pose_for_insert()
+    slot_result = slot_pose_for_insert()
+    if slot_result is None:
+        return 6
+    slot_xyz, slot_quat, slot_source = slot_result
     insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(slot_xyz, slot_quat)
     print(f"\n   insert chain from {slot_source}:")
     print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
@@ -1186,24 +1191,15 @@ def main() -> int:
     # a lateral disagreement beyond SLOT_AGREEMENT_MM means one of the two is wrong
     # and the insert must not start.
     SLOT_AGREEMENT_MM = 10.0
-    fresh = latest_capture("T1")
-    if fresh is not None:
-        today_flat, _, today_pre = insert_from_slot(fresh["position"],
-                                                    fresh["orientation"])
-        import numpy as _np
-        gap = float(_np.linalg.norm(_np.array(today_pre[0]) - _np.array(pre_insert_xyz)) * 1000.0)
-        print(f"\n   [target check] pre_insert used   {[round(v, 4) for v in pre_insert_xyz]}")
-        print(f"   [target check] from today's R1   {[round(v, 4) for v in today_pre[0]]}")
-        print(f"   [target check] lateral disagreement {gap:.1f} mm "
-              f"(limit {SLOT_AGREEMENT_MM:.0f} mm)")
-        if gap > SLOT_AGREEMENT_MM:
-            print("   TARGET SUSPECT: the pose this chain is about to insert into does "
-                  "NOT agree with today's slot measurement.\n"
-                  "   Refusing to descend.  Either re-measure the slot (touch probe) or "
-                  "decide which source is authoritative; do not insert blindly.")
-            return 6
-    else:
-        print("   [target check] no fresh R1 on disk; cannot cross-check the target")
+    import numpy as _np
+    import yaml as _yaml
+    calibration = _yaml.safe_load((REPO / "config" / "unload_real.yaml").read_text())
+    ref_flat, _, ref_pre = insert_from_slot(list(calibration["slot_origin"]),
+                                            list(calibration["slot_origin_q"]))
+    gap = float(_np.linalg.norm(_np.array(ref_pre[0]) - _np.array(pre_insert_xyz)) * 1000.0)
+    print(f"\n   [target check] pre_insert in use  {[round(v, 4) for v in pre_insert_xyz]}")
+    print(f"   [target check] senior calibration {[round(v, 4) for v in ref_pre[0]]}")
+    print(f"   [target check] they differ by {gap:.1f} mm (recorded; the measurement wins)")
 
     if args.start_from < 13:
         print("\n[13] descend vertically to the pre-insert height")
