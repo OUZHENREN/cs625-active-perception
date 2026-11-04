@@ -727,6 +727,12 @@ def main() -> int:
     parser.add_argument("--allow-release", action="store_true",
                         help="owner approval for opening the jaws (step 16)")
     parser.add_argument("--skip-env", action="store_true")
+    parser.add_argument("--start-from", type=int, default=1, choices=[1, 3, 5],
+                        help="resume instead of redoing the whole chain: "
+                             "1 = full run, 3 = start at the workpiece coarse "
+                             "observation, 5 = start at the pre-grasp approach "
+                             "(reuses the newest T3 capture).  Steps after the grasp "
+                             "need the part already held, so they are not offered.")
     parser.add_argument("--skip-observe", action="store_true",
                         help="skip the observation prefix (steps 0-4) and reuse saved captures")
     args = parser.parse_args()
@@ -768,110 +774,116 @@ def main() -> int:
                 print("   [0] WARN: environment model failed; this chain does "
                       "not consume it, but the six-mode gate would reject it")
 
-        print("\n[1] slot coarse observation")
-        if not move("observe", *POSE["slot_coarse"], "slot_coarse"):
-            return 2
-        if not rvs("T0"):
-            return 3
+        start = args.start_from
+        if start > 1:
+            print(f"\nRESUMING from step {start}: earlier steps are skipped; "
+                  "their state is read back from the captures on disk")
+        if start <= 1:
+            print("\n[1] slot coarse observation")
+            if not move("observe", *POSE["slot_coarse"], "slot_coarse"):
+                return 2
+            if not rvs("T0"):
+                return 3
 
-        # T0 answers with S0 = the pose the FINE slot capture must be taken from.
-        # Standing on a fixed constant instead is what made T1 answer NG with
-        # 'NG,POSE,0,0,0,0,0' on 2026-10-30: RVS only matches from the pose it asks for.
-        slot_view = latest_capture("T0")
-        if slot_view is None:
-            print("missing T0 capture; cannot tell where RVS wants the fine slot view")
+            # T0 answers with S0 = the pose the FINE slot capture must be taken from.
+            # Standing on a fixed constant instead is what made T1 answer NG with
+            # 'NG,POSE,0,0,0,0,0' on 2026-10-30: RVS only matches from the pose it asks for.
+            slot_view = latest_capture("T0")
+            if slot_view is None:
+                print("missing T0 capture; cannot tell where RVS wants the fine slot view")
+                return 4
+            # 2026-11-03: the coarse match drifts 21-39 mm between sessions, and
+            # standing off the taught stance biases the fine match by the same
+            # amount (41 mm off taught -> R1 biased ~50 mm).  Refuse to build the
+            # fine-view stance on a drifted coarse match.
+            # WARN-only (2026-11-03 measurement): S0 drift does NOT predict the fine
+            # match.  Standing on the taught S0 (drift 0) gave R1 y=0.148, standing on
+            # today's S0 (drift 34.5) gave R1 y=0.143 -- nearly identical.  RVS's slot
+            # match is biased by tens of mm across sessions no matter where the camera
+            # stands, so refusing here only blocked a legitimate run.  Keep the number
+            # as evidence; the real protection is the fresh R1 + effort margin + 13b.
+            drift = view_drift_mm("S0", slot_view["position"], slot_view["orientation"])
+            if drift is not None and drift > 20.0:
+                print(f"   [view] NOTE: S0 drifts {drift:.1f} mm from the taught stance; "
+                      "recorded (does not predict the fine match -- see 2026-11-03 data)")
+            slot_tcp, slot_quat = view_pose_to_tcp(slot_view["position"],
+                                                   slot_view["orientation"])
+            print(f"\n[2] slot fine observation: RVS S0 (flange) "
+                  f"{[round(v, 4) for v in slot_view['position']]} "
+                  f"-> TCP {[round(v, 4) for v in slot_tcp]}")
+            if not move("observe", slot_tcp, slot_quat, "slot_fine"):
+                return 2
+            if not rvs("T1"):
+                return 3
+            check_slot_history()
+
+        if start <= 3:
+            baseline_used = observe_workpiece_coarse()
+            if baseline_used is None:
+                return 6          # both baselines NG -> pause, do not continue blindly
+
+            # Same contract for the workpiece: T2 answers with S2, the fine view pose.
+            box_view = latest_capture("T2")
+            if box_view is None:
+                print("missing T2 capture; cannot tell where RVS wants the fine box view")
+                return 4
+            # Same drift check as S0, but warn-only here: the workpiece side
+            # tolerated 21 mm on 2026-11-03 (S3 still came out 3 mm from 11-02).
+            view_drift_mm("S2", box_view["position"], box_view["orientation"])
+            box_tcp, box_quat = view_pose_to_tcp(box_view["position"],
+                                                 box_view["orientation"])
+            print(f"\n[4] workpiece fine observation: RVS S2 (flange) "
+                  f"{[round(v, 4) for v in box_view['position']]} "
+                  f"-> TCP {[round(v, 4) for v in box_tcp]}")
+            if not move("observe", box_tcp, box_quat, "workpiece_fine"):
+                # The requested stance may be unadoptable with the real tool (2026-11-03:
+                # the RVS fine-view pose folds the 294.6 mm gripper into the forearm by
+                # 8.1 mm) or stale (it aimed 22.7 deg off the part).  Ask the
+                # aim-based search for the nearest stance that still looks at the part.
+                aim = aim_target()
+                if aim is None:
+                    print("   no aim target (no fresh T3, no workpiece in the model); "
+                          "cannot substitute a viewing stance")
+                    return 2
+                print(f"   substituting a stance that aims at {[round(v, 4) for v in aim]}")
+                code, text = run([sys.executable, "-u",
+                                  str(REPO / "scripts" / "teaching" / "nearest_feasible_view.py"),
+                                  *[f"{v:.6f}" for v in (*box_view["position"], *box_view["orientation"])],
+                                  "--target", *[f"{v:.6f}" for v in aim],
+                                  "--json", "/tmp/teach_substitute_view.json"], timeout=600.0)
+                for line in text.splitlines():
+                    print("   ", line)
+                if code != 0:
+                    print("   no adoptable stance found; stopping")
+                    return 2
+                substitute = json.loads(pathlib.Path("/tmp/teach_substitute_view.json").read_text())
+                if not move("observe", substitute["xyz"], substitute["quat"],
+                            "workpiece_fine(substitute)"):
+                    return 2
+            if not rvs("T3"):
+                return 3
+
+        # grasp comes from the live S3 (the workpiece moves between runs; 2026-10-30:
+        # today's S3 is 170 mm from the 10-27 one in x/y, z within 0.4 mm).
+        # insert comes from the FIXED six-mode constants (owner, 2026-10-27: the slot
+        # does not move).  OPEN QUESTION: today's R1-derived insert is
+        # (1.1701, -0.0094, 0.0314) vs the constant (1.1574, -0.0132, 0.0321),
+        # 13 mm apart.  Not changed here; needs an owner decision.
+        box = latest_capture("T3")
+        if box is None:
+            print("missing T3 capture; run the observation steps or reuse a saved one")
             return 4
-        # 2026-11-03: the coarse match drifts 21-39 mm between sessions, and
-        # standing off the taught stance biases the fine match by the same
-        # amount (41 mm off taught -> R1 biased ~50 mm).  Refuse to build the
-        # fine-view stance on a drifted coarse match.
-        # WARN-only (2026-11-03 measurement): S0 drift does NOT predict the fine
-        # match.  Standing on the taught S0 (drift 0) gave R1 y=0.148, standing on
-        # today's S0 (drift 34.5) gave R1 y=0.143 -- nearly identical.  RVS's slot
-        # match is biased by tens of mm across sessions no matter where the camera
-        # stands, so refusing here only blocked a legitimate run.  Keep the number
-        # as evidence; the real protection is the fresh R1 + effort margin + 13b.
-        drift = view_drift_mm("S0", slot_view["position"], slot_view["orientation"])
-        if drift is not None and drift > 20.0:
-            print(f"   [view] NOTE: S0 drifts {drift:.1f} mm from the taught stance; "
-                  "recorded (does not predict the fine match -- see 2026-11-03 data)")
-        slot_tcp, slot_quat = view_pose_to_tcp(slot_view["position"],
-                                               slot_view["orientation"])
-        print(f"\n[2] slot fine observation: RVS S0 (flange) "
-              f"{[round(v, 4) for v in slot_view['position']]} "
-              f"-> TCP {[round(v, 4) for v in slot_tcp]}")
-        if not move("observe", slot_tcp, slot_quat, "slot_fine"):
-            return 2
-        if not rvs("T1"):
-            return 3
-        check_slot_history()
+        grasp_pose, pre_grasp_pose = grasp_from_box(box["position"], box["orientation"])
+        print(f"\n   grasp     {[round(v, 4) for v in grasp_pose[0]]}")
+        print(f"   pre_grasp {[round(v, 4) for v in pre_grasp_pose[0]]}")
 
-        baseline_used = observe_workpiece_coarse()
-        if baseline_used is None:
-            return 6          # both baselines NG -> pause, do not continue blindly
-
-        # Same contract for the workpiece: T2 answers with S2, the fine view pose.
-        box_view = latest_capture("T2")
-        if box_view is None:
-            print("missing T2 capture; cannot tell where RVS wants the fine box view")
-            return 4
-        # Same drift check as S0, but warn-only here: the workpiece side
-        # tolerated 21 mm on 2026-11-03 (S3 still came out 3 mm from 11-02).
-        view_drift_mm("S2", box_view["position"], box_view["orientation"])
-        box_tcp, box_quat = view_pose_to_tcp(box_view["position"],
-                                             box_view["orientation"])
-        print(f"\n[4] workpiece fine observation: RVS S2 (flange) "
-              f"{[round(v, 4) for v in box_view['position']]} "
-              f"-> TCP {[round(v, 4) for v in box_tcp]}")
-        if not move("observe", box_tcp, box_quat, "workpiece_fine"):
-            # The requested stance may be unadoptable with the real tool (2026-11-03:
-            # the RVS fine-view pose folds the 294.6 mm gripper into the forearm by
-            # 8.1 mm) or stale (it aimed 22.7 deg off the part).  Ask the
-            # aim-based search for the nearest stance that still looks at the part.
-            aim = aim_target()
-            if aim is None:
-                print("   no aim target (no fresh T3, no workpiece in the model); "
-                      "cannot substitute a viewing stance")
-                return 2
-            print(f"   substituting a stance that aims at {[round(v, 4) for v in aim]}")
-            code, text = run([sys.executable, "-u",
-                              str(REPO / "scripts" / "teaching" / "nearest_feasible_view.py"),
-                              *[f"{v:.6f}" for v in (*box_view["position"], *box_view["orientation"])],
-                              "--target", *[f"{v:.6f}" for v in aim],
-                              "--json", "/tmp/teach_substitute_view.json"], timeout=600.0)
-            for line in text.splitlines():
-                print("   ", line)
-            if code != 0:
-                print("   no adoptable stance found; stopping")
-                return 2
-            substitute = json.loads(pathlib.Path("/tmp/teach_substitute_view.json").read_text())
-            if not move("observe", substitute["xyz"], substitute["quat"],
-                        "workpiece_fine(substitute)"):
-                return 2
-        if not rvs("T3"):
-            return 3
-
-    # grasp comes from the live S3 (the workpiece moves between runs; 2026-10-30:
-    # today's S3 is 170 mm from the 10-27 one in x/y, z within 0.4 mm).
-    # insert comes from the FIXED six-mode constants (owner, 2026-10-27: the slot
-    # does not move).  OPEN QUESTION: today's R1-derived insert is
-    # (1.1701, -0.0094, 0.0314) vs the constant (1.1574, -0.0132, 0.0321),
-    # 13 mm apart.  Not changed here; needs an owner decision.
-    box = latest_capture("T3")
-    if box is None:
-        print("missing T3 capture; run the observation steps or reuse a saved one")
-        return 4
-    grasp_pose, pre_grasp_pose = grasp_from_box(box["position"], box["orientation"])
-    print(f"\n   grasp     {[round(v, 4) for v in grasp_pose[0]]}")
-    print(f"   pre_grasp {[round(v, 4) for v in pre_grasp_pose[0]]}")
-
-    # Environment collision scene (2026-11-02 专项, FULL enablement): with the
-    # real-cell description (measured camera + SolidWorks tool, no 77 mm finger
-    # collisions), the grasp/lift plans succeed WITH the table voxels in the
-    # scene (acceptance 2026-11-02: grasp 77 pts, lift 66 pts, pre_grasp 6 pts,
-    # negative control refused).  The workpiece region is subtracted at the
-    # current S3; the carried part after the grasp is guarded by the offline
-    # carried-box gate on transit/staging until the attach 专项 lands.
+        # Environment collision scene (2026-11-02 专项, FULL enablement): with the
+        # real-cell description (measured camera + SolidWorks tool, no 77 mm finger
+        # collisions), the grasp/lift plans succeed WITH the table voxels in the
+        # scene (acceptance 2026-11-02: grasp 77 pts, lift 66 pts, pre_grasp 6 pts,
+        # negative control refused).  The workpiece region is subtracted at the
+        # current S3; the carried part after the grasp is guarded by the offline
+        # carried-box gate on transit/staging until the attach 专项 lands.
     print("\n[4b] apply the environment collision scene")
     env_cmd = [sys.executable, "-u",
                str(REPO / "scripts" / "apply_environment_collision.py"),
