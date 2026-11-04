@@ -269,3 +269,26 @@ teaching_observation_baselines:
     quat: [-0.1025, 0.9348, 0.3370, 0.0462]
     joints_deg: [-8.9, -90.1, -83.9, -101.9, 134.7, 171.6]
     aim_point: [0.790, 0.683, 0.20]
+
+# --- teaching insert end (owner-verified 2026-11-04) ---------------------------
+# The formula end point (slot x T_s_tcp -> z = 0.0324) is ~40 mm TOO DEEP: the real seat
+# is where the pendant-side protective stop fires, not where the formula says.  The owner
+# confirmed this pose as the true insert end after the first complete vertical insert.
+teaching_insert_end:
+  tcp: [1.1471, -0.0551, 0.0721]
+  quat: [-0.0047, -0.9961, 0.0021, -0.0881]      # tilted entry attitude (-10 deg)
+  flat_quat: [0.0048, 1.0, -0.0017, 0.0008]      # straightened attitude after seating
+  formula_end_tcp: [1.1362, -0.0547, 0.0324]     # what the chain computes; 39.7 mm deeper
+  depth_below_fixture_mm: 371
+  travel_along_tool_mm: 352
+  verdict: "protective stop at the seat; do not drive to the formula end point"
+  stamp: "2026-11-04T16:42:00"
+
+# Lateral correction the owner applied to the whole insert chain on 2026-11-04, in
+# cumulative millimetres toward the robot base (world -x).  Applied to the slot reference,
+# so both the pre-insert and the insert end move together (manual entry 19).
+teaching_insert_lateral_shift:
+  total_mm: 45.5
+  increments_mm: [8.0, 5.0, 27.5, 5.0]
+  axis: "world -x (toward the robot base)"
+  stamp: "2026-11-04T16:20:00"
