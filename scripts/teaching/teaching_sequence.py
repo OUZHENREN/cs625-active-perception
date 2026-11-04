@@ -411,7 +411,20 @@ def trigger_once(command: str, timeout: float, min_frames: int = 1) -> bool:
     return False
 
 
-def observe_workpiece_coarse() -> str | None:
+def trigger_consistent(command: str, timeout: float, min_frames: int = 3) -> bool:
+    """Collect `min_frames` mutually consistent answers within a bounded budget."""
+    code, text = run([sys.executable, "-u", str(RVS_CLIENT), command,
+                      "--timeout", str(timeout),
+                      "--min-frames", str(min_frames),
+                      "--max-attempts", str(min_frames + 3)],
+                     timeout=(timeout + 120.0) * (min_frames + 3))
+    for line in text.splitlines():
+        if line.startswith("answer:"):
+            print("   ", line)
+    return code == 0
+
+
+def observe_workpiece_coarse(only: str | None = None) -> str | None:
     """Move to a coarse baseline and get T2; switch baselines on failure.
 
     Returns the baseline name that worked, or None when both failed (the caller
@@ -421,7 +434,9 @@ def observe_workpiece_coarse() -> str | None:
     if not baselines:
         print("   no coarse-observation baselines in config")
         return None
-    for name, (position, quat) in baselines.items():
+    order = [only] if only in baselines else list(baselines)
+    for name in order:
+        position, quat = baselines[name]
         print(f"\n[3] workpiece coarse observation at baseline {name} "
               f"{[round(v, 4) for v in position]}")
         if not move("observe", position, quat, f"workpiece_coarse_{name}"):
@@ -657,6 +672,21 @@ def slot_pose_for_insert():
     return position, quat, "senior calibration"
 
 
+
+def taught_view_pose(name: str):
+    """A taught view pose from config (rvs_taught_views), as (position, quat)."""
+    import yaml
+    try:
+        config = yaml.safe_load((REPO / "config" / "tasks" / "common.yaml").read_text())
+        entry = (config.get("rvs_taught_views") or {}).get(name) or {}
+        if entry.get("position") and entry.get("quat"):
+            return ([float(v) for v in entry["position"]],
+                    [float(v) for v in entry["quat"]])
+    except Exception:
+        pass
+    return None
+
+
 def view_drift_mm(command: str, xyz, quat) -> float | None:
     """Deviation of a coarse-match OUTPUT from the taught reference, in mm.
 
@@ -727,7 +757,7 @@ def main() -> int:
     parser.add_argument("--allow-release", action="store_true",
                         help="owner approval for opening the jaws (step 16)")
     parser.add_argument("--skip-env", action="store_true")
-    parser.add_argument("--start-from", type=int, default=1, choices=[1, 3, 5],
+    parser.add_argument("--start-from", type=int, default=1, choices=[1, 3, 5, 13, 14],
                         help="resume instead of redoing the whole chain: "
                              "1 = full run, 3 = start at the workpiece coarse "
                              "observation, 5 = start at the pre-grasp approach "
@@ -739,8 +769,7 @@ def main() -> int:
 
     steps = [
         "0 环境建模（离线，不动机械臂）",
-        "1 插槽粗观测 T0",
-        "2 插槽精观测 T1",
+        "1 插槽精观测 T1（粗观测已删除：插槽近乎固定，直接用教学 S0）",
         "3 工件粗观测 T2",
         "4 工件精观测 T3",
         "5 预抓取位",
@@ -779,41 +808,31 @@ def main() -> int:
             print(f"\nRESUMING from step {start}: earlier steps are skipped; "
                   "their state is read back from the captures on disk")
         if start <= 1:
-            print("\n[1] slot coarse observation")
-            if not move("observe", *POSE["slot_coarse"], "slot_coarse"):
-                return 2
-            if not rvs("T0"):
-                return 3
-
-            # T0 answers with S0 = the pose the FINE slot capture must be taken from.
-            # Standing on a fixed constant instead is what made T1 answer NG with
-            # 'NG,POSE,0,0,0,0,0' on 2026-10-30: RVS only matches from the pose it asks for.
-            slot_view = latest_capture("T0")
-            if slot_view is None:
-                print("missing T0 capture; cannot tell where RVS wants the fine slot view")
+            # Slot coarse observation REMOVED (owner 2026-11-04): the slot pose is
+            # nearly fixed, so the T0 round-trip only added a failure mode (RVS
+            # refused T1 on 2026-10-30 whenever the camera stood off the stance it
+            # asked for).  The chain now goes straight to the fine capture from the
+            # TAUGHT S0 stance, which is a constant in config.
+            s0 = taught_view_pose("S0")
+            if s0 is None:
+                print("no taught S0 view pose in config; cannot place the fine slot view")
                 return 4
-            # 2026-11-03: the coarse match drifts 21-39 mm between sessions, and
-            # standing off the taught stance biases the fine match by the same
-            # amount (41 mm off taught -> R1 biased ~50 mm).  Refuse to build the
-            # fine-view stance on a drifted coarse match.
-            # WARN-only (2026-11-03 measurement): S0 drift does NOT predict the fine
-            # match.  Standing on the taught S0 (drift 0) gave R1 y=0.148, standing on
-            # today's S0 (drift 34.5) gave R1 y=0.143 -- nearly identical.  RVS's slot
-            # match is biased by tens of mm across sessions no matter where the camera
-            # stands, so refusing here only blocked a legitimate run.  Keep the number
-            # as evidence; the real protection is the fresh R1 + effort margin + 13b.
-            drift = view_drift_mm("S0", slot_view["position"], slot_view["orientation"])
-            if drift is not None and drift > 20.0:
-                print(f"   [view] NOTE: S0 drifts {drift:.1f} mm from the taught stance; "
-                      "recorded (does not predict the fine match -- see 2026-11-03 data)")
-            slot_tcp, slot_quat = view_pose_to_tcp(slot_view["position"],
-                                                   slot_view["orientation"])
-            print(f"\n[2] slot fine observation: RVS S0 (flange) "
-                  f"{[round(v, 4) for v in slot_view['position']]} "
+            slot_tcp, slot_quat = view_pose_to_tcp(*s0)
+            print(f"\n[1] slot fine observation (coarse observation removed: the slot is "
+                  f"nearly fixed)\n    taught S0 {[round(v, 4) for v in s0[0]]} "
                   f"-> TCP {[round(v, 4) for v in slot_tcp]}")
             if not move("observe", slot_tcp, slot_quat, "slot_fine"):
                 return 2
-            if not rvs("T1"):
+            # RVS is not a one-shot measurement (manual entry 16): retry the same
+            # stance a few times before declaring the slot observation failed.
+            slot_ok = False
+            for attempt in range(1, 4):
+                print(f"   T1 attempt {attempt}/3")
+                if trigger_consistent("T1", FAILOVER_TIMEOUT, min_frames=3):
+                    slot_ok = True
+                    break
+            if not slot_ok:
+                print("   slot fine observation failed after 3 attempts; stopping")
                 return 3
             check_slot_history()
 
@@ -860,8 +879,36 @@ def main() -> int:
                 if not move("observe", substitute["xyz"], substitute["quat"],
                             "workpiece_fine(substitute)"):
                     return 2
-            if not rvs("T3"):
-                return 3
+            # Same rule as the coarse step: if the fine workpiece capture keeps
+            # failing at this baseline's stance, try the OTHER baseline's stance
+            # before giving up (owner rule: one stroke of NG is not a failure, a
+            # whole stance failing is).
+            box_ok = False
+            for attempt in range(1, 4):
+                print(f"   T3 attempt {attempt}/3 at baseline {baseline_used}")
+                if trigger_consistent("T3", FAILOVER_TIMEOUT, min_frames=3):
+                    box_ok = True
+                    break
+            if not box_ok:
+                other = "B" if baseline_used == "A" else "A"
+                print(f"   T3 keeps failing at baseline {baseline_used}; "
+                      f"switching to baseline {other}")
+                retry_baseline = observe_workpiece_coarse(only=other)
+                if retry_baseline is None:
+                    print("   both baselines failed at the fine workpiece capture; pausing")
+                    return 6
+                baseline_used = retry_baseline
+                box_view = latest_capture("T2")
+                if box_view is None:
+                    print("   no S2 capture after the baseline switch; pausing")
+                    return 4
+                box_tcp, box_quat = view_pose_to_tcp(box_view["position"],
+                                                     box_view["orientation"])
+                if not move("observe", box_tcp, box_quat, "workpiece_fine(switched)"):
+                    return 2
+                if not trigger_consistent("T3", FAILOVER_TIMEOUT, min_frames=3):
+                    print("   T3 still failing after the baseline switch; pausing")
+                    return 6
 
         # grasp comes from the live S3 (the workpiece moves between runs; 2026-10-30:
         # today's S3 is 170 mm from the 10-27 one in x/y, z within 0.4 mm).
@@ -979,13 +1026,22 @@ def main() -> int:
     insert_xyz, tilted_q = insert_tilted            # tilted entry attitude
     insert_flat_q = insert_flat[1]                  # straightened attitude
 
+    start = args.start_from
+    if start >= 13:
+        print(f"\nRESUMING from step {start}: the part must already be gripped")
+        if not grip_still_holding():
+            print("   grip check FAILED (position_mm below the holding threshold); "
+                  "cannot resume at the insert stage")
+            return 6
+        print("   grip check OK: the workpiece is held")
     print("\n[12] rotate to -10 deg at safe height (translation unchanged)")
     hold = POSE["staging"][0]
     if not move("pre_insert", [hold[0], hold[1], hold[2]], pre_insert_q,
                 "rotate only", goal_tol=0.0003):
         return 2
 
-    print("\n[13] descend vertically to the pre-insert height")
+    if args.start_from < 13:
+        print("\n[13] descend vertically to the pre-insert height")
     if not move("pre_insert", pre_insert_xyz, pre_insert_q, "descend only",
                 goal_tol=0.0003):
         return 2
