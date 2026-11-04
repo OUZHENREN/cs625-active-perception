@@ -129,6 +129,12 @@ SAFE_HEIGHT_Z = 0.530          # raise here before any rotation near the slot
 # Owner raised it from 120 mm to 150 mm on 2026-11-04: 120 mm left too little room to
 # verify and correct the pose before the jaws reach the workpiece.
 APPROACH_HEIGHT_M = 0.150
+# Surface clearance (owner 2026-11-04, from a real collision): the gripper's lower
+# motor-protection frame interferes with a groove on the workpiece surface when the
+# grasp point sits exactly on the nominal surface.  Both the grasp and the pre-grasp
+# pose are therefore pulled back along the TOOL x axis by this amount, i.e. 1-2 mm of
+# air between the tool body and the part surface.
+GRASP_CLEARANCE_M = 0.0015
 
 
 def run(args: list[str], timeout: float = 240.0) -> tuple[int, str]:
@@ -971,8 +977,19 @@ def main() -> int:
             print("missing T3 capture; run the observation steps or reuse a saved one")
             return 4
         grasp_pose, pre_grasp_pose = grasp_from_box(box["position"], box["orientation"])
-        print(f"\n   grasp     {[round(v, 4) for v in grasp_pose[0]]}")
-        print(f"   pre_grasp {[round(v, 4) for v in pre_grasp_pose[0]]}")
+        # Pull the grasp point back 1.5 mm along the tool x axis so the gripper's
+        # motor-protection frame cannot touch the groove on the workpiece surface
+        # (owner, after a real collision on 2026-11-04).
+        import numpy as _np
+        from scipy.spatial.transform import Rotation as _R
+        _rot = _R.from_quat(grasp_pose[1]).as_matrix()
+        _back = _rot @ _np.array([GRASP_CLEARANCE_M, 0.0, 0.0])
+        grasp_pose = ([grasp_pose[0][0] - float(_back[0]),
+                       grasp_pose[0][1] - float(_back[1]),
+                       grasp_pose[0][2] - float(_back[2])], grasp_pose[1])
+        print(f"\n   grasp     {[round(v, 4) for v in grasp_pose[0]]}  "
+              f"(pulled back {GRASP_CLEARANCE_M * 1000:.1f} mm along tool x for clearance)")
+        print(f"   nominal pre_grasp {[round(v, 4) for v in pre_grasp_pose[0]]}")
 
         # Environment collision scene (2026-11-02 专项, FULL enablement): with the
         # real-cell description (measured camera + SolidWorks tool, no 77 mm finger
