@@ -1121,6 +1121,21 @@ def main() -> int:
                   "but the grip check failed")
             return 6
         print(f"\n   [resume] part confirmed in the gripper before step 10")
+    # Insertion chain (2026-11-03 revision of audit hole 5): derived from the
+    # MECHANICAL slot calibration, with R1 used as a health check only.  RVS's
+    # fine slot match carries a stance-dependent bias of tens of mm (36 mm on
+    # 2026-11-03), which is far too coarse for a 1 mm-clearance insertion; the
+    # calibrated pose agrees with the proven six-mode constants to 2 mm.
+    slot_xyz, slot_quat, slot_source = slot_pose_for_insert()
+    insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(slot_xyz, slot_quat)
+    print(f"\n   insert chain from {slot_source}:")
+    print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
+    print(f"     tilted     {[round(v, 4) for v in insert_tilted[0]]}")
+    print(f"     pre_insert {[round(v, 4) for v in pre_insert_pose[0]]}")
+
+    pre_insert_xyz, pre_insert_q = pre_insert_pose
+    insert_xyz, tilted_q = insert_tilted            # tilted entry attitude
+    insert_flat_q = insert_flat[1]                  # straightened attitude
     if args.start_from >= 12:
         print("\n[10-11] transit/staging SKIPPED (resumed at the rotation step)")
     else:
@@ -1132,21 +1147,6 @@ def main() -> int:
         if not move("staging", POSE["staging"][0], grasp_pose[1], "staging"):
             return 2
 
-        # Insertion chain (2026-11-03 revision of audit hole 5): derived from the
-        # MECHANICAL slot calibration, with R1 used as a health check only.  RVS's
-        # fine slot match carries a stance-dependent bias of tens of mm (36 mm on
-        # 2026-11-03), which is far too coarse for a 1 mm-clearance insertion; the
-        # calibrated pose agrees with the proven six-mode constants to 2 mm.
-        slot_xyz, slot_quat, slot_source = slot_pose_for_insert()
-        insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(slot_xyz, slot_quat)
-        print(f"\n   insert chain from {slot_source}:")
-        print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
-        print(f"     tilted     {[round(v, 4) for v in insert_tilted[0]]}")
-        print(f"     pre_insert {[round(v, 4) for v in pre_insert_pose[0]]}")
-
-        pre_insert_xyz, pre_insert_q = pre_insert_pose
-        insert_xyz, tilted_q = insert_tilted            # tilted entry attitude
-        insert_flat_q = insert_flat[1]                  # straightened attitude
 
         start = args.start_from
         if start <= 5 and grip_still_holding():
