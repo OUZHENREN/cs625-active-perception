@@ -275,7 +275,7 @@ def main() -> int:
         # Short moves: use a straight line, which cannot wind.
         import numpy as _np
         span = float(_np.max(_np.abs(_np.asarray(goal_joints) - _np.asarray(seed))))
-        if span <= _np.radians(60.0) and straight_line_ok(seed, goal_joints):
+        if span <= _np.radians(100.0) and straight_line_ok(seed, goal_joints):
             points = straight_line_plan(seed, goal_joints)
             class _Traj:
                 pass
