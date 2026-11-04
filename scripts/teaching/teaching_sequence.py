@@ -813,7 +813,7 @@ def main() -> int:
     parser.add_argument("--allow-release", action="store_true",
                         help="owner approval for opening the jaws (step 16)")
     parser.add_argument("--skip-env", action="store_true")
-    parser.add_argument("--start-from", type=int, default=1, choices=[1, 3, 5, 13, 14],
+    parser.add_argument("--start-from", type=int, default=1, choices=[1, 3, 5, 10, 13, 14],
                         help="resume instead of redoing the whole chain: "
                              "1 = full run, 3 = start at the workpiece coarse "
                              "observation, 5 = start at the pre-grasp approach "
@@ -1071,6 +1071,20 @@ def main() -> int:
         print("   WARN: attach failed; offline carried-box gates still guard "
               "lift/transit/staging")
 
+    # The environment voxels exist to keep the GRASP APPROACH honest.  Once the part
+    # is attached they also collide with the carried box, and no path exists to lift
+    # it clear (measured 2026-11-04: every IK seed sane, planning returned 99999).
+    # So the scene is removed here; the carried-box envelope gate keeps guarding
+    # transit/staging offline.
+    print("\n[7c] clear the environment scene (the carried part needs a free path)")
+    code, text = run([sys.executable, "-u",
+                      str(REPO / "scripts" / "apply_environment_collision.py"),
+                      "--remove"], timeout=180.0)
+    for line in text.splitlines():
+        print("   ", line)
+    if code != 0:
+        print("   WARN: could not clear the scene; the lift may refuse to plan")
+
     print("\n[8] lift 0.15 m")
     lifted = [grasp_pose[0][0], grasp_pose[0][1], grasp_pose[0][2] + 0.15]
     if not move("lift", lifted, grasp_pose[1], "lift"):
@@ -1106,7 +1120,7 @@ def main() -> int:
     insert_flat_q = insert_flat[1]                  # straightened attitude
 
     start = args.start_from
-    if start >= 13:
+    if start >= 10:
         print(f"\nRESUMING from step {start}: the part must already be gripped")
         if not grip_still_holding():
             print("   grip check FAILED (position_mm below the holding threshold); "
