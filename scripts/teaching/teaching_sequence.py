@@ -161,10 +161,15 @@ def execute_plan(path: Path, time_scale: float, tail_fraction: float,
         return "ALL_ASSEMBLY_CHUNKS_OK" in text
     data = json.loads(path.read_text())
     points = data["points"]
-    step = max(2, math.ceil((len(points) - 1) / segments))
+    # A short trajectory cannot be cut into the requested number of segments
+    # (2026-11-04: a 2-point approach plan with segments=4 indexed past the end).
+    segments = max(1, min(segments, max(1, len(points) - 1)))
+    step = max(1, math.ceil((len(points) - 1) / segments))
     ok = True
     for i in range(segments):
         start = i * step
+        if start >= len(points):
+            break
         end = min((i + 1) * step + 1, len(points))  # +1 shared seam point
         # Re-time from zero: each segment is its own trajectory goal, so the
         # first timestamp must be 0.  Keeping the original absolute times made
