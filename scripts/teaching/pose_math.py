@@ -69,7 +69,7 @@ def grasp_from_box(box_xyz, box_quat):
     return to_pose(grasp), to_pose(pre_grasp)
 
 
-def insert_from_slot(slot_xyz, slot_quat, tilt_deg=None):
+def insert_from_slot(slot_xyz, slot_quat, tilt_deg=None, extra_height_m=0.0):
     """Insert chain from the slot pose.
 
     tilt_deg defaults to the senior's -10 deg entry tilt.  The owner chose to derive
@@ -83,6 +83,12 @@ def insert_from_slot(slot_xyz, slot_quat, tilt_deg=None):
     tilt[:3, :3] = R.from_euler("y", angle, degrees=True).as_matrix()
     rotated = insert @ tilt
     pre_insert = translation(rotated, 0.0, 0.0, -PRE_INSERT_BACKOFF_M)
+    # Owner 2026-11-04: the pre-insert standing height is raised further (the 350 mm
+    # back-off alone put the tool too low to inspect the entry).  The extra height is a
+    # world +z offset applied after the back-off, so the insert end point is unchanged.
+    if extra_height_m:
+        pre_insert = pre_insert.copy()
+        pre_insert[2, 3] += float(extra_height_m)
     return to_pose(insert), to_pose(rotated), to_pose(pre_insert)
 
 

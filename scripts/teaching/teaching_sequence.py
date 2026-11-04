@@ -138,6 +138,10 @@ SAFE_HEIGHT_Z = 0.530          # raise here before any rotation near the slot
 # Owner raised it from 120 mm to 150 mm on 2026-11-04: 120 mm left too little room to
 # verify and correct the pose before the jaws reach the workpiece.
 APPROACH_HEIGHT_M = 0.150
+# Owner 2026-11-04: raise the pre-insert standing position by another 100 mm.  The
+# 350 mm back-off alone left the tool too low to watch the entry; the insert end point
+# is unchanged, only where the descent starts from.
+PRE_INSERT_EXTRA_HEIGHT_M = 0.100
 # Surface clearance (owner 2026-11-04, from a real collision): the gripper's lower
 # motor-protection frame interferes with a groove on the workpiece surface when the
 # grasp point sits exactly on the nominal surface.  Both the grasp and the pre-grasp
@@ -1129,7 +1133,8 @@ def main() -> int:
     # entry possible.  Our T_S_TCP / tilt / backoff match his constants exactly.
     SLOT_TILT_DEG = -10.0
     insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(
-        slot_xyz, slot_quat, tilt_deg=SLOT_TILT_DEG)
+        slot_xyz, slot_quat, tilt_deg=SLOT_TILT_DEG,
+        extra_height_m=PRE_INSERT_EXTRA_HEIGHT_M)
     print(f"\n   insert chain from {slot_source}:")
     print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
     print(f"     tilted     {[round(v, 4) for v in insert_tilted[0]]}")
