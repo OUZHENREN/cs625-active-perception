@@ -122,12 +122,13 @@ POSE = {
     "baseline": ([1.044, -0.011, 0.726], [-0.059, 0.938, 0.060, 0.336]),
 }
 SAFE_HEIGHT_Z = 0.530          # raise here before any rotation near the slot
-# Vertical approach height (owner 2026-11-03, verified on the cell): the tool body is
-# 294.6 mm wide, so the senior's horizontal pre_grasp (grasp + 120 mm along tool x)
-# collides with the fixture frame whenever the workpiece yaw differs from the 10-27
-# orientation.  Descending from 120 mm above the grasp pose measured
-# 0.199 mm / 0.031 deg with no protective stop.
-APPROACH_HEIGHT_M = 0.120
+# Vertical approach height (owner 2026-11-03/04): the tool body is 294.6 mm wide, so
+# the senior's horizontal pre_grasp (grasp + 120 mm along tool x) collides with the
+# fixture frame whenever the workpiece yaw differs from the 10-27 orientation.
+# Descending vertically measured 0.199 mm / 0.031 deg with no protective stop.
+# Owner raised it from 120 mm to 150 mm on 2026-11-04: 120 mm left too little room to
+# verify and correct the pose before the jaws reach the workpiece.
+APPROACH_HEIGHT_M = 0.150
 
 
 def run(args: list[str], timeout: float = 240.0) -> tuple[int, str]:
