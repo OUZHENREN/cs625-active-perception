@@ -1134,7 +1134,8 @@ def main() -> int:
     SLOT_TILT_DEG = -10.0
     insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(
         slot_xyz, slot_quat, tilt_deg=SLOT_TILT_DEG,
-        extra_height_m=PRE_INSERT_EXTRA_HEIGHT_M)
+        extra_height_m=PRE_INSERT_EXTRA_HEIGHT_M,
+        vertical_approach=True)
     print(f"\n   insert chain from {slot_source}:")
     print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
     print(f"     tilted     {[round(v, 4) for v in insert_tilted[0]]}")
