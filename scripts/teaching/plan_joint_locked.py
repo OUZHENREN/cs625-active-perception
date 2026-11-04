@@ -153,6 +153,27 @@ def collision_violation(client, node, candidate: list[float]) -> str | None:
     return None
 
 
+
+def straight_line_plan(start, goal, duration: float = 4.0, samples: int = 24):
+    """Linear joint-space interpolation between two близ configurations.
+
+    Why (2026-11-04): for a short move (tens of degrees) OMPL sometimes returned a
+    winding path -- e.g. wrist_3 travelling 284 deg to go from 79 to 79 -- and the
+    wrap guard then refused a perfectly reasonable move.  A straight line between two
+    nearby collision-free configurations is shorter, deterministic and easy to check,
+    so it is used when the geometry allows and OMPL stays as the fallback.
+    """
+    import numpy as np
+    start = np.asarray(start, dtype=float)
+    goal = np.asarray(goal, dtype=float)
+    points = []
+    for i in range(samples + 1):
+        fraction = i / samples
+        q = start + (goal - start) * fraction
+        points.append({"q": [float(v) for v in q], "t": duration * fraction})
+    return points
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("pose", nargs="*", type=float, metavar="X Y Z QX QY QZ QW")
@@ -238,8 +259,38 @@ def main() -> int:
         print("NO /plan_kinematic_path")
         return 3
 
+    def straight_line_ok(start, goal, samples: int = 20) -> bool:
+        """True when every sampled point between start and goal is collision-free."""
+        import numpy as np
+        start_arr = np.asarray(start, dtype=float)
+        goal_arr = np.asarray(goal, dtype=float)
+        for i in range(samples + 1):
+            q = start_arr + (goal_arr - start_arr) * (i / samples)
+            if collision_violation(validity, node, [float(v) for v in q]) is not None:
+                return False
+        return True
+
     def try_plan(goal_joints):
         """Plan to a joint goal; returns the trajectory or None."""
+        # Short moves: use a straight line, which cannot wind.
+        import numpy as _np
+        span = float(_np.max(_np.abs(_np.asarray(goal_joints) - _np.asarray(seed))))
+        if span <= _np.radians(60.0) and straight_line_ok(seed, goal_joints):
+            points = straight_line_plan(seed, goal_joints)
+            class _Traj:
+                pass
+            traj = _Traj()
+            traj.joint_names = ORDER
+            traj.points = []
+            for entry in points:
+                point = type("P", (), {})()
+                point.positions = entry["q"]
+                from builtin_interfaces.msg import Duration as _Dur
+                sec = int(entry["t"])
+                point.time_from_start = _Dur(sec=sec,
+                                             nanosec=int((entry["t"] - sec) * 1e9))
+                traj.points.append(point)
+            return traj, 1, len(traj.points)
         plan_request = GetMotionPlan.Request().motion_plan_request
         plan_request.group_name = "cs625_arm"
         plan_request.num_planning_attempts = 20

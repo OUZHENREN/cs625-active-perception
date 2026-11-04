@@ -71,13 +71,17 @@ SPEED = {
     # a quarter of that cruise (tail_scale 4.0), so only the last centimetres creep.
     "pre_grasp":  (0.016, 1.5, 0.3, 4.0),
     "grasp":      (0.008, 2.0, 0.4, 4.0),
-    "lift":       (0.03, 1.5, 0.0, 1.0),
-    "transit":    (0.08, 1.0, 0.0, 1.0),
-    "staging":    (0.05, 1.5, 0.0, 1.0),
-    "pre_insert": (0.03, 1.5, 0.4, 1.67),
+    # CARRYING THE PART (owner, repeated and finally quantified 2026-11-04): every
+    # move with the workpiece in the jaws must stay slow -- the raise to safe height
+    # at 0.03 m/s was judged "completely beyond acceptable".  0.015 m/s cruise with a
+    # 2.0 time scale gives roughly a third of the previous speed.
+    "lift":       (0.015, 2.0, 0.2, 2.0),
+    "transit":    (0.020, 2.0, 0.0, 1.0),
+    "staging":    (0.020, 2.0, 0.0, 1.0),
+    "pre_insert": (0.015, 2.0, 0.4, 2.0),
     "insert":     (0.005, 3.0, 0.0, 1.0),   # tight clearance: do not change
     "straighten": (0.1, 1.0, 0.0, 1.0),     # owner: 0.1 is allowed here
-    "withdraw":   (0.03, 1.5, 0.0, 1.0),
+    "withdraw":   (0.015, 2.0, 0.0, 1.0),
     "baseline":   (0.08, 1.0, 0.0, 1.0),
     "observe":    (0.05, 1.5, 0.0, 1.0),
 }
@@ -156,6 +160,10 @@ def run(args: list[str], timeout: float = 240.0) -> tuple[int, str]:
 # always refuse it; the lateral transport (transit/staging) is where the part
 # sweeps across the cell and must keep the full margin.
 SEGMENTED = {"pre_grasp": 4, "grasp": 6, "lift": 2, "transit": 2, "staging": 2}
+# Carried phases may never exceed this cruise speed (owner, 2026-11-04).  Enforced in
+# move() so a later edit to SPEED cannot silently make a carried move fast again.
+CARRY_SPEED_CAP = 0.020
+CARRY_PHASES = {"lift", "transit", "staging", "pre_insert", "straighten", "withdraw"}
 CARRIED = {"transit", "staging"}
 ENVELOPE_CHECK = REPO / "scripts" / "check_tool_envelope.py"
 
@@ -244,6 +252,11 @@ def move(name: str, xyz, quat, label: str = "", goal_tol: float = 0.008) -> bool
     segment.
     """
     velocity, time_scale, tail_fraction, tail_scale = SPEED[name]
+    if name in CARRY_PHASES and velocity > CARRY_SPEED_CAP:
+        print(f"   [speed] {name} capped from {velocity} to {CARRY_SPEED_CAP} m/s "
+              "(carrying the workpiece)")
+        velocity = CARRY_SPEED_CAP
+        time_scale = max(time_scale, 2.0)
     plan = Path(f"/tmp/teach_{name}.json")
     code, text = run([sys.executable, "-u", str(PLAN),
                       *[f"{v:.6f}" for v in (*xyz, *quat)],
