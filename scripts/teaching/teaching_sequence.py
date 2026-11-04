@@ -75,13 +75,16 @@ SPEED = {
     # move with the workpiece in the jaws must stay slow -- the raise to safe height
     # at 0.03 m/s was judged "completely beyond acceptable".  0.015 m/s cruise with a
     # 2.0 time scale gives roughly a third of the previous speed.
-    "lift":       (0.015, 2.0, 0.2, 2.0),
-    "transit":    (0.020, 2.0, 0.0, 1.0),
-    "staging":    (0.020, 2.0, 0.0, 1.0),
-    "pre_insert": (0.015, 2.0, 0.4, 2.0),
+    # Owner 2026-11-04 (second reduction): the carrying baseline is another third
+    # slower than the 0.020 setting -- 0.013 m/s is the reference for any transport
+    # with the workpiece in the jaws.
+    "lift":       (0.012, 2.0, 0.2, 2.0),
+    "transit":    (0.013, 2.0, 0.0, 1.0),
+    "staging":    (0.013, 2.0, 0.0, 1.0),
+    "pre_insert": (0.012, 2.0, 0.4, 2.0),
     "insert":     (0.005, 3.0, 0.0, 1.0),   # tight clearance: do not change
     "straighten": (0.1, 1.0, 0.0, 1.0),     # owner: 0.1 is allowed here
-    "withdraw":   (0.015, 2.0, 0.0, 1.0),
+    "withdraw":   (0.012, 2.0, 0.0, 1.0),
     "baseline":   (0.08, 1.0, 0.0, 1.0),
     "observe":    (0.05, 1.5, 0.0, 1.0),
 }
@@ -162,7 +165,7 @@ def run(args: list[str], timeout: float = 240.0) -> tuple[int, str]:
 SEGMENTED = {"pre_grasp": 4, "grasp": 6, "lift": 2, "transit": 2, "staging": 2}
 # Carried phases may never exceed this cruise speed (owner, 2026-11-04).  Enforced in
 # move() so a later edit to SPEED cannot silently make a carried move fast again.
-CARRY_SPEED_CAP = 0.020
+CARRY_SPEED_CAP = 0.013
 CARRY_PHASES = {"lift", "transit", "staging", "pre_insert", "straighten", "withdraw"}
 CARRIED = {"transit", "staging"}
 ENVELOPE_CHECK = REPO / "scripts" / "check_tool_envelope.py"
@@ -1118,43 +1121,46 @@ def main() -> int:
                   "but the grip check failed")
             return 6
         print(f"\n   [resume] part confirmed in the gripper before step 10")
-    print("\n[10] transit")
-    if not move("transit", POSE["transit"][0], grasp_pose[1], "transit"):
-        return 2
+    if args.start_from >= 12:
+        print("\n[10-11] transit/staging SKIPPED (resumed at the rotation step)")
+    else:
+        print("\n[10] transit")
+        if not move("transit", POSE["transit"][0], grasp_pose[1], "transit"):
+            return 2
 
-    print("\n[11] staging")
-    if not move("staging", POSE["staging"][0], grasp_pose[1], "staging"):
-        return 2
+        print("\n[11] staging")
+        if not move("staging", POSE["staging"][0], grasp_pose[1], "staging"):
+            return 2
 
-    # Insertion chain (2026-11-03 revision of audit hole 5): derived from the
-    # MECHANICAL slot calibration, with R1 used as a health check only.  RVS's
-    # fine slot match carries a stance-dependent bias of tens of mm (36 mm on
-    # 2026-11-03), which is far too coarse for a 1 mm-clearance insertion; the
-    # calibrated pose agrees with the proven six-mode constants to 2 mm.
-    slot_xyz, slot_quat, slot_source = slot_pose_for_insert()
-    insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(slot_xyz, slot_quat)
-    print(f"\n   insert chain from {slot_source}:")
-    print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
-    print(f"     tilted     {[round(v, 4) for v in insert_tilted[0]]}")
-    print(f"     pre_insert {[round(v, 4) for v in pre_insert_pose[0]]}")
+        # Insertion chain (2026-11-03 revision of audit hole 5): derived from the
+        # MECHANICAL slot calibration, with R1 used as a health check only.  RVS's
+        # fine slot match carries a stance-dependent bias of tens of mm (36 mm on
+        # 2026-11-03), which is far too coarse for a 1 mm-clearance insertion; the
+        # calibrated pose agrees with the proven six-mode constants to 2 mm.
+        slot_xyz, slot_quat, slot_source = slot_pose_for_insert()
+        insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(slot_xyz, slot_quat)
+        print(f"\n   insert chain from {slot_source}:")
+        print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
+        print(f"     tilted     {[round(v, 4) for v in insert_tilted[0]]}")
+        print(f"     pre_insert {[round(v, 4) for v in pre_insert_pose[0]]}")
 
-    pre_insert_xyz, pre_insert_q = pre_insert_pose
-    insert_xyz, tilted_q = insert_tilted            # tilted entry attitude
-    insert_flat_q = insert_flat[1]                  # straightened attitude
+        pre_insert_xyz, pre_insert_q = pre_insert_pose
+        insert_xyz, tilted_q = insert_tilted            # tilted entry attitude
+        insert_flat_q = insert_flat[1]                  # straightened attitude
 
-    start = args.start_from
-    if start <= 5 and grip_still_holding():
-        print("\nREFUSED: the workpiece is already gripped, but --start-from "
-              f"{start} would replay the grasp sequence.  Use --start-from 10 "
-              "(transit) to continue with the part in hand, or release it first.")
-        return 6
-    if start >= 13:
-        print(f"\nRESUMING from step {start}: the part must already be gripped")
-        if not grip_still_holding():
-            print("   grip check FAILED (position_mm below the holding threshold); "
-                  "cannot resume at the insert stage")
+        start = args.start_from
+        if start <= 5 and grip_still_holding():
+            print("\nREFUSED: the workpiece is already gripped, but --start-from "
+                  f"{start} would replay the grasp sequence.  Use --start-from 10 "
+                  "(transit) to continue with the part in hand, or release it first.")
             return 6
-        print("   grip check OK: the workpiece is held")
+        if start >= 13:
+            print(f"\nRESUMING from step {start}: the part must already be gripped")
+            if not grip_still_holding():
+                print("   grip check FAILED (position_mm below the holding threshold); "
+                      "cannot resume at the insert stage")
+                return 6
+            print("   grip check OK: the workpiece is held")
     print("\n[12] rotate to -10 deg at safe height (translation unchanged)")
     hold = POSE["staging"][0]
     if not move("pre_insert", [hold[0], hold[1], hold[2]], pre_insert_q,
