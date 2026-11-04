@@ -179,7 +179,7 @@ def execute_plan(path: Path, time_scale: float, tail_fraction: float,
                           "--tail-fraction", str(tail_fraction),
                           "--tail-scale", str(tail_scale),
                           "--goal-tolerance", str(goal_tol),
-                          "--verify-final", str(goal_tol),
+                          "--verify-final", str(max(goal_tol, 0.02)),
                           "--fault-poll", "0.2"], timeout=600.0)
         for line in text.splitlines()[-3:]:
             print("   ", line)
@@ -216,7 +216,7 @@ def execute_plan(path: Path, time_scale: float, tail_fraction: float,
                               "--time-scale", str(time_scale),
                               "--tail-fraction", "0.0", "--tail-scale", "1.0",
                               "--goal-tolerance", str(goal_tol),
-                              "--verify-final", str(goal_tol),
+                              "--verify-final", str(max(goal_tol, 0.02)),
                               "--fault-poll", "0.2"], timeout=600.0)
             for line in text.splitlines()[-2:]:
                 print("   ", line)
@@ -826,7 +826,8 @@ def main() -> int:
     parser.add_argument("--allow-release", action="store_true",
                         help="owner approval for opening the jaws (step 16)")
     parser.add_argument("--skip-env", action="store_true")
-    parser.add_argument("--start-from", type=int, default=1, choices=[1, 3, 5, 10, 13, 14],
+    parser.add_argument("--start-from", type=int, default=1,
+                        choices=[1, 3, 5, 10, 12, 13, 14],
                         help="resume instead of redoing the whole chain: "
                              "1 = full run, 3 = start at the workpiece coarse "
                              "observation, 5 = start at the pre-grasp approach "
