@@ -452,22 +452,32 @@ FAILOVER_ATTEMPTS = 2
 FAILOVER_TIMEOUT = 20.0
 # Owner 2026-11-05: waiting for RVS used to reach five or six minutes because every
 # attempt waited a full minute and there are up to six attempts (3 per baseline x 2
-# baselines).  The whole observation sequence is now capped at ONE minute: the deadline is
-# set when the sequence starts and every attempt only gets what is left.
+# baselines).  The whole observation sequence is now capped at ONE minute of RVS WAITING.
+#
+# It must count WAITING only, not wall-clock: measured 2026-11-05 19:24, the arm's three
+# moves (parking -> slot -> baseline A -> baseline B, tens of seconds each) consumed the
+# budget, so on arrival at baseline B the chain reported 'budget exhausted' and never even
+# triggered T2.  RVS itself had only used ~26 s.
 RVS_WAIT_BUDGET = 60.0
+RVS_SPENT = [0.0]        # seconds actually spent waiting inside trigger calls
 
 
-def _rvs_remaining(deadline: float, attempts_left: int = 1,
-                   floor: float = 6.0) -> float:
-    """Timeout for the next RVS attempt.
+def rvs_budget_reset() -> None:
+    RVS_SPENT[0] = 0.0
 
-    The budget is shared out, not consumed greedily: with a fixed 20 s cap the first
-    baseline ate everything and the failover never ran (measured 2026-11-05: baseline A
-    used 40 s, and baseline B was skipped with 'budget exhausted').  Each attempt now gets
-    remaining_budget / attempts_left, so every configured attempt is reachable inside the
-    one-minute ceiling.
+
+def rvs_budget_left() -> float:
+    return max(0.0, RVS_WAIT_BUDGET - RVS_SPENT[0])
+
+
+def _rvs_remaining(attempts_left: int = 1, floor: float = 6.0) -> float:
+    """Timeout for the next RVS attempt, from the remaining WAITING budget.
+
+    Two corrections are baked in (both measured on 2026-11-05):
+      * the budget is shared out by attempts_left instead of being consumed greedily;
+      * it counts only the time spent inside trigger calls, never the arm's moves.
     """
-    left = deadline - time.time()
+    left = rvs_budget_left()
     if left < floor:
         return 0.0
     share = left / max(1, attempts_left)
@@ -503,10 +513,12 @@ def trigger_once(command: str, timeout: float, min_frames: int = 1) -> bool:
     never succeed and the failover kept walking the arm to the other baseline
     even though RVS had answered correctly.
     """
+    started = time.time()
     code, text = run([sys.executable, "-u", str(RVS_CLIENT), command,
                       "--timeout", str(timeout),
                       "--min-frames", str(min_frames), "--max-attempts", "1"],
                      timeout=timeout + 120.0)
+    RVS_SPENT[0] += time.time() - started
     answer = [line for line in text.splitlines() if line.startswith("answer:")]
     for line in answer:
         print("   ", line)
@@ -520,11 +532,13 @@ def trigger_once(command: str, timeout: float, min_frames: int = 1) -> bool:
 
 def trigger_consistent(command: str, timeout: float, min_frames: int = 3) -> bool:
     """Collect `min_frames` mutually consistent answers within a bounded budget."""
+    started = time.time()
     code, text = run([sys.executable, "-u", str(RVS_CLIENT), command,
                       "--timeout", str(timeout),
                       "--min-frames", str(min_frames),
                       "--max-attempts", str(min_frames + 3)],
                      timeout=(timeout + 120.0) * (min_frames + 3))
+    RVS_SPENT[0] += time.time() - started
     for line in text.splitlines():
         if line.startswith("answer:"):
             print("   ", line)
@@ -542,7 +556,7 @@ def observe_workpiece_coarse(only: str | None = None) -> str | None:
         print("   no coarse-observation baselines in config")
         return None
     order = [only] if only in baselines else list(baselines)
-    deadline = time.time() + RVS_WAIT_BUDGET
+    rvs_budget_reset()
     for name in order:
         position, quat = baselines[name]
         print(f"\n[3] workpiece coarse observation at baseline {name} "
@@ -553,12 +567,13 @@ def observe_workpiece_coarse(only: str | None = None) -> str | None:
         for attempt in range(1, FAILOVER_ATTEMPTS + 1):
             attempts_left = (FAILOVER_ATTEMPTS - attempt + 1) + \
                 FAILOVER_ATTEMPTS * (len(order) - order.index(name) - 1)
-            budget = _rvs_remaining(deadline, attempts_left)
+            budget = _rvs_remaining(attempts_left)
             if budget <= 0:
-                print(f"   RVS wait budget ({RVS_WAIT_BUDGET:.0f} s) exhausted; stopping")
+                print(f"   RVS wait budget ({RVS_WAIT_BUDGET:.0f} s of WAITING) exhausted; "
+                      f"stopping (spent {RVS_SPENT[0]:.0f} s on triggers)")
                 return None
             print(f"   T2 attempt {attempt}/{FAILOVER_ATTEMPTS} at baseline {name} "
-                  f"(timeout {budget:.0f} s, budget left {deadline - time.time():.0f} s)")
+                  f"(timeout {budget:.0f} s, wait budget left {rvs_budget_left():.0f} s)")
             if trigger_once("T2", budget):
                 capture = latest_capture("T2")
                 if capture is not None:
@@ -985,9 +1000,9 @@ def main() -> int:
             # before giving up (owner rule: one stroke of NG is not a failure, a
             # whole stance failing is).
             box_ok = False
-            t3_deadline = time.time() + RVS_WAIT_BUDGET
+            rvs_budget_reset()
             for attempt in range(1, 4):
-                budget = _rvs_remaining(t3_deadline)
+                budget = _rvs_remaining(4 - attempt)
                 if budget <= 0:
                     print(f"   RVS wait budget ({RVS_WAIT_BUDGET:.0f} s) exhausted for T3")
                     break
