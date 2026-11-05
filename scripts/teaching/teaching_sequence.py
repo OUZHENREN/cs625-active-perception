@@ -142,12 +142,13 @@ APPROACH_HEIGHT_M = 0.150
 # 350 mm back-off alone left the tool too low to watch the entry; the insert end point
 # is unchanged, only where the descent starts from.
 PRE_INSERT_EXTRA_HEIGHT_M = 0.100
-# Surface clearance (owner 2026-11-04, from a real collision; raised to 3 mm on
-# 2026-11-05 because 1.5 mm was still too tight): the gripper's lower motor-protection
+# Surface clearance (owner 2026-11-04, from a real collision; 1.5 -> 3 mm on 2026-11-05,
+# then 3 -> 6 mm the same evening because the gripper's motor-protection seat still hit the
+# groove on the workpiece's outer surface): the gripper's lower motor-protection
 # frame interferes with a groove on the workpiece surface when the grasp point sits on the
 # nominal surface.  Both the grasp and the pre-grasp pose are pulled back along the TOOL x
 # axis by this amount.
-GRASP_CLEARANCE_M = 0.003
+GRASP_CLEARANCE_M = 0.006
 
 
 def run(args: list[str], timeout: float = 240.0) -> tuple[int, str]:
