@@ -105,10 +105,13 @@ def test_spread_rotation_limit_rejected(rvs):
     assert reason and "SPREAD_TOO_LARGE" in reason
 
 
-def test_view_poses_have_no_spread_limit(rvs):
-    # S0/S2 are recomputed per trigger, so a large spread is legitimate there
+def test_view_pose_spread_limits(rvs):
+    # S0 is a slot coarse view and stays unlimited, but S2 (T2) must be self-consistent:
+    # 2026-11-05 three frames taken from a STATIC camera disagreed by 920 mm / 180 deg and
+    # the client still reported one of them as the answer.
     assert rvs.spread_violation("T0", 500.0, 90.0) is None
-    assert rvs.spread_violation("T2", 500.0, 90.0) is None
+    assert rvs.spread_violation("T2", 30.0, 4.0) is None
+    assert "SPREAD_TOO_LARGE" in rvs.spread_violation("T2", 500.0, 90.0)
 
 
 # --- holes 1 and 4: wiring shape ------------------------------------------------
