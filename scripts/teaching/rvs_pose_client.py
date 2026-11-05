@@ -198,7 +198,14 @@ def spread_report(frames: list[dict]) -> tuple[float, float]:
 # Target poses (R1/S3) describe FIXED objects, so their frames must agree
 # (2026-11-02 audit, hole 6).  View poses (S0/S2) legitimately vary because RVS
 # recomputes them per trigger, so no limit applies there.
-SPREAD_LIMITS = {"T1": (30.0, 3.0), "T3": (30.0, 3.0)}
+# Minimum agreement between frames of one capture.  T2 was missing here until 2026-11-05,
+# and that hid a broken recognition: three frames taken from a STATIC camera agreed to
+# within nothing at all (answers 920.9 mm / 179.8 deg apart -- (0.70, 0.43, 0.57) vs
+# (1.44, 0.70, 0.09) vs (1.38, 0.75, 0.07)) yet the client happily reported one of them as
+# "the" view.  A view pose that is meant to decide where the camera stands next must also
+# be self-consistent, so T2 gets a limit too -- looser than T1/T3 because it is a stance,
+# not a millimetre-critical object pose.
+SPREAD_LIMITS = {"T1": (30.0, 3.0), "T2": (60.0, 8.0), "T3": (30.0, 3.0)}
 
 # 2026-11-03 (owner ruling): when RVS has no answer, the FIRST thing to check is
 # RVS_AI.  'NG,POSE,0,0,0,0,0' means the pose was not found, and RVS's coarse
