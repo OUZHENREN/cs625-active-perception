@@ -149,6 +149,11 @@ PRE_INSERT_EXTRA_HEIGHT_M = 0.100
 # nominal surface.  Both the grasp and the pre-grasp pose are pulled back along the TOOL x
 # axis by this amount.
 GRASP_CLEARANCE_M = 0.006
+# Owner 2026-11-05: RVS's box attitude is ~0.8 deg off vertical, which tilts the gripper's
+# motor-protection seat enough to clip the workpiece groove on the way down.  When this is
+# on, the grasp attitude is snapped to EXACTLY vertical while keeping the measured YAW, so
+# the jaws still align with the handles but the seat stays level.
+GRASP_SNAP_VERTICAL = True
 
 
 def run(args: list[str], timeout: float = 240.0) -> tuple[int, str]:
@@ -1295,6 +1300,20 @@ def main() -> int:
             print("missing T3 capture; run the observation steps or reuse a saved one")
             return 4
         grasp_pose, pre_grasp_pose = grasp_from_box(box["position"], box["orientation"])
+        if GRASP_SNAP_VERTICAL:
+            import numpy as _np
+            from scipy.spatial.transform import Rotation as _R
+            _m = _R.from_quat(grasp_pose[1]).as_matrix()
+            _jaw = _m @ _np.array([1.0, 0.0, 0.0])          # jaw axis, kept horizontal
+            _yaw = float(_np.arctan2(_jaw[1], _jaw[0]))
+            # tool z -> world -z, tool x kept at that yaw:  Rz(yaw) * Rx(180)
+            _q_vert = (_R.from_euler("z", _yaw) * _R.from_euler("x", 180.0, degrees=True)).as_quat()
+            _before = float(_np.degrees((_R.from_quat(grasp_pose[1]).inv()
+                                        * _R.from_quat(_q_vert)).magnitude()))
+            print(f"   [vertical] grasp attitude snapped to vertical "
+                  f"(was {_before:.2f} deg off; yaw kept at {_np.degrees(_yaw):.1f} deg)")
+            grasp_pose = (grasp_pose[0], [float(v) for v in _q_vert])
+            pre_grasp_pose = (pre_grasp_pose[0], [float(v) for v in _q_vert])
         # Pull the grasp point back 1.5 mm along the tool x axis so the gripper's
         # motor-protection frame cannot touch the groove on the workpiece surface
         # (owner, after a real collision on 2026-11-04).
