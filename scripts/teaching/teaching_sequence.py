@@ -143,12 +143,12 @@ APPROACH_HEIGHT_M = 0.150
 # is unchanged, only where the descent starts from.
 PRE_INSERT_EXTRA_HEIGHT_M = 0.100
 # Surface clearance (owner 2026-11-04, from a real collision; 1.5 -> 3 mm on 2026-11-05,
-# then 3 -> 6 mm the same evening because the gripper's motor-protection seat still hit the
-# groove on the workpiece's outer surface): the gripper's lower motor-protection
+# then 3 -> 6 mm, then 6 -> 10 mm the same evening because the gripper's motor-protection
+# seat still hit the groove on the workpiece's outer surface): the gripper's lower motor-protection
 # frame interferes with a groove on the workpiece surface when the grasp point sits on the
 # nominal surface.  Both the grasp and the pre-grasp pose are pulled back along the TOOL x
 # axis by this amount.
-GRASP_CLEARANCE_M = 0.006
+GRASP_CLEARANCE_M = 0.010
 # Owner 2026-11-05: RVS's box attitude is ~0.8 deg off vertical, which tilts the gripper's
 # motor-protection seat enough to clip the workpiece groove on the way down.  When this is
 # on, the grasp attitude is snapped to EXACTLY vertical while keeping the measured YAW, so
