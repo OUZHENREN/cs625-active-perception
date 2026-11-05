@@ -230,6 +230,22 @@ def execute_plan(path: Path, time_scale: float, tail_fraction: float,
             for line in text.splitlines()[-2:]:
                 print("   ", line)
             ok = "ALL_ASSEMBLY_CHUNKS_OK" in text
+            if "NO_MOTION" in text:
+                STATE["no_motion"] += 1
+                print(f"   [guard] NO_MOTION #{STATE['no_motion']}/{MAX_NO_MOTION}")
+                if STATE["no_motion"] >= MAX_NO_MOTION:
+                    print("\n   =============== CHAIN ABORTED: NO MOTION ===============")
+                    print("   The controller accepted the goal but the arm did not move, "
+                          "twice in a row.")
+                    print("   The reverse-control channels are opened by the robot's "
+                          "external-control program; when that program is stopped nothing "
+                          "on this side can make the arm move.")
+                    print("   On the teach pendant: confirm the program is loaded, then "
+                          "press Run/Play.  Restart the chain afterwards.")
+                    print("   ========================================================")
+                    raise SystemExit(9)
+            elif "ALL_ASSEMBLY_CHUNKS_OK" in text:
+                STATE["no_motion"] = 0          # a good chunk resets the counter
             if code == 10 and attempts < 3:
                 print(f"   reverse-control channel was down and has been re-sent "
                       f"(attempt {attempts}); retrying this segment")
@@ -357,6 +373,75 @@ def verify_and_correct(label: str, xyz, quat, pos_tol_mm: float,
             print(f"   [{label}] correction did not converge; re-checking once more")
     return False
 
+
+
+
+# --- efficiency guards (owner, 2026-11-05) -------------------------------------
+# A failed reconnect cost ten minutes of repeated whole-chain runs.  The rule now:
+#   * before ANY motion, a 60 s hard gate on the reverse-control channels.  If they do not
+#     come up inside that window the chain refuses to start and prints the diagnosis --
+#     repeating the same attempt cannot help because the channels are initiated by the
+#     robot's external-control program;
+#   * two consecutive NO_MOTION chunks abort the whole chain instead of walking through the
+#     remaining segments;
+#   * the recovery action runs at most once per run.
+START_GATE_SECONDS = 60.0
+MAX_NO_MOTION = 2
+MAX_RECOVERIES = 1
+_REVERSE_PORTS = (50001, 50003, 50004)
+
+
+def reverse_control_ports() -> int:
+    """How many of the robot's reverse-control channels are ESTAB (0..3)."""
+    established = 0
+    for path in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            lines = Path(path).read_text().splitlines()[1:]
+        except OSError:
+            continue
+        for line in lines:
+            fields = line.split()
+            if len(fields) < 4 or fields[3] != "01":        # 01 = ESTABLISHED
+                continue
+            try:
+                local_port = int(fields[1].rsplit(":", 1)[1], 16)
+            except (IndexError, ValueError):
+                continue
+            if local_port in _REVERSE_PORTS:
+                established += 1
+    return established
+
+
+def start_gate(allow_recovery: bool = True) -> bool:
+    """Wait up to START_GATE_SECONDS for the reverse-control channels; refuse otherwise."""
+    count = reverse_control_ports()
+    print(f"\n[start gate] reverse-control channels: {count}/3")
+    if count >= 3:
+        return True
+    if allow_recovery and STATE["recoveries"] < MAX_RECOVERIES:
+        STATE["recoveries"] += 1
+        print("   [start gate] re-sending external_control once")
+        run([sys.executable, "-u", str(REPO / "scripts" / "recover_control.sh")],
+            timeout=120.0)
+        deadline = time.time() + START_GATE_SECONDS
+        while time.time() < deadline:
+            time.sleep(5.0)
+            count = reverse_control_ports()
+            print(f"   [start gate] +{START_GATE_SECONDS - (deadline - time.time()):.0f}s "
+                  f"channels {count}/3")
+            if count >= 3:
+                return True
+    print("\n   ================= CHAIN REFUSED TO START =================")
+    print(f"   reverse-control channels are {count}/3 after "
+          f"{START_GATE_SECONDS:.0f} s and one recovery attempt.")
+    print("   These channels are opened BY THE ROBOT when its external-control program")
+    print("   runs; a stopped program cannot be restarted from this side.")
+    print("   Check on the teach pendant: program loaded, then press Run/Play.")
+    print("   Nothing has moved.  =======================================")
+    return False
+
+
+STATE = {"no_motion": 0, "recoveries": 0}
 
 
 def current_tcp(timeout: float = 8.0):
@@ -1037,6 +1122,11 @@ def main() -> int:
     if not args.confirm:
         print("\ndry run: pass --confirm to execute")
         return 0
+
+    # 60 s hard gate before any motion (owner, 2026-11-05: a failed reconnect must not be
+    # retried for ten minutes).  Nothing moves until the channels are up.
+    if not start_gate():
+        return 5
 
     if not args.skip_observe:
         if not args.skip_env:
