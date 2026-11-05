@@ -166,10 +166,15 @@ def send_command(command: str, xyz_mm: list[float], rpy_deg: list[float]) -> str
 # than MAX_ATTEMPTS times.  RVS occasionally answers with garbage
 # (2026-10-30 T0: x = 4.41 m twice before a good answer); implausible frames
 # are saved for the record but do not count.
-# RVS logs its own ICP fit quality; below ~0.8 the answer is a different feature, not the
-# target (measured 2026-11-05: the frames that jumped 920 mm scored 0.60-0.67, the accepted
-# one 0.846).  Frames below the threshold are saved but do not count.
-FITNESS_MIN = 0.8
+# RVS logs its own ICP fit quality (see scripts/teaching/rvs_fitness.py).  Measured
+# 2026-11-05: the frames that jumped 920 mm apart scored 0.60-0.67, an accepted coarse frame
+# 0.846, and the slot captures 0.99.
+#
+# Thresholds differ by what the pose is used for (owner, 2026-11-05):
+#   T1 (slot fine) and T3 (workpiece fine) feed the grasp/insert maths, so they must reach
+#   0.9; T2 only decides where the camera stands next, so 0.8 is enough.
+FITNESS_MIN = {"T1": 0.9, "T3": 0.9, "T2": 0.8, "T0": 0.8}
+FITNESS_MIN_DEFAULT = 0.8
 
 MIN_FRAMES_DEFAULT = 3
 MAX_ATTEMPTS_DEFAULT = 10
@@ -246,9 +251,9 @@ def main() -> int:
     parser.add_argument("command", choices=sorted(ANSWER_TOPIC))
     parser.add_argument("--tool-offset", type=float, default=0.0,
                         help="metres from flange to TCP along tool z; RVS expects the flange")
-    parser.add_argument("--fitness-min", type=float, default=FITNESS_MIN,
-                        help="minimum RVS pose fitness for a frame to count "
-                             "(read from RVS's own log; 0.8 per the owner)")
+    parser.add_argument("--fitness-min", type=float, default=None,
+                        help="override the per-command RVS fitness floor "
+                             "(default: T1/T3 0.9, T2/T0 0.8 -- owner rule)")
     parser.add_argument("--timeout", type=float, default=300.0,
                         help="per-attempt wait; T3 was ~17 s on 10-27 but T2 took 229 s "
                              "on 2026-10-30, so 300 s is the safe default")
@@ -329,10 +334,12 @@ def main() -> int:
                 record["fitness"] = None
                 record["fitness_error"] = str(exc)
             out.write_text(json.dumps(record, indent=2))
-            if record["fitness"] is not None and record["fitness"] < args.fitness_min:
+            floor = (args.fitness_min if args.fitness_min is not None
+                     else FITNESS_MIN.get(args.command, FITNESS_MIN_DEFAULT))
+            if record["fitness"] is not None and record["fitness"] < floor:
                 print(f"   low-fit frame {record['position'][0]:.3f}, "
                       f"{record['position'][1]:.3f}, {record['position'][2]:.3f} "
-                      f"fitness {record['fitness']:.3f} < {args.fitness_min} "
+                      f"fitness {record['fitness']:.3f} < {floor:.2f} "
                       "(different feature; saved, not counted)")
                 continue
             frames.append(record)
