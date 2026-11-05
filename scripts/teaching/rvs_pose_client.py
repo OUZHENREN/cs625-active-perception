@@ -37,6 +37,7 @@ import math
 import socket
 import sys
 import time
+import pathlib
 from pathlib import Path
 
 import numpy as np
@@ -327,7 +328,7 @@ def main() -> int:
             try:
                 import importlib.util as _ilu
                 _spec = _ilu.spec_from_file_location(
-                    "rvs_fitness", pathlib.Path(__file__).with_name("rvs_fitness.py"))
+                    "rvs_fitness", Path(__file__).with_name("rvs_fitness.py"))
                 _fitness = _ilu.module_from_spec(_spec)
                 _spec.loader.exec_module(_fitness)
                 # Match the trigger's own time interval (see rvs_fitness.for_window).
@@ -338,6 +339,8 @@ def main() -> int:
             except Exception as exc:                      # never break a capture for this
                 record["fitness"] = None
                 record["fitness_error"] = str(exc)
+                print(f"   [fitness] lookup failed ({exc}); fitness not enforced "
+                      "for this frame -- investigate before trusting the 0.9 rule")
             out.write_text(json.dumps(record, indent=2))
             floor = (args.fitness_min if args.fitness_min is not None
                      else FITNESS_MIN.get(args.command, FITNESS_MIN_DEFAULT))
