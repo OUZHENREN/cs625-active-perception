@@ -84,6 +84,25 @@ def latest(since: dt.datetime | None = None, directory: str | None = None):
     return rows
 
 
+def for_window(start: dt.datetime, end: dt.datetime,
+               slack: float = 3.0, directory: str | None = None):
+    """LAST fitness logged inside [start - slack, end + slack], or None.
+
+    Why not "closest to the answer time" (2026-11-05): RVS writes the fitness line while it
+    is doing the ICP, i.e. BEFORE the pose reaches us, and the gap varied by tens of
+    seconds.  Matching with a +/-15 s window around the answer therefore returned None for
+    every capture of a run, so the 0.9 floor silently did nothing.  The trigger's own
+    [start, end] interval is the right frame of reference.
+    """
+    lo = start - dt.timedelta(seconds=slack)
+    hi = end + dt.timedelta(seconds=slack)
+    best = None
+    for stamp, value in latest(since=lo, directory=directory):
+        if stamp <= hi:
+            best = (stamp, value)
+    return best
+
+
 def for_time(when: dt.datetime, window: float = 12.0, directory: str | None = None):
     """Fitness logged closest to `when` (within `window` seconds), or None."""
     best = None

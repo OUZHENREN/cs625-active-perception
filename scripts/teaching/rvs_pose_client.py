@@ -287,8 +287,10 @@ def main() -> int:
             node.received = []
             sent = send_command(args.command, xyz_mm, rpy_deg)
             print(f"[attempt {attempt}/{args.max_attempts}] sent:", sent)
+            started_wall = dt.datetime.now()
             started = time.time()
             answer = node.wait_for_pose(args.timeout)
+            ended_wall = dt.datetime.now()
             elapsed = time.time() - started
             if answer is None:
                 print(f"   no answer after {elapsed:.0f}s")
@@ -328,8 +330,11 @@ def main() -> int:
                     "rvs_fitness", pathlib.Path(__file__).with_name("rvs_fitness.py"))
                 _fitness = _ilu.module_from_spec(_spec)
                 _spec.loader.exec_module(_fitness)
-                found = _fitness.for_time(dt.datetime.now(), window=15.0)
+                # Match the trigger's own time interval (see rvs_fitness.for_window).
+                found = _fitness.for_window(started_wall, ended_wall)
                 record["fitness"] = round(found[1], 6) if found else None
+                record["fitness_window"] = [started_wall.strftime("%H:%M:%S.%f")[:-3],
+                                            ended_wall.strftime("%H:%M:%S.%f")[:-3]]
             except Exception as exc:                      # never break a capture for this
                 record["fitness"] = None
                 record["fitness_error"] = str(exc)
