@@ -445,6 +445,19 @@ def latest_capture(command: str) -> dict | None:
 #   after both:  the task PAUSES (return None) -- no silent continuation
 FAILOVER_ATTEMPTS = 3
 FAILOVER_TIMEOUT = 60.0
+# Owner 2026-11-05: waiting for RVS used to reach five or six minutes because every
+# attempt waited a full minute and there are up to six attempts (3 per baseline x 2
+# baselines).  The whole observation sequence is now capped at ONE minute: the deadline is
+# set when the sequence starts and every attempt only gets what is left.
+RVS_WAIT_BUDGET = 60.0
+
+
+def _rvs_remaining(deadline: float, floor: float = 5.0) -> float:
+    """Timeout for the next RVS attempt: never more than the remaining budget."""
+    left = deadline - time.time()
+    if left < floor:
+        return 0.0
+    return min(FAILOVER_TIMEOUT, left)
 
 
 def load_observation_baselines() -> dict:
@@ -456,7 +469,9 @@ def load_observation_baselines() -> dict:
     except Exception:
         raw = {}
     result = {}
-    for name in ("A", "B"):
+    # A -> B -> C: B is promoted from the last successful fine capture and C keeps the
+    # stance that was demoted (owner, 2026-11-05).
+    for name in ("A", "B", "C"):
         entry = raw.get(name) or {}
         if entry.get("position") and entry.get("quat"):
             result[name] = ([float(v) for v in entry["position"]],
@@ -513,6 +528,7 @@ def observe_workpiece_coarse(only: str | None = None) -> str | None:
         print("   no coarse-observation baselines in config")
         return None
     order = [only] if only in baselines else list(baselines)
+    deadline = time.time() + RVS_WAIT_BUDGET
     for name in order:
         position, quat = baselines[name]
         print(f"\n[3] workpiece coarse observation at baseline {name} "
@@ -521,9 +537,13 @@ def observe_workpiece_coarse(only: str | None = None) -> str | None:
             print(f"   cannot move to baseline {name}; trying the next one")
             continue
         for attempt in range(1, FAILOVER_ATTEMPTS + 1):
+            budget = _rvs_remaining(deadline)
+            if budget <= 0:
+                print(f"   RVS wait budget ({RVS_WAIT_BUDGET:.0f} s) exhausted; stopping")
+                return None
             print(f"   T2 attempt {attempt}/{FAILOVER_ATTEMPTS} at baseline {name} "
-                  f"(timeout {FAILOVER_TIMEOUT:.0f} s)")
-            if trigger_once("T2", FAILOVER_TIMEOUT):
+                  f"(timeout {budget:.0f} s, budget left {deadline - time.time():.0f} s)")
+            if trigger_once("T2", budget):
                 capture = latest_capture("T2")
                 if capture is not None:
                     print(f"   baseline {name} recognised the workpiece")
@@ -949,11 +969,27 @@ def main() -> int:
             # before giving up (owner rule: one stroke of NG is not a failure, a
             # whole stance failing is).
             box_ok = False
+            t3_deadline = time.time() + RVS_WAIT_BUDGET
             for attempt in range(1, 4):
-                print(f"   T3 attempt {attempt}/3 at baseline {baseline_used}")
-                if trigger_consistent("T3", FAILOVER_TIMEOUT, min_frames=3):
+                budget = _rvs_remaining(t3_deadline)
+                if budget <= 0:
+                    print(f"   RVS wait budget ({RVS_WAIT_BUDGET:.0f} s) exhausted for T3")
+                    break
+                print(f"   T3 attempt {attempt}/3 at baseline {baseline_used} "
+                      f"(timeout {budget:.0f} s)")
+                if trigger_consistent("T3", budget, min_frames=3):
                     box_ok = True
                     break
+            if box_ok:
+                # Owner 2026-11-05: the stance where the fine capture succeeded becomes
+                # the coarse baseline B for the next run; the old B becomes C.
+                code, text = run([sys.executable, "-u",
+                                  str(REPO / "scripts" / "teaching" / "promote_baseline.py"),
+                                  "--from-current"], timeout=120.0)
+                for line in text.splitlines():
+                    print("   ", line)
+                if code != 0:
+                    print("   WARN: could not promote this view to baseline B")
             if not box_ok:
                 other = "B" if baseline_used == "A" else "A"
                 print(f"   T3 keeps failing at baseline {baseline_used}; "
@@ -1134,8 +1170,7 @@ def main() -> int:
     SLOT_TILT_DEG = -10.0
     insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(
         slot_xyz, slot_quat, tilt_deg=SLOT_TILT_DEG,
-        extra_height_m=PRE_INSERT_EXTRA_HEIGHT_M,
-        vertical_approach=True)
+        extra_height_m=PRE_INSERT_EXTRA_HEIGHT_M)
     print(f"\n   insert chain from {slot_source}:")
     print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
     print(f"     tilted     {[round(v, 4) for v in insert_tilted[0]]}")

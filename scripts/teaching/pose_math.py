@@ -84,12 +84,11 @@ def insert_from_slot(slot_xyz, slot_quat, tilt_deg=None, extra_height_m=0.0,
     tilt[:3, :3] = R.from_euler("y", angle, degrees=True).as_matrix()
     rotated = insert @ tilt
     if vertical_approach:
-        # Owner 2026-11-04: the entry ATTITUDE is tilted (-10 deg, for the wedge), but the
-        # MOTION must be purely vertical -- only z may change while inserting.  Offsetting
-        # along the tilted tool axis (the senior's formula) makes x advance 0.178 mm per
-        # mm of descent, i.e. 79 mm of lateral travel over a 445 mm insert, which is what
-        # kept driving the workpiece into the slot mouth.  So the pre-insert sits straight
-        # above the insert pose in world z while keeping the tilted attitude.
+        # Kept as an OPTION only.  Owner clarification 2026-11-04: the insertion runs along
+        # the TOOL z axis, so x MUST change in world coordinates -- that is the slot's
+        # direction, not an error.  (My earlier reading of "only z changes" as world z was
+        # wrong: it also discarded the operator's lateral translation of the pre-insert.)
+        # The default chain is the senior's: back off along the tilted tool z.
         pre_insert = rotated.copy()
         pre_insert[0, 3] = insert[0, 3]
         pre_insert[1, 3] = insert[1, 3]
