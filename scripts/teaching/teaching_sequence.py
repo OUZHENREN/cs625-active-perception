@@ -466,6 +466,36 @@ RVS_WAIT_BUDGET = 60.0
 SETTLE_BEFORE_CAPTURE = 15.0
 
 
+def library_gate(kind: str, position, quat, label: str) -> bool:
+    """Gross-error gate against the pose library (owner, 2026-11-05).
+
+    Fitness and frame spread catch a bad MATCH of the right object; this catches a match of
+    the WRONG object or a nonsense pose, by comparing with the poses that were accepted
+    before.  A rejection pauses the task with an explicit report instead of carrying the
+    pose into the grasp/insert stage.  Accepted poses are appended so the library grows.
+    """
+    import importlib.util as _ilu
+    spec = _ilu.spec_from_file_location(
+        "pose_library", REPO / "scripts" / "teaching" / "pose_library.py")
+    library = _ilu.module_from_spec(spec)
+    spec.loader.exec_module(library)
+    ok, reason, best = library.check(kind, position, quat)
+    print(f"   [library] {label}: {reason}")
+    if not ok:
+        print("\n   ================ POSE REJECTED - TASK PAUSED ================")
+        print(f"   {reason}")
+        print(f"   rejected {label}: {[round(float(v), 4) for v in position]}")
+        if best is not None:
+            print(f"   nearest accepted: {[round(float(v), 4) for v in best[2]['position']]}"
+                  f"  ({best[2].get('stamp', '?')})")
+        print("   Check the workpiece/slot placement and RVS recognition, then resume with "
+              "the appropriate --start-from value.  Do NOT continue automatically.")
+        print("   =============================================================\n", flush=True)
+        return False
+    library.add(kind, position, quat)
+    return True
+
+
 def settle_before_capture(where: str, seconds: float | None = None) -> None:
     """Wait for the stance to settle before triggering RVS."""
     total = SETTLE_BEFORE_CAPTURE if seconds is None else seconds
@@ -968,6 +998,11 @@ def main() -> int:
                 print("   slot fine observation failed after 3 attempts; stopping")
                 return 3
             check_slot_history()
+            slot_rec = latest_capture("T1")
+            if slot_rec is not None:
+                if not library_gate("slot", slot_rec["position"],
+                                    slot_rec["orientation"], "R1"):
+                    return 6
 
         if start <= 3:
             baseline_used = observe_workpiece_coarse()
@@ -1068,6 +1103,9 @@ def main() -> int:
         # (1.1701, -0.0094, 0.0314) vs the constant (1.1574, -0.0132, 0.0321),
         # 13 mm apart.  Not changed here; needs an owner decision.
         box = latest_capture("T3")
+        if box is not None and not library_gate("workpiece", box["position"],
+                                                box["orientation"], "S3"):
+            return 6
         if box is None:
             print("missing T3 capture; run the observation steps or reuse a saved one")
             return 4
