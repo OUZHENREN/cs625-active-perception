@@ -538,10 +538,13 @@ def verify_pose_gate(xyz, quat, pos_tol_mm: float = 1.0,
     the 353 mm lever), so the old 0.1 mm could never pass and would abort every
     insert before it started.  1.0 mm is still 35x finer than the slot-pose
     error this chain is fighting."""
+    # "--qz value" breaks when value is negative ("-0.0" looks like an option to argparse):
+    # measured 2026-11-05, the 5b gate aborted every vertical-snap grasp because qz was -0.0.
+    # The "=" form is unambiguous.
     code, text = run([sys.executable, "-u", str(REPO / "scripts" / "teaching" / "verify_pose.py"),
-                      "--x", str(xyz[0]), "--y", str(xyz[1]), "--z", str(xyz[2]),
-                      "--qx", str(quat[0]), "--qy", str(quat[1]),
-                      "--qz", str(quat[2]), "--qw", str(quat[3]),
+                      f"--x={xyz[0]}", f"--y={xyz[1]}", f"--z={xyz[2]}",
+                      f"--qx={quat[0]}", f"--qy={quat[1]}",
+                      f"--qz={quat[2]}", f"--qw={quat[3]}",
                       "--pos-tol-mm", str(pos_tol_mm),
                       "--rot-tol-deg", str(rot_tol_deg)], timeout=60.0)
     for line in text.splitlines():
