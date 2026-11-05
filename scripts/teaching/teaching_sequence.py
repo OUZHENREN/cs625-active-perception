@@ -443,8 +443,13 @@ def latest_capture(command: str) -> dict | None:
 #   switch when: three triggers all come back NG, or the trigger produces no data
 #                for a full timeout
 #   after both:  the task PAUSES (return None) -- no silent continuation
-FAILOVER_ATTEMPTS = 3
-FAILOVER_TIMEOUT = 60.0
+# Owner 2026-11-05: 1 minute total, but the sequence must still be able to try both
+# baselines.  With a 60 s single-attempt timeout the first baseline ate the whole budget
+# (measured: T1 answered in 4.7 s, then baseline A waited 44 s and the budget was gone,
+# so baseline B was never attempted).  Attempts are therefore 2 per baseline with a 20 s
+# cap, and the 60 s total budget still applies as the hard ceiling.
+FAILOVER_ATTEMPTS = 2
+FAILOVER_TIMEOUT = 20.0
 # Owner 2026-11-05: waiting for RVS used to reach five or six minutes because every
 # attempt waited a full minute and there are up to six attempts (3 per baseline x 2
 # baselines).  The whole observation sequence is now capped at ONE minute: the deadline is
