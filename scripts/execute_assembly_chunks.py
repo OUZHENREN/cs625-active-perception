@@ -297,11 +297,24 @@ def main() -> int:
                     stretched = tail_start + (now - tail_start) * args.tail_scale
                     message.time_from_start = Duration(
                         sec=int(stretched), nanosec=int((stretched - int(stretched)) * 1e9))
+        # Tolerances (2026-11-05): a goal that carried only a POSITION tolerance left the
+        # velocity tolerance at its zero default, so a trajectory that finished with a
+        # residual tracking velocity (measured: 0.001 rad on elbow) was reported as
+        # GOAL_TOLERANCE_VIOLATED even though the arm had completed the move.  Both
+        # tolerances are now explicit, and a generous path tolerance stops the controller
+        # from aborting on transient deviations along the way.
         for name in data["joint_names"]:
             tolerance = JointTolerance()
             tolerance.name = name
             tolerance.position = args.goal_tolerance
+            tolerance.velocity = max(0.05, args.goal_tolerance * 5.0)
             goal.goal_tolerance.append(tolerance)
+
+            path = JointTolerance()
+            path.name = name
+            path.position = max(0.15, args.goal_tolerance * 10.0)
+            path.velocity = 1.0
+            goal.path_tolerance.append(path)
         scaled_total = (
             goal.trajectory.points[-1].time_from_start.sec
             + goal.trajectory.points[-1].time_from_start.nanosec * 1e-9
