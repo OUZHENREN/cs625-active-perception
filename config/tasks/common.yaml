@@ -282,7 +282,9 @@ teaching_insert_end:
   formula_end_tcp: [1.1362, -0.0547, 0.0324]     # what the chain computes; 39.7 mm deeper
   depth_below_fixture_mm: 371
   travel_along_tool_mm: 352
-  verdict: "protective stop at the seat; do not drive to the formula end point"
+  verdict: "protective stop under the single-direction strategy; NOT the physical bottom"
+  owner_correction: "2026-11-05: this depth is not the physical bottom -- the part jammed
+    because the rotation space had closed; the real strategy rotates about x while inserting"
   repeatability_mm: 1.1               # three independent attempts stopped at 371-372 mm
   obstructions: "workpiece touches the slot bottom AND two side walls at this depth"
   stamp: "2026-11-04T16:42:00"
@@ -305,3 +307,18 @@ teaching_rotation_policy:
   max_step_deg: 1.5
   note: "rotate only after backing the gripper out of the slot; 2 deg was already too much"
   stamp: "2026-11-04T17:00:00"
+
+# Owner-taught assembly strategy (2026-11-05).  This is the authoritative procedure for this
+# workpiece; it supersedes the single-direction insert attempt of 2026-11-04.
+teaching_assembly_strategy:
+  early_rotation:
+    axis: "world x"
+    note: "rotate about x during the early insert stage to gain a looser region"
+  angle_space_shrinks: "as depth grows the free rotation space closes to almost nothing"
+  steady_free_rotation_deg: [0.5, 1.0]   # the minimum-resistance attitude once deep
+  at_bottom:
+    motion: "lateral y sweep"
+    side_gap_mm: 2.0
+    note: "the two side gaps unbalance easily; use that to widen the clearance"
+  verdict: "this sequence is what completes the assembly; position accuracy alone cannot"
+  stamp: "2026-11-05T16:48:00"
