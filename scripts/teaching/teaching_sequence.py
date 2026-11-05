@@ -459,6 +459,22 @@ FAILOVER_TIMEOUT = 20.0
 # budget, so on arrival at baseline B the chain reported 'budget exhausted' and never even
 # triggered T2.  RVS itself had only used ~26 s.
 RVS_WAIT_BUDGET = 60.0
+# Owner 2026-11-05: after arriving at a capture stance the camera/RVS need time to settle
+# before a trigger is meaningful -- without this the first triggers score ~0.6 and only
+# later ones reach 0.8+.  Settling is NOT part of the RVS wait budget (no trigger runs
+# during it), so the one-minute cap still applies to actual waiting.
+SETTLE_BEFORE_CAPTURE = 15.0
+
+
+def settle_before_capture(where: str, seconds: float | None = None) -> None:
+    """Wait for the stance to settle before triggering RVS."""
+    total = SETTLE_BEFORE_CAPTURE if seconds is None else seconds
+    if total <= 0:
+        return
+    print(f"   [settle] holding still for {total:.0f} s before triggering at {where}")
+    for remaining in range(int(total), 0, -5):
+        print(f"      {remaining:2d} s ...")
+        time.sleep(min(5, remaining))
 RVS_SPENT = [0.0]        # seconds actually spent waiting inside trigger calls
 
 
@@ -564,6 +580,7 @@ def observe_workpiece_coarse(only: str | None = None) -> str | None:
         if not move("observe", position, quat, f"workpiece_coarse_{name}"):
             print(f"   cannot move to baseline {name}; trying the next one")
             continue
+        settle_before_capture(f"baseline {name}")
         for attempt in range(1, FAILOVER_ATTEMPTS + 1):
             attempts_left = (FAILOVER_ATTEMPTS - attempt + 1) + \
                 FAILOVER_ATTEMPTS * (len(order) - order.index(name) - 1)
@@ -995,6 +1012,7 @@ def main() -> int:
                 if not move("observe", substitute["xyz"], substitute["quat"],
                             "workpiece_fine(substitute)"):
                     return 2
+            settle_before_capture("workpiece fine view")
             # Same rule as the coarse step: if the fine workpiece capture keeps
             # failing at this baseline's stance, try the OTHER baseline's stance
             # before giving up (owner rule: one stroke of NG is not a failure, a
@@ -1038,6 +1056,7 @@ def main() -> int:
                                                      box_view["orientation"])
                 if not move("observe", box_tcp, box_quat, "workpiece_fine(switched)"):
                     return 2
+                settle_before_capture("workpiece fine view (switched)")
                 if not trigger_consistent("T3", FAILOVER_TIMEOUT, min_frames=3):
                     print("   T3 still failing after the baseline switch; pausing")
                     return 6

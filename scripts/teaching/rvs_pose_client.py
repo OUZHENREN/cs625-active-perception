@@ -31,6 +31,7 @@ records what came back, which makes it safe to run before any motion step.
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import math
 import socket
@@ -165,6 +166,11 @@ def send_command(command: str, xyz_mm: list[float], rpy_deg: list[float]) -> str
 # than MAX_ATTEMPTS times.  RVS occasionally answers with garbage
 # (2026-10-30 T0: x = 4.41 m twice before a good answer); implausible frames
 # are saved for the record but do not count.
+# RVS logs its own ICP fit quality; below ~0.8 the answer is a different feature, not the
+# target (measured 2026-11-05: the frames that jumped 920 mm scored 0.60-0.67, the accepted
+# one 0.846).  Frames below the threshold are saved but do not count.
+FITNESS_MIN = 0.8
+
 MIN_FRAMES_DEFAULT = 3
 MAX_ATTEMPTS_DEFAULT = 10
 
@@ -240,6 +246,9 @@ def main() -> int:
     parser.add_argument("command", choices=sorted(ANSWER_TOPIC))
     parser.add_argument("--tool-offset", type=float, default=0.0,
                         help="metres from flange to TCP along tool z; RVS expects the flange")
+    parser.add_argument("--fitness-min", type=float, default=FITNESS_MIN,
+                        help="minimum RVS pose fitness for a frame to count "
+                             "(read from RVS's own log; 0.8 per the owner)")
     parser.add_argument("--timeout", type=float, default=300.0,
                         help="per-attempt wait; T3 was ~17 s on 10-27 but T2 took 229 s "
                              "on 2026-10-30, so 300 s is the safe default")
@@ -306,6 +315,25 @@ def main() -> int:
             if not plausible(record):
                 print(f"   implausible frame {[round(v, 3) for v in record['position']]}"
                       " discarded (saved for the record)")
+                continue
+            # RVS's own fit quality for this answer (owner: only >=0.8 is meaningful).
+            try:
+                import importlib.util as _ilu
+                _spec = _ilu.spec_from_file_location(
+                    "rvs_fitness", pathlib.Path(__file__).with_name("rvs_fitness.py"))
+                _fitness = _ilu.module_from_spec(_spec)
+                _spec.loader.exec_module(_fitness)
+                found = _fitness.for_time(dt.datetime.now(), window=15.0)
+                record["fitness"] = round(found[1], 6) if found else None
+            except Exception as exc:                      # never break a capture for this
+                record["fitness"] = None
+                record["fitness_error"] = str(exc)
+            out.write_text(json.dumps(record, indent=2))
+            if record["fitness"] is not None and record["fitness"] < args.fitness_min:
+                print(f"   low-fit frame {record['position'][0]:.3f}, "
+                      f"{record['position'][1]:.3f}, {record['position'][2]:.3f} "
+                      f"fitness {record['fitness']:.3f} < {args.fitness_min} "
+                      "(different feature; saved, not counted)")
                 continue
             frames.append(record)
             print(f"   valid #{len(frames)} {[round(v, 4) for v in record['position']]}"
