@@ -457,12 +457,21 @@ FAILOVER_TIMEOUT = 20.0
 RVS_WAIT_BUDGET = 60.0
 
 
-def _rvs_remaining(deadline: float, floor: float = 5.0) -> float:
-    """Timeout for the next RVS attempt: never more than the remaining budget."""
+def _rvs_remaining(deadline: float, attempts_left: int = 1,
+                   floor: float = 6.0) -> float:
+    """Timeout for the next RVS attempt.
+
+    The budget is shared out, not consumed greedily: with a fixed 20 s cap the first
+    baseline ate everything and the failover never ran (measured 2026-11-05: baseline A
+    used 40 s, and baseline B was skipped with 'budget exhausted').  Each attempt now gets
+    remaining_budget / attempts_left, so every configured attempt is reachable inside the
+    one-minute ceiling.
+    """
     left = deadline - time.time()
     if left < floor:
         return 0.0
-    return min(FAILOVER_TIMEOUT, left)
+    share = left / max(1, attempts_left)
+    return max(floor, min(FAILOVER_TIMEOUT, share))
 
 
 def load_observation_baselines() -> dict:
@@ -542,7 +551,9 @@ def observe_workpiece_coarse(only: str | None = None) -> str | None:
             print(f"   cannot move to baseline {name}; trying the next one")
             continue
         for attempt in range(1, FAILOVER_ATTEMPTS + 1):
-            budget = _rvs_remaining(deadline)
+            attempts_left = (FAILOVER_ATTEMPTS - attempt + 1) + \
+                FAILOVER_ATTEMPTS * (len(order) - order.index(name) - 1)
+            budget = _rvs_remaining(deadline, attempts_left)
             if budget <= 0:
                 print(f"   RVS wait budget ({RVS_WAIT_BUDGET:.0f} s) exhausted; stopping")
                 return None
