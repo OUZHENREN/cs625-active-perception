@@ -996,28 +996,51 @@ def resolve_slot_ambiguity(slot_xyz, slot_quat):
 
 
 def slot_pose_for_insert():
-    """Insertion authority = TODAY's slot measurement (owner decision 2026-11-04).
+    """Insertion authority = the RECORDED verified slot pose (owner, 2026-11-05).
 
-    Insertion is driven ONLY by today's RVS slot measurement (owner, 2026-11-04).
-    The 2026-10-22 stored calibration is obsolete and is not consulted at all:
+    Owner ruling: the live R1 is only a rough cross-check.  Using it as the authority puts
+    the insert target tens of millimetres away from the pose that was actually verified
+    against the real slot, and that is what kept triggering protective/emergency stops.
 
-        pre_insert comes from today's R1: (1.1016, -0.0430, 0.3770)
-        (the obsolete 2026-10-22 calibration would have given (1.0996, -0.0125, 0.3773))
+    Order:
+      1. runtime/slot_reference_verified.json -- the slot pose back-computed from the pose
+         the owner aligned by eye and confirmed inserts cleanly (2026-11-04);
+      2. today's R1 -- only when no recorded reference exists (and then it is used at all
+         because there is nothing better).
 
-    Consequence: a fresh R1 is now REQUIRED.  There is no fallback -- if no T1 capture
-    within the freshness window exists, the chain refuses to compute an insert target
-    instead of silently substituting an old value (that is what caused the 2026-11-03
-    collision).
+    Either way the live R1 is printed as a comparison so drift stays visible.
     """
+    reference_path = REPO / "runtime" / "slot_reference_verified.json"
+    reference = None
+    if reference_path.exists():
+        try:
+            data = json.loads(reference_path.read_text())
+            if data.get("slot") and data.get("slot_quat"):
+                reference = (data["slot"], data["slot_quat"], "recorded verified pose")
+        except (json.JSONDecodeError, OSError):
+            reference = None
+
     r1 = latest_capture("T1")
+    if reference is not None:
+        slot_xyz, slot_quat, source = reference
+        if r1 is not None:
+            import numpy as _np
+            gap = float(_np.linalg.norm(_np.array(r1["position"]) - _np.array(slot_xyz)) * 1000.0)
+            print(f"   [slot] authority = {source} {[round(v, 4) for v in slot_xyz]}")
+            print(f"   [slot] today's R1 sits {gap:.1f} mm away -- recorded only, NOT used "
+                  "(a live-driven target is what triggered the emergency stops)")
+        else:
+            print(f"   [slot] authority = {source} {[round(v, 4) for v in slot_xyz]} "
+                  "(no live R1 available)")
+        return ([float(v) for v in slot_xyz], [float(v) for v in slot_quat], source)
+
     if r1 is None:
-        print("   [slot] NO FRESH R1: refusing to derive an insert target from stale "
-              "data.  Re-run the slot fine observation (T1) first.")
+        print("   [slot] no recorded reference and no fresh R1: refusing to derive a target")
         return None
-    print(f"   [slot] insertion uses TODAY's R1 ({r1['stamp']}); no other source")
+    print(f"   [slot] NO recorded reference; falling back to today's R1 ({r1['stamp']})")
     return ([float(v) for v in r1["position"]],
             [float(v) for v in r1["orientation"]],
-            "today's R1")
+            "today's R1 (fallback)")
 
 
 def taught_view_pose(name: str):
