@@ -514,6 +514,15 @@ def lift_before_lateral(target_xyz, label: str) -> bool:
     return _plan_and_execute(raised, here_quat, "lift-first", 0.015, 2.0, 0.002)
 
 
+
+def retract_along_tool_x(xyz, quat, distance: float):
+    """Move a pose back along its own tool x axis (the grasp clearance direction)."""
+    from scipy.spatial.transform import Rotation as _R
+    import numpy as _np
+    back = _R.from_quat(quat).as_matrix() @ _np.array([distance, 0.0, 0.0])
+    return ([float(xyz[i]) - float(back[i]) for i in range(3)], list(quat))
+
+
 def verify_pose_gate(xyz, quat, pos_tol_mm: float = 1.0,
                      rot_tol_deg: float = 0.1) -> bool:
     """Refuse a tight move when the TCP is off target beyond the gate.
@@ -1434,6 +1443,18 @@ def main() -> int:
     insert_flat, insert_tilted, pre_insert_pose = insert_from_slot(
         slot_xyz, slot_quat, tilt_deg=SLOT_TILT_DEG,
         extra_height_m=PRE_INSERT_EXTRA_HEIGHT_M)
+    # Owner 2026-11-05: the same 3 mm surface clearance that protects the grasp must also
+    # protect the insert stage -- the gripper's motor-protection seat can hit the slot just
+    # as it can hit the workpiece.  Pre-insert, tilted insert and flat (straighten) poses
+    # are all pulled back along their own tool x axis.
+    pre_insert_pose = retract_along_tool_x(pre_insert_pose[0], pre_insert_pose[1],
+                                           GRASP_CLEARANCE_M)
+    insert_tilted = retract_along_tool_x(insert_tilted[0], insert_tilted[1],
+                                         GRASP_CLEARANCE_M)
+    insert_flat = retract_along_tool_x(insert_flat[0], insert_flat[1],
+                                       GRASP_CLEARANCE_M)
+    print(f"   [clearance] pre-insert / insert / straighten pulled back "
+          f"{GRASP_CLEARANCE_M * 1000:.1f} mm along tool x")
     print(f"\n   insert chain from {slot_source}:")
     print(f"     insert     {[round(v, 4) for v in insert_flat[0]]}")
     print(f"     tilted     {[round(v, 4) for v in insert_tilted[0]]}")
