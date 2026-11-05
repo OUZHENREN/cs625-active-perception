@@ -134,6 +134,12 @@ def main() -> int:
     parser.add_argument("--min-rot-deg", type=float, default=0.6)
     parser.add_argument("--y-sweep-mm", type=float, default=2.0)
     parser.add_argument("--y-step-mm", type=float, default=1.0)
+    parser.add_argument("--expect", nargs=7, type=float, default=None,
+                        metavar=("X", "Y", "Z", "QX", "QY", "QZ", "QW"),
+                        help="pose the arm must already be at (the pre-insert gate); "
+                             "the run refuses to start if the TCP is outside --pos-tol-mm")
+    parser.add_argument("--pos-tol-mm", type=float, default=2.0)
+    parser.add_argument("--rot-tol-deg", type=float, default=0.5)
     parser.add_argument("--velocity", type=float, default=0.002)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -156,6 +162,23 @@ def main() -> int:
           f"{args.min_rot_deg:.1f} deg; y sweep +/-{args.y_sweep_mm:.1f} mm at the bottom")
     if args.dry_run:
         return 0
+
+    # Pose re-verification before the insert (owner, 2026-11-05): the chain gates the
+    # pre-insert pose (13b) but this script is also launched by hand, so it checks itself.
+    if args.expect is not None:
+        expected_xyz = np.array(args.expect[:3], dtype=float)
+        expected_quat = np.array(args.expect[3:], dtype=float)
+        pos_err = float(np.linalg.norm(start_xyz - expected_xyz) * 1000.0)
+        rot_err = float(np.degrees((R.from_quat(expected_quat).inv()
+                                    * R.from_quat(start_quat)).magnitude()))
+        print(f"\n[gate] TCP vs expected pre-insert: {pos_err:.2f} mm / {rot_err:.2f} deg "
+              f"(limits {args.pos_tol_mm:.1f} mm / {args.rot_tol_deg:.2f} deg)")
+        if pos_err > args.pos_tol_mm or rot_err > args.rot_tol_deg:
+            print("   GATE FAILED: refusing to start the insert from the wrong pose")
+            node.destroy_node()
+            rclpy.shutdown()
+            return 4
+        print("   GATE OK")
 
     baseline = node.effort()
     print(f"effort baseline {baseline:.2f}")
@@ -203,6 +226,11 @@ def main() -> int:
                 break
     else:
         print("\nno bottom detected within the requested depth; sweep skipped")
+    final, final_quat = node.pose()
+    if final is not None:
+        to_target = float(np.linalg.norm(final - target) * 1000.0)
+        print(f"\nfinal TCP ({final[0]:.4f}, {final[1]:.4f}, {final[2]:.4f})  "
+              f"{to_target:.1f} mm from the recorded insert target")
     node.destroy_node()
     rclpy.shutdown()
     print("ASSEMBLY_SEARCH_DONE")
