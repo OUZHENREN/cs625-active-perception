@@ -256,20 +256,20 @@ teaching_observation_candidates:
 #   A（当前工作位姿，2026-11-03 由所有者手摆）：识别成功
 #   B（下面这组关节）：三帧 3.0 mm / 0.52°，识别成功
 teaching_observation_baselines:
-  # 2026-11-04 11:21 replaced A: was [0.5306, 0.4429, 0.7971] / [-0.4624, 0.8083, 0.0914, 0.3529]
+  # 2026-11-05 21:04 rewritten by promote_baseline.py (successful fine view -> B, old B -> C)
   A:
+    note: 2026-11-04 重设：相机 z=0.758（旧 0.883）、距离 0.77 m（旧 0.93）、 俯角 46.7°；T2 实测 2/2 帧 0.9 mm（旧 A 连续 3 次失败）
     position: [0.5313, 0.4406, 0.6737]
     quat: [-0.4616, 0.8075, 0.0912, 0.3559]
     joints_deg: [63.6, -55.1, -119.1, -54.3, 76.8, 89.1]
-    note: "2026-11-04 重设：相机 z=0.758（旧 0.883）、距离 0.77 m（旧 0.93）、
-      俯角 46.7°；T2 实测 2/2 帧 0.9 mm（旧 A 连续 3 次失败）" 
   B:
-    note: "工件逆时针 +45° 附近；方位角 88.2°、俯角 45°、距瞄准点 1.05 m"
-    position: [0.7288, 0.0239, 0.6588]
-    quat: [-0.1025, 0.9348, 0.3370, 0.0462]
-    joints_deg: [-8.9, -90.1, -83.9, -101.9, 134.7, 171.6]
-    aim_point: [0.790, 0.683, 0.20]
-
+    note: promoted from a successful fine capture
+    position: [0.7279, 0.4006, 0.5731]
+    quat: [-0.5202, 0.7091, 0.2209, 0.4217]
+  C:
+    note: previous B (demoted)
+    position: [0.7253, 0.4001, 0.5721]
+    quat: [-0.5190, 0.7090, 0.2218, 0.4228]
 # --- teaching insert end (owner-verified 2026-11-04) ---------------------------
 # The formula end point (slot x T_s_tcp -> z = 0.0324) is ~40 mm TOO DEEP: the real seat
 # is where the pendant-side protective stop fires, not where the formula says.  The owner
@@ -322,3 +322,16 @@ teaching_assembly_strategy:
     note: "the two side gaps unbalance easily; use that to widen the clearance"
   verdict: "this sequence is what completes the assembly; position accuracy alone cannot"
   stamp: "2026-11-05T16:48:00"
+
+# Grasp/insert geometry rules proven on the real cell (2026-11-05).  The source of truth is
+# the code (teaching_sequence.GRASP_CLEARANCE_M / GRASP_SNAP_VERTICAL); this block documents
+# the values so automation and future sessions see them without reading the source.
+teaching_grasp_geometry:
+  surface_clearance_mm: 6.0
+  clearance_scope: ["grasp", "pre_insert", "insert", "straighten"]
+  clearance_axis: "tool x (retract)"
+  snap_grasp_vertical: true
+  snap_note: "tool z axis forced to world -z, measured yaw kept; costs the measured 0.8 deg"
+  why: "RVS box attitude is ~0.8 deg off vertical and the gripper's motor-protection seat
+    then clips the workpiece groove; 1.5 and 3 mm clearances both failed on 2026-11-05"
+  stamp: "2026-11-05T21:34:00"
