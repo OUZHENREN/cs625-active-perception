@@ -1160,6 +1160,15 @@ def main() -> int:
                       "not consume it, but the six-mode gate would reject it")
 
         start = args.start_from
+        # Startup guard (owner, 2026-11-04): replaying the grasp sequence while the part is
+        # already in the jaws is dangerous.  It belongs HERE, before any motion -- it was
+        # originally placed after [11] staging, where the part is always gripped by design,
+        # so it aborted every successful run (2026-11-05).
+        if start <= 5 and grip_still_holding():
+            print("\nREFUSED: the workpiece is already gripped, but --start-from "
+                  f"{start} would replay the grasp sequence.  Use --start-from 10 "
+                  "(transit) to continue with the part in hand, or release it first.")
+            return 6
         if start > 1:
             print(f"\nRESUMING from step {start}: earlier steps are skipped; "
                   "their state is read back from the captures on disk")
@@ -1511,11 +1520,6 @@ def main() -> int:
 
 
         start = args.start_from
-        if start <= 5 and grip_still_holding():
-            print("\nREFUSED: the workpiece is already gripped, but --start-from "
-                  f"{start} would replay the grasp sequence.  Use --start-from 10 "
-                  "(transit) to continue with the part in hand, or release it first.")
-            return 6
         if start >= 13:
             print(f"\nRESUMING from step {start}: the part must already be gripped")
             if not grip_still_holding():
