@@ -2,7 +2,8 @@
 """Insertion strategy the owner taught on 2026-11-05, executed as a scripted search.
 
 The physical rules (owner, 2026-11-05):
-  1. while the part is still entering, a small rotation about world x opens a looser region;
+  1. while the part is still entering, a small rotation about world Y opens a looser region
+     (Y is the slot-opening axis whose two side gaps are only ~2 mm);
   2. the free rotation space closes with depth, so the amplitude shrinks -- down to a
      steady 0.5-1 deg near the bottom;
   3. once it reaches the bottom, sweep laterally in y: the two side gaps are about 2 mm
@@ -158,7 +159,7 @@ def main() -> int:
     print(f"start ({start_xyz[0]:.4f}, {start_xyz[1]:.4f}, {start_xyz[2]:.4f})  "
           f"target {np.round(target, 4).tolist()}  distance {total_depth:.0f} mm  "
           f"steps {steps} x {args.step_mm:.0f} mm")
-    print(f"dither: +/-{args.rot_amplitude_deg:.1f} deg about world x, shrinking to "
+    print(f"dither: +/-{args.rot_amplitude_deg:.1f} deg about world Y, shrinking to "
           f"{args.min_rot_deg:.1f} deg; y sweep +/-{args.y_sweep_mm:.1f} mm at the bottom")
     if args.dry_run:
         return 0
@@ -191,7 +192,11 @@ def main() -> int:
         amplitude = max(args.min_rot_deg,
                         args.rot_amplitude_deg * (1.0 - 0.7 * fraction))
         sign = 1.0 if index % 2 else -1.0
-        quat = (R.from_euler("x", sign * amplitude, degrees=True) * attitude).as_quat()
+        # Dither about WORLD Y (owner correction 2026-11-05): the two ~2 mm side gaps are
+        # along y, so rotating about y swings the part's lower end in the x-z plane -- i.e.
+        # along the slot opening, never into those gaps.  Rotating about x was wrong: it
+        # swings the lower end in y and squeezes the 2 mm clearances shut.
+        quat = (R.from_euler("y", sign * amplitude, degrees=True) * attitude).as_quat()
         status = plan_and_run(node, point, quat, args.velocity)
         mean = node.effort()
         print(f"{index:>4}{point[2]:>9.4f}{sign * amplitude:>+8.2f}"
