@@ -266,6 +266,13 @@ def move(name: str, xyz, quat, label: str = "", goal_tol: float = 0.008) -> bool
               "(carrying the workpiece)")
         velocity = CARRY_SPEED_CAP
         time_scale = max(time_scale, 2.0)
+    # Safety guard (owner, 2026-11-05): a lateral move that starts near the workpiece must
+    # be preceded by a vertical lift, otherwise a joint-space path can swing the tool
+    # sideways at low height and knock the part over.
+    if name not in CARRY_PHASES and not lift_before_lateral(xyz, label or name):
+        print(f"  {label or name}: REFUSED (could not lift to the safe height first)")
+        return False
+
     plan = Path(f"/tmp/teach_{name}.json")
     code, text = run([sys.executable, "-u", str(PLAN),
                       *[f"{v:.6f}" for v in (*xyz, *quat)],
@@ -349,6 +356,77 @@ def verify_and_correct(label: str, xyz, quat, pos_tol_mm: float,
         if code != 0 and "TCP_GATE_OK" not in text:
             print(f"   [{label}] correction did not converge; re-checking once more")
     return False
+
+
+
+def current_tcp(timeout: float = 8.0):
+    """Read the live TCP pose (xyz, quat) from the broadcaster, or None."""
+    script = (
+        "import rclpy,time,json\n"
+        "from geometry_msgs.msg import PoseStamped\n"
+        "rclpy.init(); n=rclpy.create_node('tcp_read'); d={}\n"
+        "n.create_subscription(PoseStamped,'/tcp_pose_broadcaster/pose',"
+        "lambda m: d.__setitem__('m',m),10)\n"
+        "end=time.time()+6\n"
+        "while 'm' not in d and time.time()<end: rclpy.spin_once(n,timeout_sec=0.1)\n"
+        "print(json.dumps(None) if 'm' not in d else json.dumps("
+        "[[d['m'].pose.position.x,d['m'].pose.position.y,d['m'].pose.position.z],"
+        "[d['m'].pose.orientation.x,d['m'].pose.orientation.y,"
+        "d['m'].pose.orientation.z,d['m'].pose.orientation.w]]))\n"
+        "n.destroy_node(); rclpy.shutdown()\n")
+    code, text = run([sys.executable, "-c", script], timeout=timeout + 10.0)
+    if code != 0:
+        return None
+    for line in reversed(text.splitlines()):
+        line = line.strip()
+        if line.startswith("[["):
+            try:
+                data = json.loads(line)
+            except json.JSONDecodeError:
+                return None
+            return (list(data[0]), list(data[1]))
+    return None
+
+
+def _plan_and_execute(xyz, quat, label: str, velocity: float,
+                      time_scale: float, goal_tol: float) -> bool:
+    """Small plan+execute used by the lift-first guard."""
+    plan = pathlib.Path("/tmp/teach_lift_first.json")
+    code, text = run([sys.executable, "-u", str(PLAN),
+                      *[f"{v:.6f}" for v in (*xyz, *quat)],
+                      "--velocity", str(velocity), "--goal-tol", str(goal_tol),
+                      "--output", str(plan)], timeout=300.0)
+    if code != 0:
+        for line in text.splitlines()[-2:]:
+            print("   ", line)
+        return False
+    ok = execute_plan(plan, time_scale, 0.0, 1.0, goal_tol, 2)
+    print(f"  {label}: {'OK' if ok else 'FAILED'}")
+    return ok
+
+
+def lift_before_lateral(target_xyz, label: str) -> bool:
+    """Raise to the safe height before a lateral move near the workpiece.
+
+    Owner, 2026-11-05, after a near-miss: the gripper was lifted DIAGONALLY away from the
+    pre-grasp pose and the workpiece was almost knocked over.  A joint-space interpolation
+    does not keep a straight line in Cartesian space, so a move that is "just lateral" on
+    paper can swing the tool sideways at low height.  Any move with a significant lateral
+    component, starting below the safe height, therefore performs a PURE VERTICAL lift
+    first and only then the lateral part.
+    """
+    measured = current_tcp()
+    if measured is None:
+        print("   [lift-first] cannot read the TCP; refusing the lateral move")
+        return False
+    here, here_quat = measured
+    lateral = math.hypot(target_xyz[0] - here[0], target_xyz[1] - here[1])
+    if lateral < LIFT_FIRST_LATERAL_M or here[2] >= SAFE_HEIGHT_Z - 0.005:
+        return True                      # nothing to guard
+    print(f"   [lift-first] {label}: {lateral * 1000:.0f} mm lateral while at "
+          f"z={here[2]:.3f} < safe {SAFE_HEIGHT_Z:.3f}; lifting vertically first")
+    raised = [here[0], here[1], SAFE_HEIGHT_Z]
+    return _plan_and_execute(raised, here_quat, "lift-first", 0.015, 2.0, 0.002)
 
 
 def verify_pose_gate(xyz, quat, pos_tol_mm: float = 1.0,
@@ -464,6 +542,10 @@ RVS_WAIT_BUDGET = 60.0
 # later ones reach 0.8+.  Settling is NOT part of the RVS wait budget (no trigger runs
 # during it), so the one-minute cap still applies to actual waiting.
 SETTLE_BEFORE_CAPTURE = 15.0
+# Owner 2026-11-05 (after a near-miss): near the workpiece, always lift or pull back to the
+# safe height before doing anything else.  A lateral component beyond this threshold while
+# below SAFE_HEIGHT_Z triggers an automatic vertical lift first.
+LIFT_FIRST_LATERAL_M = 0.020
 
 
 def library_gate(kind: str, position, quat, label: str) -> bool:
