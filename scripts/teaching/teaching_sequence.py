@@ -142,12 +142,12 @@ APPROACH_HEIGHT_M = 0.150
 # 350 mm back-off alone left the tool too low to watch the entry; the insert end point
 # is unchanged, only where the descent starts from.
 PRE_INSERT_EXTRA_HEIGHT_M = 0.100
-# Surface clearance (owner 2026-11-04, from a real collision): the gripper's lower
-# motor-protection frame interferes with a groove on the workpiece surface when the
-# grasp point sits exactly on the nominal surface.  Both the grasp and the pre-grasp
-# pose are therefore pulled back along the TOOL x axis by this amount, i.e. 1-2 mm of
-# air between the tool body and the part surface.
-GRASP_CLEARANCE_M = 0.0015
+# Surface clearance (owner 2026-11-04, from a real collision; raised to 3 mm on
+# 2026-11-05 because 1.5 mm was still too tight): the gripper's lower motor-protection
+# frame interferes with a groove on the workpiece surface when the grasp point sits on the
+# nominal surface.  Both the grasp and the pre-grasp pose are pulled back along the TOOL x
+# axis by this amount.
+GRASP_CLEARANCE_M = 0.003
 
 
 def run(args: list[str], timeout: float = 240.0) -> tuple[int, str]:
@@ -1081,6 +1081,9 @@ def aim_target():
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--stop-after-pre-insert", action="store_true",
+                        help="run the chain only as far as the pre-insert stance, then stop "
+                             "(no insert, no gripper command)")
     parser.add_argument("--confirm", action="store_true",
                         help="actually move; without it only prints the plan")
     parser.add_argument("--allow-release", action="store_true",
@@ -1499,6 +1502,15 @@ def main() -> int:
     if not verify_pose_gate(pre_insert_xyz, pre_insert_q):
         print("   gate FAILED: aborting before insert")
         return 5
+
+    # Owner 2026-11-05: a run may legitimately stop at the pre-insert stance (to inspect
+    # the stance or to continue the insert separately).  --stop-after-pre-insert does that
+    # cleanly instead of killing the process mid-chain.
+    if args.stop_after_pre_insert:
+        print("\n[stop] reached the pre-insert stance; stopping here by request")
+        print("   pre_insert TCP:", [round(float(v), 4) for v in pre_insert_xyz])
+        print("   to continue later: run the same command without --stop-after-pre-insert")
+        return 0
 
     print("\n[13c] grip-hold check before insert")
     if not grip_still_holding():
