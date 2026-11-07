@@ -110,6 +110,7 @@ def resolve_reference(ref: str) -> pathlib.Path | None:
       4. docs/reference/<basename>            (updated technical reference).
     """
     ref = re.sub(r":\d+(-\d+)?$", "", ref)      # strip a trailing :line or :line-line
+    ref = re.sub(r"::[A-Za-z_][\w.]*\(\)?$", "", ref)   # strip a trailing ::symbol reference
     literal = REPO / ref
     if literal.exists():
         return literal
