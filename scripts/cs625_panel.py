@@ -285,7 +285,7 @@ class StageTable(QtWidgets.QTableWidget):
         for column in range(5):
             item = self.horizontalHeaderItem(column)
             if item is not None:
-                align = (QtCore.Qt.AlignRight if column in (0, 2, 3)
+                align = (QtCore.Qt.AlignRight if column in (0, 3)
                          else QtCore.Qt.AlignLeft)
                 item.setTextAlignment(align | QtCore.Qt.AlignVCenter)
         for row, (number, name) in enumerate(STAGES):
@@ -294,7 +294,9 @@ class StageTable(QtWidgets.QTableWidget):
             for column, text in enumerate((f"{number:02d}", name, "未开始", "",
                                            STAGE_NOTES.get(number, ""))):
                 item = QtWidgets.QTableWidgetItem(text)
-                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                right = column in (0, 3)
+                item.setTextAlignment((QtCore.Qt.AlignRight if right else QtCore.Qt.AlignLeft)
+                                      | QtCore.Qt.AlignVCenter)
                 if column in (0, 2):
                     item.setForeground(QtGui.QColor(C_MUTED))
                 self.setItem(row, column, item)
@@ -751,9 +753,7 @@ class SafeTab(QtWidgets.QWidget):
 
         # 长信息栏：最近一次运行摘要（放得下就多写几行）
         self.summary = LogView()
-        self.summary.setFixedHeight(150)
-        right_column.addWidget(make_group("最近一次运行", self.summary), 0)
-        right_column.addStretch(1)
+        right_column.addWidget(make_group("最近一次运行", self.summary), 1)
         lower_layout.addLayout(right_column, 1)
 
         outer.addWidget(lower, 1)
@@ -1139,13 +1139,26 @@ class EfficiencyTab(QtWidgets.QWidget):
         self.effort_chart = EffortChart()
         right_layout.addWidget(make_group("插入力矩曲线（debug_runs/*/effort.csv）",
                                           self.effort_chart), 1)
+        self.wrench_chart = WrenchChart()
+        self.wrench_chart.setFixedHeight(110)
+        self.wrench_chart.push(None)
+        right_layout.addWidget(make_group("六维力（未安装）", self.wrench_chart), 0)
 
         self.results = QtWidgets.QTableWidget(0, 6)
-        self.results.setHorizontalHeaderLabels(["时间", "成功", "时长 s", "卡滞", "力峰值", "阶段"])
+        self.results.setHorizontalHeaderLabels(["时间", "成功", "时长 s", "卡滞", "力峰值", "备注"])
         self.results.verticalHeader().setVisible(False)
         self.results.setShowGrid(False)
         self.results.verticalHeader().setDefaultSectionSize(24)
-        self.results.horizontalHeader().setStretchLastSection(True)
+        header = self.results.horizontalHeader()
+        header.setStretchLastSection(True)
+        for column, width in {0: 96, 1: 52, 2: 62, 3: 52, 4: 70}.items():
+            header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
+            self.results.setColumnWidth(column, width)
+        for column in range(6):
+            item = self.results.horizontalHeaderItem(column)
+            if item is not None:
+                item.setTextAlignment((QtCore.Qt.AlignLeft if column in (0, 5)
+                                       else QtCore.Qt.AlignRight) | QtCore.Qt.AlignVCenter)
         self.results.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
 
         self.status_card = RvizStatusCard(probe=False)
@@ -1243,8 +1256,8 @@ class EfficiencyTab(QtWidgets.QWidget):
             for column, text in enumerate(values):
                 item = QtWidgets.QTableWidgetItem(text)
                 item.setTextAlignment(
-                    QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter if column
-                    else QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                    (QtCore.Qt.AlignLeft if column in (0, 5) else QtCore.Qt.AlignRight)
+                    | QtCore.Qt.AlignVCenter)
                 self.results.setItem(row, column, item)
         if runs:
             self.effort_chart.load(runs[-1].parent / "effort.csv")
