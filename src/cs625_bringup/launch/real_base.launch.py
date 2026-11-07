@@ -6,6 +6,8 @@ and keeps the motion controller inactive by default. Camera-brand topics end at
 the common sensor adapter launch.
 """
 
+import os
+
 from launch import LaunchDescription
 from launch.actions import (
     DeclareLaunchArgument,
@@ -62,6 +64,7 @@ def _compose(context):
                 launch_arguments={
                     "cs_type": LaunchConfiguration("cs_type"),
                     "robot_ip": LaunchConfiguration("robot_ip"),
+                    "local_ip": LaunchConfiguration("local_ip"),
                     "runtime_config_package": LaunchConfiguration(
                         "runtime_config_package"
                     ),
@@ -227,6 +230,14 @@ def generate_launch_description():
     )
 
     arguments = [
+        DeclareLaunchArgument(
+            "local_ip",
+            # Which host address the robot dials back to for the reverse-control channels.
+            # Vendor default 0.0.0.0 = auto-detect, which on 2026-11-05 advertised an
+            # address the robot could not reach ("未连接到服务端").  Machine-local override:
+            #   export CS625_HOST_IP=<wsl eth1 ip>
+            default_value=os.environ.get("CS625_HOST_IP", "0.0.0.0"),
+        ),
         DeclareLaunchArgument("cs_type", default_value="cs625"),
         DeclareLaunchArgument("use_sim_time", default_value="false"),
         DeclareLaunchArgument("execute", default_value="false"),
