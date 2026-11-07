@@ -1257,6 +1257,14 @@ def main() -> int:
                 print("   [0] WARN: environment model failed; this chain does "
                       "not consume it, but the six-mode gate would reject it")
 
+        if args.resume:
+            restored = resume_start_from()
+            if restored is None:
+                print("\nREFUSED: --resume given but no completed phase is recorded "
+                      f"({RUN_STATE.relative_to(REPO)})")
+                return 6
+            args.start_from = restored
+
         start = args.start_from
         # Startup guard (owner, 2026-11-04): replaying the grasp sequence while the part is
         # already in the jaws is dangerous.  It belongs HERE, before any motion -- it was
