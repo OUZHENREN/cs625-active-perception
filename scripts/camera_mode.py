@@ -115,6 +115,16 @@ MODELING_SPEC = {
     "point_cloud": True,
 }
 
+# 高分辨率档：PS800 系列支持 2560 宽的彩色/深度模式，是否可用由驱动回报为准。
+# 解析力更高、单帧更大（2560x1440 BGR8 约 11 MiB），只建议在做精测量/存档时用。
+HIGH_SPEC = {
+    "label": "high-2560",
+    "color_res": "2560x1440",
+    "depth_res": "2560x1440",
+    "depth_enable": True,
+    "point_cloud": True,
+}
+
 FAST_CANDIDATES = [
     {
         "label": "640x480 color+depth",
@@ -1131,11 +1141,20 @@ def main(argv=None):
     subparsers.add_parser("modeling", help="switch back to 1280x960")
     subparsers.add_parser("probe", help="measure every candidate mode and print a table")
     subparsers.add_parser("stop", help="stop the camera launch recorded by this tool")
+    subparsers.add_parser("high", help="start at 2560x1440 with depth (driver must support it)")
     args = parser.parse_args(argv)
 
     ensure_ros_environment()
 
+    def cmd_high(_args):
+        """切/起 2560 档：先停掉现有相机，再用 HIGH_SPEC 启动并测量。"""
+        stop_camera(verbose=False)
+        result = run_spec(HIGH_SPEC)
+        print_measurement(HIGH_SPEC["label"], result)
+        return 0 if result["color_fps"] > 0 else 1
+
     handlers = {
+        "high": cmd_high,
         "stop": lambda _args: (stop_camera(verbose=True), 0)[1],
         "status": cmd_status,
         "fast": cmd_fast,

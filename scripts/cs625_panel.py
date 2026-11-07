@@ -578,6 +578,7 @@ class SafeTab(QtWidgets.QWidget):
         menu = QtWidgets.QMenu(self.btn_camera)
         menu.addAction("启动（fast，无深度）", lambda: self._camera("fast"))
         menu.addAction("启动（modeling，1280x960）", lambda: self._camera("modeling"))
+        menu.addAction("启动（high，2560x1440）", lambda: self._camera("high"))
         menu.addAction("停止", lambda: self._camera("stop"))
         menu.addSeparator()
         menu.addAction("状态", lambda: self._camera("status"))

@@ -249,8 +249,11 @@ class CameraView(QtWidgets.QWidget):
             return
         pixmap = QtGui.QPixmap.fromImage(self._image)
         self.inner.setPixmap(pixmap)      # 恒为 1:1，不缩放
+        need_w = pixmap.width() + 1000
+        room = self.window().width() if self.window() is not None else 0
+        hint = "" if room >= need_w else f" · 需窗口 ≥{need_w} px 宽"
         self.label_status.setText(
-            f"{self._source} · {pixmap.width()}×{pixmap.height()} · 1:1（不缩放、不滚动）")
+            f"{self._source} · {pixmap.width()}×{pixmap.height()} · 1:1（不缩放、不滚动）{hint}")
 
     def resizeEvent(self, event) -> None:         # noqa: N802
         super().resizeEvent(event)
