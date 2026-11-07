@@ -41,6 +41,59 @@ def _warn(state: int) -> bool:
     return state in (2, 4, 5, 6, 7)
 
 
+
+
+def _sample_cloud(msg, limit: int = 2600) -> list[tuple[float, float, float]]:
+    """Down-sample a PointCloud2 to a drawable list (skip fields, ignore NaN)."""
+    try:
+        import struct
+        fields = {f.name: f for f in msg.fields}
+        if not {"x", "y", "z"} <= set(fields):
+            return []
+        stride = max(1, (msg.width * msg.height) // limit)
+        step = msg.point_step
+        data = bytes(msg.data)
+        points: list[tuple[float, float, float]] = []
+        for index in range(0, msg.width * msg.height, stride):
+            offset = index * step
+            try:
+                x = struct.unpack_from("<f", data, offset + fields["x"].offset)[0]
+                y = struct.unpack_from("<f", data, offset + fields["y"].offset)[0]
+                z = struct.unpack_from("<f", data, offset + fields["z"].offset)[0]
+            except struct.error:
+                break
+            if x != x or y != y or z != z:      # NaN
+                continue
+            if abs(x) > 4 or abs(y) > 4 or abs(z) > 3:
+                continue
+            points.append((x, y, z))
+            if len(points) >= limit:
+                break
+        return points
+    except Exception:                            # noqa: BLE001 - display only
+        return []
+
+
+def _path_joint_samples(msg, limit: int = 12):
+    """Sample joint positions from a DisplayTrajectory so the worker can FK them.
+
+    Returns a list of sensor_msgs/JointState (at most `limit`), or [] when the message
+    carries no trajectory.  A TCP path is then computed from these samples with
+    /compute_fk -- the display must never invent coordinates.
+    """
+    try:
+        if not msg.trajectory:
+            return []
+        joint_trajectory = msg.trajectory[0].joint_trajectory
+        points = joint_trajectory.points
+        if not points:
+            return []
+        step = max(1, len(points) // limit)
+        return [list(p.positions) for p in points[::step]][:limit]
+    except Exception:                            # noqa: BLE001
+        return []
+
+
 class SceneWorker(QtCore.QThread):
     """Collect arm link poses + TCP pose over ROS without blocking the UI.
 
@@ -55,17 +108,49 @@ class SceneWorker(QtCore.QThread):
         super().__init__(parent)
         self._period = period_s
         self._stop = threading.Event()
+        self._cloud_at = 0.0
+        self._path_seen = None
+        self._node = None
 
     def stop(self) -> None:
         self._stop.set()
+
+    def _tcp_path(self, message, joints, fk, rclpy) -> list:
+        """FK the planned joint samples into a TCP polyline (display only, no invention)."""
+        samples = _path_joint_samples(message)
+        if not samples or joints is None or not fk.service_is_ready():
+            return []
+        names = list(joints.name)
+        line = []
+        for positions in samples:
+            try:
+                state = type(joints)()
+                state.name = names
+                state.position = [float(v) for v in positions][:len(names)]
+                request = type(fk.Request())()
+                request.header.frame_id = "world"
+                request.fk_link_names = ["my_end_effector_link"]
+                request.robot_state.joint_state = state
+                future = fk.call_async(request)
+                deadline = time.time() + 0.4
+                while not future.done() and time.time() < deadline:
+                    rclpy.spin_once(self._node, timeout_sec=0.01)
+                result = future.result()
+                if result is None or result.error_code.val != 1:
+                    continue
+                pose = result.pose_stamped[0].pose.position
+                line.append((pose.x, pose.y, pose.z))
+            except Exception:                    # noqa: BLE001
+                continue
+        return line
 
     def run(self) -> None:                      # noqa: C901 - simple polling loop
         try:
             import rclpy
             from geometry_msgs.msg import PoseStamped
             from moveit_msgs.srv import GetPositionFK
-            from moveit_msgs.msg import RobotState
-            from sensor_msgs.msg import JointState
+            from moveit_msgs.msg import DisplayTrajectory, RobotState
+            from sensor_msgs.msg import JointState, PointCloud2
         except Exception as exc:                # noqa: BLE001
             self.failed.emit(f"ROS 不可用：{type(exc).__name__}")
             return
@@ -74,17 +159,24 @@ class SceneWorker(QtCore.QThread):
         try:
             rclpy.init(args=None)
             node = rclpy.create_node("panel_scene")
+            self._node = node
             latest: dict = {}
             node.create_subscription(PoseStamped, "/tcp_pose_broadcaster/pose",
                                      lambda m: latest.__setitem__("tcp", m), 10)
             node.create_subscription(JointState, "/joint_states",
                                      lambda m: latest.__setitem__("joints", m), 10)
+            node.create_subscription(PointCloud2, "/sensors/camera/points",
+                                     lambda m: latest.__setitem__("cloud", m), 2)
+            node.create_subscription(DisplayTrajectory,
+                                     "/move_group/display_planned_path",
+                                     lambda m: latest.__setitem__("path", m), 2)
             fk = node.create_client(GetPositionFK, "/compute_fk")
             order = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
                      "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"]
             announced = False
             while not self._stop.is_set() and rclpy.ok():
                 rclpy.spin_once(node, timeout_sec=self._period)
+                now_s = time.time()
                 payload = {"links": [], "tcp": None, "efforts": {}, "q_deg": {}}
                 joints = latest.get("joints")
                 if joints is not None:
@@ -114,6 +206,14 @@ class SceneWorker(QtCore.QThread):
                 if tcp is not None:
                     p = tcp.pose.position
                     payload["tcp"] = (p.x, p.y, p.z)
+                cloud = latest.get("cloud")
+                if cloud is not None and now_s - self._cloud_at > 1.2:
+                    self._cloud_at = now_s
+                    payload["cloud"] = _sample_cloud(cloud)
+                path = latest.get("path")
+                if path is not None and path is not self._path_seen:
+                    self._path_seen = path
+                    payload["path"] = self._tcp_path(path, latest.get("joints"), fk, rclpy)
                 if payload["links"] or payload["tcp"] or payload["efforts"]:
                     self.frame.emit(payload)
                 elif not announced:
@@ -148,6 +248,8 @@ class SceneView(QtWidgets.QWidget):
         self._drag: tuple[float, float] | None = None
         self._boxes: list[tuple[tuple[float, float, float], tuple[float, float, float], str]] = []
         self._links: list[tuple[str, tuple[float, float, float]]] = []
+        self._cloud: list[tuple[float, float, float]] = []
+        self._path: list[tuple[float, float, float]] = []
         self._tcp: tuple[float, float, float] | None = None
         self._status = "静态场景"
         self._load_model()
@@ -215,6 +317,12 @@ class SceneView(QtWidgets.QWidget):
         tcp = payload.get("tcp")
         if tcp:
             self._tcp = tcp
+        cloud = payload.get("cloud")
+        if cloud is not None:
+            self._cloud = cloud
+        path = payload.get("path")
+        if path is not None:
+            self._path = path
         self._status = "在线" if self._links or self._tcp else self._status
         self.telemetry.emit(payload)
         self.update()
@@ -248,6 +356,8 @@ class SceneView(QtWidgets.QWidget):
         painter.setRenderHint(QtGui.QPainter.Antialiasing, True)
         painter.fillRect(self.rect(), QtGui.QColor("#0b1015"))
         self._draw_floor(painter)
+        self._draw_cloud(painter)
+        self._draw_path(painter)
 
         items: list[tuple[float, str, object]] = []
         for center, size, color in self._boxes:
@@ -291,6 +401,23 @@ class SceneView(QtWidgets.QWidget):
             p0 = self._project((-0.1, i * 0.07, -0.15))
             p1 = self._project((1.5, i * 0.07, -0.15))
             painter.drawLine(p0, p1)
+
+    def _draw_cloud(self, painter: QtGui.QPainter) -> None:
+        if not self._cloud:
+            return
+        painter.setPen(QtGui.QPen(QtGui.QColor("#33475a"), 1))
+        for point in self._cloud[::2]:
+            painter.drawPoint(self._project(point))
+
+    def _draw_path(self, painter: QtGui.QPainter) -> None:
+        if len(self._path) < 2:
+            return
+        painter.setPen(QtGui.QPen(QtGui.QColor("#c8862f"), 1.6))
+        previous = self._project(self._path[0])
+        for point in self._path[1:]:
+            current = self._project(point)
+            painter.drawLine(previous, current)
+            previous = current
 
     def _draw_box(self, painter: QtGui.QPainter, center, size, color: str) -> None:
         """实体盒：顶面 + 两个可见侧面，用明暗区分朝向（比线框更容易看出结构）。"""
