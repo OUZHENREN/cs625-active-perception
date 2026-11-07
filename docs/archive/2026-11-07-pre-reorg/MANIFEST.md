@@ -26,11 +26,11 @@
 
 | 原件 | 新位置 | 更新要点 |
 |---|---|---|
-| `interfaces.md` | `reference/interfaces.md` | 六模式契约 → 位姿契约 + 观测采集中间产物 |
-| `frames_and_topics.md` | `reference/frames_and_topics.md` | 补 tcp_pose_broadcaster / teaching 采集话题 |
-| `project_layout.md` | `reference/project_layout.md` | 补 teaching/ 与 scripts 分层现状 |
-| `dependencies.md` | `reference/dependencies.md` | 补相机↔RVS 互斥、WSL 镜像网络、Windows 防火墙 |
-| `file_viewer.md` | `reference/file_viewer.md` | 原样移动（工具仍可用） |
+| `interfaces.md` | `reference/interfaces.md` | 六模式契约 → 两模式 + 采集/权威/续跑契约（**已完成**） |
+| `frames_and_topics.md` | `reference/frames_and_topics.md` | 补 tcp_pose_broadcaster / RVS 采集 / 状态与力矩话题（**已完成**） |
+| `project_layout.md` | `reference/project_layout.md` | 包边界沿用，脚本层与 runtime 数据目录按现状重写（**已完成**） |
+| `dependencies.md` | `reference/dependencies.md` | 补相机↔RVS 互斥、WSL 镜像网络、Windows 防火墙（**已完成**） |
+| `file_viewer.md` | `reference/file_viewer.md` | 原样移动（工具仍可用，**已完成**） |
 
 ## 四、工作日志
 
