@@ -1019,6 +1019,18 @@ def slot_pose_for_insert():
                 reference = (data["slot"], data["slot_quat"], "recorded verified pose")
         except (json.JSONDecodeError, OSError):
             reference = None
+    if reference is None:
+        # runtime/ is not version-controlled; config/tasks/common.yaml keeps a backup copy so
+        # a cleanup of runtime/ does not silently drop the verified pose (2026-11-07).
+        try:
+            import yaml as _yaml
+            backup = (_yaml.safe_load((REPO / "config" / "tasks" / "common.yaml").read_text())
+                      or {}).get("teaching_slot_reference") or {}
+            if backup.get("slot") and backup.get("slot_quat"):
+                reference = (backup["slot"], backup["slot_quat"],
+                             "config backup (verified pose)")
+        except Exception:
+            reference = None
 
     r1 = latest_capture("T1")
     if reference is not None:

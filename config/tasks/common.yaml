@@ -335,3 +335,14 @@ teaching_grasp_geometry:
   why: "RVS box attitude is ~0.8 deg off vertical and the gripper's motor-protection seat
     then clips the workpiece groove; 1.5, 3 and 6 mm all failed on 2026-11-05"
   stamp: "2026-11-05T21:34:00"
+
+# Last owner-verified slot pose (backup of runtime/slot_reference_verified.json).
+# runtime/ is not version-controlled, so this block is what survives a cleanup.
+# slot_pose_for_insert() reads the runtime file first, then this block, and only falls back
+# to the live R1 when neither exists.  The live R1 is NEVER the authority (2026-11-05: a
+# live-driven target sat 33 mm away from the verified pose and drove the arm into the slot).
+teaching_slot_reference:
+  slot: [1.219397, 0.138884, 0.444411]
+  slot_quat: [-0.001664, -0.000814, -0.004822, 0.999987]
+  source: "manual verified pose 2026-11-04, chain shifted 45.5 mm toward the robot in x"
+  stamp: "2026-11-07T19:40:00"
