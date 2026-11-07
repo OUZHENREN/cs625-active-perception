@@ -57,7 +57,9 @@ class TelemetryWorker(QtCore.QThread):
             return
 
         try:
-            rclpy.init(args=None)
+            self._owns_context = not rclpy.ok()
+            if self._owns_context:
+                rclpy.init(args=None)
             node = rclpy.create_node("panel_status")
             latest: dict = {"cloud_frames": 0}
             node.create_subscription(JointState, "/joint_states",
@@ -98,7 +100,7 @@ class TelemetryWorker(QtCore.QThread):
                         break
                     time.sleep(0.1)
             node.destroy_node()
-            if rclpy.ok():
+            if self._owns_context and rclpy.ok():
                 rclpy.shutdown()
         except Exception as exc:                # noqa: BLE001
             self.frame.emit({"error": f"{type(exc).__name__}: {exc}"})

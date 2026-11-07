@@ -55,7 +55,11 @@ class CameraWorker(QtCore.QThread):
             return
 
         try:
-            rclpy.init(args=None)
+            # 同进程里 status/telemetry 线程也可能先初始化过 rclpy，重复 init 会抛
+            # "Context.init() must only be called once"，所以只在未初始化时初始化。
+            self._owns_context = not rclpy.ok()
+            if self._owns_context:
+                rclpy.init(args=None)
             node = rclpy.create_node("panel_camera")
             qos = QoSProfile(depth=1, history=HistoryPolicy.KEEP_LAST,
                              reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -93,7 +97,7 @@ class CameraWorker(QtCore.QThread):
                     self.status = f"{source} {image.width()}×{image.height()}"
                     self.image_ready.emit(image, source)
             node.destroy_node()
-            if rclpy.ok():
+            if self._owns_context and rclpy.ok():
                 rclpy.shutdown()
         except Exception as exc:                # noqa: BLE001
             self.status = f"异常：{type(exc).__name__}: {exc}"
@@ -136,7 +140,7 @@ class CameraView(QtWidgets.QWidget):
     def __init__(self, probe: bool = True, parent=None) -> None:
         super().__init__(parent)
         self.setStyleSheet(f"background:{C_BG}; border:1px solid {C_BORDER};")
-        self._fit = False
+        self._fit = True          # 默认铺满整列，绝不出现滚动条
         self._image: QtGui.QImage | None = None
         self._source = "color"
 
@@ -150,17 +154,18 @@ class CameraView(QtWidgets.QWidget):
         self.label_status.setStyleSheet(f"color:{C_MUTED}; font-size:8.5pt;")
         self.btn_color = QtWidgets.QPushButton("彩色")
         self.btn_depth = QtWidgets.QPushButton("深度")
-        self.btn_fit = QtWidgets.QPushButton("适应窗口")
+        self.btn_fit = QtWidgets.QPushButton("铺满整列")
         for button in (self.btn_color, self.btn_depth, self.btn_fit):
             button.setFixedHeight(24)
             button.setCheckable(True)
             bar.addWidget(button, 0)
         self.btn_color.setChecked(True)
+        self.btn_fit.setChecked(True)
         bar.addWidget(self.label_status, 1)
         layout.addLayout(bar)
 
         self.canvas = QtWidgets.QScrollArea()
-        self.canvas.setWidgetResizable(False)
+        self.canvas.setWidgetResizable(True)
         self.canvas.setAlignment(QtCore.Qt.AlignCenter)
         self.inner = QtWidgets.QLabel("无图像（相机未启动或 RVS 占用）")
         self.inner.setStyleSheet(f"color:{C_MUTED}; font-size:9pt;")
@@ -214,12 +219,18 @@ class CameraView(QtWidgets.QWidget):
             return
         pixmap = QtGui.QPixmap.fromImage(self._image)
         if self._fit:
-            self.inner.setPixmap(pixmap.scaled(self.canvas.viewport().size(),
-                                               QtCore.Qt.KeepAspectRatio,
-                                               QtCore.Qt.SmoothTransformation))
+            target = self.canvas.viewport().size()
+            scaled = pixmap.scaled(target, QtCore.Qt.KeepAspectRatio,
+                                    QtCore.Qt.SmoothTransformation)
+            self.inner.setPixmap(scaled)
+            ratio = scaled.width() / max(1, pixmap.width()) * 100.0
+            self.label_status.setText(
+                f"{self._source} · {pixmap.width()}×{pixmap.height()} · "
+                f"铺满 {scaled.width()}×{scaled.height()}（{ratio:.0f}%）")
         else:
-            self.inner.setPixmap(pixmap)          # 原始像素，1:1
-        self.inner.resize(pixmap.size() if not self._fit else self.inner.sizeHint())
+            self.inner.setPixmap(pixmap)
+            self.label_status.setText(
+                f"{self._source} · {pixmap.width()}×{pixmap.height()} · 1:1 原始像素")
 
     def resizeEvent(self, event) -> None:         # noqa: N802
         super().resizeEvent(event)

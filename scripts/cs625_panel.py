@@ -590,9 +590,9 @@ class SafeTab(QtWidgets.QWidget):
         splitter.addWidget(self._build_right())
         splitter.addWidget(self._build_camera_column())
         splitter.setStretchFactor(0, 30)
-        splitter.setStretchFactor(1, 26)
-        splitter.setStretchFactor(2, 44)
-        splitter.setSizes([600, 520, 900])
+        splitter.setStretchFactor(1, 30)
+        splitter.setStretchFactor(2, 40)
+        splitter.setSizes([580, 580, 760])
         root.addWidget(splitter, 1)
 
     def _build_left(self) -> QtWidgets.QWidget:
@@ -672,7 +672,8 @@ class SafeTab(QtWidgets.QWidget):
         key_grid.setVerticalSpacing(2)
         self.key_labels: dict[str, QtWidgets.QLabel] = {}
         for row, name in enumerate(("T1 fitness", "T3 fitness", "最近采集", "上次阶段",
-                                    "反控", "当前阶段", "相机", "RViz", "界面")):
+                                    "反控", "当前阶段", "相机", "RViz",
+                                    "分支", "提交")):
             label = QtWidgets.QLabel(name)
             label.setObjectName("Cap")
             value = QtWidgets.QLabel("—")
@@ -682,24 +683,37 @@ class SafeTab(QtWidgets.QWidget):
             key_grid.addWidget(value, row, 1)
         key_grid.setColumnStretch(1, 1)
         key_grid.setRowStretch(9, 1)
-        layout.addWidget(key_box, 1)
+        layout.addWidget(key_box, 0)
 
-        session_box = QtWidgets.QGroupBox("会话")
-        session_grid = QtWidgets.QGridLayout(session_box)
-        session_grid.setContentsMargins(8, 4, 8, 4)
-        session_grid.setVerticalSpacing(2)
-        self.session_labels: dict[str, QtWidgets.QLabel] = {}
-        for row, name in enumerate(("分支", "最近提交")):
-            label = QtWidgets.QLabel(name)
-            label.setObjectName("Cap")
-            value = QtWidgets.QLabel("—")
-            value.setObjectName("Mono")
-            self.session_labels[name] = value
-            session_grid.addWidget(label, row, 0)
-            session_grid.addWidget(value, row, 1)
-        session_grid.setColumnStretch(1, 1)
-        session_box.setFixedHeight(70)
-        layout.addWidget(session_box, 0)
+        self.captures = QtWidgets.QTableWidget(0, 4)
+        self.captures.setHorizontalHeaderLabels(["命令", "fitness", "z m", "时间"])
+        self.captures.verticalHeader().setVisible(False)
+        self.captures.setShowGrid(False)
+        self.captures.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.captures.verticalHeader().setDefaultSectionSize(22)
+        header = self.captures.horizontalHeader()
+        header.setStretchLastSection(True)
+        for column, width in {0: 52, 1: 74, 2: 66}.items():
+            header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
+            self.captures.setColumnWidth(column, width)
+        for column in range(4):
+            item = self.captures.horizontalHeaderItem(column)
+            if item is not None:
+                item.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter
+                                      if column else QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self.captures.setFixedHeight(5 * 22 + 28)
+        layout.addWidget(make_group("最近采集", self.captures), 0)
+
+        self.status_card = RvizStatusCard(probe=self._probe)
+        self.status_card.open_rviz.connect(self._open_rviz)
+        self.status_card.diagnose.connect(self._diagnose_scene)
+        if self._probe:
+            self.status_card._worker.frame.connect(
+                lambda payload: self._on_telemetry(payload))
+        status_box = make_group("3D 状态（RViz）", self.status_card)
+        status_box.setFixedHeight(172)
+        layout.addWidget(status_box, 0)
+
         return panel
 
     def _build_camera_column(self) -> QtWidgets.QWidget:
@@ -710,36 +724,7 @@ class SafeTab(QtWidgets.QWidget):
         layout.setSpacing(3)
 
         self.camera = CameraView(probe=self._probe)
-        layout.addWidget(make_group("相机（原始像素，1:1 可切换）", self.camera), 1)
-
-        self.captures = QtWidgets.QTableWidget(0, 4)
-        self.captures.setHorizontalHeaderLabels(["命令", "fitness", "z m", "时间"])
-        self.captures.verticalHeader().setVisible(False)
-        self.captures.setShowGrid(False)
-        self.captures.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self.captures.verticalHeader().setDefaultSectionSize(22)
-        header = self.captures.horizontalHeader()
-        header.setStretchLastSection(False)
-        for column, width in {0: 52, 1: 74, 2: 66, 3: 90}.items():
-            header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
-            self.captures.setColumnWidth(column, width)
-        for column in range(4):
-            item = self.captures.horizontalHeaderItem(column)
-            if item is not None:
-                item.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter
-                                      if column else QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        self.captures.setFixedHeight(8 * 22 + 28)
-        layout.addWidget(make_group("最近采集", self.captures), 0)
-
-        self.status_card = RvizStatusCard(probe=self._probe)
-        self.status_card.open_rviz.connect(self._open_rviz)
-        self.status_card.diagnose.connect(self._diagnose_scene)
-        if self._probe:
-            self.status_card._worker.frame.connect(
-                lambda payload: self._on_telemetry(payload))
-        status_box = make_group("3D 状态（RViz）", self.status_card)
-        status_box.setFixedHeight(190)
-        layout.addWidget(status_box, 0)
+        layout.addWidget(make_group("相机（铺满整列，可切 1:1）", self.camera), 1)
         return panel
 
     # --------------------------------------------------------------- actions
@@ -943,8 +928,8 @@ class SafeTab(QtWidgets.QWidget):
             stamp = log.split(" ", 1)[1][:28] if " " in log else "—"
         except (OSError, subprocess.SubprocessError):
             pass
-        self.session_labels["分支"].setText(branch)
-        self.session_labels["最近提交"].setText(f"{commit} · {stamp}")
+        self.key_labels["分支"].setText(branch)
+        self.key_labels["提交"].setText(f"{commit} · {stamp}")
         self._session_cache = True
 
     def _refresh_keys(self) -> None:
