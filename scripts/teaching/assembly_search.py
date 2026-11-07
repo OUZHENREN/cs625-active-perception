@@ -15,7 +15,8 @@ Two cautions extracted from it:
       10 deg rotation about the TCP much harder.
 
 The physical rules (owner, 2026-11-05):
-  1. while the part is still entering, a small rotation about world Y opens a looser region
+  1. while the part is still entering, a small rotation about the TCP's own Y axis opens a
+     looser region
      (Y is the slot-opening axis whose two side gaps are only ~2 mm);
   2. the free rotation space closes with depth, so the amplitude shrinks -- down to a
      steady 0.5-1 deg near the bottom;
