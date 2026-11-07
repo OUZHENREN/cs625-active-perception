@@ -105,7 +105,14 @@ def check(kind: str, position, quat=None):
     return True, f"{dist:.0f} mm / {ang:.1f} deg from the nearest accepted pose", best
 
 
+# Only poses that were themselves trustworthy may enter the library (owner, 2026-11-07):
+# a bad sample would turn every later comparison into a false alarm.
+MIN_LIBRARY_FITNESS = 0.9
+
+
 def add(kind: str, position, quat=None, fitness=None, note: str = "") -> None:
+    if fitness is not None and fitness < MIN_LIBRARY_FITNESS:
+        return                      # low-confidence sample: not worth keeping
     data = load()
     entry = {"position": [float(v) for v in position],
              "quat": [float(v) for v in quat] if quat else None,

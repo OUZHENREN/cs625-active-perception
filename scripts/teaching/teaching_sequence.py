@@ -352,6 +352,51 @@ RESUME_FOR_PHASE = {
 }
 
 
+
+# --- reverse-control health monitor (owner, 2026-11-07) -----------------------
+# Waiting for a move to fail before noticing a dead channel wastes a whole segment.  A small
+# watchdog checks the three channels every 5 s while the chain runs and performs the LIGHT
+# recovery (resend external_control, no controller cycle) as soon as they disappear.
+CHANNEL_CHECK_SECONDS = 5.0
+CHANNEL_WATCHDOG = {"thread": None, "stop": False, "recoveries": 0,
+                    "max_recoveries": 3}
+
+
+def _channel_watchdog() -> None:
+    while not CHANNEL_WATCHDOG["stop"]:
+        time.sleep(CHANNEL_CHECK_SECONDS)
+        if CHANNEL_WATCHDOG["stop"]:
+            return
+        if reverse_control_ports() >= 3:
+            continue
+        if CHANNEL_WATCHDOG["recoveries"] >= CHANNEL_WATCHDOG["max_recoveries"]:
+            print("   [channels] still down after the allowed recoveries; leaving it to the "
+                  "driver restart", flush=True)
+            CHANNEL_WATCHDOG["stop"] = True
+            return
+        CHANNEL_WATCHDOG["recoveries"] += 1
+        print(f"   [channels] lost (recovery {CHANNEL_WATCHDOG['recoveries']}/"
+              f"{CHANNEL_WATCHDOG['max_recoveries']}); re-sending external_control",
+              flush=True)
+        run([sys.executable, "-u", str(REPO / "scripts" / "recover_control.sh")],
+            timeout=120.0)
+
+
+def start_channel_watchdog() -> None:
+    import threading
+    if CHANNEL_WATCHDOG["thread"] is not None:
+        return
+    CHANNEL_WATCHDOG["stop"] = False
+    thread = threading.Thread(target=_channel_watchdog, daemon=True)
+    thread.start()
+    CHANNEL_WATCHDOG["thread"] = thread
+    print(f"   [channels] watchdog every {CHANNEL_CHECK_SECONDS:.0f} s is running")
+
+
+def stop_channel_watchdog() -> None:
+    CHANNEL_WATCHDOG["stop"] = True
+
+
 def mark_phase(phase: str) -> None:
     """Remember the last successfully completed phase (owner, 2026-11-07).
 
@@ -737,7 +782,9 @@ def library_gate(kind: str, position, quat, label: str) -> bool:
               "the appropriate --start-from value.  Do NOT continue automatically.")
         print("   =============================================================\n", flush=True)
         return False
-    library.add(kind, position, quat)
+    # Carry the capture's own fit score into the library so later comparisons rest on
+    # trustworthy samples only (owner, 2026-11-07).
+    library.add(kind, position, quat, fitness=STATE.get("last_fitness"))
     return True
 
 
@@ -1246,6 +1293,7 @@ def main() -> int:
     # retried for ten minutes).  Nothing moves until the channels are up.
     if not start_gate():
         return 5
+    start_channel_watchdog()
 
     if not args.skip_observe:
         if not args.skip_env:
@@ -1308,6 +1356,7 @@ def main() -> int:
             check_slot_history()
             slot_rec = latest_capture("T1")
             if slot_rec is not None:
+                STATE["last_fitness"] = slot_rec.get("fitness")
                 if not library_gate("slot", slot_rec["position"],
                                     slot_rec["orientation"], "R1"):
                     return 6
@@ -1411,6 +1460,8 @@ def main() -> int:
         # (1.1701, -0.0094, 0.0314) vs the constant (1.1574, -0.0132, 0.0321),
         # 13 mm apart.  Not changed here; needs an owner decision.
         box = latest_capture("T3")
+        if box is not None:
+            STATE["last_fitness"] = box.get("fitness")
         if box is not None and not library_gate("workpiece", box["position"],
                                                 box["orientation"], "S3"):
             return 6
