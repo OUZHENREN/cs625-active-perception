@@ -588,9 +588,11 @@ class SafeTab(QtWidgets.QWidget):
         splitter.setHandleWidth(4)
         splitter.addWidget(self._build_left())
         splitter.addWidget(self._build_right())
-        splitter.setStretchFactor(0, 38)
-        splitter.setStretchFactor(1, 62)
-        splitter.setSizes([820, 1340])
+        splitter.addWidget(self._build_camera_column())
+        splitter.setStretchFactor(0, 30)
+        splitter.setStretchFactor(1, 26)
+        splitter.setStretchFactor(2, 44)
+        splitter.setSizes([600, 520, 900])
         root.addWidget(splitter, 1)
 
     def _build_left(self) -> QtWidgets.QWidget:
@@ -621,19 +623,28 @@ class SafeTab(QtWidgets.QWidget):
         return panel
 
     def _build_right(self) -> QtWidgets.QWidget:
+        """中列：遥测（力矩/六维力/TCP/夹爪）+ 关键数值 + 会话。"""
         panel = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(3)
 
-        # 遥测三卡等高
         self.effort_bars = EffortBars()
         self.wrench = WrenchGrid()
         self.tcp_label = TcpGripLabel()
-        telemetry = QtWidgets.QWidget()
-        telemetry_row = QtWidgets.QHBoxLayout(telemetry)
-        telemetry_row.setContentsMargins(0, 0, 0, 0)
-        telemetry_row.setSpacing(3)
+        self.effort_bars.setFixedHeight(132)
+        self.wrench.setFixedHeight(132)
+        self.tcp_label.setFixedHeight(132)
+        layout.addWidget(make_group("关节力矩 N·m（满量程 60）", self.effort_bars), 0)
+
+        pair = QtWidgets.QWidget()
+        pair_row = QtWidgets.QHBoxLayout(pair)
+        pair_row.setContentsMargins(0, 0, 0, 0)
+        pair_row.setSpacing(3)
+        pair_row.addWidget(make_group("六维力（未安装）", self.wrench), 1)
+        pair_row.addWidget(make_group("TCP", self.tcp_label), 1)
+        layout.addWidget(pair, 0)
+
         gripper_box = QtWidgets.QGroupBox("夹爪控制")
         gripper_layout = QtWidgets.QVBoxLayout(gripper_box)
         gripper_layout.setContentsMargins(6, 4, 6, 4)
@@ -641,43 +652,27 @@ class SafeTab(QtWidgets.QWidget):
         self.gripper_label = QtWidgets.QLabel("位置 — · 状态 —")
         self.gripper_label.setObjectName("Mono")
         gripper_layout.addWidget(self.gripper_label)
-        gripper_buttons = QtWidgets.QHBoxLayout()
+        gripper_buttons = QtWidgets.QGridLayout()
         gripper_buttons.setSpacing(3)
-        for text, command in (("状态", "status"), ("初始化", "init"),
-                              ("张开", "release"), ("闭合", "grip")):
+        for index, (text, command) in enumerate((("状态", "status"), ("初始化", "init"),
+                                                 ("张开", "release"), ("闭合", "grip"))):
             button = QtWidgets.QPushButton(text)
-            button.setFixedHeight(24)
+            button.setFixedHeight(26)
             button.setToolTip(f"scripts/teaching/gripper.py {command}")
             button.clicked.connect(lambda _checked=False, c=command: self._gripper(c))
-            gripper_buttons.addWidget(button, 1)
+            gripper_buttons.addWidget(button, index // 2, index % 2)
         gripper_layout.addLayout(gripper_buttons)
-        gripper_layout.addStretch(1)
-        self.gripper_box = gripper_box
-
-        for widget, title in ((self.effort_bars, "关节力矩 N·m（满量程 60）"),
-                              (self.wrench, "六维力（未安装）"),
-                              (self.tcp_label, "TCP")):
-            box = make_group(title, widget)
-            box.setFixedHeight(150)
-            telemetry_row.addWidget(box, 1)
-        telemetry_row.addWidget(self.gripper_box, 1)
-        layout.addWidget(telemetry, 0)
-
-        # 关键数值与最近采集：同高，一起撑满中段
-        middle = QtWidgets.QWidget()
-        middle_row = QtWidgets.QHBoxLayout(middle)
-        middle_row.setContentsMargins(0, 0, 0, 0)
-        middle_row.setSpacing(3)
+        gripper_box.setFixedHeight(120)
+        layout.addWidget(gripper_box, 0)
 
         key_box = QtWidgets.QGroupBox("关键数值")
         key_grid = QtWidgets.QGridLayout(key_box)
-        key_grid.setContentsMargins(10, 6, 10, 6)
-        key_grid.setHorizontalSpacing(12)
-        key_grid.setVerticalSpacing(4)
+        key_grid.setContentsMargins(8, 4, 8, 4)
+        key_grid.setHorizontalSpacing(10)
+        key_grid.setVerticalSpacing(2)
         self.key_labels: dict[str, QtWidgets.QLabel] = {}
-        for row, name in enumerate(("T1 fitness", "T3 fitness", "最近采集",
-                                    "上次阶段", "反控", "当前阶段",
-                                    "相机", "RViz", "界面")):
+        for row, name in enumerate(("T1 fitness", "T3 fitness", "最近采集", "上次阶段",
+                                    "反控", "当前阶段", "相机", "RViz", "界面")):
             label = QtWidgets.QLabel(name)
             label.setObjectName("Cap")
             value = QtWidgets.QLabel("—")
@@ -686,9 +681,36 @@ class SafeTab(QtWidgets.QWidget):
             key_grid.addWidget(label, row, 0)
             key_grid.addWidget(value, row, 1)
         key_grid.setColumnStretch(1, 1)
-        key_grid.setRowStretch(len(self.key_labels), 1)
-        key_box.setFixedHeight(236)
-        middle_row.addWidget(key_box, 1)
+        key_grid.setRowStretch(9, 1)
+        layout.addWidget(key_box, 1)
+
+        session_box = QtWidgets.QGroupBox("会话")
+        session_grid = QtWidgets.QGridLayout(session_box)
+        session_grid.setContentsMargins(8, 4, 8, 4)
+        session_grid.setVerticalSpacing(2)
+        self.session_labels: dict[str, QtWidgets.QLabel] = {}
+        for row, name in enumerate(("分支", "最近提交")):
+            label = QtWidgets.QLabel(name)
+            label.setObjectName("Cap")
+            value = QtWidgets.QLabel("—")
+            value.setObjectName("Mono")
+            self.session_labels[name] = value
+            session_grid.addWidget(label, row, 0)
+            session_grid.addWidget(value, row, 1)
+        session_grid.setColumnStretch(1, 1)
+        session_box.setFixedHeight(70)
+        layout.addWidget(session_box, 0)
+        return panel
+
+    def _build_camera_column(self) -> QtWidgets.QWidget:
+        """右列：相机整列高（原始像素 1:1）+ 最近采集 + 3D 状态。"""
+        panel = QtWidgets.QWidget()
+        layout = QtWidgets.QVBoxLayout(panel)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(3)
+
+        self.camera = CameraView(probe=self._probe)
+        layout.addWidget(make_group("相机（原始像素，1:1 可切换）", self.camera), 1)
 
         self.captures = QtWidgets.QTableWidget(0, 4)
         self.captures.setHorizontalHeaderLabels(["命令", "fitness", "z m", "时间"])
@@ -698,7 +720,7 @@ class SafeTab(QtWidgets.QWidget):
         self.captures.verticalHeader().setDefaultSectionSize(22)
         header = self.captures.horizontalHeader()
         header.setStretchLastSection(False)
-        for column, width in {0: 52, 1: 74, 2: 66, 3: 78}.items():
+        for column, width in {0: 52, 1: 74, 2: 66, 3: 90}.items():
             header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
             self.captures.setColumnWidth(column, width)
         for column in range(4):
@@ -706,38 +728,9 @@ class SafeTab(QtWidgets.QWidget):
             if item is not None:
                 item.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter
                                       if column else QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        session_box = QtWidgets.QGroupBox("会话")
-        session_grid = QtWidgets.QGridLayout(session_box)
-        session_grid.setContentsMargins(10, 6, 10, 6)
-        session_grid.setVerticalSpacing(4)
-        self.session_labels: dict[str, QtWidgets.QLabel] = {}
-        for row, name in enumerate(("分支", "最近提交", "配置", "工作目录")):
-            label = QtWidgets.QLabel(name)
-            label.setObjectName("Cap")
-            value = QtWidgets.QLabel("—")
-            value.setObjectName("Mono")
-            value.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
-            self.session_labels[name] = value
-            session_grid.addWidget(label, row, 0)
-            session_grid.addWidget(value, row, 1)
-        session_grid.setColumnStretch(1, 1)
-        session_grid.setRowStretch(4, 1)
+        self.captures.setFixedHeight(8 * 22 + 28)
+        layout.addWidget(make_group("最近采集", self.captures), 0)
 
-        key_column = QtWidgets.QWidget()
-        key_column_layout = QtWidgets.QVBoxLayout(key_column)
-        key_column_layout.setContentsMargins(0, 0, 0, 0)
-        key_column_layout.setSpacing(3)
-        key_column_layout.addWidget(key_box, 0)
-        key_column_layout.addWidget(session_box, 1)
-        middle_row.addWidget(key_column, 1)
-        middle_row.addWidget(make_group("最近采集", self.captures), 2)
-        layout.addWidget(middle, 1)
-
-        # 相机：彩色/深度按原始分辨率 1:1 显示，调试时不被缩放误导
-        self.camera = CameraView(probe=self._probe)
-        layout.addWidget(make_group("相机（1:1 原始像素）", self.camera), 1)
-
-        # 3D 状态卡：只占必要高度
         self.status_card = RvizStatusCard(probe=self._probe)
         self.status_card.open_rviz.connect(self._open_rviz)
         self.status_card.diagnose.connect(self._diagnose_scene)
@@ -745,7 +738,7 @@ class SafeTab(QtWidgets.QWidget):
             self.status_card._worker.frame.connect(
                 lambda payload: self._on_telemetry(payload))
         status_box = make_group("3D 状态（RViz）", self.status_card)
-        status_box.setFixedHeight(196)
+        status_box.setFixedHeight(190)
         layout.addWidget(status_box, 0)
         return panel
 
@@ -951,9 +944,7 @@ class SafeTab(QtWidgets.QWidget):
         except (OSError, subprocess.SubprocessError):
             pass
         self.session_labels["分支"].setText(branch)
-        self.session_labels["最近提交"].setText(commit)
-        self.session_labels["配置"].setText(stamp)
-        self.session_labels["工作目录"].setText(str(REPO))
+        self.session_labels["最近提交"].setText(f"{commit} · {stamp}")
         self._session_cache = True
 
     def _refresh_keys(self) -> None:
