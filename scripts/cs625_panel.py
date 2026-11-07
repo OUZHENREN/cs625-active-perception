@@ -594,8 +594,19 @@ class SafeTab(QtWidgets.QWidget):
         self.captures.verticalHeader().setVisible(False)
         self.captures.setShowGrid(False)
         self.captures.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self.captures.horizontalHeader().setStretchLastSection(True)
         self.captures.verticalHeader().setDefaultSectionSize(20)
+        header = self.captures.horizontalHeader()
+        header.setStretchLastSection(True)
+        widths = {0: 52, 1: 74, 2: 66}
+        for column, width in widths.items():
+            header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
+            self.captures.setColumnWidth(column, width)
+        for column in range(4):
+            item = self.captures.horizontalHeaderItem(column)
+            if item is not None:
+                # 数值列右对齐、文本列左对齐，表头与数据同侧，避免"看着错位"
+                item.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter
+                                      if column else QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
         layout.addWidget(make_group("最近采集", self.captures), 1)
         return panel
 
@@ -612,11 +623,16 @@ class SafeTab(QtWidgets.QWidget):
         bar.setSpacing(4)
         hint = QtWidgets.QLabel("RViz 显示完整场景（规划/Marker/点云）")
         hint.setObjectName("Cap")
+        self.btn_diag = QtWidgets.QPushButton("诊断")
+        self.btn_diag.setFixedWidth(64)
+        self.btn_diag.setToolTip("检查 /joint_states、/compute_fk、点云话题是否真的在")
+        self.btn_diag.clicked.connect(self._diagnose_scene)
         self.btn_rviz = QtWidgets.QPushButton("打开 RViz")
         self.btn_rviz.setFixedWidth(84)
         self.btn_rviz.setToolTip("scripts/open_rviz.sh —— 复用 MoveIt 的 RViz 配置")
         self.btn_rviz.clicked.connect(self._open_rviz)
         bar.addWidget(hint, 1)
+        bar.addWidget(self.btn_diag, 0)
         bar.addWidget(self.btn_rviz, 0)
         scene_layout.addLayout(bar)
         self.scene = SceneView(probe=self._probe)
@@ -687,6 +703,34 @@ class SafeTab(QtWidgets.QWidget):
         process.finished.connect(lambda code, _status: self.log.append_line(
             f"[相机] {action} 结束 code={code}", "ok" if code == 0 else "err"))
         process.start(command[0], command[1:])
+
+    def _diagnose_scene(self) -> None:
+        """把 3D 四个数据源的真实状态打到日志里（每项都是 ros2 命令，失败不影响界面）。"""
+        checks = (
+            ("/joint_states", ["ros2", "topic", "info", "/joint_states"]),
+            ("/compute_fk", ["ros2", "service", "list"]),
+            ("点云 /sensors/camera/points",
+             ["ros2", "topic", "info", "/sensors/camera/points"]),
+            ("/robot_description", ["ros2", "topic", "info", "/robot_description"]),
+        )
+        self.log.append_line("[诊断] 开始检查 3D 数据源", "info")
+        for label, command in checks:
+            code, text = run_cmd(command, timeout=8.0)
+            if code != 0:
+                self.log.append_line(f"[诊断] {label}: 命令失败（ROS 未启动？）", "err")
+                continue
+            if label == "/compute_fk":
+                hit = "/compute_fk" in text
+                self.log.append_line(
+                    f"[诊断] /compute_fk: {'可用' if hit else '缺失（move_group 未运行）'}",
+                    "ok" if hit else "warn")
+                continue
+            publishers = re.search(r"Publisher count:\s*(\d+)", text)
+            subscribers = re.search(r"Subscription count:\s*(\d+)", text)
+            count = publishers.group(1) if publishers else "?"
+            subs = subscribers.group(1) if subscribers else "?"
+            level = "ok" if count not in ("0", "?") else "warn"
+            self.log.append_line(f"[诊断] {label}: 发布者 {count} / 订阅者 {subs}", level)
 
     def _open_rviz(self) -> None:
         """在本面板之外打开标准 RViz（同一份 MoveIt 显示配置）。"""
@@ -759,6 +803,9 @@ class SafeTab(QtWidgets.QWidget):
                       time.strftime("%H:%M:%S", time.localtime(path.stat().st_mtime))]
             for column, text in enumerate(values):
                 item = QtWidgets.QTableWidgetItem(text)
+                item.setTextAlignment(
+                    QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter if column
+                    else QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
                 if column == 1 and fitness is not None:
                     item.setForeground(QtGui.QColor(
                         C_OK if fitness >= limit else C_WARN))
@@ -989,7 +1036,11 @@ class EfficiencyTab(QtWidgets.QWidget):
                       str(data.get("jam_count", "—")),
                       str(data.get("force_peak_n", "—"))]
             for column, text in enumerate(values):
-                self.results.setItem(row, column, QtWidgets.QTableWidgetItem(text))
+                item = QtWidgets.QTableWidgetItem(text)
+                item.setTextAlignment(
+                    QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter if column
+                    else QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+                self.results.setItem(row, column, item)
         if runs:
             self.effort_chart.load(runs[-1].parent / "effort.csv")
 
