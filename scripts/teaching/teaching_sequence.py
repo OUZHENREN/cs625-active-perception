@@ -239,6 +239,24 @@ def execute_plan(path: Path, time_scale: float, tail_fraction: float,
             if "NO_MOTION" in text:
                 STATE["no_motion"] += 1
                 print(f"   [guard] NO_MOTION #{STATE['no_motion']}/{MAX_NO_MOTION}")
+                if (STATE["no_motion"] < MAX_NO_MOTION
+                        and STATE["driver_recoveries"] < MAX_DRIVER_RECOVERIES):
+                    # Owner 2026-11-07: this failure has exactly one remedy -- restart the
+                    # driver stack.  Do it automatically once per run instead of making the
+                    # operator do it by hand (measured six times on 2026-11-05).
+                    STATE["driver_recoveries"] += 1
+                    print("   [guard] restarting the driver stack automatically "
+                          f"(recovery {STATE['driver_recoveries']}/"
+                          f"{MAX_DRIVER_RECOVERIES})")
+                    code_rec, text_rec = run(
+                        ["bash", str(REPO / "scripts" / "recover_driver_stack.sh"),
+                         "--timeout", "120"], timeout=240.0)
+                    for line in text_rec.splitlines():
+                        print("     ", line)
+                    if code_rec == 0:
+                        print("   [guard] driver stack ready; retrying this chunk")
+                        continue
+                    print("   [guard] automatic recovery failed")
                 if STATE["no_motion"] >= MAX_NO_MOTION:
                     print("\n   =============== CHAIN ABORTED: NO MOTION ===============")
                     print("   The controller accepted the goal but the arm did not move, "
@@ -393,6 +411,9 @@ def verify_and_correct(label: str, xyz, quat, pos_tol_mm: float,
 #   * the recovery action runs at most once per run.
 START_GATE_SECONDS = 60.0
 MAX_NO_MOTION = 2
+MAX_DRIVER_RECOVERIES = 1
+# The retry after an automatic driver restart must not re-enter the NO_MOTION branch with a
+# stale counter: the restart itself proves the previous attempt was an infrastructure fault.
 MAX_RECOVERIES = 1
 _REVERSE_PORTS = (50001, 50003, 50004)
 
@@ -447,7 +468,7 @@ def start_gate(allow_recovery: bool = True) -> bool:
     return False
 
 
-STATE = {"no_motion": 0, "recoveries": 0}
+STATE = {"no_motion": 0, "recoveries": 0, "driver_recoveries": 0}
 
 
 def current_tcp(timeout: float = 8.0):
@@ -1612,9 +1633,19 @@ def main() -> int:
         print("   insert aborted/incomplete; stopping the sequence")
         return 8
 
-    print("\n[15] straighten (0.1 m/s)")
-    if not move("straighten", insert_xyz, insert_flat_q, "straighten",
-                goal_tol=0.0003):
+    # [15] straighten: a single 10 deg move jams (the jaws are ~370 mm inside the slot and
+    # sweeping them needs ~35 mm of room that is not there).  The owner's own observation --
+    # a seated part still has ~1.5 deg of free rotation -- turns the achievable angle into the
+    # measurement, so the incremental script is used and it never forces (2026-11-07).
+    print("\n[15] straighten inside the slot (incremental, stops at the slot wall)")
+    code, text = run([sys.executable, "-u",
+                      str(REPO / "scripts" / "teaching" / "straighten_in_slot.py"),
+                      "--total-deg", "10.0", "--step-deg", "0.5",
+                      "--effort-jump", "1.0"], timeout=900.0)
+    for line in text.splitlines()[-12:]:
+        print("   ", line)
+    if code != 0:
+        print("   straighten did not complete; the part is left at the last good attitude")
         return 2
 
     if not args.allow_release:
