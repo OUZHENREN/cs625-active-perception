@@ -135,12 +135,14 @@ class CameraWorker(QtCore.QThread):
 
 
 class CameraView(QtWidgets.QWidget):
-    """1:1 显示相机图像（不缩放），带"适应窗口"开关与状态行。"""
+    """1:1 显示相机图像（不缩放、不滚动），窗口与分割器按图像尺寸腾地方。"""
+
+    image_size = QtCore.pyqtSignal(int, int)      # 真实像素尺寸变化时发出
 
     def __init__(self, probe: bool = True, parent=None) -> None:
         super().__init__(parent)
         self.setStyleSheet(f"background:{C_BG}; border:1px solid {C_BORDER};")
-        self._fit = True          # 默认铺满整列，绝不出现滚动条
+        self._fit = False         # 默认 1:1 原始像素（所有者要求：不缩放）
         self._image: QtGui.QImage | None = None
         self._source = "color"
 
@@ -154,18 +156,20 @@ class CameraView(QtWidgets.QWidget):
         self.label_status.setStyleSheet(f"color:{C_MUTED}; font-size:8.5pt;")
         self.btn_color = QtWidgets.QPushButton("彩色")
         self.btn_depth = QtWidgets.QPushButton("深度")
-        self.btn_fit = QtWidgets.QPushButton("铺满整列")
+        self.btn_fit = QtWidgets.QPushButton("铺满")
         for button in (self.btn_color, self.btn_depth, self.btn_fit):
             button.setFixedHeight(24)
             button.setCheckable(True)
             bar.addWidget(button, 0)
         self.btn_color.setChecked(True)
-        self.btn_fit.setChecked(True)
+        self.btn_fit.setChecked(False)
         bar.addWidget(self.label_status, 1)
         layout.addLayout(bar)
 
         self.canvas = QtWidgets.QScrollArea()
-        self.canvas.setWidgetResizable(True)
+        self.canvas.setWidgetResizable(False)
+        self.canvas.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.canvas.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.canvas.setAlignment(QtCore.Qt.AlignCenter)
         self.inner = QtWidgets.QLabel("无图像（相机未启动或 RVS 占用）")
         self.inner.setStyleSheet(f"color:{C_MUTED}; font-size:9pt;")
@@ -180,6 +184,8 @@ class CameraView(QtWidgets.QWidget):
         self._worker: CameraWorker | None = None
         if probe:
             self.start()
+        else:
+            self._on_image(self._placeholder(), "color")
 
     # ------------------------------------------------------------------
     def start(self) -> None:
@@ -194,6 +200,24 @@ class CameraView(QtWidgets.QWidget):
             self._worker.stop()
             self._worker.wait(1500)
             self._worker = None
+
+    @staticmethod
+    def _placeholder() -> QtGui.QImage:
+        """无相机时画一张 1280×960 网格：用于离线确认"1:1 不缩放"。"""
+        image = QtGui.QImage(1280, 960, QtGui.QImage.Format_RGB888)
+        image.fill(QtGui.QColor("#11161c"))
+        painter = QtGui.QPainter(image)
+        painter.setPen(QtGui.QPen(QtGui.QColor("#243444"), 1))
+        for x in range(0, 1280, 40):
+            painter.drawLine(x, 0, x, 960)
+        for y in range(0, 960, 40):
+            painter.drawLine(0, y, 1280, y)
+        painter.setPen(QtGui.QPen(QtGui.QColor("#2fd6c9"), 2))
+        painter.drawRect(0, 0, 1279, 959)
+        painter.setPen(QtGui.QColor("#7d93a6"))
+        painter.drawText(12, 24, "占位图 1280×960（相机未启动，用于验证 1:1 不缩放）")
+        painter.end()
+        return image
 
     def _set_source(self, source: str) -> None:
         self._source = source
@@ -210,6 +234,12 @@ class CameraView(QtWidgets.QWidget):
 
     def _on_image(self, image: QtGui.QImage, source: str) -> None:
         self._image = image
+        # 1:1 且不允许滚动 → 让控件本身变成图像大小，由分割器/窗口给它留位置
+        self.canvas.setFixedSize(image.width() + 2, image.height() + 2)
+        self.inner.setFixedSize(image.width(), image.height())
+        self.setMinimumWidth(image.width() + 24)
+        self.setMinimumHeight(image.height() + 56)
+        self.image_size.emit(image.width(), image.height())
         self.label_status.setText(f"{source} · {image.width()}×{image.height()} · "
                                   f"{'适应窗口' if self._fit else '1:1'}")
         self._render()
@@ -218,19 +248,9 @@ class CameraView(QtWidgets.QWidget):
         if self._image is None:
             return
         pixmap = QtGui.QPixmap.fromImage(self._image)
-        if self._fit:
-            target = self.canvas.viewport().size()
-            scaled = pixmap.scaled(target, QtCore.Qt.KeepAspectRatio,
-                                    QtCore.Qt.SmoothTransformation)
-            self.inner.setPixmap(scaled)
-            ratio = scaled.width() / max(1, pixmap.width()) * 100.0
-            self.label_status.setText(
-                f"{self._source} · {pixmap.width()}×{pixmap.height()} · "
-                f"铺满 {scaled.width()}×{scaled.height()}（{ratio:.0f}%）")
-        else:
-            self.inner.setPixmap(pixmap)
-            self.label_status.setText(
-                f"{self._source} · {pixmap.width()}×{pixmap.height()} · 1:1 原始像素")
+        self.inner.setPixmap(pixmap)      # 恒为 1:1，不缩放
+        self.label_status.setText(
+            f"{self._source} · {pixmap.width()}×{pixmap.height()} · 1:1（不缩放、不滚动）")
 
     def resizeEvent(self, event) -> None:         # noqa: N802
         super().resizeEvent(event)

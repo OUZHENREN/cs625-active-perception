@@ -65,8 +65,9 @@ def set_scale(_screen_height: int) -> float:
 
 def target_size(screen: QtCore.QRect) -> tuple[int, int]:
     """窗口占据可用逻辑区域的 ~92%（不做物理像素换算，Qt 已处理 DPI）。"""
-    width = min(int(screen.width() * 0.92), 2560)
-    height = min(int(screen.height() * 0.92), 1400)
+    # 4K 屏上直接把窗口开大（所有者 2026-11-08：基本都够用，别裁信息）
+    width = min(int(screen.width() * 0.94), 3600)
+    height = min(int(screen.height() * 0.94), 2000)
     return max(width, MIN_SIZE[0]), max(height, MIN_SIZE[1])
 
 UI_FAMILY = "Noto Sans CJK SC, Source Han Sans SC, WenQuanYi Micro Hei, sans-serif"
@@ -113,10 +114,10 @@ STAGE_NOTES = {
 }
 
 def build_style(scale: float) -> str:
-    body = 9.0 * scale
-    small = 8.0 * scale
-    mono = 9.0 * scale
-    title = 11.0 * scale
+    body = 10.5 * scale
+    small = 9.0 * scale
+    mono = 10.5 * scale
+    title = 13.0 * scale
     return f"""
 QWidget {{ background: {C_BG}; color: {C_TEXT}; font-family: {UI_FAMILY}; font-size: {body:.1f}pt; }}
 QLabel {{ background: transparent; }}
@@ -275,8 +276,8 @@ class StageTable(QtWidgets.QTableWidget):
             header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
             self.setColumnWidth(column, width)
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.Stretch)
-        self.verticalHeader().setDefaultSectionSize(22)
-        fixed_height = 22 * len(STAGES) + 30
+        self.verticalHeader().setDefaultSectionSize(26)
+        fixed_height = 26 * len(STAGES) + 32
         self.setFixedHeight(fixed_height)
         self._rows: dict[int, int] = {}
         self._state: dict[int, str] = {}
@@ -589,10 +590,10 @@ class SafeTab(QtWidgets.QWidget):
         splitter.addWidget(self._build_left())
         splitter.addWidget(self._build_right())
         splitter.addWidget(self._build_camera_column())
-        splitter.setStretchFactor(0, 30)
+        splitter.setStretchFactor(0, 24)
         splitter.setStretchFactor(1, 30)
-        splitter.setStretchFactor(2, 40)
-        splitter.setSizes([580, 580, 760])
+        splitter.setStretchFactor(2, 46)
+        splitter.setSizes([460, 580, 900])
         root.addWidget(splitter, 1)
 
     def _build_left(self) -> QtWidgets.QWidget:
@@ -632,9 +633,9 @@ class SafeTab(QtWidgets.QWidget):
         self.effort_bars = EffortBars()
         self.wrench = WrenchGrid()
         self.tcp_label = TcpGripLabel()
-        self.effort_bars.setFixedHeight(132)
-        self.wrench.setFixedHeight(132)
-        self.tcp_label.setFixedHeight(132)
+        self.effort_bars.setFixedHeight(150)
+        self.wrench.setFixedHeight(150)
+        self.tcp_label.setFixedHeight(150)
         layout.addWidget(make_group("关节力矩 N·m（满量程 60）", self.effort_bars), 0)
 
         pair = QtWidgets.QWidget()
@@ -682,7 +683,7 @@ class SafeTab(QtWidgets.QWidget):
             key_grid.addWidget(label, row, 0)
             key_grid.addWidget(value, row, 1)
         key_grid.setColumnStretch(1, 1)
-        key_grid.setRowStretch(9, 1)
+        key_box.setFixedHeight(300)
         layout.addWidget(key_box, 0)
 
         self.captures = QtWidgets.QTableWidget(0, 4)
@@ -690,7 +691,7 @@ class SafeTab(QtWidgets.QWidget):
         self.captures.verticalHeader().setVisible(False)
         self.captures.setShowGrid(False)
         self.captures.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self.captures.verticalHeader().setDefaultSectionSize(22)
+        self.captures.verticalHeader().setDefaultSectionSize(26)
         header = self.captures.horizontalHeader()
         header.setStretchLastSection(True)
         for column, width in {0: 52, 1: 74, 2: 66}.items():
@@ -701,7 +702,7 @@ class SafeTab(QtWidgets.QWidget):
             if item is not None:
                 item.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter
                                       if column else QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        self.captures.setFixedHeight(5 * 22 + 28)
+        self.captures.setFixedHeight(8 * 26 + 32)
         layout.addWidget(make_group("最近采集", self.captures), 0)
 
         self.status_card = RvizStatusCard(probe=self._probe)
@@ -724,7 +725,7 @@ class SafeTab(QtWidgets.QWidget):
         layout.setSpacing(3)
 
         self.camera = CameraView(probe=self._probe)
-        layout.addWidget(make_group("相机（铺满整列，可切 1:1）", self.camera), 1)
+        layout.addWidget(make_group("相机（1:1 原始像素）", self.camera), 1)
         return panel
 
     # --------------------------------------------------------------- actions
@@ -1216,10 +1217,20 @@ class PanelWindow(QtWidgets.QMainWindow):
         self.tabs = QtWidgets.QTabWidget()
         self.safe = SafeTab(probe=probe and not smoke)
         self.efficient = EfficiencyTab()
+        self.safe.camera.image_size.connect(self._ensure_camera_room)
         self.tabs.addTab(self.safe, "安全模式")
         self.tabs.addTab(self.efficient, "效率模式")
         layout.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
+
+    def _ensure_camera_room(self, width: int, height: int) -> None:
+        """1:1 不滚动的前提：窗口与最小尺寸必须能装下整幅图像。"""
+        need_w = width + 1000          # 左列 + 中列 + 边距
+        need_h = height + 220
+        if self.minimumWidth() < need_w or self.minimumHeight() < need_h:
+            self.setMinimumSize(max(MIN_SIZE[0], need_w), max(MIN_SIZE[1], need_h))
+        if self.width() < need_w or self.height() < need_h:
+            self.resize(max(self.width(), need_w), max(self.height(), need_h))
 
     def closeEvent(self, event) -> None:            # noqa: N802
         poller = getattr(self.safe, "_poller", None)
