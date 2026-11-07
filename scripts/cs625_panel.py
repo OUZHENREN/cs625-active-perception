@@ -670,9 +670,9 @@ class SafeTab(QtWidgets.QWidget):
         outer.addWidget(effort_box, 0)
 
         self.wrench = WrenchChart()
-        self.wrench.setFixedHeight(110)
+        self.wrench.setFixedHeight(150)          # 与关节力矩同高
         wrench_box = make_group("六维力（未安装）", self.wrench)
-        wrench_box.setFixedHeight(138)
+        wrench_box.setFixedHeight(178)
         outer.addWidget(wrench_box, 0)
 
         # 下半部分：左右两列
@@ -1140,9 +1140,8 @@ class EfficiencyTab(QtWidgets.QWidget):
         right_layout.addWidget(make_group("插入力矩曲线（debug_runs/*/effort.csv）",
                                           self.effort_chart), 1)
         self.wrench_chart = WrenchChart()
-        self.wrench_chart.setFixedHeight(110)
         self.wrench_chart.push(None)
-        right_layout.addWidget(make_group("六维力（未安装）", self.wrench_chart), 0)
+        right_layout.addWidget(make_group("六维力（未安装）", self.wrench_chart), 1)
 
         self.results = QtWidgets.QTableWidget(0, 6)
         self.results.setHorizontalHeaderLabels(["时间", "成功", "时长 s", "卡滞", "力峰值", "备注"])
