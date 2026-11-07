@@ -155,6 +155,38 @@ GRASP_CLEARANCE_M = 0.010
 # the jaws still align with the handles but the seat stays level.
 GRASP_SNAP_VERTICAL = True
 
+# --- 效率模式（调试版）开关，2026-11-07 -------------------------------------
+# These relax CONVENIENCE checks only (pose gates, pose library, settle time).  The
+# protective-stop rules, the lift-before-lateral guard and the release permission are never
+# affected by any of them.
+DEBUG = {"no_gates": False, "no_settle": False}
+STOP_AFTER_STAGE = [None]
+
+
+def apply_speed_overrides(pairs: list[str]) -> None:
+    """--speed-override pre_grasp=0.03,grasp=0.02 -> rewrite the SPEED table."""
+    for item in pairs:
+        for chunk in item.split(","):
+            if not chunk.strip():
+                continue
+            key, _, value = chunk.partition("=")
+            key = key.strip()
+            if key not in SPEED:
+                raise SystemExit(f"--speed-override: unknown phase {key!r}; known: {sorted(SPEED)}")
+            velocity = float(value)
+            if velocity <= 0:
+                raise SystemExit(f"--speed-override: {key} must be positive")
+            _, time_scale, tail_fraction, tail_scale = SPEED[key]
+            SPEED[key] = (velocity, time_scale, tail_fraction, tail_scale)
+            print(f"   [debug] speed override {key} -> {velocity} m/s")
+
+
+def maybe_stop(stage: int, what: str) -> None:
+    """Exit cleanly right after the requested stage (efficiency mode)."""
+    if STOP_AFTER_STAGE[0] == stage:
+        print(f"\n[debug] stopping after stage {stage} ({what}) as requested")
+        raise SystemExit(0)
+
 
 def run(args: list[str], timeout: float = 240.0) -> tuple[int, str]:
     done = subprocess.run(args, capture_output=True, timeout=timeout)
@@ -646,6 +678,9 @@ def verify_pose_gate(xyz, quat, pos_tol_mm: float = 1.0,
     # "--qz value" breaks when value is negative ("-0.0" looks like an option to argparse):
     # measured 2026-11-05, the 5b gate aborted every vertical-snap grasp because qz was -0.0.
     # The "=" form is unambiguous.
+    if DEBUG["no_gates"]:
+        print("   [gate] skipped by --no-gates (pose gate only)")
+        return True
     code, text = run([sys.executable, "-u", str(REPO / "scripts" / "teaching" / "verify_pose.py"),
                       f"--x={xyz[0]}", f"--y={xyz[1]}", f"--z={xyz[2]}",
                       f"--qx={quat[0]}", f"--qy={quat[1]}",
@@ -771,6 +806,9 @@ def library_gate(kind: str, position, quat, label: str) -> bool:
     spec.loader.exec_module(library)
     ok, reason, best = library.check(kind, position, quat)
     print(f"   [library] {label}: {reason}")
+    if not ok and DEBUG["no_gates"]:
+        print("   [library] outlier accepted because --no-gates is set (DEBUG ONLY)")
+        ok = True
     if not ok:
         print("\n   ================ POSE REJECTED - TASK PAUSED ================")
         print(f"   {reason}")
@@ -790,6 +828,9 @@ def library_gate(kind: str, position, quat, label: str) -> bool:
 
 def settle_before_capture(where: str, seconds: float | None = None) -> None:
     """Wait for the stance to settle before triggering RVS."""
+    if DEBUG["no_settle"]:
+        print(f"   [settle] skipped by --no-settle ({where})")
+        return
     total = SETTLE_BEFORE_CAPTURE if seconds is None else seconds
     if total <= 0:
         return
@@ -1241,6 +1282,15 @@ def aim_target():
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--stop-after-stage", type=int, default=None,
+                        help="exit right after this stage (efficiency mode)")
+    parser.add_argument("--no-gates", action="store_true",
+                        help="skip 5b/6b/13b pose gates and the pose-library rejection "
+                             "(protective-stop rules, lift guard and release stay enforced)")
+    parser.add_argument("--no-settle", action="store_true",
+                        help="skip the 15 s settle before an RVS capture")
+    parser.add_argument("--speed-override", action="append", default=[],
+                        metavar="PHASE=VELOCITY", help="e.g. pre_grasp=0.03 (repeatable)")
     parser.add_argument("--resume", action="store_true",
                         help="reopen the chain just before the last successfully completed "
                              "phase (runtime/teaching_run_state.json), instead of --start-from")
@@ -1285,6 +1335,16 @@ def main() -> int:
     ]
     for line in steps:
         print(line)
+    # Efficiency-mode switches are applied before anything else so that --speed-override and
+    # --no-settle affect every later step (2026-11-07).
+    DEBUG["no_gates"] = bool(args.no_gates)
+    DEBUG["no_settle"] = bool(args.no_settle)
+    STOP_AFTER_STAGE[0] = args.stop_after_stage
+    if args.speed_override:
+        apply_speed_overrides(args.speed_override)
+    if args.no_gates:
+        print("   [debug] gates relaxed (pose gates + pose library only)")
+
     if not args.confirm:
         print("\ndry run: pass --confirm to execute")
         return 0
@@ -1548,6 +1608,7 @@ def main() -> int:
             print("   gate FAILED: aborting before entering the grasp area")
             return 7
 
+        maybe_stop(5, "预抓取")
         print("\n[6] init + enter grasp (jaws closed)")
         state = gripper("init")
         print(f"   gripper after init: {state}")
@@ -1559,6 +1620,7 @@ def main() -> int:
             print("   gate FAILED: aborting before opening the jaws")
             return 7
 
+        maybe_stop(6, "进入抓取")
         print("\n[7] open to grip width")
         print(f"   {gripper('grip')}")
         if not grip_still_holding():
@@ -1592,6 +1654,7 @@ def main() -> int:
         if code != 0:
             print("   WARN: could not clear the scene; the lift may refuse to plan")
 
+        maybe_stop(7, "张爪夹持")
         print("\n[8] lift 0.15 m")
         lifted = [grasp_pose[0][0], grasp_pose[0][1], grasp_pose[0][2] + 0.15]
         if not move("lift", lifted, grasp_pose[1], "lift"):
@@ -1667,6 +1730,7 @@ def main() -> int:
     if args.start_from >= 12:
         print("\n[10-11] transit/staging SKIPPED (resumed at the rotation step)")
     else:
+        maybe_stop(9, "抬到安全高度")
         print("\n[10] transit")
         if not move("transit", POSE["transit"][0], grasp_pose[1], "transit"):
             return 2
@@ -1684,6 +1748,7 @@ def main() -> int:
                       "cannot resume at the insert stage")
                 return 6
             print("   grip check OK: the workpiece is held")
+    maybe_stop(11, "staging")
     print("\n[12] rotate to -10 deg at safe height (translation unchanged)")
     hold = POSE["staging"][0]
     if not move("pre_insert", [hold[0], hold[1], hold[2]], pre_insert_q,
@@ -1697,6 +1762,7 @@ def main() -> int:
     # a lateral disagreement beyond SLOT_AGREEMENT_MM means one of the two is wrong
     # and the insert must not start.
     SLOT_AGREEMENT_MM = 10.0
+    maybe_stop(12, "旋转")
     if args.start_from < 13:
         print("\n[13] descend vertically to the pre-insert height")
     if not move("pre_insert", pre_insert_xyz, pre_insert_q, "descend only",
@@ -1722,6 +1788,7 @@ def main() -> int:
         print("   part no longer gripped; aborting")
         return 6
 
+    maybe_stop(13, "下降到预插入")
     print("\n[14] insert along the tilted axis (effort-supervised, 专项 3 A 期)")
     code, text = run([sys.executable, "-u",
                       str(REPO / "scripts" / "compliant_insert.py"),
@@ -1738,6 +1805,7 @@ def main() -> int:
     # sweeping them needs ~35 mm of room that is not there).  The owner's own observation --
     # a seated part still has ~1.5 deg of free rotation -- turns the achievable angle into the
     # measurement, so the incremental script is used and it never forces (2026-11-07).
+    maybe_stop(14, "插入")
     print("\n[15] straighten inside the slot (incremental, stops at the slot wall)")
     code, text = run([sys.executable, "-u",
                       str(REPO / "scripts" / "teaching" / "straighten_in_slot.py"),
@@ -1748,6 +1816,8 @@ def main() -> int:
     if code != 0:
         print("   straighten did not complete; the part is left at the last good attitude")
         return 2
+
+    maybe_stop(15, "转平")
 
     if not args.allow_release:
         print("\n[16] release refused: pass --allow-release after the owner agrees")
