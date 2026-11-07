@@ -663,9 +663,8 @@ class SafeTab(QtWidgets.QWidget):
 
     def _open_rviz(self) -> None:
         """在本面板之外打开标准 RViz（同一份 MoveIt 显示配置）。"""
-        process = QtCore.QProcess(self)
-        process.setWorkingDirectory(str(REPO))
-        process.startDetached("bash", [str(REPO / "scripts" / "open_rviz.sh")])
+        QtCore.QProcess.startDetached(
+            "bash", [str(REPO / "scripts" / "open_rviz.sh")], str(REPO))
         self.log.append_line("[面板] 已请求打开 RViz（scripts/open_rviz.sh）", "info")
 
     def _start(self) -> None:

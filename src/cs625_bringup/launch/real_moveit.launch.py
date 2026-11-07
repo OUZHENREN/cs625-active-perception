@@ -18,7 +18,7 @@ from pathlib import Path
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, LogInfo, OpaqueFunction
-from launch.conditions import IfCondition
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from moveit_configs_utils import MoveItConfigsBuilder
@@ -118,6 +118,10 @@ def _compose(context):
     moveit_config = builder.to_moveit_configs()
 
     move_group = Node(
+        # rviz_only:=true lets an already running stack open a second RViz window
+        # (same MoveIt parameters, no second move_group).  Without the flag the
+        # behaviour is unchanged.
+        condition=UnlessCondition(LaunchConfiguration("rviz_only")),
         package="moveit_ros_move_group",
         executable="move_group",
         name="move_group",
@@ -167,6 +171,10 @@ def generate_launch_description():
             DeclareLaunchArgument("fake_sensor_commands", default_value="false"),
             DeclareLaunchArgument("use_sim_time", default_value="false"),
             DeclareLaunchArgument("launch_rviz", default_value="false"),
+            DeclareLaunchArgument(
+                "rviz_only", default_value="false",
+                description="Start only RViz with the MoveIt parameters (no move_group).",
+            ),
             DeclareLaunchArgument(
                 "description_package",
                 default_value="eli_cs_robot_description",
