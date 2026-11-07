@@ -10,7 +10,8 @@
   · 不写解释性小字：只有「标签 + 数值」，说明放 tooltip
   · 一屏放下：阶段表固定高度不出滚动条，遥测/场景/日志同屏
   · 编号与阶段名固定列宽、左对齐
-  · 右下角是自绘 3D 场景（碰撞体 / 机械臂 / TCP），见 scripts/panel_scene.py
+  · 3D 交给 RViz（config/rviz/cs625_teaching.rviz）；面板只显示数据源状态卡，
+    见 scripts/panel_status.py
 
 用法：
     python3 scripts/cs625_panel.py
@@ -36,7 +37,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from panel_scene import SceneView                        # noqa: E402
+from panel_status import RvizStatusCard, source_summary   # noqa: E402
 
 RUN_STATE = REPO / "runtime" / "teaching_run_state.json"
 DEBUG_RUNS = REPO / "runtime" / "debug_runs"
@@ -512,12 +513,10 @@ class SafeTab(QtWidgets.QWidget):
         splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
         splitter.setHandleWidth(4)
         splitter.addWidget(self._build_left())
-        splitter.addWidget(self._build_middle())
         splitter.addWidget(self._build_right())
-        splitter.setStretchFactor(0, 30)
-        splitter.setStretchFactor(1, 26)
-        splitter.setStretchFactor(2, 44)
-        splitter.setSizes([640, 540, 940])
+        splitter.setStretchFactor(0, 38)
+        splitter.setStretchFactor(1, 62)
+        splitter.setSizes([820, 1340])
         root.addWidget(splitter, 1)
 
     def _build_left(self) -> QtWidgets.QWidget:
@@ -553,28 +552,40 @@ class SafeTab(QtWidgets.QWidget):
         self.stage_table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         stage_box.setFixedHeight(height + 20)
 
-    def _build_middle(self) -> QtWidgets.QWidget:
+    def _build_right(self) -> QtWidgets.QWidget:
         panel = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(3)
 
+        # 遥测：力矩 / 六维力 / TCP，三张卡横排，省竖直空间
+        telemetry = QtWidgets.QWidget()
+        telemetry_row = QtWidgets.QHBoxLayout(telemetry)
+        telemetry_row.setContentsMargins(0, 0, 0, 0)
+        telemetry_row.setSpacing(3)
         self.effort_bars = EffortBars()
-        self.effort_bars.setFixedHeight(132)
-        layout.addWidget(make_group("关节力矩 N·m", self.effort_bars), 0)
-
+        self.effort_bars.setFixedHeight(112)
         self.wrench = WrenchGrid()
-        self.wrench.setFixedHeight(70)
-        layout.addWidget(make_group("六维力（未安装）", self.wrench), 0)
-
+        self.wrench.setFixedHeight(112)
         self.tcp_label = TcpGripLabel()
-        self.tcp_label.setFixedHeight(52)
-        layout.addWidget(make_group("TCP / 夹爪", self.tcp_label), 0)
+        self.tcp_label.setFixedHeight(112)
+        for widget, title in ((self.effort_bars, "关节力矩 N·m"),
+                              (self.wrench, "六维力（未安装）"),
+                              (self.tcp_label, "TCP / 夹爪")):
+            box = make_group(title, widget)
+            telemetry_row.addWidget(box, 1)
+        layout.addWidget(telemetry, 0)
+
+        # 关键数值 + 最近采集：并排，填满中间
+        middle = QtWidgets.QWidget()
+        middle_row = QtWidgets.QHBoxLayout(middle)
+        middle_row.setContentsMargins(0, 0, 0, 0)
+        middle_row.setSpacing(3)
 
         self.key_box = QtWidgets.QGroupBox("关键数值")
         key_grid = QtWidgets.QGridLayout(self.key_box)
-        key_grid.setContentsMargins(4, 4, 4, 4)
-        key_grid.setHorizontalSpacing(8)
+        key_grid.setContentsMargins(6, 4, 6, 4)
+        key_grid.setHorizontalSpacing(10)
         key_grid.setVerticalSpacing(2)
         self.key_labels: dict[str, QtWidgets.QLabel] = {}
         for row, name in enumerate(("T1 fitness", "T3 fitness", "最近采集",
@@ -587,7 +598,8 @@ class SafeTab(QtWidgets.QWidget):
             key_grid.addWidget(label, row, 0)
             key_grid.addWidget(value, row, 1)
         key_grid.setColumnStretch(1, 1)
-        layout.addWidget(self.key_box, 0)
+        self.key_box.setFixedWidth(250)
+        middle_row.addWidget(self.key_box, 0)
 
         self.captures = QtWidgets.QTableWidget(0, 4)
         self.captures.setHorizontalHeaderLabels(["命令", "fitness", "z m", "时间"])
@@ -596,49 +608,35 @@ class SafeTab(QtWidgets.QWidget):
         self.captures.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.captures.verticalHeader().setDefaultSectionSize(20)
         header = self.captures.horizontalHeader()
-        header.setStretchLastSection(True)
-        widths = {0: 52, 1: 74, 2: 66}
-        for column, width in widths.items():
+        header.setStretchLastSection(False)
+        self.captures.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        for column, width in {0: 52, 1: 74, 2: 66, 3: 78}.items():
             header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
             self.captures.setColumnWidth(column, width)
         for column in range(4):
             item = self.captures.horizontalHeaderItem(column)
             if item is not None:
-                # 数值列右对齐、文本列左对齐，表头与数据同侧，避免"看着错位"
                 item.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter
                                       if column else QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        layout.addWidget(make_group("最近采集", self.captures), 1)
-        return panel
+        row_h = self.captures.verticalHeader().defaultSectionSize() or 20
+        self.captures.setFixedHeight(6 * row_h + 32)
+        middle_row.addWidget(make_group("最近采集", self.captures), 1)
+        middle_row.setAlignment(self.key_box, QtCore.Qt.AlignTop)
+        middle_row.setAlignment(self.captures, QtCore.Qt.AlignTop)
+        middle.setFixedHeight(170)
+        layout.addWidget(middle, 0)
 
-    def _build_right(self) -> QtWidgets.QWidget:
-        panel = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(panel)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        scene_box = QtWidgets.QGroupBox("场景")
-        scene_layout = QtWidgets.QVBoxLayout(scene_box)
-        scene_layout.setContentsMargins(2, 3, 2, 2)
-        scene_layout.setSpacing(2)
-        bar = QtWidgets.QHBoxLayout()
-        bar.setSpacing(4)
-        hint = QtWidgets.QLabel("RViz 显示完整场景（规划/Marker/点云）")
-        hint.setObjectName("Cap")
-        self.btn_diag = QtWidgets.QPushButton("诊断")
-        self.btn_diag.setFixedWidth(64)
-        self.btn_diag.setToolTip("检查 /joint_states、/compute_fk、点云话题是否真的在")
-        self.btn_diag.clicked.connect(self._diagnose_scene)
-        self.btn_rviz = QtWidgets.QPushButton("打开 RViz")
-        self.btn_rviz.setFixedWidth(84)
-        self.btn_rviz.setToolTip("scripts/open_rviz.sh —— 复用 MoveIt 的 RViz 配置")
-        self.btn_rviz.clicked.connect(self._open_rviz)
-        bar.addWidget(hint, 1)
-        bar.addWidget(self.btn_diag, 0)
-        bar.addWidget(self.btn_rviz, 0)
-        scene_layout.addLayout(bar)
-        self.scene = SceneView(probe=self._probe)
-        self.scene.telemetry.connect(self._on_telemetry)
-        scene_layout.addWidget(self.scene, 1)
-        layout.addWidget(scene_box, 1)
+        # 状态卡：3D 交给 RViz，这里只报数据源
+        self.status_card = RvizStatusCard(probe=self._probe)
+        self.status_card.open_rviz.connect(self._open_rviz)
+        self.status_card.diagnose.connect(self._diagnose_scene)
+        if self._probe:
+            self.status_card._worker.frame.connect(
+                lambda payload: self._on_telemetry(payload))
+        status_box = make_group("3D 状态（RViz）", self.status_card)
+        status_box.setFixedHeight(206)
+        layout.addWidget(status_box, 0)
+        layout.addStretch(1)
         return panel
 
     # --------------------------------------------------------------- actions
@@ -946,8 +944,11 @@ class EfficiencyTab(QtWidgets.QWidget):
 
         right = QtWidgets.QSplitter(QtCore.Qt.Vertical)
         right.setHandleWidth(4)
-        self.scene = SceneView(probe=False)
-        right.addWidget(make_group("场景", self.scene))
+        self.status_card = RvizStatusCard(probe=False)
+        self.status_card.open_rviz.connect(
+            lambda: QtCore.QProcess.startDetached(
+                "bash", [str(REPO / "scripts" / "open_rviz.sh")], str(REPO)))
+        right.addWidget(make_group("状态", self.status_card))
         self.effort_chart = EffortChart()
         right.addWidget(make_group("effort", self.effort_chart))
         self.results = QtWidgets.QTableWidget(0, 5)
@@ -1079,9 +1080,9 @@ class PanelWindow(QtWidgets.QMainWindow):
             poller.stop()
             poller.wait(1200)
         for tab in (self.safe, self.efficient):
-            scene = getattr(tab, "scene", None)
-            if scene is not None:
-                scene.stop_probe()
+            card = getattr(tab, "status_card", None)
+            if card is not None:
+                card.stop()
         super().closeEvent(event)
 
 
