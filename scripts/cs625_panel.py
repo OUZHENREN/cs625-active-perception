@@ -378,39 +378,70 @@ class EffortBars(QtWidgets.QWidget):
         painter.end()
 
 
-class WrenchGrid(QtWidgets.QWidget):
-    LABELS = ("Fx", "Fy", "Fz", "Mx", "My", "Mz")
+class WrenchChart(QtWidgets.QWidget):
+    """六维力曲线：六条不同颜色的轨迹，带 0 轴与图例；无传感器时显示"未采集"。"""
+
+    AXES = (("Fx", "#e05252"), ("Fy", "#4ec27a"), ("Fz", "#4a90d9"),
+            ("Mx", "#d6a52f"), ("My", "#b07ad6"), ("Mz", "#2fd6c9"))
+    WINDOW = 300          # 保留最近 300 个采样点
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self._values: dict | None = None
+        self._series: dict[str, list[float]] = {name: [] for name, _ in self.AXES}
+        self._have_data = False
 
-    def set_wrench(self, values: dict | None) -> None:
-        self._values = values
+    def push(self, values: dict | None) -> None:
+        if not values:
+            self._have_data = False
+        else:
+            self._have_data = True
+            for name, _ in self.AXES:
+                series = self._series[name]
+                series.append(float(values.get(name, 0.0)))
+                del series[:-self.WINDOW]
         self.update()
 
     def paintEvent(self, event) -> None:            # noqa: N802
         painter = QtGui.QPainter(self)
         painter.fillRect(self.rect(), QtGui.QColor("#0a0f14"))
         font = painter.font()
-        font.setPointSizeF(7.5)
+        font.setPointSizeF(8.0)
         painter.setFont(font)
-        cell_w = self.width() / 3
-        cell_h = self.height() / 2
-        for index, label in enumerate(self.LABELS):
-            column, row = index % 3, index // 3
-            x = column * cell_w + 4
-            y = row * cell_h
-            painter.setPen(QtGui.QColor("#5d7284"))
-            painter.drawText(int(x), int(y + 12), label)
-            if self._values is None:
-                painter.setPen(QtGui.QColor("#465866"))
-                text = "未采集"
-            else:
-                painter.setPen(QtGui.QColor(C_TEXT))
-                text = f"{self._values.get(label, 0.0):+.1f}"
-            painter.drawText(int(x + 18), int(y + 12), text)
+        width, height = self.width(), self.height()
+        if not self._have_data:
+            painter.setPen(QtGui.QColor("#465866"))
+            painter.drawText(10, height // 2, "六维力未采集（传感器未安装）")
+            self._draw_legend(painter, width)
+            painter.end()
+            return
+        values = [abs(v) for series in self._series.values() for v in series] or [1.0]
+        peak = max(1e-3, max(values))
+        left, right, top, bottom = 8, width - 8, 8, height - 16
+        mid = (top + bottom) / 2
+        painter.setPen(QtGui.QPen(QtGui.QColor("#22303c"), 1))
+        painter.drawLine(left, int(mid), right, int(mid))
+        for name, colour in self.AXES:
+            series = self._series[name]
+            if len(series) < 2:
+                continue
+            path = QtGui.QPainterPath()
+            for index, value in enumerate(series):
+                x = left + (right - left) * index / max(1, self.WINDOW - 1)
+                y = mid - (bottom - top) / 2 * (value / peak)
+                path.moveTo(x, y) if index == 0 else path.lineTo(x, y)
+            painter.setPen(QtGui.QPen(QtGui.QColor(colour), 1.3))
+            painter.drawPath(path)
+        painter.setPen(QtGui.QColor("#5d7284"))
+        painter.drawText(left, height - 4, f"峰值 {peak:.1f}")
+        self._draw_legend(painter, width)
         painter.end()
+
+    def _draw_legend(self, painter: QtGui.QPainter, width: int) -> None:
+        x = width - 250
+        for name, colour in self.AXES:
+            painter.setPen(QtGui.QColor(colour))
+            painter.drawText(x, 12, name)
+            x += 40
 
 
 class TcpGripLabel(QtWidgets.QLabel):
@@ -624,38 +655,36 @@ class SafeTab(QtWidgets.QWidget):
         return panel
 
     def _build_right(self) -> QtWidgets.QWidget:
-        """中列：两列网格（力矩整行；六维力|TCP；夹爪|关键数值；采集|3D状态）。"""
+        """中列：力矩(整行) / 六维力(整行) / [TCP+夹爪控制] | [关键数值] / [采集伸到底] | [3D+摘要]。"""
         panel = QtWidgets.QWidget()
-        layout = QtWidgets.QVBoxLayout(panel)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(3)
+        outer = QtWidgets.QVBoxLayout(panel)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(3)
 
-        grid = QtWidgets.QGridLayout()
-        grid.setContentsMargins(0, 0, 0, 0)
-        grid.setHorizontalSpacing(3)
-        grid.setVerticalSpacing(3)
-
-        # 行 0：关节力矩（整行）
         self.effort_bars = EffortBars()
         self.effort_bars.setFixedHeight(150)
         effort_box = make_group("关节力矩 N·m（满量程 60）", self.effort_bars)
         effort_box.setFixedHeight(178)
-        grid.addWidget(effort_box, 0, 0, 1, 2)
+        outer.addWidget(effort_box, 0)
 
-        # 行 1：六维力 | TCP
-        self.wrench = WrenchGrid()
-        self.wrench.setFixedHeight(104)
+        self.wrench = WrenchChart()
+        self.wrench.setFixedHeight(110)
         wrench_box = make_group("六维力（未安装）", self.wrench)
-        wrench_box.setFixedHeight(132)
-        grid.addWidget(wrench_box, 1, 0)
+        wrench_box.setFixedHeight(138)
+        outer.addWidget(wrench_box, 0)
 
+        # 下半部分：左右两列
+        lower = QtWidgets.QWidget()
+        lower_layout = QtWidgets.QHBoxLayout(lower)
+        lower_layout.setContentsMargins(0, 0, 0, 0)
+        lower_layout.setSpacing(3)
+
+        left_column = QtWidgets.QVBoxLayout()
+        left_column.setSpacing(3)
         self.tcp_label = TcpGripLabel()
-        self.tcp_label.setFixedHeight(104)
-        tcp_box = make_group("TCP / 夹爪", self.tcp_label)
-        tcp_box.setFixedHeight(132)
-        grid.addWidget(tcp_box, 1, 1)
+        self.tcp_label.setFixedHeight(52)
+        left_column.addWidget(make_group("TCP / 夹爪", self.tcp_label), 0)
 
-        # 行 2：夹爪控制 | 关键数值
         gripper_box = QtWidgets.QGroupBox("夹爪控制")
         gripper_layout = QtWidgets.QVBoxLayout(gripper_box)
         gripper_layout.setContentsMargins(8, 4, 8, 4)
@@ -669,37 +698,12 @@ class SafeTab(QtWidgets.QWidget):
                                                  ("张开", "release"), ("闭合", "grip"))):
             button = QtWidgets.QPushButton(text)
             button.setFixedHeight(28)
-            button.setToolTip(f"scripts/teaching/gripper.py {command}")
             button.clicked.connect(lambda _checked=False, c=command: self._gripper(c))
             gripper_buttons.addWidget(button, index // 2, index % 2)
         gripper_layout.addLayout(gripper_buttons)
-        gripper_layout.addStretch(1)
-        gripper_box.setFixedHeight(178)
-        grid.addWidget(gripper_box, 2, 0)
+        gripper_box.setFixedHeight(112)
+        left_column.addWidget(gripper_box, 0)
 
-        key_box = QtWidgets.QGroupBox("关键数值")
-        key_grid = QtWidgets.QGridLayout(key_box)
-        key_grid.setContentsMargins(8, 4, 8, 4)
-        key_grid.setHorizontalSpacing(10)
-        key_grid.setVerticalSpacing(2)
-        self.key_labels: dict[str, QtWidgets.QLabel] = {}
-        names = ("T1 fitness", "T3 fitness", "最近采集", "上次阶段", "反控",
-                 "当前阶段", "相机", "RViz", "分支", "提交")
-        for index, name in enumerate(names):
-            row, column = index % 5, (index // 5) * 2
-            label = QtWidgets.QLabel(name)
-            label.setObjectName("Cap")
-            value = QtWidgets.QLabel("—")
-            value.setObjectName("Mono")
-            self.key_labels[name] = value
-            key_grid.addWidget(label, row, column)
-            key_grid.addWidget(value, row, column + 1)
-        key_grid.setColumnStretch(1, 1)
-        key_grid.setColumnStretch(3, 1)
-        key_box.setFixedHeight(178)
-        grid.addWidget(key_box, 2, 1)
-
-        # 行 3：最近采集 | 3D 状态
         self.captures = QtWidgets.QTableWidget(0, 4)
         self.captures.setHorizontalHeaderLabels(["命令", "fitness", "z m", "时间"])
         self.captures.verticalHeader().setVisible(False)
@@ -711,14 +715,29 @@ class SafeTab(QtWidgets.QWidget):
         for column, width in {0: 46, 1: 66, 2: 60}.items():
             header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
             self.captures.setColumnWidth(column, width)
-        for column in range(4):
-            item = self.captures.horizontalHeaderItem(column)
-            if item is not None:
-                item.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter
-                                      if column else QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        captures_box = make_group("最近采集", self.captures)
-        captures_box.setFixedHeight(232)
-        grid.addWidget(captures_box, 3, 0)
+        left_column.addWidget(make_group("最近采集", self.captures), 1)
+        lower_layout.addLayout(left_column, 1)
+
+        right_column = QtWidgets.QVBoxLayout()
+        right_column.setSpacing(3)
+        key_box = QtWidgets.QGroupBox("关键数值")
+        key_grid = QtWidgets.QGridLayout(key_box)
+        key_grid.setContentsMargins(8, 4, 8, 4)
+        key_grid.setHorizontalSpacing(8)
+        key_grid.setVerticalSpacing(2)
+        self.key_labels: dict[str, QtWidgets.QLabel] = {}
+        for row, name in enumerate(("T1 fitness", "T3 fitness", "最近采集", "上次阶段",
+                                    "反控", "当前阶段", "相机", "RViz", "分支", "提交")):
+            label = QtWidgets.QLabel(name)
+            label.setObjectName("Cap")
+            value = QtWidgets.QLabel("—")
+            value.setObjectName("Mono")
+            self.key_labels[name] = value
+            key_grid.addWidget(label, row, 0)
+            key_grid.addWidget(value, row, 1)
+        key_grid.setColumnStretch(1, 1)
+        key_box.setFixedHeight(268)
+        right_column.addWidget(key_box, 0)
 
         self.status_card = RvizStatusCard(probe=self._probe)
         self.status_card.open_rviz.connect(self._open_rviz)
@@ -727,13 +746,17 @@ class SafeTab(QtWidgets.QWidget):
             self.status_card._worker.frame.connect(
                 lambda payload: self._on_telemetry(payload))
         status_box = make_group("3D 状态（RViz）", self.status_card)
-        status_box.setFixedHeight(232)
-        grid.addWidget(status_box, 3, 1)
+        status_box.setFixedHeight(206)
+        right_column.addWidget(status_box, 0)
 
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
-        layout.addLayout(grid)
-        layout.addStretch(1)
+        # 长信息栏：最近一次运行摘要（放得下就多写几行）
+        self.summary = LogView()
+        self.summary.setFixedHeight(150)
+        right_column.addWidget(make_group("最近一次运行", self.summary), 0)
+        right_column.addStretch(1)
+        lower_layout.addLayout(right_column, 1)
+
+        outer.addWidget(lower, 1)
         return panel
 
     def _build_camera_column(self) -> QtWidgets.QWidget:
@@ -1113,14 +1136,6 @@ class EfficiencyTab(QtWidgets.QWidget):
             lambda width, height: getattr(self.window(), "_ensure_camera_room", lambda w, h: None)(width, height))
         right_layout.addWidget(make_group("相机（1:1 原始像素）", self.camera), 2)
 
-        self.status_card = RvizStatusCard(probe=False)
-        self.status_card.open_rviz.connect(
-            lambda: QtCore.QProcess.startDetached(
-                "bash", [str(REPO / "scripts" / "open_rviz.sh")], str(REPO)))
-        status_box = make_group("3D 状态（RViz）", self.status_card)
-        status_box.setFixedHeight(186)
-        right_layout.addWidget(status_box, 0)
-
         self.effort_chart = EffortChart()
         right_layout.addWidget(make_group("插入力矩曲线（debug_runs/*/effort.csv）",
                                           self.effort_chart), 1)
@@ -1129,10 +1144,27 @@ class EfficiencyTab(QtWidgets.QWidget):
         self.results.setHorizontalHeaderLabels(["时间", "成功", "时长 s", "卡滞", "力峰值", "阶段"])
         self.results.verticalHeader().setVisible(False)
         self.results.setShowGrid(False)
-        self.results.verticalHeader().setDefaultSectionSize(22)
+        self.results.verticalHeader().setDefaultSectionSize(24)
         self.results.horizontalHeader().setStretchLastSection(True)
         self.results.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        right_layout.addWidget(make_group("运行记录", self.results), 1)
+
+        self.status_card = RvizStatusCard(probe=False)
+        self.status_card.open_rviz.connect(
+            lambda: QtCore.QProcess.startDetached(
+                "bash", [str(REPO / "scripts" / "open_rviz.sh")], str(REPO)))
+
+        bottom = QtWidgets.QWidget()
+        bottom_row = QtWidgets.QHBoxLayout(bottom)
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+        bottom_row.setSpacing(3)
+        status_box = make_group("3D 状态（RViz）", self.status_card)
+        status_box.setFixedHeight(206)
+        bottom_row.addWidget(status_box, 1)
+        results_box = make_group("运行记录", self.results)
+        results_box.setFixedHeight(206)
+        bottom_row.addWidget(results_box, 1)
+        right_layout.addWidget(bottom, 0)
+
         root.addWidget(right, 1)
 
     def _build_command(self) -> list[str]:
