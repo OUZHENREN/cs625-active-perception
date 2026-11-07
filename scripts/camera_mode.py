@@ -1130,11 +1130,13 @@ def main(argv=None):
     subparsers.add_parser("fast", help="switch to the first fast candidate with fps >= 10")
     subparsers.add_parser("modeling", help="switch back to 1280x960")
     subparsers.add_parser("probe", help="measure every candidate mode and print a table")
+    subparsers.add_parser("stop", help="stop the camera launch recorded by this tool")
     args = parser.parse_args(argv)
 
     ensure_ros_environment()
 
     handlers = {
+        "stop": lambda _args: (stop_camera(verbose=True), 0)[1],
         "status": cmd_status,
         "fast": cmd_fast,
         "modeling": cmd_modeling,

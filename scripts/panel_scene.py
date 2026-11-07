@@ -151,6 +151,7 @@ class SceneWorker(QtCore.QThread):
             from moveit_msgs.srv import GetPositionFK
             from moveit_msgs.msg import DisplayTrajectory, RobotState
             from sensor_msgs.msg import JointState, PointCloud2
+            from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
         except Exception as exc:                # noqa: BLE001
             self.failed.emit(f"ROS 不可用：{type(exc).__name__}")
             return
@@ -165,8 +166,12 @@ class SceneWorker(QtCore.QThread):
                                      lambda m: latest.__setitem__("tcp", m), 10)
             node.create_subscription(JointState, "/joint_states",
                                      lambda m: latest.__setitem__("joints", m), 10)
+            # 相机的点云发布端是 best effort；用默认（reliable）订阅会一帧都收不到，
+            # 这正是"3D 里没有点云"的直接原因。
+            cloud_qos = QoSProfile(depth=2, history=HistoryPolicy.KEEP_LAST,
+                                   reliability=ReliabilityPolicy.BEST_EFFORT)
             node.create_subscription(PointCloud2, "/sensors/camera/points",
-                                     lambda m: latest.__setitem__("cloud", m), 2)
+                                     lambda m: latest.__setitem__("cloud", m), cloud_qos)
             node.create_subscription(DisplayTrajectory,
                                      "/move_group/display_planned_path",
                                      lambda m: latest.__setitem__("path", m), 2)
@@ -177,8 +182,10 @@ class SceneWorker(QtCore.QThread):
             while not self._stop.is_set() and rclpy.ok():
                 rclpy.spin_once(node, timeout_sec=self._period)
                 now_s = time.time()
-                payload = {"links": [], "tcp": None, "efforts": {}, "q_deg": {}}
+                payload = {"links": [], "tcp": None, "efforts": {}, "q_deg": {},
+                           "sources": {"fk": False, "cloud": False, "joints": False}}
                 joints = latest.get("joints")
+                payload["sources"]["joints"] = joints is not None
                 if joints is not None:
                     names = list(joints.name)
                     payload["efforts"] = {n: abs(e) for n, e in zip(names, joints.effort)}
@@ -199,6 +206,7 @@ class SceneWorker(QtCore.QThread):
                             rclpy.spin_once(node, timeout_sec=0.02)
                         result = future.result()
                         if result is not None and result.error_code.val == 1:
+                            payload["sources"]["fk"] = True
                             for name, pose in zip(result.fk_link_names, result.pose_stamped):
                                 p = pose.pose.position
                                 payload["links"].append((name, (p.x, p.y, p.z)))
@@ -210,6 +218,7 @@ class SceneWorker(QtCore.QThread):
                 if cloud is not None and now_s - self._cloud_at > 1.2:
                     self._cloud_at = now_s
                     payload["cloud"] = _sample_cloud(cloud)
+                    payload["sources"]["cloud"] = bool(payload["cloud"])
                 path = latest.get("path")
                 if path is not None and path is not self._path_seen:
                     self._path_seen = path
@@ -254,6 +263,7 @@ class SceneView(QtWidgets.QWidget):
         self._path: list[tuple[float, float, float]] = []
         self._tcp: tuple[float, float, float] | None = None
         self._status = "静态场景"
+        self._sources: dict = {}
         self._load_model()
         self._worker: SceneWorker | None = None
         if probe:
@@ -344,6 +354,7 @@ class SceneView(QtWidgets.QWidget):
         if path is not None:
             self._path = path
         self._status = "在线" if self._links or self._tcp else self._status
+        self._sources = payload.get("sources") or {}
         self.telemetry.emit(payload)
         self.update()
 
@@ -416,8 +427,12 @@ class SceneView(QtWidgets.QWidget):
         font = painter.font()
         font.setPointSizeF(max(7.0, font.pointSizeF() - 1))
         painter.setFont(font)
-        painter.drawText(8, self.height() - 8,
-                         f"{self._status} · 拖动旋转 / 滚轮缩放")
+        sources = self._sources
+        flags = " ".join(
+            f"{name}{'✓' if ok else '✗'}"
+            for name, ok in (("关节", sources.get("joints")), ("臂FK", sources.get("fk")),
+                             ("点云", sources.get("cloud")), ("TCP", self._tcp is not None)))
+        painter.drawText(8, self.height() - 8, f"{self._status} · {flags}")
         painter.end()
 
     def _draw_floor(self, painter: QtGui.QPainter) -> None:

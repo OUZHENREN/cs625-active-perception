@@ -494,6 +494,19 @@ class SafeTab(QtWidgets.QWidget):
         for button in (self.btn_start, self.btn_resume, self.btn_abort):
             button.setFixedWidth(92)
             top.addWidget(button, 0)
+
+        # 相机：RVS 与 ROS 相机互斥，这里只负责启动/停止/查看状态
+        self.btn_camera = QtWidgets.QPushButton("相机 ▾")
+        self.btn_camera.setFixedWidth(76)
+        self.btn_camera.setToolTip("启动/停止 Percipio 相机（与 RVS 互斥）")
+        menu = QtWidgets.QMenu(self.btn_camera)
+        menu.addAction("启动（fast，无深度）", lambda: self._camera("fast"))
+        menu.addAction("启动（modeling，1280x960）", lambda: self._camera("modeling"))
+        menu.addAction("停止", lambda: self._camera("stop"))
+        menu.addSeparator()
+        menu.addAction("状态", lambda: self._camera("status"))
+        self.btn_camera.setMenu(menu)
+        top.addWidget(self.btn_camera, 0)
         root.addLayout(top)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
@@ -577,7 +590,7 @@ class SafeTab(QtWidgets.QWidget):
         layout.addWidget(self.key_box, 0)
 
         self.captures = QtWidgets.QTableWidget(0, 4)
-        self.captures.setHorizontalHeaderLabels(["命令", "fitness", "高度 z", "时间"])
+        self.captures.setHorizontalHeaderLabels(["命令", "fitness", "z m", "时间"])
         self.captures.verticalHeader().setVisible(False)
         self.captures.setShowGrid(False)
         self.captures.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
@@ -661,6 +674,20 @@ class SafeTab(QtWidgets.QWidget):
         self.btn_resume.setEnabled(True)
         self._refresh_run_state()
 
+    def _camera(self, action: str) -> None:
+        """在后台跑 camera_mode.py（子进程），输出进日志，不阻塞界面。"""
+        command = [sys.executable, str(REPO / "scripts" / "camera_mode.py"), action]
+        self.log.append_line("$ " + " ".join(command), "info")
+        process = QtCore.QProcess(self)
+        process.setWorkingDirectory(str(REPO))
+        process.setProcessChannelMode(QtCore.QProcess.MergedChannels)
+        process.readyReadStandardOutput.connect(
+            lambda: [self.log.append_line(line) for line in
+                     bytes(process.readAllStandardOutput()).decode("utf-8", "replace").splitlines()])
+        process.finished.connect(lambda code, _status: self.log.append_line(
+            f"[相机] {action} 结束 code={code}", "ok" if code == 0 else "err"))
+        process.start(command[0], command[1:])
+
     def _open_rviz(self) -> None:
         """在本面板之外打开标准 RViz（同一份 MoveIt 显示配置）。"""
         QtCore.QProcess.startDetached(
@@ -706,25 +733,35 @@ class SafeTab(QtWidgets.QWidget):
         folder = REPO / "runtime" / "rvs_teaching"
         if not folder.is_dir():
             return
-        files = sorted(folder.glob("*.json"), key=lambda q: q.stat().st_mtime)[-6:]
+        files = sorted(folder.glob("*.json"), key=lambda q: q.stat().st_mtime)[-40:]
         self.captures.setRowCount(0)
+        shown = 0
         for path in reversed(files):
             try:
                 data = json.loads(path.read_text())
             except (OSError, json.JSONDecodeError):
                 continue
+            # 目录里还混着手工记录与历史文件；只展示真正的 RVS 采集
+            if data.get("command") not in ("T0", "T1", "T2", "T3"):
+                continue
+            if shown >= 6:
+                break
+            shown += 1
             row = self.captures.rowCount()
             self.captures.insertRow(row)
             position = data.get("position") or [0, 0, 0]
             fitness = data.get("fitness")
-            values = [str(data.get("command", "—")),
+            command = str(data.get("command"))
+            limit = {"T1": 0.9, "T3": 0.9, "T2": 0.8, "T0": 0.8}.get(command, 0.8)
+            values = [command,
                       "—" if fitness is None else f"{fitness:.3f}",
                       f"{position[2]:.3f}" if len(position) > 2 else "—",
                       time.strftime("%H:%M:%S", time.localtime(path.stat().st_mtime))]
             for column, text in enumerate(values):
                 item = QtWidgets.QTableWidgetItem(text)
                 if column == 1 and fitness is not None:
-                    item.setForeground(QtGui.QColor(C_OK if fitness >= 0.9 else C_WARN))
+                    item.setForeground(QtGui.QColor(
+                        C_OK if fitness >= limit else C_WARN))
                 self.captures.setItem(row, column, item)
 
     def _refresh_keys(self) -> None:
