@@ -624,31 +624,41 @@ class SafeTab(QtWidgets.QWidget):
         return panel
 
     def _build_right(self) -> QtWidgets.QWidget:
-        """中列：遥测（力矩/六维力/TCP/夹爪）+ 关键数值 + 会话。"""
+        """中列：两列网格（力矩整行；六维力|TCP；夹爪|关键数值；采集|3D状态）。"""
         panel = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(3)
 
+        grid = QtWidgets.QGridLayout()
+        grid.setContentsMargins(0, 0, 0, 0)
+        grid.setHorizontalSpacing(3)
+        grid.setVerticalSpacing(3)
+
+        # 行 0：关节力矩（整行）
         self.effort_bars = EffortBars()
-        self.wrench = WrenchGrid()
-        self.tcp_label = TcpGripLabel()
         self.effort_bars.setFixedHeight(150)
-        self.wrench.setFixedHeight(150)
-        self.tcp_label.setFixedHeight(150)
-        layout.addWidget(make_group("关节力矩 N·m（满量程 60）", self.effort_bars), 0)
+        effort_box = make_group("关节力矩 N·m（满量程 60）", self.effort_bars)
+        effort_box.setFixedHeight(178)
+        grid.addWidget(effort_box, 0, 0, 1, 2)
 
-        pair = QtWidgets.QWidget()
-        pair_row = QtWidgets.QHBoxLayout(pair)
-        pair_row.setContentsMargins(0, 0, 0, 0)
-        pair_row.setSpacing(3)
-        pair_row.addWidget(make_group("六维力（未安装）", self.wrench), 1)
-        pair_row.addWidget(make_group("TCP", self.tcp_label), 1)
-        layout.addWidget(pair, 0)
+        # 行 1：六维力 | TCP
+        self.wrench = WrenchGrid()
+        self.wrench.setFixedHeight(104)
+        wrench_box = make_group("六维力（未安装）", self.wrench)
+        wrench_box.setFixedHeight(132)
+        grid.addWidget(wrench_box, 1, 0)
 
+        self.tcp_label = TcpGripLabel()
+        self.tcp_label.setFixedHeight(104)
+        tcp_box = make_group("TCP / 夹爪", self.tcp_label)
+        tcp_box.setFixedHeight(132)
+        grid.addWidget(tcp_box, 1, 1)
+
+        # 行 2：夹爪控制 | 关键数值
         gripper_box = QtWidgets.QGroupBox("夹爪控制")
         gripper_layout = QtWidgets.QVBoxLayout(gripper_box)
-        gripper_layout.setContentsMargins(6, 4, 6, 4)
+        gripper_layout.setContentsMargins(8, 4, 8, 4)
         gripper_layout.setSpacing(3)
         self.gripper_label = QtWidgets.QLabel("位置 — · 状态 —")
         self.gripper_label.setObjectName("Mono")
@@ -658,13 +668,14 @@ class SafeTab(QtWidgets.QWidget):
         for index, (text, command) in enumerate((("状态", "status"), ("初始化", "init"),
                                                  ("张开", "release"), ("闭合", "grip"))):
             button = QtWidgets.QPushButton(text)
-            button.setFixedHeight(26)
+            button.setFixedHeight(28)
             button.setToolTip(f"scripts/teaching/gripper.py {command}")
             button.clicked.connect(lambda _checked=False, c=command: self._gripper(c))
             gripper_buttons.addWidget(button, index // 2, index % 2)
         gripper_layout.addLayout(gripper_buttons)
-        gripper_box.setFixedHeight(120)
-        layout.addWidget(gripper_box, 0)
+        gripper_layout.addStretch(1)
+        gripper_box.setFixedHeight(178)
+        grid.addWidget(gripper_box, 2, 0)
 
         key_box = QtWidgets.QGroupBox("关键数值")
         key_grid = QtWidgets.QGridLayout(key_box)
@@ -672,29 +683,32 @@ class SafeTab(QtWidgets.QWidget):
         key_grid.setHorizontalSpacing(10)
         key_grid.setVerticalSpacing(2)
         self.key_labels: dict[str, QtWidgets.QLabel] = {}
-        for row, name in enumerate(("T1 fitness", "T3 fitness", "最近采集", "上次阶段",
-                                    "反控", "当前阶段", "相机", "RViz",
-                                    "分支", "提交")):
+        names = ("T1 fitness", "T3 fitness", "最近采集", "上次阶段", "反控",
+                 "当前阶段", "相机", "RViz", "分支", "提交")
+        for index, name in enumerate(names):
+            row, column = index % 5, (index // 5) * 2
             label = QtWidgets.QLabel(name)
             label.setObjectName("Cap")
             value = QtWidgets.QLabel("—")
             value.setObjectName("Mono")
             self.key_labels[name] = value
-            key_grid.addWidget(label, row, 0)
-            key_grid.addWidget(value, row, 1)
+            key_grid.addWidget(label, row, column)
+            key_grid.addWidget(value, row, column + 1)
         key_grid.setColumnStretch(1, 1)
-        key_box.setFixedHeight(300)
-        layout.addWidget(key_box, 0)
+        key_grid.setColumnStretch(3, 1)
+        key_box.setFixedHeight(178)
+        grid.addWidget(key_box, 2, 1)
 
+        # 行 3：最近采集 | 3D 状态
         self.captures = QtWidgets.QTableWidget(0, 4)
         self.captures.setHorizontalHeaderLabels(["命令", "fitness", "z m", "时间"])
         self.captures.verticalHeader().setVisible(False)
         self.captures.setShowGrid(False)
         self.captures.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self.captures.verticalHeader().setDefaultSectionSize(26)
+        self.captures.verticalHeader().setDefaultSectionSize(24)
         header = self.captures.horizontalHeader()
         header.setStretchLastSection(True)
-        for column, width in {0: 52, 1: 74, 2: 66}.items():
+        for column, width in {0: 46, 1: 66, 2: 60}.items():
             header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
             self.captures.setColumnWidth(column, width)
         for column in range(4):
@@ -702,8 +716,9 @@ class SafeTab(QtWidgets.QWidget):
             if item is not None:
                 item.setTextAlignment(QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter
                                       if column else QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
-        self.captures.setFixedHeight(8 * 26 + 32)
-        layout.addWidget(make_group("最近采集", self.captures), 0)
+        captures_box = make_group("最近采集", self.captures)
+        captures_box.setFixedHeight(232)
+        grid.addWidget(captures_box, 3, 0)
 
         self.status_card = RvizStatusCard(probe=self._probe)
         self.status_card.open_rviz.connect(self._open_rviz)
@@ -712,9 +727,13 @@ class SafeTab(QtWidgets.QWidget):
             self.status_card._worker.frame.connect(
                 lambda payload: self._on_telemetry(payload))
         status_box = make_group("3D 状态（RViz）", self.status_card)
-        status_box.setFixedHeight(172)
-        layout.addWidget(status_box, 0)
+        status_box.setFixedHeight(232)
+        grid.addWidget(status_box, 3, 1)
 
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        layout.addLayout(grid)
+        layout.addStretch(1)
         return panel
 
     def _build_camera_column(self) -> QtWidgets.QWidget:
@@ -990,8 +1009,9 @@ class SafeTab(QtWidgets.QWidget):
 class EfficiencyTab(QtWidgets.QWidget):
     """效率模式：左侧配置（阶段/速度/参数/执行），右侧看结果（状态/力矩/记录/日志）。"""
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, probe: bool = True, parent=None) -> None:
         super().__init__(parent)
+        self._probe = probe
         self._process: QtCore.QProcess | None = None
         self._build()
         self._timer = QtCore.QTimer(self)
@@ -1087,12 +1107,18 @@ class EfficiencyTab(QtWidgets.QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(4)
 
+        # 相机：效率模式下同样需要看实时画面（1:1，不缩放）
+        self.camera = CameraView(probe=self._probe)
+        self.camera.image_size.connect(
+            lambda width, height: getattr(self.window(), "_ensure_camera_room", lambda w, h: None)(width, height))
+        right_layout.addWidget(make_group("相机（1:1 原始像素）", self.camera), 2)
+
         self.status_card = RvizStatusCard(probe=False)
         self.status_card.open_rviz.connect(
             lambda: QtCore.QProcess.startDetached(
                 "bash", [str(REPO / "scripts" / "open_rviz.sh")], str(REPO)))
         status_box = make_group("3D 状态（RViz）", self.status_card)
-        status_box.setFixedHeight(158)
+        status_box.setFixedHeight(186)
         right_layout.addWidget(status_box, 0)
 
         self.effort_chart = EffortChart()
@@ -1216,7 +1242,7 @@ class PanelWindow(QtWidgets.QMainWindow):
 
         self.tabs = QtWidgets.QTabWidget()
         self.safe = SafeTab(probe=probe and not smoke)
-        self.efficient = EfficiencyTab()
+        self.efficient = EfficiencyTab(probe=probe and not smoke)
         self.safe.camera.image_size.connect(self._ensure_camera_room)
         self.tabs.addTab(self.safe, "安全模式")
         self.tabs.addTab(self.efficient, "效率模式")
