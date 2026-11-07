@@ -238,7 +238,7 @@
 （注意：是显著下降，不是绝对不能识别）。
 → 识别率不是"离基准位多近"的函数，而是"工件呈现给相机的是哪个面/哪个角度"的函数。
 → 因此基准位不能按"角度等分"设计，必须按实测识别窗口划界（详见
-  docs/worklogs/2026-11-03_WORKLOG_OBSERVATION_BASELINES_AND_ACCURACY.md）。
+  docs/worklogs/2026-11/2026-11-03_WORKLOG_OBSERVATION_BASELINES_AND_ACCURACY.md）。
 ```
 
 **踩坑记录（重要）**：曾试图把 J6 从 +171.6° 改到 −8.4°（两者相差 180°）。

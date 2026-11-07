@@ -591,9 +591,25 @@ class SafeTab(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        scene_box = QtWidgets.QGroupBox("场景")
+        scene_layout = QtWidgets.QVBoxLayout(scene_box)
+        scene_layout.setContentsMargins(2, 3, 2, 2)
+        scene_layout.setSpacing(2)
+        bar = QtWidgets.QHBoxLayout()
+        bar.setSpacing(4)
+        hint = QtWidgets.QLabel("RViz 显示完整场景（规划/Marker/点云）")
+        hint.setObjectName("Cap")
+        self.btn_rviz = QtWidgets.QPushButton("打开 RViz")
+        self.btn_rviz.setFixedWidth(84)
+        self.btn_rviz.setToolTip("scripts/open_rviz.sh —— 复用 MoveIt 的 RViz 配置")
+        self.btn_rviz.clicked.connect(self._open_rviz)
+        bar.addWidget(hint, 1)
+        bar.addWidget(self.btn_rviz, 0)
+        scene_layout.addLayout(bar)
         self.scene = SceneView(probe=self._probe)
         self.scene.telemetry.connect(self._on_telemetry)
-        layout.addWidget(make_group("场景", self.scene), 1)
+        scene_layout.addWidget(self.scene, 1)
+        layout.addWidget(scene_box, 1)
         return panel
 
     # --------------------------------------------------------------- actions
@@ -644,6 +660,13 @@ class SafeTab(QtWidgets.QWidget):
         self.btn_start.setEnabled(True)
         self.btn_resume.setEnabled(True)
         self._refresh_run_state()
+
+    def _open_rviz(self) -> None:
+        """在本面板之外打开标准 RViz（同一份 MoveIt 显示配置）。"""
+        process = QtCore.QProcess(self)
+        process.setWorkingDirectory(str(REPO))
+        process.startDetached("bash", [str(REPO / "scripts" / "open_rviz.sh")])
+        self.log.append_line("[面板] 已请求打开 RViz（scripts/open_rviz.sh）", "info")
 
     def _start(self) -> None:
         self._spawn(["bash", str(RESUME)])

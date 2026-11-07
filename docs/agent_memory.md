@@ -143,7 +143,7 @@ pre-insert:    scripts/preinsert_plan_only.py
 夹爪桥:        C:\Users\Public\hitbot_bridge.ps1
 插槽成功数据:  runs/20261021_slot_t1_success/
 碰撞场景:      runs/20261021_collision_scene/
-日终 handoff:  docs/worklogs/2026-10-21_HANDOFF_DAY_END.md
+日终 handoff:  docs/worklogs/2026-10/2026-10-21_HANDOFF_DAY_END.md
 ```
 
 VS Code 任务：
@@ -406,7 +406,7 @@ slot_pre:    1.100, -0.012, 0.377
   - 段间 `dwell ≥ 1.5 s`
   - 每段读 feedback/TCP，超差即停
 - 成功流程复盘文档：
-  `docs/worklogs/2026-10-22_WORKLOG_VOXEL_GRASP_FLOW.md`
+  `docs/worklogs/2026-10/2026-10-22_WORKLOG_VOXEL_GRASP_FLOW.md`
 
 
 ## 37. 2026-10-22 师兄任务流（装卸）结构备忘
@@ -800,8 +800,8 @@ insert 行程 < 100 mm  视为配置错误
 文档入口（不要新建重复文档）：
 ```text
 长期规则与经验：docs/agent_memory.md（本文）
-单次流程复盘：docs/worklogs/2026-10-22_WORKLOG_VOXEL_GRASP_FLOW.md
-日终交接：    docs/worklogs/2026-10-21_HANDOFF_DAY_END.md
+单次流程复盘：docs/worklogs/2026-10/2026-10-22_WORKLOG_VOXEL_GRASP_FLOW.md
+日终交接：    docs/worklogs/2026-10/2026-10-21_HANDOFF_DAY_END.md
 ```
 
 
@@ -1041,8 +1041,8 @@ TCP 1.125, -0.015, 0.158，-10° 倾斜
 插槽/工件碰撞体当前已从场景移除
 ```
 - 明天先脱困（2–3 mm 反向微动，两次无效即停），再继续卸载。
-- 完整交接：`docs/worklogs/2026-10-22_HANDOFF_EVENING_UNLOAD.md`
-- 单次流程复盘：`docs/worklogs/2026-10-22_WORKLOG_VOXEL_GRASP_FLOW.md`
+- 完整交接：`docs/worklogs/2026-10/2026-10-22_HANDOFF_EVENING_UNLOAD.md`
+- 单次流程复盘：`docs/worklogs/2026-10/2026-10-22_WORKLOG_VOXEL_GRASP_FLOW.md`
 
 
 ## 83. 2026-10-22 日终复核：最后一次“不动”是链路掉线
@@ -1354,7 +1354,7 @@ TCP 1.0309, 0.6861, 0.4398
 夹爪 0 mm 空夹 init=5，安全模式 1
 工件已由所有者手动放回工件桌
 ```
-详细交接：`docs/worklogs/2026-10-23_HANDOFF_MODES_ARCHITECTURE.md`
+详细交接：`docs/worklogs/2026-10/2026-10-23_HANDOFF_MODES_ARCHITECTURE.md`
 
 
 ## 101. 2026-10-23 环境建模的「常量 / 变量」区分（所有者强调，设计依据）
@@ -1750,7 +1750,7 @@ A. 外参没有用 RVS 手眼，用了手搓常量
 B. 深度单位错了 4 倍
    设备自报 DepthScaleUnit = 0.25（mm/计数），驱动把原始计数直接当 mm 发布。
    修法：camport_ros2 的 publishDepthFrame 用 depth_scale_ 换算成毫米
-        （docs/dependencies.md 已登记这是该 fork 的第 3 处改动）
+        （docs/reference/dependencies.md 已登记这是该 fork 的第 3 处改动）
 ```
 
 零运动「已知靶点」验证（scripts/known_target_calibration.py，一帧 RGB-D）：
@@ -2063,7 +2063,7 @@ src/cs625_simulation/assets/cs625_task/slot_fixture/meshes/slot_fixture.stl
   · 任务分段试跑 A/B/C/D 与任务阶段数据
   · NBV 接入与评估
 
-详细交接：docs/worklogs/2026-10-24_HANDOFF_NEXT_SESSION_YOLO_AND_PIPELINE.md
+详细交接：docs/worklogs/2026-10/2026-10-24_HANDOFF_NEXT_SESSION_YOLO_AND_PIPELINE.md
 ```
 
 
@@ -2117,7 +2117,7 @@ scripts/execute_assembly_chunks.py
 （曾给 coarse_to_fine_pose.py 加间距门禁，已撤回：capture_dataset.py 早已有 MIN_TCP_CLEARANCE=0.38，
   同一套规则不要在第二个脚本里重写）
 
-详细工作日志：docs/worklogs/2026-10-24_WORKLOG_EXECUTION_ESTOP_ROOT_CAUSE.md
+详细工作日志：docs/worklogs/2026-10/2026-10-24_WORKLOG_EXECUTION_ESTOP_ROOT_CAUSE.md
 ```
 
 
@@ -2181,8 +2181,8 @@ scripts/model_environment.py   离线建模 + evaluate_gate() 纯函数门禁（
 机器人地址 No route to host（相机地址正常）→ 需要所有者确认上电/网线/IP；地址本身写在 ~/.cs625_local.env（CS625_ROBOT_IP / CS625_CAMERA_IP），不要写进仓库
 ```
 
-详细工作日志：docs/worklogs/2026-10-24_WORKLOG_SIX_MODES_AND_ENV_MODEL.md
-源码权威性分级：docs/source_authority.md
+详细工作日志：docs/worklogs/2026-10/2026-10-24_WORKLOG_SIX_MODES_AND_ENV_MODEL.md
+源码权威性分级：docs/archive/2026-11-07-pre-reorg/source_authority.md
 
 
 ## 123. 2026-10-24 21:3x：六模式只规划全过 + 真机夹具几何 + 双 UI + 实验归档 + 工作区重整
@@ -2219,7 +2219,7 @@ load/safe 19/19 · load/efficient 19/19 · unload/safe 38/38 · unload/efficient
 full/safe 57/57 · full/efficient 57/57          单测 185 passed
 ```
 
-详细工作日志：docs/worklogs/2026-10-24_WORKLOG_SIX_MODES_ACCEPTANCE.md
+详细工作日志：docs/worklogs/2026-10/2026-10-24_WORKLOG_SIX_MODES_ACCEPTANCE.md
 
 
 ## 125. 2026-10-25 夜：仿真真正跑起来 + 用真机记录定义仿真场景
@@ -2239,5 +2239,5 @@ full/safe 57/57 · full/efficient 57/57          单测 185 passed
    原始 z=0.35 带工件无解，抬到 0.55 后真机 4 段全成功。
 
 ### 权威文档
-docs/sim_scene_from_real_runs.md（场景定义）、docs/real_run_reference.md（49 条真机轨迹）、
-docs/sim_fidelity.md（保真度）、docs/worklogs/2026-10-25_HANDOFF_SIM_REAL_ALIGNMENT.md（交接）
+docs/archive/2026-11-07-pre-reorg/sim_scene_from_real_runs.md（场景定义）、docs/archive/2026-11-07-pre-reorg/real_run_reference.md（49 条真机轨迹）、
+docs/archive/2026-11-07-pre-reorg/sim_fidelity.md（保真度）、docs/worklogs/2026-10/2026-10-25_HANDOFF_SIM_REAL_ALIGNMENT.md（交接）
