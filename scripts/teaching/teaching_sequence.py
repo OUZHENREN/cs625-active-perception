@@ -339,7 +339,46 @@ def move(name: str, xyz, quat, label: str = "", goal_tol: float = 0.008) -> bool
     ok = execute_plan(plan, time_scale, tail_fraction, tail_scale, goal_tol,
                       segments)
     print(f"  {label or name}: {'OK' if ok else 'FAILED'}")
+    if ok:
+        mark_phase(name)
     return ok
+
+
+RUN_STATE = REPO / "runtime" / "teaching_run_state.json"
+# Which --start-from value reopens the chain just before each completed phase.
+RESUME_FOR_PHASE = {
+    "pre_grasp": 5, "grasp": 5, "lift": 10, "transit": 10, "staging": 10,
+    "rotate": 12, "pre_insert": 13, "insert": 14, "straighten": 15,
+}
+
+
+def mark_phase(phase: str) -> None:
+    """Remember the last successfully completed phase (owner, 2026-11-07).
+
+    After a protective stop the chain may have to be restarted; knowing the last good phase
+    lets `--resume` reopen the chain at the right place instead of replaying everything.
+    """
+    try:
+        RUN_STATE.parent.mkdir(parents=True, exist_ok=True)
+        RUN_STATE.write_text(json.dumps({
+            "last_phase": phase,
+            "resume_start_from": RESUME_FOR_PHASE.get(phase),
+            "stamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        }, indent=2))
+    except OSError:
+        pass
+
+
+def resume_start_from() -> int | None:
+    """--start-from value restored from the last completed phase, or None."""
+    try:
+        data = json.loads(RUN_STATE.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    value = data.get("resume_start_from")
+    print(f"   [resume] last completed phase: {data.get('last_phase')} "
+          f"({data.get('stamp')}) -> start-from {value}")
+    return int(value) if value is not None else None
 
 
 def gripper(command: str) -> dict:
@@ -1155,6 +1194,9 @@ def aim_target():
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--resume", action="store_true",
+                        help="reopen the chain just before the last successfully completed "
+                             "phase (runtime/teaching_run_state.json), instead of --start-from")
     parser.add_argument("--stop-after-pre-insert", action="store_true",
                         help="run the chain only as far as the pre-insert stance, then stop "
                              "(no insert, no gripper command)")
