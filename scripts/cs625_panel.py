@@ -38,6 +38,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 REPO = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from panel_status import RvizStatusCard, source_summary   # noqa: E402
+from panel_camera import CameraView                        # noqa: E402
 
 RUN_STATE = REPO / "runtime" / "teaching_run_state.json"
 DEBUG_RUNS = REPO / "runtime" / "debug_runs"
@@ -279,6 +280,13 @@ class StageTable(QtWidgets.QTableWidget):
         self.setFixedHeight(fixed_height)
         self._rows: dict[int, int] = {}
         self._state: dict[int, str] = {}
+        header = self.horizontalHeader()
+        for column in range(5):
+            item = self.horizontalHeaderItem(column)
+            if item is not None:
+                align = (QtCore.Qt.AlignRight if column in (0, 2, 3)
+                         else QtCore.Qt.AlignLeft)
+                item.setTextAlignment(align | QtCore.Qt.AlignVCenter)
         for row, (number, name) in enumerate(STAGES):
             self._rows[number] = row
             self._state[number] = "idle"
@@ -626,12 +634,33 @@ class SafeTab(QtWidgets.QWidget):
         telemetry_row = QtWidgets.QHBoxLayout(telemetry)
         telemetry_row.setContentsMargins(0, 0, 0, 0)
         telemetry_row.setSpacing(3)
+        gripper_box = QtWidgets.QGroupBox("夹爪控制")
+        gripper_layout = QtWidgets.QVBoxLayout(gripper_box)
+        gripper_layout.setContentsMargins(6, 4, 6, 4)
+        gripper_layout.setSpacing(3)
+        self.gripper_label = QtWidgets.QLabel("位置 — · 状态 —")
+        self.gripper_label.setObjectName("Mono")
+        gripper_layout.addWidget(self.gripper_label)
+        gripper_buttons = QtWidgets.QHBoxLayout()
+        gripper_buttons.setSpacing(3)
+        for text, command in (("状态", "status"), ("初始化", "init"),
+                              ("张开", "release"), ("闭合", "grip")):
+            button = QtWidgets.QPushButton(text)
+            button.setFixedHeight(24)
+            button.setToolTip(f"scripts/teaching/gripper.py {command}")
+            button.clicked.connect(lambda _checked=False, c=command: self._gripper(c))
+            gripper_buttons.addWidget(button, 1)
+        gripper_layout.addLayout(gripper_buttons)
+        gripper_layout.addStretch(1)
+        self.gripper_box = gripper_box
+
         for widget, title in ((self.effort_bars, "关节力矩 N·m（满量程 60）"),
                               (self.wrench, "六维力（未安装）"),
-                              (self.tcp_label, "TCP / 夹爪")):
+                              (self.tcp_label, "TCP")):
             box = make_group(title, widget)
             box.setFixedHeight(150)
             telemetry_row.addWidget(box, 1)
+        telemetry_row.addWidget(self.gripper_box, 1)
         layout.addWidget(telemetry, 0)
 
         # 关键数值与最近采集：同高，一起撑满中段
@@ -668,8 +697,8 @@ class SafeTab(QtWidgets.QWidget):
         self.captures.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.captures.verticalHeader().setDefaultSectionSize(22)
         header = self.captures.horizontalHeader()
-        header.setStretchLastSection(True)
-        for column, width in {0: 52, 1: 74, 2: 66}.items():
+        header.setStretchLastSection(False)
+        for column, width in {0: 52, 1: 74, 2: 66, 3: 78}.items():
             header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
             self.captures.setColumnWidth(column, width)
         for column in range(4):
@@ -704,6 +733,10 @@ class SafeTab(QtWidgets.QWidget):
         middle_row.addWidget(make_group("最近采集", self.captures), 2)
         layout.addWidget(middle, 1)
 
+        # 相机：彩色/深度按原始分辨率 1:1 显示，调试时不被缩放误导
+        self.camera = CameraView(probe=self._probe)
+        layout.addWidget(make_group("相机（1:1 原始像素）", self.camera), 1)
+
         # 3D 状态卡：只占必要高度
         self.status_card = RvizStatusCard(probe=self._probe)
         self.status_card.open_rviz.connect(self._open_rviz)
@@ -712,7 +745,7 @@ class SafeTab(QtWidgets.QWidget):
             self.status_card._worker.frame.connect(
                 lambda payload: self._on_telemetry(payload))
         status_box = make_group("3D 状态（RViz）", self.status_card)
-        status_box.setFixedHeight(158)
+        status_box.setFixedHeight(196)
         layout.addWidget(status_box, 0)
         return panel
 
@@ -764,6 +797,21 @@ class SafeTab(QtWidgets.QWidget):
         self.btn_start.setEnabled(True)
         self.btn_resume.setEnabled(True)
         self._refresh_run_state()
+
+    def _gripper(self, command: str) -> None:
+        """夹爪控制：调用 scripts/teaching/gripper.py，输出进日志。"""
+        script = REPO / "scripts" / "teaching" / "gripper.py"
+        self.log.append_line(f"$ python3 {script.name} {command}", "info")
+        process = QtCore.QProcess(self)
+        process.setWorkingDirectory(str(REPO))
+        process.setProcessChannelMode(QtCore.QProcess.MergedChannels)
+        process.readyReadStandardOutput.connect(
+            lambda: [self.log.append_line(line) for line in
+                     bytes(process.readAllStandardOutput()).decode("utf-8", "replace").splitlines()])
+        process.finished.connect(
+            lambda code, _status: self.log.append_line(
+                f"[夹爪] {command} 结束 code={code}", "ok" if code == 0 else "err"))
+        process.start(sys.executable, [str(script), command])
 
     def _camera(self, action: str) -> None:
         """在后台跑 camera_mode.py（子进程），输出进日志，不阻塞界面。"""
@@ -1206,6 +1254,9 @@ class PanelWindow(QtWidgets.QMainWindow):
             card = getattr(tab, "status_card", None)
             if card is not None:
                 card.stop()
+            camera = getattr(tab, "camera", None)
+            if camera is not None:
+                camera.stop()
         super().closeEvent(event)
 
 
