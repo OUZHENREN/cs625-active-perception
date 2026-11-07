@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 """Insertion strategy the owner taught on 2026-11-05, executed as a scripted search.
 
+Owner's MANUAL procedure, verbatim (2026-11-07):
+    "先将工件大致插入，然后适当沿 TCP Y 轴转动以减小碰撞和摩擦，并且注意插入到最终部分
+     应该还能有 1.5 度左右的旋转空间；插入的同时也可以检查 Y 轴两端的空间，正常插入的话
+     应该左右各有 2 mm 的间隙；
+     一定要注意适当地转动而不是直接插入，否则会导致空间越来越小和力矩阻力越来越大导致无法
+     插入；同时也可以检查左右两端的间隙是否平衡，不然在最后的转 10 度环节的阻力也会大很多。"
+
+Two cautions extracted from it:
+    * rotate WHILE inserting, never drive straight in: the free space closes and the torque
+      resistance grows until the part can no longer move;
+    * keep the two side gaps (y, ~2 mm each) BALANCED: an unbalanced part makes the final
+      10 deg rotation about the TCP much harder.
+
 The physical rules (owner, 2026-11-05):
   1. while the part is still entering, a small rotation about world Y opens a looser region
      (Y is the slot-opening axis whose two side gaps are only ~2 mm);
@@ -16,7 +29,8 @@ limitation and asked for the scripted version.
 
 Stages:
   A  descend step by step toward the recorded insert target, rotating +/- amplitude about
-     world x on alternating steps (amplitude shrinks with depth, floored at --min-rot-deg);
+     the TCP's own Y axis on alternating steps (amplitude shrinks with depth, floored
+     at --min-rot-deg);
   B  keep descending until the effort residual jumps or a protective stop ends the motion
      -- that is the "bottom";
   C  sweep y by --y-sweep-mm in --y-step-mm steps, both directions, reporting the effort at
@@ -131,8 +145,11 @@ def main() -> int:
                         help="insert attitude (default: keep the current one)")
     parser.add_argument("--step-mm", type=float, default=10.0)
     parser.add_argument("--max-depth-mm", type=float, default=460.0)
-    parser.add_argument("--rot-amplitude-deg", type=float, default=1.5)
-    parser.add_argument("--min-rot-deg", type=float, default=0.6)
+    parser.add_argument("--rot-amplitude-deg", type=float, default=2.0,
+                        help="initial dither amplitude about the TCP y axis")
+    parser.add_argument("--min-rot-deg", type=float, default=1.5,
+                        help="amplitude kept near the seat; the owner says the part must "
+                             "still have about 1.5 deg of free rotation there")
     parser.add_argument("--y-sweep-mm", type=float, default=2.0)
     parser.add_argument("--y-step-mm", type=float, default=1.0)
     parser.add_argument("--expect", nargs=7, type=float, default=None,
@@ -141,6 +158,9 @@ def main() -> int:
                              "the run refuses to start if the TCP is outside --pos-tol-mm")
     parser.add_argument("--pos-tol-mm", type=float, default=2.0)
     parser.add_argument("--rot-tol-deg", type=float, default=0.5)
+    parser.add_argument("--y-balance-tol-mm", type=float, default=1.0,
+                        help="warn when the TCP drifts this far in y from the nominal insert "
+                             "axis (the two side gaps should stay ~2 mm each)")
     parser.add_argument("--velocity", type=float, default=0.002)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -159,7 +179,7 @@ def main() -> int:
     print(f"start ({start_xyz[0]:.4f}, {start_xyz[1]:.4f}, {start_xyz[2]:.4f})  "
           f"target {np.round(target, 4).tolist()}  distance {total_depth:.0f} mm  "
           f"steps {steps} x {args.step_mm:.0f} mm")
-    print(f"dither: +/-{args.rot_amplitude_deg:.1f} deg about world Y, shrinking to "
+    print(f"dither: +/-{args.rot_amplitude_deg:.1f} deg about the TCP y axis, shrinking to "
           f"{args.min_rot_deg:.1f} deg; y sweep +/-{args.y_sweep_mm:.1f} mm at the bottom")
     if args.dry_run:
         return 0
@@ -192,15 +212,21 @@ def main() -> int:
         amplitude = max(args.min_rot_deg,
                         args.rot_amplitude_deg * (1.0 - 0.7 * fraction))
         sign = 1.0 if index % 2 else -1.0
-        # Dither about WORLD Y (owner correction 2026-11-05): the two ~2 mm side gaps are
-        # along y, so rotating about y swings the part's lower end in the x-z plane -- i.e.
-        # along the slot opening, never into those gaps.  Rotating about x was wrong: it
-        # swings the lower end in y and squeezes the 2 mm clearances shut.
-        quat = (R.from_euler("y", sign * amplitude, degrees=True) * attitude).as_quat()
+        # Rotate about the TCP'S OWN Y axis (owner, 2026-11-07): the senior's chain
+        # right-multiplies (T_world_insert @ Ry(-10)), i.e. the rotation is expressed in the
+        # TCP frame, so the TCP point -- the gripped end of the workpiece -- stays fixed and
+        # the far end swings about it.  Right-multiplication is what makes the axis belong to
+        # the tool instead of to the world.
+        quat = (attitude * R.from_euler("y", sign * amplitude, degrees=True)).as_quat()
         status = plan_and_run(node, point, quat, args.velocity)
         mean = node.effort()
+        # Gap-balance proxy: how far the TCP sits from the nominal insert axis in y.  The
+        # owner expects ~2 mm each side, so a drift beyond --y-balance-tol-mm means the part
+        # is hugging one wall -- which makes the final 10 deg rotation much harder.
+        y_drift = float(point[1] - target[1]) * 1000.0
+        flag = "  <-- Y UNBALANCED" if abs(y_drift) > args.y_balance_tol_mm else ""
         print(f"{index:>4}{point[2]:>9.4f}{sign * amplitude:>+8.2f}"
-              f"{mean:>9.2f}{mean - baseline:>+10.2f}")
+              f"{mean:>9.2f}{mean - baseline:>+10.2f}   y-drift {y_drift:+.1f} mm{flag}")
         if status != "OK":
             print(f"   -> {status}")
             if status == "STOPPED":
