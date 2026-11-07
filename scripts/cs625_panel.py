@@ -1132,8 +1132,6 @@ class EfficiencyTab(QtWidgets.QWidget):
 
         # 相机：效率模式下同样需要看实时画面（1:1，不缩放）
         self.camera = CameraView(probe=self._probe)
-        self.camera.image_size.connect(
-            lambda width, height: getattr(self.window(), "_ensure_camera_room", lambda w, h: None)(width, height))
         right_layout.addWidget(make_group("相机（1:1 原始像素）", self.camera), 2)
 
         self.effort_chart = EffortChart()
@@ -1287,7 +1285,14 @@ class PanelWindow(QtWidgets.QMainWindow):
         self.tabs = QtWidgets.QTabWidget()
         self.safe = SafeTab(probe=probe and not smoke)
         self.efficient = EfficiencyTab(probe=probe and not smoke)
-        self.safe.camera.image_size.connect(self._ensure_camera_room)
+        # 两个标签页的相机都走同一条"把窗口撑够大"的路径：1:1 且不允许滚动，
+        # 唯一能保证看得全的办法就是窗口/列必须放得下整幅图像。
+        for tab in (self.safe, self.efficient):
+            camera = getattr(tab, "camera", None)
+            if camera is not None:
+                camera.image_size.connect(self._ensure_camera_room)
+                if camera._image is not None:
+                    self._ensure_camera_room(camera._image.width(), camera._image.height())
         self.tabs.addTab(self.safe, "安全模式")
         self.tabs.addTab(self.efficient, "效率模式")
         layout.addWidget(self.tabs, 1)
