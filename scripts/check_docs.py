@@ -81,6 +81,11 @@ def collect_referenced_paths() -> dict[str, set[str]]:
         for path in REPO.glob(pattern):
             if not path.is_file():
                 continue
+            # Historical records (work logs, archived docs) cite files as they existed then;
+            # re-checking them would only flag history.  Only live docs must resolve.
+            rel = str(path.relative_to(REPO))
+            if rel.startswith(("docs/worklogs/", "docs/archive/")):
+                continue
             for match in re.findall(r"`((?:docs|scripts|config|src|test)/[^`\s]+)`",
                                     path.read_text(errors="ignore")):
                 # Glob patterns, placeholders and bare directory mentions are not concrete
@@ -93,10 +98,43 @@ def collect_referenced_paths() -> dict[str, set[str]]:
     return found
 
 
+def resolve_reference(ref: str) -> pathlib.Path | None:
+    """Locate a cited path, tolerating the 2026-11-07 reorganisation.
+
+    Historical work logs cite files by their pre-reorg location (docs/worklogs/<file>,
+    docs/<file>).  Those citations must keep working without rewriting history, so a
+    reference is resolved against:
+      1. its literal path;
+      2. docs/worklogs/<YYYY-MM>/<basename>   (work logs moved into month folders);
+      3. docs/archive/<any stamp>/<basename>  (outdated docs kept read-only);
+      4. docs/reference/<basename>            (updated technical reference).
+    """
+    ref = re.sub(r":\d+(-\d+)?$", "", ref)      # strip a trailing :line or :line-line
+    literal = REPO / ref
+    if literal.exists():
+        return literal
+    name = pathlib.PurePosixPath(ref).name
+    if not name or "." not in name:
+        return None
+    parent = pathlib.PurePosixPath(ref).parent.name
+    candidates: list[pathlib.Path] = []
+    if "worklogs" in ref:
+        candidates += sorted(REPO.glob(f"docs/worklogs/*/{name}"))
+    candidates += sorted(REPO.glob(f"docs/archive/*/{name}"))
+    candidates += [REPO / "docs" / "reference" / name,
+                   REPO / "docs" / "manuals" / name]
+    if parent:
+        candidates += sorted(REPO.glob(f"**/{parent}/{name}"))
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def check_paths(verbose: bool) -> None:
     referenced = collect_referenced_paths()
     missing = {ref: where for ref, where in referenced.items()
-               if not (REPO / ref).exists()}
+               if resolve_reference(ref) is None}
     print(f"referenced paths: {len(referenced)} checked, {len(missing)} missing")
     for ref, where in sorted(missing.items()):
         problem(f"referenced path does not exist: {ref}  (cited in {sorted(where)[:3]})")
@@ -108,6 +146,9 @@ def check_commits() -> None:
         for path in REPO.glob(pattern):
             if not path.is_file():
                 continue
+            rel = str(path.relative_to(REPO))
+            if rel.startswith(("docs/worklogs/", "docs/archive/")):
+                continue          # historical citations, checked only for live docs
             text = path.read_text(errors="ignore")
             for match in re.findall(
                     r"(?:commit|提交|Commit|COMMIT)[^\n]{0,24}?\b([0-9a-f]{7,40})\b", text):
