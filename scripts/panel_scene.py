@@ -247,6 +247,8 @@ class SceneView(QtWidgets.QWidget):
         self.center = (0.55, 0.30, 0.10)
         self._drag: tuple[float, float] | None = None
         self._boxes: list[tuple[tuple[float, float, float], tuple[float, float, float], str]] = []
+        self._tiles: list[tuple[tuple[float, float, float], tuple[float, float]]] = []
+        self._markers: list[tuple[str, tuple[float, float, float], str]] = []
         self._links: list[tuple[str, tuple[float, float, float]]] = []
         self._cloud: list[tuple[float, float, float]] = []
         self._path: list[tuple[float, float, float]] = []
@@ -259,7 +261,14 @@ class SceneView(QtWidgets.QWidget):
 
     # ------------------------------------------------------------------ data
     def _load_model(self) -> None:
-        """Read tables / slot / workpiece / voxels from the measured cell model."""
+        """Read the measured cell model.
+
+        Only geometry that really exists in ``model.json`` is drawn:
+          * tables -- slab from z + xy_min/xy_max (no invented thickness);
+          * voxels -- the collision band, drawn as flat tiles on the measured surface;
+          * slot / workpiece -- POSE MARKERS only: the model stores their pose, not a size,
+            so drawing a sized box would invent dimensions.
+        """
         if not MODEL.exists():
             self._status = "无环境模型"
             return
@@ -268,35 +277,46 @@ class SceneView(QtWidgets.QWidget):
         except (OSError, json.JSONDecodeError):
             self._status = "环境模型损坏"
             return
-        boxes = self._boxes
+
         for name, table in (data.get("tables") or {}).items():
-            center = table.get("center") or table.get("xyz")
-            size = table.get("size")
-            if center and size:
-                boxes.append((tuple(center), tuple(size), C_TABLE))
+            try:
+                z = float(table.get("z"))
+                x0, y0 = (float(v) for v in table.get("xy_min"))
+                x1, y1 = (float(v) for v in table.get("xy_max"))
+            except (TypeError, ValueError):
+                continue
+            thickness = 0.02
+            center = ((x0 + x1) / 2, (y0 + y1) / 2, z - thickness / 2)
+            self._boxes.append((center, (abs(x1 - x0), abs(y1 - y0), thickness), C_TABLE))
+
         voxels = data.get("collisions") or []
-        stride = max(1, len(voxels) // 420)             # cap the draw count
+        stride = max(1, len(voxels) // 900)
         for index, voxel in enumerate(voxels):
             if index % stride:
                 continue
             center = voxel.get("center")
             size = voxel.get("size")
-            if center and size:
-                boxes.append((tuple(center), tuple(size), C_VOXEL))
-        for key, color, extent in (("slot", C_SLOT, 0.11), ("workpiece", C_PART, 0.07)):
+            if not center or not size:
+                continue
+            self._tiles.append(((center[0], center[1], center[2] + size[2] / 2),
+                                (size[0], size[1])))
+
+        for key, label, color in (("slot", "slot", C_SLOT), ("workpiece", "part", C_PART)):
             entry = data.get(key) or {}
             xyz = entry.get("xyz") or entry.get("centre")
             if xyz:
-                boxes.append((tuple(xyz), (extent, extent, extent), color))
-        if boxes:
-            xs = [c[0] for c, _, _ in boxes]
-            ys = [c[1] for c, _, _ in boxes]
-            zs = [c[2] for c, _, _ in boxes]
+                self._markers.append((label, tuple(float(v) for v in xyz), color))
+
+        if self._boxes or self._markers:
+            xs = [c[0] for c, _, _ in self._boxes] + [m[1][0] for m in self._markers]
+            ys = [c[1] for c, _, _ in self._boxes] + [m[1][1] for m in self._markers]
+            zs = [c[2] for c, _, _ in self._boxes] + [m[1][2] for m in self._markers]
             self.center = ((min(xs) + max(xs)) / 2, (min(ys) + max(ys)) / 2,
                            (min(zs) + max(zs)) / 2)
-            span = max(max(xs) - min(xs), max(ys) - min(ys), 1e-3)
-            self.scale = max(80.0, min(420.0, 320.0 / span))
-        self._status = f"{len(boxes)} 个体"
+            span = max(max(xs) - min(xs), max(ys) - min(ys), 0.6)
+            self.scale = max(150.0, min(700.0, 620.0 / span))
+        self._status = (f"表 {len(self._boxes)} · 体素 {len(self._tiles)} · "
+                        f"标记 {len(self._markers)}")
 
     def start_probe(self) -> None:
         self._worker = SceneWorker(parent=self)
@@ -362,6 +382,10 @@ class SceneView(QtWidgets.QWidget):
         items: list[tuple[float, str, object]] = []
         for center, size, color in self._boxes:
             items.append((self._depth(center), "box", (center, size, color)))
+        for center, size in self._tiles:
+            items.append((self._depth(center), "tile", (center, size)))
+        for label, position, color in self._markers:
+            items.append((self._depth(position), "marker", (label, position, color)))
         for index in range(len(self._links) - 1):
             p0 = self._links[index][1]
             p1 = self._links[index + 1][1]
@@ -374,6 +398,10 @@ class SceneView(QtWidgets.QWidget):
         for _, kind, payload in items:
             if kind == "box":
                 self._draw_box(painter, *payload)
+            elif kind == "tile":
+                self._draw_tile(painter, *payload)
+            elif kind == "marker":
+                self._draw_marker(painter, *payload)
             elif kind == "link":
                 p0, p1 = payload
                 painter.setPen(QtGui.QPen(QtGui.QColor(C_ARM), 3))
@@ -401,6 +429,30 @@ class SceneView(QtWidgets.QWidget):
             p0 = self._project((-0.1, i * 0.07, -0.15))
             p1 = self._project((1.5, i * 0.07, -0.15))
             painter.drawLine(p0, p1)
+
+    def _draw_tile(self, painter: QtGui.QPainter, center, size) -> None:
+        """碰撞带顶面：平坦瓦片，读起来像桌子表面而不是一片柱子。"""
+        hx, hy = size[0] / 2, size[1] / 2
+        corners = [(center[0] + sx * hx, center[1] + sy * hy, center[2])
+                   for sx in (-1, 1) for sy in (-1, 1)]
+        polygon = QtGui.QPolygonF([self._project(corners[i]) for i in (0, 1, 3, 2)])
+        painter.setPen(QtCore.Qt.NoPen)
+        painter.setBrush(QtGui.QColor(C_VOXEL))
+        painter.drawPolygon(polygon)
+
+    def _draw_marker(self, painter: QtGui.QPainter, label: str, position, color: str) -> None:
+        """位姿标记：模型只有位姿没有尺寸，画坐标轴而不是假尺寸盒子。"""
+        base = QtGui.QColor(color)
+        origin = self._project(position)
+        for axis in ((0.05, 0, 0), (0, 0.05, 0), (0, 0, 0.05)):
+            end = (position[0] + axis[0], position[1] + axis[1], position[2] + axis[2])
+            painter.setPen(QtGui.QPen(base, 2))
+            painter.drawLine(origin, self._project(end))
+        painter.setPen(QtGui.QPen(base, 1))
+        font = painter.font()
+        font.setPointSizeF(7.5)
+        painter.setFont(font)
+        painter.drawText(origin + QtCore.QPointF(7, -7), label)
 
     def _draw_cloud(self, painter: QtGui.QPainter) -> None:
         if not self._cloud:
