@@ -44,8 +44,29 @@ DEBUG_RUNS = REPO / "runtime" / "debug_runs"
 DEBUG = REPO / "scripts" / "teaching" / "teaching_debug.py"
 RESUME = REPO / "scripts" / "resume_teaching.sh"
 
-DEFAULT_SIZE = (2200, 1250)
+DEFAULT_SIZE = (2200, 1250)      # 4K 屏上会被 target_size() 覆盖
 MIN_SIZE = (1280, 760)
+
+# 界面缩放：4K（纵向 2160）下取 1.7，1080p 下为 1.0。字体/行高/控件高度都乘这个系数，
+# 所以在 4K 上不是"把 1080p 的界面拉大"，而是字号本身变大、信息量保持。
+SCALE = [1.0]
+
+
+def set_scale(_screen_height: int) -> float:
+    """默认不额外放大：字号用逻辑点（pt），Qt 会按系统 DPI 缩放。
+
+    强行按 4K 放大字号会把布局撑得很空（所有者 2026-11-07 反馈），所以界面保持紧凑，
+    只让窗口占据更大的可用区域。
+    """
+    SCALE[0] = 1.0
+    return SCALE[0]
+
+
+def target_size(screen: QtCore.QRect) -> tuple[int, int]:
+    """窗口占据可用逻辑区域的 ~92%（不做物理像素换算，Qt 已处理 DPI）。"""
+    width = min(int(screen.width() * 0.92), 2560)
+    height = min(int(screen.height() * 0.92), 1400)
+    return max(width, MIN_SIZE[0]), max(height, MIN_SIZE[1])
 
 UI_FAMILY = "Noto Sans CJK SC, Source Han Sans SC, WenQuanYi Micro Hei, sans-serif"
 MONO_FAMILY = "JetBrains Mono, DejaVu Sans Mono, monospace"
@@ -70,45 +91,53 @@ STAGES = [
 SPEED_PHASES = ["pre_grasp", "grasp", "lift", "transit", "staging",
                 "pre_insert", "insert", "straighten"]
 
-STYLE = f"""
-QWidget {{ background: {C_BG}; color: {C_TEXT}; font-family: {UI_FAMILY}; font-size: 9pt; }}
+def build_style(scale: float) -> str:
+    body = 9.0 * scale
+    small = 8.0 * scale
+    mono = 9.0 * scale
+    title = 11.0 * scale
+    return f"""
+QWidget {{ background: {C_BG}; color: {C_TEXT}; font-family: {UI_FAMILY}; font-size: {body:.1f}pt; }}
 QLabel {{ background: transparent; }}
-QLabel#Title {{ font-size: 11pt; font-weight: 700; }}
-QLabel#Mono {{ font-family: {MONO_FAMILY}; font-size: 9pt; }}
-QLabel#Cap {{ color: {C_MUTED}; font-size: 8pt; }}
+QLabel#Title {{ font-size: {title:.1f}pt; font-weight: 700; }}
+QLabel#Mono {{ font-family: {MONO_FAMILY}; font-size: {mono:.1f}pt; }}
+QLabel#Cap {{ color: {C_MUTED}; font-size: {small:.1f}pt; }}
 QGroupBox {{ background: {C_PANEL}; border: 1px solid {C_BORDER}; border-radius: 2px;
-    margin-top: 9px; padding: 2px; font-size: 8pt; }}
+    margin-top: {int(9*scale)}px; padding: 2px; font-size: {small:.1f}pt; }}
 QGroupBox::title {{ subcontrol-origin: margin; left: 6px; padding: 0 3px;
-    color: {C_MUTED}; font-size: 8pt; }}
+    color: {C_MUTED}; font-size: {small:.1f}pt; }}
 QFrame#Chip {{ background: {C_PANEL}; border: 1px solid {C_BORDER}; border-radius: 2px; }}
 QLabel#ChipValue[level="ok"] {{ color: {C_OK}; }}
 QLabel#ChipValue[level="warn"] {{ color: {C_WARN}; }}
 QLabel#ChipValue[level="bad"] {{ color: {C_BAD}; }}
 QPlainTextEdit {{ background: #0a0f14; border: 1px solid {C_BORDER};
-    font-family: {MONO_FAMILY}; font-size: 8.5pt; color: #b9c9d8; }}
+    font-family: {MONO_FAMILY}; font-size: {small + 0.5:.1f}pt; color: #b9c9d8; }}
 QTableWidget {{ background: #0a0f14; alternate-background-color: #0e151c;
     gridline-color: {C_BORDER}; border: 1px solid {C_BORDER};
-    font-family: {MONO_FAMILY}; font-size: 8.5pt; }}
+    font-family: {MONO_FAMILY}; font-size: {small + 0.5:.1f}pt; }}
 QTableWidget::item {{ padding: 0 3px; }}
 QHeaderView::section {{ background: #16202a; color: {C_MUTED}; border: none;
-    padding: 1px 3px; font-size: 8pt; }}
+    padding: 1px 3px; font-size: {small:.1f}pt; }}
 QPushButton {{ background: #17222d; border: 1px solid #263444; border-radius: 2px;
-    padding: 2px 8px; font-size: 9pt; min-height: 22px; }}
+    padding: 2px 8px; font-size: {body:.1f}pt; min-height: {int(22*scale)}px; }}
 QPushButton:hover {{ background: #1f2e3c; }}
 QPushButton:disabled {{ color: #4f606e; }}
 QPushButton[role="go"] {{ background: #10423e; border-color: {C_ACCENT}; font-weight: 700; }}
 QPushButton[role="stop"] {{ background: #471a1e; border-color: #a83c44; font-weight: 700; }}
-QCheckBox {{ font-size: 8.5pt; spacing: 4px; }}
+QCheckBox {{ font-size: {small + 0.5:.1f}pt; spacing: 4px; }}
 QLineEdit {{ background: #0a0f14; border: 1px solid {C_BORDER}; padding: 1px 3px;
-    font-family: {MONO_FAMILY}; font-size: 8.5pt; }}
+    font-family: {MONO_FAMILY}; font-size: {small + 0.5:.1f}pt; }}
 QProgressBar {{ background: #0a0f14; border: 1px solid {C_BORDER}; text-align: center;
-    font-family: {MONO_FAMILY}; font-size: 8pt; }}
+    font-family: {MONO_FAMILY}; font-size: {small:.1f}pt; }}
 QProgressBar::chunk {{ background: #1f6f6a; }}
 QTabBar::tab {{ background: #16202a; color: #c8d6e2; padding: 3px 14px;
-    border: 1px solid {C_BORDER}; border-bottom: none; font-size: 9pt; }}
+    border: 1px solid {C_BORDER}; border-bottom: none; font-size: {body:.1f}pt; }}
 QTabBar::tab:selected {{ background: {C_PANEL}; color: {C_ACCENT}; font-weight: 700; }}
 QSplitter::handle {{ background: {C_BORDER}; }}
 """
+
+
+STYLE = build_style(1.0)          # 启动时按真实屏幕重算（见 main）
 
 
 # --------------------------------------------------------------------------- helpers
@@ -186,7 +215,7 @@ class Chip(QtWidgets.QFrame):
     def __init__(self, title: str, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("Chip")
-        self.setFixedHeight(24)
+        self.setFixedHeight(int(24 * SCALE[0]))
         layout = QtWidgets.QHBoxLayout(self)
         layout.setContentsMargins(6, 0, 6, 0)
         layout.setSpacing(6)
@@ -207,7 +236,7 @@ class Chip(QtWidgets.QFrame):
 
 
 class StageTable(QtWidgets.QTableWidget):
-    ROW_H = 18
+    ROW_H = 18          # 实际行高由字体决定，构造后按实测值设置
 
     def __init__(self, parent=None) -> None:
         super().__init__(len(STAGES), 3, parent)
@@ -564,11 +593,11 @@ class SafeTab(QtWidgets.QWidget):
         telemetry_row.setContentsMargins(0, 0, 0, 0)
         telemetry_row.setSpacing(3)
         self.effort_bars = EffortBars()
-        self.effort_bars.setFixedHeight(112)
+        self.effort_bars.setFixedHeight(int(112 * SCALE[0]))
         self.wrench = WrenchGrid()
-        self.wrench.setFixedHeight(112)
+        self.wrench.setFixedHeight(int(112 * SCALE[0]))
         self.tcp_label = TcpGripLabel()
-        self.tcp_label.setFixedHeight(112)
+        self.tcp_label.setFixedHeight(int(112 * SCALE[0]))
         for widget, title in ((self.effort_bars, "关节力矩 N·m"),
                               (self.wrench, "六维力（未安装）"),
                               (self.tcp_label, "TCP / 夹爪")):
@@ -1050,9 +1079,11 @@ class PanelWindow(QtWidgets.QMainWindow):
     def __init__(self, smoke: bool = False, probe: bool = True) -> None:
         super().__init__()
         self.setWindowTitle("CS625")
-        self.setStyleSheet(STYLE)
-        self.setMinimumSize(*MIN_SIZE)
-        self.resize(*DEFAULT_SIZE)
+        self.setStyleSheet(build_style(SCALE[0]))
+        self.setMinimumSize(*MIN_SIZE)   # 紧凑布局下 1280x760 依然够用
+        screen = QtWidgets.QApplication.primaryScreen()
+        geometry = screen.availableGeometry() if screen is not None else None
+        self.resize(*(target_size(geometry) if geometry is not None else DEFAULT_SIZE))
 
         central = QtWidgets.QWidget()
         layout = QtWidgets.QVBoxLayout(central)
@@ -1102,13 +1133,29 @@ def main(argv: Sequence[str] | None = None) -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--smoke", metavar="PNG", help="离屏渲染截图后退出（不需要 ROS）")
     parser.add_argument("--no-probe", action="store_true", help="不读取 ROS 状态")
+    parser.add_argument("--scale", type=float, default=None,
+                        help="界面缩放系数（默认按屏幕高度自动：1080p=1.0，4K≈1.7）")
+    parser.add_argument("--size", metavar="WxH", default=None,
+                        help="强制窗口尺寸（离屏截图或单屏验证用）")
     args = parser.parse_args(argv)
 
     if args.smoke:
         os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
     app = QtWidgets.QApplication.instance() or QtWidgets.QApplication(sys.argv[:1])
+    screen = app.primaryScreen()
+    height = screen.availableGeometry().height() if screen is not None else 1250
+    if args.scale is not None:
+        SCALE[0] = args.scale
+    else:
+        set_scale(height)
+    app.setStyleSheet(build_style(SCALE[0]))
+    print(f"[panel] 屏幕 {screen.availableGeometry().width()}x{height} "
+          f"→ 缩放 {SCALE[0]:.2f}")
     window = PanelWindow(smoke=bool(args.smoke), probe=not args.no_probe)
+    if args.size:
+        width, _, height = args.size.lower().partition("x")
+        window.resize(int(width), int(height))
     if args.smoke:
         return run_smoke(app, window, pathlib.Path(args.smoke))
     window.show()
