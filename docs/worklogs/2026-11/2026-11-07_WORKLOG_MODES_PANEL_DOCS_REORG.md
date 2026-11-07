@@ -118,3 +118,80 @@ git push origin teaching-rvs-mode / main                           → 成功，
 
 明天上机：起驱动栈 → 点面板「打开 RViz」→ 确认机械臂模型、TF、点云、规划场景都能显示；
 确认后再做视觉采集（停 RVS、启 percipio 相机、采 20 组静态点云）。
+
+---
+
+## 9. 续（2026-11-08 凌晨）：面板、RViz、相机
+
+> 所有者要求：这一段也并入 11-07 的工作日志，不另算一天。
+
+### 9.1 做的事
+
+```text
+① 3D 由 RViz 负责，面板只显示状态卡
+   · 找到根因：`rviz2 -d config` 单独启动拿不到 robot_description
+     （报 "Could not find parameter robot_description ... within 10 s"，场景只剩空坐标系）
+   · 修复：real_moveit.launch.py 增加 rviz_only:=true（跳过 move_group、保留全部参数），
+     新增 teaching_rviz.launch.py 薄封装，open_rviz.sh 改为走它；
+     显示配置 config/rviz/cs625_teaching.rviz（MoveIt 显示 + /sensors/camera/points）
+   · 面板场景区改为「3D 状态卡」：四项数据源（/joint_states、/compute_fk、
+     /sensors/camera/points、/robot_description）+ 诊断 + 打开 RViz
+② 相机嵌入面板：1:1 原始像素、不缩放、不滚动
+   · scripts/panel_camera.py：best-effort QoS 订阅 color/depth，深度 mm→灰度线性映射
+   · 图像尺寸反过来抬高窗口最小尺寸（宽 = 图宽 + 1000，高 = 图高 + 220）
+   · 两个标签页统一由主窗口连接尺寸信号，构造时立即应用一次
+③ 六维力：六格数字 → 整行曲线（六轴彩色轨迹 + 0 轴 + 图例），与关节力矩同高 178 px
+④ 阶段表新增「说明」列（每阶段真实约束），列宽固定、数值列右对齐
+⑤ 夹爪控制面板：状态 / 初始化 / 张开 / 闭合（调 scripts/teaching/gripper.py）
+⑥ 相机控制：面板「相机 ▾」菜单（fast / modeling / high-2560 / 停止 / 状态），
+   camera_mode.py 新增 stop 与 high 子命令
+⑦ 运行记录表格列宽固定、表头与数据同侧；「最近一次运行」摘要延伸到底部
+⑧ 效率模式：相机占右列上方整块；3D 状态与运行记录并排
+```
+
+### 9.2 修掉的 bug
+
+```text
+· RuntimeError: Context.init() must only be called once
+  → 相机与状态两个 rclpy 线程共享进程，改为只在未初始化时 init、只由初始化者 shutdown
+· RuntimeError: Executor is already spinning
+  → 两个线程并发 spin_once，加模块级锁串行化
+· 自绘 3D 读错字段（model.json 的 tables 是 z + xy_min/xy_max，没有 center/size）→ 桌子未画出
+  → 结论：不自己造 3D，删掉自绘模块，交给 RViz
+· 效率模式相机在构造期发尺寸信号，主窗口尚未建立 → 回调落空、图像被裁
+  → 统一由窗口连接并立即应用一次；离屏实测 1400×900 启动会自动撑到 2280×1180
+```
+
+### 9.3 验证
+
+```bash
+python3 -m pytest test/ -q                → 293 passed（每次提交前都跑）
+python3 scripts/check_docs.py             → ALL DOC CHECKS PASSED
+离屏渲染 3000×1700 / 1400×900             → 无裁切；窗口自动撑到能放下整幅相机图
+相机 1:1（占位图 1280×960）               → 画布 1282×962、滚动条不可见
+```
+
+### 9.4 仍未验证
+
+```text
+· RViz 修复后未在有机器人的情况下实际观察
+· 相机未接真机（面板显示占位图）
+· 效率模式分阶段执行、straighten_in_slot、装配搜索仍未上机
+· 六维力曲线只有"未采集"状态（传感器十二月到位）
+```
+
+### 9.5 当日新增提交（11-07 夜 → 11-08 凌晨，同一条工作线）
+
+```text
+2ec4ce6 自动重启驱动栈 + 槽内分步转平
+f10b576/3084cc6 --resume 接线 + 文档检查器
+5f43186 一键续跑 + 5 秒通道看门狗 + 位姿库 fitness
+c048322 任务收敛 17→5
+76c762e 效率模式（分阶段 + 归档 + 18 项指标）
+8776ccc/b602b2f/fcd0b5c 文档重整与合并
+8d862be/69ceb3d/4ec195c/af726ef 面板（状态卡、相机、夹爪、三栏）
+6a8c.../93a...b97db76 RViz 接入 + 文档路径修正
+cbf2a8a 工作日志
+b97db76→da7e23b 面板迭代与相机 1:1 修复
+477b349 交接文档与 README 索引
+```

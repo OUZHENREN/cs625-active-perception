@@ -21,7 +21,7 @@
 | 文档 | 用途 |
 |---|---|
 | [`worklogs/2026-11/2026-11-09_HANDOFF_NEXT_SESSION_VISION_ALGORITHM.md`](worklogs/2026-11/2026-11-09_HANDOFF_NEXT_SESSION_VISION_ALGORITHM.md) | **视觉算法研究交接**：现状、起点、第一步、陷阱清单 |
-| [`worklogs/2026-11/2026-11-08_WORKLOG_PANEL_RVIZ_AND_CAMERA.md`](worklogs/2026-11/2026-11-08_WORKLOG_PANEL_RVIZ_AND_CAMERA.md) | 面板/RViz/相机这一轮的完整记录 |
+| [`worklogs/2026-11/2026-11-07_WORKLOG_MODES_PANEL_DOCS_REORG.md`](worklogs/2026-11/2026-11-07_WORKLOG_MODES_PANEL_DOCS_REORG.md) | 11-07 全天（含 11-08 凌晨的面板/RViz/相机，第 9 节） |
 
 ## 先看这几份（按顺序）
 
