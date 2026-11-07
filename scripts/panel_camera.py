@@ -17,6 +17,8 @@ import time
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+from panel_status import SPIN_LOCK
+
 COLOR_TOPIC = "/sensors/camera/color/image_raw"
 DEPTH_TOPIC = "/sensors/camera/depth/image_raw"
 
@@ -79,7 +81,8 @@ class CameraWorker(QtCore.QThread):
             self.status = "等待图像"
             reemit = 0.0
             while not self._stop and rclpy.ok():
-                rclpy.spin_once(node, timeout_sec=0.05)
+                with SPIN_LOCK:
+                    rclpy.spin_once(node, timeout_sec=0.05)
                 now = time.time()
                 if now - reemit < 0.1:           # 最多 10 Hz 刷新界面，图像不缩放
                     continue

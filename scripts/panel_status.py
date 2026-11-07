@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 
 from PyQt5 import QtCore, QtGui, QtWidgets
@@ -31,6 +32,10 @@ C_WARN = "#d6a52f"
 C_BAD = "#e05252"
 C_ACCENT = "#2fd6c9"
 MONO = "JetBrains Mono, DejaVu Sans Mono, monospace"
+
+# 同一进程里相机与状态两个线程各自 spin 自己的节点时，rclpy 会抛
+# "Executor is already spinning"；用一把模块级锁把 spin_once 串行化。
+SPIN_LOCK = threading.Lock()
 
 
 class TelemetryWorker(QtCore.QThread):
@@ -78,7 +83,8 @@ class TelemetryWorker(QtCore.QThread):
             last_cloud = 0
 
             while not self._stop and rclpy.ok():
-                rclpy.spin_once(node, timeout_sec=self._period / 2)
+                with SPIN_LOCK:
+                    rclpy.spin_once(node, timeout_sec=self._period / 2)
                 payload: dict = {}
                 joints = latest.get("joints")
                 if joints is not None:
