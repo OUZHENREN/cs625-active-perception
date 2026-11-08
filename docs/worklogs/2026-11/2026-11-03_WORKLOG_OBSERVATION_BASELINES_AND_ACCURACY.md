@@ -1,7 +1,8 @@
 # 2026-11-03 WORKLOG 粗观测基准 A/B 与识别准确率实测
 
 > 前序：`docs/worklogs/2026-11-03_WORKLOG_COLLISION_INCIDENT_AND_MOTION_GATES.md`
-> 相关：`docs/plans/2026-11-03_PLAN_CS625_FOCUS_AND_ROADMAP.md`（策略）、
+> 相关：`docs/plans/2026-10.md`（策略；2026-11-08 起计划逐月一份，本行原指向
+> `2026-11-03_PLAN_CS625_FOCUS_AND_ROADMAP.md`，该文件已按月份改名为 `2026-10.md`，内容未改）、
 > `docs/manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md` 第 14 条（经验）
 > 真机使用：✅ 真实机械臂；✅ 真实相机 + RVS；✅ 发生真实运动
 

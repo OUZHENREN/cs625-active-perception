@@ -42,8 +42,10 @@ fi
 [[ -f "${source_file}" ]] || die "work log not found: ${source_file}"
 
 base_name="$(basename "${source_file}")"
-if [[ ! "${base_name}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}_ ]]; then
-  die "work-log filename must start with YYYY-MM-DD_: ${base_name}"
+# Two accepted shapes: dated work logs (YYYY-MM-DD_TOPIC.md) and the monthly plans
+# introduced on 2026-11-08 (YYYY-MM.md, one file per month, see docs/plans/2026-10.md).
+if [[ ! "${base_name}" =~ ^([0-9]{4}-[0-9]{2}-[0-9]{2}_|[0-9]{4}-[0-9]{2}\.) ]]; then
+  die "filename must start with YYYY-MM-DD_ or YYYY-MM.: ${base_name}"
 fi
 
 # The local env file only holds machine-local values; loading it is best effort.

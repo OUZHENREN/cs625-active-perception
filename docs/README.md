@@ -21,6 +21,7 @@
 | 文档 | 用途 |
 |---|---|
 | [`worklogs/2026-11/2026-11-09_HANDOFF_NEXT_SESSION_VISION_ALGORITHM.md`](worklogs/2026-11/2026-11-09_HANDOFF_NEXT_SESSION_VISION_ALGORITHM.md) | **视觉算法研究交接**：现状、起点、第一步、陷阱清单 |
+| [`plans/2026-11.md`](plans/2026-11.md) | **本月做什么**：三件交付、每周产物、验收线、明确不做 |
 | [`worklogs/2026-11/2026-11-07_WORKLOG_MODES_PANEL_DOCS_REORG.md`](worklogs/2026-11/2026-11-07_WORKLOG_MODES_PANEL_DOCS_REORG.md) | 11-07 全天（含 11-08 凌晨的面板/RViz/相机，第 9 节） |
 
 ## 先看这几份（按顺序）
@@ -47,7 +48,7 @@ docs/
 │   ├── real_cell.md                 真机工位 + 就绪检查 + 网络排障
 │   └── simulation.md                仿真环境（总述/场景生成/保真度）
 ├── manuals/                ← 实机经验手册（29 条）
-├── plans/                  ← 阶段计划
+├── plans/                  ← 月度计划（YYYY-MM.md，一个月一份；旧月份不重写）
 ├── decisions/              ← ADR（含 ADR-005 两模式与插入权威）
 ├── worklogs/               ← 工作日志，按月份分目录
 │   ├── 2026-09/  2026-10/  2026-11/
@@ -122,6 +123,8 @@ scripts/sync_worklog.sh docs/worklogs/2026-11/<file>.md
 
 1. **只追加、不覆盖**：`agent_memory.md` 与手册只增条目，不改历史条目。
 2. **归档要批准**：把文档移进 `archive/` 属于所有者决策，需明确同意；本次重整已获批准。
-3. **新日期取代旧日期**：新版另起日期文件名，不覆盖旧版。
-4. **实验数据不动**：`evidence/` 与 `runtime/` 下的实验产物一律不整理、不删除。
-5. **文档也要自检**：`scripts/check_docs.py` 会检查章节编号、索引一致性、路径与提交哈希。
+3. **计划逐月一份**：`plans/` 下文件名就是月份（`YYYY-MM.md`），当月方案只写当月文件；
+   旧月份文件不重写、不覆盖（2026-11-08 所有者决定，见 `docs/plans/2026-10.md` 头部）。
+4. **新日期取代旧日期**：新版另起日期文件名，不覆盖旧版。
+5. **实验数据不动**：`evidence/` 与 `runtime/` 下的实验产物一律不整理、不删除。
+6. **文档也要自检**：`scripts/check_docs.py` 会检查章节编号、索引一致性、路径与提交哈希。
