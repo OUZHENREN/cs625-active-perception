@@ -2263,3 +2263,27 @@ docs/archive/2026-11-07-pre-reorg/sim_fidelity.md（保真度）、docs/worklogs
 · 精度验收用"相机系重复性 + 已知平移/转角的相对精度"，不用 base_link 绝对误差。
 · 仿真最多说明"代码链路能跑通"，不能说明"视觉算法准"。
 ```
+
+## 127. 2026-11-08 相机到底有哪些档：RVS 工程与驱动枚举（复核过原件）
+
+### 事实（来源：`D:\Program Files (x86)\RobotVisionSuite\runtime\CS625_SlotBox_VisualGuidance_RVS20260627-01_WSL.rvs`，JSON）
+```text
+selected_depth_mode = DEPTH16_1280x960    可选：1280x960 / 640x480 / 320x240
+selected_rgb_mode   = yuyv 2560x1920      可选：2560x1920 / 1920x1440 / 1280x960 / 640x480
+laser_power = 100, laser_auto_ctrl = 1
+```
+→ **RVS 的"2K"是彩色（2560×1920），深度最高档就是 1280×960**；不要把 2K 当成深度分辨率。
+
+### 两条要注意的推论
+1. **"1280×960 深度有效点≈0"很可能是过期结论**：那条测量在 2026-10-23，而
+   `laser_power:=100` 是 2026-10-24 才写进 `scripts/camera_mode.py` 的；
+   驱动 launch 注释写着 RVS 用激光 100 + 自动控制在 1280×960 上拿到 **79% 有效深度**。
+   → 换配置后必须复测，不能拿旧结论当"相机不行"。
+2. **内参是按模式存的**：`config/real/camera_intrinsics.json` 只有 1280×960 一份
+   （fx 931.47 / fy 931.60 / cx 648.70 / cy 449.32）。`capture_dataset.py`、
+   `model_environment.py`、`auto_label_*` 都直接读它；跑 640 或 2560 档时如果不缩放，
+   点云尺度会错 2× 或 0.5×。
+
+### 另加的档
+`camera_mode.py high`（2560×1440 彩色+深度，2026-11-08 加）是否被驱动接受**未实测**；
+深度在 RVS 枚举里没有 2560 档，所以 high 档大概率只能是彩色高清、深度回落。
