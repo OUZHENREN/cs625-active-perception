@@ -66,7 +66,7 @@ python3 scripts/show_targets_in_scene.py       # 已知位姿的工件与插槽�
 python3 scripts/camera_mode.py {status,fast,modeling,high,stop}
 ```
 
-### VS Code 任务（只有 5 个）
+### VS Code 任务（只有 6 个）
 
 ```text
 ① 开工 · 真机      驱动栈 + MoveIt + 四项门
@@ -74,6 +74,7 @@ python3 scripts/camera_mode.py {status,fast,modeling,high,stop}
 ③ 效率模式 · 调试  scripts/teaching/teaching_debug.py
 ④ 面板 · 两模式    scripts/cs625_panel.py
 ⑤ 自检 · 离线      pytest + check_docs + 环境校验
+⑥ DSH · 启动/打开界面  打开正在运行的 DSH Web；没有才后台启动
 ```
 
 ---
