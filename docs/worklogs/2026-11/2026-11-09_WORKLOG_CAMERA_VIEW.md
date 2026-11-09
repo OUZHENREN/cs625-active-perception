@@ -509,3 +509,56 @@ RVS 在 laser_power=100 下是 79% 有效深度；我们无偏振、无 RVS 后�
 · 计划：D0.5 关闭，偏振降级为"已尝试、留档"，不再投入时间。
 · 触发重启的条件：换工件/换角度导致大面积镜面失效 → 换 800–900 nm 专用膜再测。
 ```
+
+## 20. 今日收尾（2026-11-09 结束）
+
+### 今天真正拿到的东西
+
+```text
+工具（都进仓库了）
+  scripts/camera_view.py        ROS 相机查看器（4K 自适应、彩色/深度/红外、换档按钮、诊断）
+  scripts/camera_probe.py       实时探针：帧数/亮度/有效点/中位深度，用数字代替肉眼看
+  scripts/camera_census.py      档位普查（换档→采帧→指标表→存图存深度）
+  scripts/polarizer_ab.py       偏振 A/B：capture / frames / compare / sweep / sweep-capture
+  docs/manuals/debug/           调试命令手册（README / camera.md / ros_graph.md）
+  .vscode/tasks.json            新增任务「⑦ 相机 · 查看/换档」
+
+实验数据
+  runtime/experiments/camera_census_20261109_184714/   三档普查 + 对比图
+  ~/cs625_experiment_archive/camera_census_20261109_184714/   （已归档，含 README）
+  runtime/polarizer_ab/*                               偏振 A/B 全部原始采集
+
+结论
+  1. 1280×960 + laser 100 = 76.1% 有效点、1.48 mm 点距、0.8 fps（"≈0 有效点"旧结论作废）
+  2. 三档普查：modeling 与 high 深度内容一致，fast 无深度 → D1 默认 modeling
+  3. 偏振：可见光膜在相机红外波段不偏振，0°/90° 无差别 → 本工位不做偏振，已关闭
+```
+
+### 明天的第一件事（唯一推荐）
+
+```text
+写 scripts/vision_capture.py（D1 的数据入口）：
+  · 默认 modeling 档（1280×960 彩色 + 深度）
+  · 静止采 20 组（5 种朝向 × 4 次），落盘 runtime/vision_dataset/<stamp>/
+    cloud.npy / color.png / depth.npy / meta.json
+  · 复用 camera_probe 的 reliable 订阅；不动机械臂、不碰夹爪
+  · 验收：20 组点云到中位点云的 RMS ≤ 2 mm；给出帧率/有效点/点距/空洞率四个数
+```
+
+### 当前现场状态
+
+```text
+相机：modeling 档运行中（pid 见 runtime/camera.pid），0.8 fps
+查看器：已在桌面运行（scripts/camera_view.py）
+机械臂：未动过；夹爪未启动；今天全程没有发生任何机械臂运动
+明日开工前：确认 RVS 关闭、相机仍在（ros2 topic info /camera/color/image_raw 发布者=1）
+```
+
+### 挂起项（不在今天范围）
+
+```text
+· 手眼口径验证：按所有者决定延后，触发条件=第一次用自研位姿驱动机械臂
+· PreSetMode（Quality 1.4 / Fast 3.2 fps）：驱动未暴露成 ROS 参数，未测
+· 红外流（left_ir）：需要 launch 加 left_ir_enable:=true，未开
+· 夹爪/机械臂：今天明确不做
+```
