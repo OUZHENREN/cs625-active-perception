@@ -2362,3 +2362,10 @@ RVS 私有后处理（专用滤波/掩膜/3D 模板匹配算子）：RVS 内部�
 设备参数只对齐了激光功率，自动激光控制与 LED 增益比没对齐；
 RVS 的后处理链不可复现——这不是"没做"，而是"做不到"，如实记录。
 ```
+
+### 如果要对齐自动激光控制（未做，有线索）
+SDK 里有 `TY_BOOL_LASER_AUTO_CTRL`（0x0501|TY_FEATURE_BOOL）与 `TY_INT_LASER_POWER`；
+驱动的 `set_laser_power()` 只写后者。`/camera/dynamic_config`（std_msgs/String）会把内容当
+GenICam XML 解析并写入设备，所以理论上可以用它打开自动激光控制——但需要先确认该特征的
+GenICam 名称（SDK 里只有枚举，不等于 XML 名字），属于"可尝试，未验证"。
+
