@@ -31,6 +31,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import subprocess
 import sys
@@ -58,6 +59,44 @@ C_BORDER = "#1f2c39"
 C_TEXT = "#dbe7f1"
 C_MUTED = "#7d93a6"
 C_ACCENT = "#2fd6c9"
+
+# 深色主题 + 显式的按钮配色。之前只设了 QWidget 的文字颜色，按钮仍是系统浅色底，
+# 浅色字落在浅色底上就看不清了；这里把按钮的底/边/悬停/按下/禁用全部写死。
+APP_QSS = """
+QWidget {{ background: {bg}; color: {text}; }}
+QMainWindow, QDialog {{ background: {bg}; }}
+QPushButton {{
+    background: #18232e; color: {text};
+    border: 1px solid #2f4256; border-radius: 4px;
+    padding: 5px 10px; font-size: 10pt;
+}}
+QPushButton:hover {{ background: #22303d; border-color: {accent}; }}
+QPushButton:pressed {{ background: #101a23; }}
+QPushButton:checked {{ background: #0f3a37; border-color: {accent}; color: #b6fff8; }}
+QPushButton:disabled {{ background: #111a22; color: #5b7186; border-color: #1f2c39; }}
+QPlainTextEdit {{
+    background: #0e1620; color: #a8bccd;
+    border: 1px solid {border}; font-size: 9.5pt;
+}}
+QScrollArea {{ border: 1px solid {border}; background: #05080c; }}
+QLabel {{ background: transparent; }}
+QLabel#status {{ color: {muted}; font-size: 9.5pt; }}
+QLabel#status_live {{ color: {accent}; font-size: 9.5pt; font-weight: 600; }}
+QLabel#footer {{ color: {muted}; font-size: 8.5pt; }}
+""".format(bg=C_BG, text=C_TEXT, accent=C_ACCENT, border=C_BORDER, muted=C_MUTED)
+
+
+def pick_font_family() -> str:
+    """挑一个能显示中文的字体；都没有时退回 DejaVu Sans。"""
+    try:
+        available = set(QtGui.QFontDatabase().families())
+    except Exception:                           # noqa: BLE001
+        return "DejaVu Sans"
+    for name in ("Noto Sans CJK SC", "Source Han Sans SC", "WenQuanYi Micro Hei",
+                 "WenQuanYi Zen Hei", "Microsoft YaHei", "DejaVu Sans"):
+        if name in available:
+            return name
+    return "DejaVu Sans"
 
 
 def convert_image(message) -> tuple[QtGui.QImage | None, dict]:
@@ -210,6 +249,78 @@ class ModeRunner(QtCore.QThread):
         self.finished_action.emit(self._action, process.wait())
 
 
+class Diagnostics(QtCore.QThread):
+    """把"为什么看不到图像"一次性问清楚：节点、话题、发布者、域名、相机进程。"""
+
+    line = QtCore.pyqtSignal(str)
+
+    def run(self) -> None:
+        self.line.emit("— 诊断开始 —")
+        self.line.emit(f"ROS_DOMAIN_ID={os.environ.get('ROS_DOMAIN_ID', '0')}   "
+                       f"RMW={os.environ.get('RMW_IMPLEMENTATION', 'default')}")
+
+        nodes = self._run(["ros2", "node", "list"])
+        self.line.emit(f"节点 {len(nodes)} 个")
+        for node in nodes[:12]:
+            self.line.emit(f"  · {node}")
+        if not nodes:
+            self.line.emit("  ❌ 一个节点都没有：相机/驱动没起，或另一个终端用了不同的 "
+                           "ROS_DOMAIN_ID。先在那个终端 ros2 topic list 对照。")
+
+        topics = self._run(["ros2", "topic", "list"])
+        camera_topics = [topic for topic in topics
+                         if any(token in topic for token in ("camera", "sensors/camera"))]
+        self.line.emit(f"话题 {len(topics)} 个，其中相机相关 {len(camera_topics)} 个")
+        published = []
+        for topic in camera_topics[:16]:
+            count = self._publishers(topic)
+            if count > 0:
+                published.append(topic)
+            note = "" if count > 0 else "（只有订阅端，比如本窗口自己）"
+            self.line.emit(f"  · {topic}   发布者 {count}{note}")
+        if not published:
+            self.line.emit("  ❌ 没有任何相机话题有发布者：相机进程没起或已退出；"
+                           "注意本窗口自己的订阅也会让话题出现在列表里。")
+        for topic in (topic for group in TOPICS.values() for topic in group):
+            if topic in camera_topics:
+                continue
+            self.line.emit(f"  · {topic}   没有这个 topic")
+
+        ps = self._run(["pgrep", "-af", "percipio_camera"])
+        self.line.emit("percipio_camera 进程：" + ("无" if not ps else ""))
+        for pid_line in ps[:6]:
+            self.line.emit(f"  · {pid_line}")
+        self.line.emit("— 诊断结束 —")
+
+    def _run(self, command: list[str]) -> list[str]:
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=15)
+        except Exception as exc:                # noqa: BLE001
+            self.line.emit(f"  {command[0]} 失败：{exc}")
+            return []
+        if result.returncode != 0:
+            if command[0] == "pgrep" and result.returncode == 1:   # 没有匹配进程
+                return []
+            self.line.emit(f"  {command[0]} 退出码 {result.returncode}: "
+                           f"{result.stderr.strip()[:160]}")
+            return []
+        return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+    def _publishers(self, topic: str) -> int:
+        try:
+            result = subprocess.run(["ros2", "topic", "info", topic],
+                                    capture_output=True, text=True, timeout=15)
+        except Exception:                       # noqa: BLE001
+            return -1
+        for line in result.stdout.splitlines():
+            if "Publisher count" in line:
+                try:
+                    return int(line.split(":", 1)[1].strip())
+                except (IndexError, ValueError):
+                    return -1
+        return -1
+
+
 class ImageArea(QtWidgets.QWidget):
     """图像显示区：默认铺满，可切 1:1 原始像素。"""
 
@@ -221,6 +332,8 @@ class ImageArea(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         self.scroll = QtWidgets.QScrollArea()
         self.scroll.setWidgetResizable(True)
+        self.scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.scroll.setStyleSheet(f"background:{C_BG}; border:1px solid {C_BORDER};")
         self.label = QtWidgets.QLabel("无图像")
         self.label.setAlignment(QtCore.Qt.AlignCenter)
@@ -235,6 +348,9 @@ class ImageArea(QtWidgets.QWidget):
     def set_fit(self, fit: bool) -> None:
         self._fit = fit
         self.scroll.setWidgetResizable(fit)
+        policy = QtCore.Qt.ScrollBarAlwaysOff if fit else QtCore.Qt.ScrollBarAsNeeded
+        self.scroll.setHorizontalScrollBarPolicy(policy)
+        self.scroll.setVerticalScrollBarPolicy(policy)
         if not fit and self._image is not None:
             self.label.setFixedSize(self._image.size())
         self._render()
@@ -261,11 +377,15 @@ class ImageArea(QtWidgets.QWidget):
 class CameraWindow(QtWidgets.QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("CS625 相机 · ROS 端查看 / 换档")
+        # WSLg 的窗口装饰字体没有中文字形，中文标题会变成方块，所以标题用 ASCII。
+        self.setWindowTitle("CS625 Camera - ROS view / mode switch")
         self.resize(960, 760)
         self._worker: CameraWorker | None = None
         self._runner: ModeRunner | None = None
+        self._diagnostics: Diagnostics | None = None
         self._kind = "color"
+        self._last_frame = 0.0
+        self._hinted = False
 
         central = QtWidgets.QWidget()
         root = QtWidgets.QVBoxLayout(central)
@@ -281,6 +401,7 @@ class CameraWindow(QtWidgets.QMainWindow):
         modes.addWidget(self._button("启动 · high 2560×1440", lambda: self._run_mode("high")))
         modes.addWidget(self._button("停止", lambda: self._run_mode("stop")))
         modes.addWidget(self._button("状态", lambda: self._run_mode("status")))
+        modes.addWidget(self._button("诊断", self._diagnose))
         self.mode_buttons = modes
         root.addLayout(modes)
 
@@ -294,11 +415,12 @@ class CameraWindow(QtWidgets.QMainWindow):
             button.setChecked(kind == self._kind)
             self.kind_buttons[kind] = button
             display.addWidget(button)
-        self.btn_fit = self._button("1:1", self._toggle_fit, checkable=True)
+        self.btn_fit = self._button("铺满", self._toggle_fit, checkable=True)
+        self.btn_fit.setChecked(True)          # 默认铺满
         display.addWidget(self.btn_fit)
         display.addWidget(self._button("截图", self._snapshot))
         self.status_label = QtWidgets.QLabel("等待图像")
-        self.status_label.setStyleSheet(f"color:{C_MUTED}; font-size:9pt;")
+        self.status_label.setObjectName("status")
         display.addWidget(self.status_label, 1)
         root.addLayout(display)
 
@@ -317,10 +439,14 @@ class CameraWindow(QtWidgets.QMainWindow):
         footer = QtWidgets.QLabel(
             "只操作相机 launch 进程（runtime/camera.pid）；不发机械臂指令、不启动夹爪、不碰 MoveIt。"
             "  换档时相机会被重启，图像会短暂中断。")
-        footer.setStyleSheet(f"color:{C_MUTED}; font-size:8.5pt;")
+        footer.setObjectName("footer")
         root.addWidget(footer)
 
+        self.log.appendPlainText("就绪：选一档启动，或点『诊断』看为什么没有图像。")
         self._start_worker()
+        self._timer = QtCore.QTimer(self)
+        self._timer.timeout.connect(self._check_frames)
+        self._timer.start(3000)
 
     # ------------------------------------------------------------------
     def _button(self, text, slot, checkable=False):
@@ -346,14 +472,20 @@ class CameraWindow(QtWidgets.QMainWindow):
             self._worker.set_kind(kind)
 
     def _toggle_fit(self) -> None:
-        fit = not self.btn_fit.isChecked()
-        self.btn_fit.setChecked(fit)
+        # Qt 已经替我们翻转了 checked，这里按翻转后的状态处理
+        fit = self.btn_fit.isChecked()
         self.btn_fit.setText("铺满" if fit else "1:1")
         self.image_area.set_fit(fit)
 
     def _on_frame(self, kind: str, image: QtGui.QImage, info: dict) -> None:
         if kind != self._kind:
             return
+        self._last_frame = time.time()
+        self._hinted = False
+        if self.status_label.objectName() != "status_live":
+            self.status_label.setObjectName("status_live")
+            self.status_label.style().unpolish(self.status_label)
+            self.status_label.style().polish(self.status_label)
         self.image_area.set_image(image)
         parts = [f"{image.width()}×{image.height()}", info.get("encoding", "?")]
         fps = info.get("fps", 0.0)
@@ -373,6 +505,27 @@ class CameraWindow(QtWidgets.QMainWindow):
         path = SNAPSHOT_DIR / f"{time.strftime('%Y%m%d_%H%M%S')}_{self._kind}.png"
         image.save(str(path))
         self.log.appendPlainText(f"截图 -> {path.relative_to(REPO)}")
+
+    def _diagnose(self) -> None:
+        """后台跑一次 ROS 体检，结果进日志；不阻塞界面。"""
+        if self._diagnostics is not None and self._diagnostics.isRunning():
+            self.log.appendPlainText("诊断还在跑，等它结束")
+            return
+        self._diagnostics = Diagnostics()
+        self._diagnostics.line.connect(self.log.appendPlainText)
+        self._diagnostics.start()
+
+    def _check_frames(self) -> None:
+        """超过 10 s 没有图像时提示一次，并说明常见原因。"""
+        if self._hinted:
+            return
+        age = time.time() - self._last_frame if self._last_frame else 9999.0
+        if age < 10.0:
+            return
+        self._hinted = True
+        self.log.appendPlainText(
+            "10 秒没有图像。常见原因：① 相机没起；② 另一个终端 ROS_DOMAIN_ID 不同；"
+            "③ RVS 占着相机（Windows 端）；④ 话题名不是 /camera/*。点『诊断』看细节。")
 
     def _run_mode(self, action: str) -> None:
         if self._runner is not None and self._runner.isRunning():
@@ -407,6 +560,8 @@ class CameraWindow(QtWidgets.QMainWindow):
             self._worker = None
         if self._runner is not None and self._runner.isRunning():
             self._runner.wait(2000)
+        if self._diagnostics is not None and self._diagnostics.isRunning():
+            self._diagnostics.wait(3000)
 
     def closeEvent(self, event) -> None:       # noqa: N802
         self.shutdown()
@@ -440,7 +595,8 @@ def main() -> int:
         return list_topics()
 
     app = QtWidgets.QApplication(sys.argv)
-    app.setStyleSheet(f"QMainWindow{{background:{C_BG};}} QWidget{{color:{C_TEXT};}}")
+    app.setFont(QtGui.QFont(pick_font_family(), 10))
+    app.setStyleSheet(APP_QSS)
     window = CameraWindow()
     app.aboutToQuit.connect(window.shutdown)
     window.show()

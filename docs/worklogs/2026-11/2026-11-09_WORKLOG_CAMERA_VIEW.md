@@ -82,3 +82,36 @@ Critical-chain status（未变）：
 Sim/real alignment：本轮只用真机相机；real motion 未发生。
 Intentionally not done：夹爪、机械臂运动、MoveIt、数据集落盘、PreSetMode。
 ```
+
+## 8. 补充（2026-11-09 18:0x）：所有者看到窗口后反馈的三类问题
+
+### 8.1 窗口标题乱码
+
+现象：标题栏里中文变成方块。原因：WSLg 的窗口装饰由 Weston 绘制，字体没有中文字形，
+Qt 里的中文字体管不到标题栏。处置：标题改成 ASCII `CS625 Camera - ROS view / mode switch`，
+界面内的中文保持（按钮/状态栏/日志都正常，截图已验证）。
+
+### 8.2 按钮文字对比度不足
+
+现象：按钮左浅右灰、文字发白。原因：上一版只设了 `QWidget { color }`，按钮底仍是系统浅色，
+浅色字落在浅色底上。处置：写完整 QSS——按钮底 `#18232e`、边框、悬停、按下、选中、**禁用**
+五种状态全部显式配色；并显式挑中文字体（本机可用 `WenQuanYi Micro Hei`）。
+
+### 8.3 "彩色：等待图像"——这才是真正的问题
+
+本机诊断结果（18:0x，`ROS_DOMAIN_ID=0`）：
+
+```text
+节点 0 个；话题只有 /rosout 与 /parameter_events
+percipio_camera 进程：无
+```
+
+也就是说：**这个 WSL 会话里现在没有任何 ROS 节点在跑**，相机没有发布者。
+窗口自己的订阅会让 `/camera/*` 出现在话题列表里（但发布者 0），所以"话题存在"不等于"相机在发"。
+
+处置：
+1. 窗口新增 **诊断** 按钮：一次打印 ROS_DOMAIN_ID/RMW、节点表、相机话题及其发布者数、
+   percipio_camera 进程；没有节点/没有发布者时直接给结论。
+2. 10 秒无图像时在日志里自动提示一次（相机没起 / 另一个终端 ROS_DOMAIN_ID 不同 / RVS 占着）。
+3. 想直接看就点窗口里的 **启动 · modeling 1280×960**（等价 `python3 scripts/camera_mode.py modeling`），
+   它会用 `~/.cs625_local.env` 里的相机 IP 起相机 launch。
