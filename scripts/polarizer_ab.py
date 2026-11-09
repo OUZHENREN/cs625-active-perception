@@ -178,6 +178,25 @@ def hole_ratio(depth_m: np.ndarray, k: list[float], roi, cell_m: float = 0.003) 
     return float(1.0 - cells.any(axis=(1, 3)).mean())
 
 
+def cell_ratios(valid: np.ndarray, roi, cells: int = 3) -> np.ndarray:
+    """把有效点掩膜切成 cells×cells 格，返回每格的有效点比例。
+
+    偏振消光会让整幅图**均匀**变暗；遮挡/膜没盖严则会让某些格子整片变黑。
+    这个网格就是用来区分这两者的。
+    """
+    roi_sl = roi_slice(valid.shape, roi)
+    crop = valid if roi_sl is None else valid[roi_sl]
+    height, width = crop.shape
+    out = np.full((cells, cells), np.nan)
+    for row in range(cells):
+        for col in range(cells):
+            block = crop[row * height // cells:(row + 1) * height // cells,
+                         col * width // cells:(col + 1) * width // cells]
+            if block.size:
+                out[row, col] = float(block.mean())
+    return out
+
+
 def colour_saturation(colour: np.ndarray, roi) -> tuple[float, float]:
     """ROI colour stats: share of pixels clipped to white, and the mean brightness.
 
@@ -208,11 +227,13 @@ def state_metrics(dataset: pathlib.Path, roi, stride: int) -> dict:
     acc: dict[str, list[float]] = {key: [] for key in
                                    ("valid_ratio", "flying", "planarity",
                                     "hole", "spacing_mm", "saturation", "brightness")}
+    grids: list[np.ndarray] = []
     for depth_path in sorted(dataset.glob("depth_*.npy")):
         depth_m = depth_to_metres(np.load(depth_path))
         valid = np.isfinite(depth_m) & (depth_m > 0.0)
         roi_sl = roi_slice(depth_m.shape, roi)
         acc["valid_ratio"].append(float(valid[roi_sl].mean()) if roi_sl else float(valid.mean()))
+        grids.append(cell_ratios(valid, roi))
         # flying/planarity come from a strided cloud (speed); spacing from the
         # stride-1 cloud so its millimetres stay honest.
         if stride > 1:
@@ -233,8 +254,12 @@ def state_metrics(dataset: pathlib.Path, roi, stride: int) -> dict:
             clipped, brightness = colour_saturation(cv2.imread(str(colour_path)), roi)
             acc["saturation"].append(clipped)
             acc["brightness"].append(brightness)
-    return {key: float(np.nanmedian(values)) for key, values in acc.items()
-            if values and not all(math.isnan(v) for v in values)}
+    result = {key: float(np.nanmedian(values)) for key, values in acc.items()
+              if values and not all(math.isnan(v) for v in values)}
+    result["valid_std"] = round(float(np.nanstd(acc["valid_ratio"])), 4)
+    if grids:
+        result["grid"] = np.nanmedian(np.stack(grids), axis=0)
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -359,6 +384,7 @@ ROWS = [
     ("hole", "空洞率（ROI 内 3 mm 格）", "{:.3f}", "可能上升（镜面变空）"),
     ("saturation", "彩色过曝比例", "{:.3f}", "参考"),
     ("brightness", "彩色平均亮度", "{:.1f}", "装膜后应明显变暗"),
+    ("valid_std", "帧间有效点波动", "{:.4f}", "越小越稳；>0.05 说明采集时在动"),
 ]
 
 
@@ -378,6 +404,28 @@ def cmd_compare(args) -> int:
             delta_text = f"{'n/a':>10}"
         print(f"{label:<28}{fmt.format(b):>10}{fmt.format(a):>10}{delta_text}   {expect}")
     print("-" * 80)
+
+    grid_b, grid_a = before.get("grid"), after.get("grid")
+    if grid_b is not None and grid_a is not None:
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ratio = np.where(grid_b > 0.02, grid_a / np.maximum(grid_b, 1e-9), np.nan)
+        print("\n空间分布（after / before 每格有效点比例，1.00 = 没变化）：")
+        for row in ratio:
+            print("   [" + "  ".join(f"{value:5.2f}" if not math.isnan(value) else "   --"
+                                     for value in row) + "]")
+        finite = ratio[~np.isnan(ratio)]
+        if finite.size:
+            worst, best = float(finite.min()), float(finite.max())
+            mean = float(finite.mean())
+            print(f"   最小 {worst:.2f} · 最大 {best:.2f} · 平均 {mean:.2f}", end="  →  ")
+            if mean < 0.30:
+                print("整体大幅衰减：图案被压没了（消光过强，或投射窗被膜/手挡住）")
+            elif worst < 0.25 and best > 0.7:
+                print("局部缺失：像遮挡/膜没盖严，不是均匀消光")
+            elif best - worst < 0.35:
+                print("整体均匀变化：符合偏振消光的特征")
+            else:
+                print("介于两者之间，需要结合图像判断")
 
     flying_b, flying_a = before.get("flying"), after.get("flying")
     if flying_b is None or flying_a is None or math.isnan(flying_b) or math.isnan(flying_a):
