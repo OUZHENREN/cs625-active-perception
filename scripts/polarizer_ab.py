@@ -178,12 +178,20 @@ def hole_ratio(depth_m: np.ndarray, k: list[float], roi, cell_m: float = 0.003) 
     return float(1.0 - cells.any(axis=(1, 3)).mean())
 
 
-def colour_saturation(colour: np.ndarray, roi) -> float:
-    """Share of ROI pixels clipped to white (the specular blob in the colour frame)."""
+def colour_saturation(colour: np.ndarray, roi) -> tuple[float, float]:
+    """ROI colour stats: share of pixels clipped to white, and the mean brightness.
+
+    The mean brightness is the cheap "did the film actually cut light" check: a
+    working polariser in front of a bright scene drops roughly half the light; a
+    film that barely changes it is either not over the aperture or transparent at
+    the camera's wavelength.
+    """
     crop = colour[roi_slice(colour.shape[:2], roi)] if roi else colour
     if crop.size == 0:
-        return float("nan")
-    return float((crop[..., :3].min(axis=-1) >= 250).mean())
+        return float("nan"), float("nan")
+    clipped = float((crop[..., :3].min(axis=-1) >= 250).mean())
+    brightness = float(crop[..., :3].mean())
+    return clipped, brightness
 
 
 def state_metrics(dataset: pathlib.Path, roi, stride: int) -> dict:
@@ -199,7 +207,7 @@ def state_metrics(dataset: pathlib.Path, roi, stride: int) -> dict:
 
     acc: dict[str, list[float]] = {key: [] for key in
                                    ("valid_ratio", "flying", "planarity",
-                                    "hole", "spacing_mm", "saturation")}
+                                    "hole", "spacing_mm", "saturation", "brightness")}
     for depth_path in sorted(dataset.glob("depth_*.npy")):
         depth_m = depth_to_metres(np.load(depth_path))
         valid = np.isfinite(depth_m) & (depth_m > 0.0)
@@ -222,7 +230,9 @@ def state_metrics(dataset: pathlib.Path, roi, stride: int) -> dict:
         colour_path = dataset / depth_path.name.replace("depth_", "color_").replace(".npy", ".png")
         if colour_path.exists():
             import cv2
-            acc["saturation"].append(colour_saturation(cv2.imread(str(colour_path)), roi))
+            clipped, brightness = colour_saturation(cv2.imread(str(colour_path)), roi)
+            acc["saturation"].append(clipped)
+            acc["brightness"].append(brightness)
     return {key: float(np.nanmedian(values)) for key, values in acc.items()
             if values and not all(math.isnan(v) for v in values)}
 
@@ -341,6 +351,7 @@ ROWS = [
     ("spacing_mm", "平均点距 (mm)", "{:.2f}", "不应变稀"),
     ("hole", "空洞率（ROI 内 3 mm 格）", "{:.3f}", "可能上升（镜面变空）"),
     ("saturation", "彩色过曝比例", "{:.3f}", "参考"),
+    ("brightness", "彩色平均亮度", "{:.1f}", "装膜后应明显变暗"),
 ]
 
 
