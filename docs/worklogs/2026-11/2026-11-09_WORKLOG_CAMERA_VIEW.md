@@ -181,3 +181,34 @@ C 投射端：另一片膜举在投射窗前旋转，看深度飞点是否随角
 
 工具侧：`polarizer_ab.py compare` 增加了一行「彩色平均亮度」，用来区分"膜在挡光"和
 "膜完全没进光路"。
+
+## 11. 18:2x UI 缩放 + RVS→ROS 前置数据对齐核查
+
+### 11.1 4K 屏上界面太小
+
+处置：`camera_view.py` 增加 DPI/分辨率自适应与 `--ui-scale`：
+
+```text
+detect_scale()：按主屏逻辑分辨率取 max(w/1920, h/1080)，夹在 1.0–2.5
+窗口默认尺寸：可用屏幕的 72%，并设最小尺寸（随缩放），避免被压扁
+字体/内边距/按钮高度/日志高度：全部乘 scale；样例 1.6 倍时按钮 30→48 px、正文 10→16 pt
+Qt 高 DPI 属性（AA_EnableHighDpiScaling / AA_UseHighDpiPixmaps）在 QApplication 之前设置
+显式覆盖：python3 scripts/camera_view.py --ui-scale 2.0
+```
+
+### 11.2 RVS 的前置数据，ROS 侧对齐了吗（逐项核实，见 agent_memory §129）
+
+```text
+✅ 内参：同一设备同一档；2026-11-09 实测 color/depth camera_info 的 K 与
+        config/real/camera_intrinsics.json 完全一致（深度已配准到彩色，两者 K 相同）
+✅ 手眼：已由 scripts/sync_real_handeye.py 从 RVS 三个标定文件导入，带 provenance
+⚠️ 手眼未验证：T_tcp_cam vs T_flange_cam 两种口径差 0.16 m；本月按所有者决定不验
+✅ 激光功率：laser_power:=100 与 RVS 一致
+❌ laser_auto_ctrl：RVS=1，驱动只写 TY_INT_LASER_POWER，不设自动控制
+❌ triggerMode22_ledGainRatio：驱动没暴露
+?  曝光/增益：RVS 工程无显式值（设备 AE），ROS 也没设；设备里是否残留 RVS 用户集无法确认
+❌ RVS 私有后处理（滤波/掩膜/3D 模板匹配）：不可复现，只能自研替代
+```
+
+结论：几何前置对齐且有证据；标定前置导入但未验证；设备参数只对齐了激光功率；
+RVS 的后处理链不可复现——这是"做不到"，不是"没做"，如实写进 memory。

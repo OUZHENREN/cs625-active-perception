@@ -2329,3 +2329,36 @@ laser_power = 100, laser_auto_ctrl = 1
 结论：**接收端单独两片膜没有任何可测效果**。先别撕（它也没让数据变差），用三步对照实验定位：
 ① 用纸挡窗口，确认哪个是 IR 接收窗；② 把膜举到彩色镜头前，确认它在可见光确实偏振；
 ③ 把另一片膜举到投射窗前旋转，看飞点是否随角度变化。
+
+## 129. 2026-11-09 RVS → ROS 前置数据对齐现状（逐项核实）
+
+### 已对齐（有证据）
+```text
+内参：同一台设备，ROS 由驱动发布 /camera/{color,depth}/camera_info。
+      2026-11-09 实测 1280x960：fx 931.473 / fy 931.596 / cx 648.695 / cy 449.319，
+      与 config/real/camera_intrinsics.json 完全一致；color 与 depth 的 K 相同（深度已配准到彩色）。
+      注意：内参是按分辨率给的，仓库只存了 1280x960 一份，换 640/2560 档必须重读 camera_info。
+手眼：scripts/sync_real_handeye.py 从 RVS 的 HandEyeTool.ini / ColorToRobotTCP.txt /
+      DepthToRobotTCP.txt 生成 config/handeye/tcp_to_camera.json（相机光学系在法兰系下的位姿，
+      再与 T_flange_tcp=(-0.046,0,0.353) 合成 T_tcp_cam）。文件带 provenance，禁止手改。
+激光功率：ROS 传 laser_power:=100，与 RVS 相同。
+```
+
+### 没对齐 / 不可复现
+```text
+laser_auto_ctrl：RVS 工程里=1；驱动 set_laser_power() 只写 TY_INT_LASER_POWER，不设自动控制
+                 → ROS 侧自动激光控制是关的（这是与 RVS 的一个真实差异）。
+triggerMode22_ledGainRatio（RVS 0.5）：网口驱动没暴露这个参数。
+曝光/增益：RVS 工程里没有显式值（走设备自动曝光），ROS launch 也没有曝光参数
+          → 两边都靠设备 AE；但设备里是否残留 RVS 的"用户集"无法从 ROS 侧确认。
+手眼【未验证】：T_tcp_cam vs T_flange_cam 两种口径差 0.16 m；所有者 2026-11-08 决定本月不验，
+               触发条件=第一次用自研位姿驱动机械臂（base_link）。
+RVS 私有后处理（专用滤波/掩膜/3D 模板匹配算子）：RVS 内部实现，ROS 侧不能复现，只能自研替代。
+```
+
+### 结论
+```text
+几何前置（内参）对齐且有实测证据；标定前置（手眼）导入了但没有验证；
+设备参数只对齐了激光功率，自动激光控制与 LED 增益比没对齐；
+RVS 的后处理链不可复现——这不是"没做"，而是"做不到"，如实记录。
+```

@@ -62,28 +62,50 @@ C_ACCENT = "#2fd6c9"
 
 # 深色主题 + 显式的按钮配色。之前只设了 QWidget 的文字颜色，按钮仍是系统浅色底，
 # 浅色字落在浅色底上就看不清了；这里把按钮的底/边/悬停/按下/禁用全部写死。
-APP_QSS = """
-QWidget {{ background: {bg}; color: {text}; }}
-QMainWindow, QDialog {{ background: {bg}; }}
+def build_qss(scale: float = 1.0) -> str:
+    """深色主题；所有字号/内边距按 ``scale`` 放大（4K 屏上默认界面太小）。"""
+    def pt(value: float) -> str:
+        return f"{value * scale:.1f}pt"
+
+    def px(value: float) -> str:
+        return f"{value * scale:.1f}px"
+
+    return f"""
+QWidget {{ background: {C_BG}; color: {C_TEXT}; }}
+QMainWindow, QDialog {{ background: {C_BG}; }}
 QPushButton {{
-    background: #18232e; color: {text};
-    border: 1px solid #2f4256; border-radius: 4px;
-    padding: 5px 10px; font-size: 10pt;
+    background: #18232e; color: {C_TEXT};
+    border: 1px solid #2f4256; border-radius: {px(4)};
+    padding: {px(5)} {px(10)}; font-size: {pt(10)};
 }}
-QPushButton:hover {{ background: #22303d; border-color: {accent}; }}
+QPushButton:hover {{ background: #22303d; border-color: {C_ACCENT}; }}
 QPushButton:pressed {{ background: #101a23; }}
-QPushButton:checked {{ background: #0f3a37; border-color: {accent}; color: #b6fff8; }}
-QPushButton:disabled {{ background: #111a22; color: #5b7186; border-color: #1f2c39; }}
+QPushButton:checked {{ background: #0f3a37; border-color: {C_ACCENT}; color: #b6fff8; }}
+QPushButton:disabled {{ background: #111a22; color: #5b7186; border-color: {C_BORDER}; }}
 QPlainTextEdit {{
     background: #0e1620; color: #a8bccd;
-    border: 1px solid {border}; font-size: 9.5pt;
+    border: 1px solid {C_BORDER}; font-size: {pt(10)};
 }}
-QScrollArea {{ border: 1px solid {border}; background: #05080c; }}
+QScrollArea {{ border: 1px solid {C_BORDER}; background: #05080c; }}
 QLabel {{ background: transparent; }}
-QLabel#status {{ color: {muted}; font-size: 9.5pt; }}
-QLabel#status_live {{ color: {accent}; font-size: 9.5pt; font-weight: 600; }}
-QLabel#footer {{ color: {muted}; font-size: 8.5pt; }}
-""".format(bg=C_BG, text=C_TEXT, accent=C_ACCENT, border=C_BORDER, muted=C_MUTED)
+QLabel#status {{ color: {C_MUTED}; font-size: {pt(10)}; }}
+QLabel#status_live {{ color: {C_ACCENT}; font-size: {pt(10)}; font-weight: 600; }}
+QLabel#footer {{ color: {C_MUTED}; font-size: {pt(9)}; }}
+"""
+
+
+APP_QSS = build_qss(1.0)
+
+
+def detect_scale() -> float:
+    """按屏幕逻辑分辨率猜一个界面缩放；4K 全屏（无系统缩放）会得到 2.0。"""
+    screen = QtWidgets.QApplication.primaryScreen()
+    if screen is None:
+        return 1.0
+    geo = screen.geometry()
+    if geo.width() <= 0 or geo.height() <= 0:
+        return 1.0
+    return max(1.0, min(2.5, max(geo.width() / 1920.0, geo.height() / 1080.0)))
 
 
 def pick_font_family() -> str:
@@ -375,11 +397,18 @@ class ImageArea(QtWidgets.QWidget):
 
 
 class CameraWindow(QtWidgets.QMainWindow):
-    def __init__(self) -> None:
+    def __init__(self, scale: float = 1.0) -> None:
         super().__init__()
+        self._scale = max(0.8, min(2.5, float(scale)))
         # WSLg 的窗口装饰字体没有中文字形，中文标题会变成方块，所以标题用 ASCII。
         self.setWindowTitle("CS625 Camera - ROS view / mode switch")
-        self.resize(960, 760)
+        screen = QtWidgets.QApplication.primaryScreen()
+        if screen is not None:
+            geo = screen.availableGeometry()
+            self.resize(int(geo.width() * 0.72), int(geo.height() * 0.72))
+        else:
+            self.resize(int(960 * self._scale), int(760 * self._scale))
+        self.setMinimumSize(int(760 * self._scale), int(600 * self._scale))
         self._worker: CameraWorker | None = None
         self._runner: ModeRunner | None = None
         self._diagnostics: Diagnostics | None = None
@@ -431,7 +460,7 @@ class CameraWindow(QtWidgets.QMainWindow):
         # --- 日志 ---------------------------------------------------------
         self.log = QtWidgets.QPlainTextEdit()
         self.log.setReadOnly(True)
-        self.log.setMaximumHeight(120)
+        self.log.setMaximumHeight(int(round(150 * self._scale)))
         self.log.setStyleSheet(f"background:{C_PANEL}; color:{C_MUTED}; "
                                f"border:1px solid {C_BORDER}; font-size:8.5pt;")
         root.addWidget(self.log)
@@ -451,7 +480,7 @@ class CameraWindow(QtWidgets.QMainWindow):
     # ------------------------------------------------------------------
     def _button(self, text, slot, checkable=False):
         button = QtWidgets.QPushButton(text)
-        button.setFixedHeight(28)
+        button.setFixedHeight(int(round(30 * self._scale)))
         button.setCheckable(checkable)
         button.clicked.connect(slot)
         return button
@@ -590,14 +619,27 @@ def main() -> int:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--list-topics", action="store_true",
                         help="只检查相机话题，不打开窗口")
+    parser.add_argument("--ui-scale", default="auto",
+                        help="界面缩放：auto（按屏幕分辨率）或数字，例如 1.0 / 1.5 / 2.0")
     args = parser.parse_args()
     if args.list_topics:
         return list_topics()
 
+    # 高 DPI 必须在 QApplication 之前设置，否则 4K 屏上是位图放大、字发虚
+    for attribute in ("AA_EnableHighDpiScaling", "AA_UseHighDpiPixmaps"):
+        flag = getattr(QtCore.Qt, attribute, None)
+        if flag is not None:
+            QtWidgets.QApplication.setAttribute(flag, True)
+
     app = QtWidgets.QApplication(sys.argv)
-    app.setFont(QtGui.QFont(pick_font_family(), 10))
-    app.setStyleSheet(APP_QSS)
-    window = CameraWindow()
+    try:
+        scale = detect_scale() if args.ui_scale == "auto" else float(args.ui_scale)
+    except ValueError:
+        scale = 1.0
+    scale = max(0.8, min(2.5, scale))
+    app.setFont(QtGui.QFont(pick_font_family(), int(round(10 * scale))))
+    app.setStyleSheet(build_qss(scale))
+    window = CameraWindow(scale=scale)
     app.aboutToQuit.connect(window.shutdown)
     window.show()
     return app.exec_()
