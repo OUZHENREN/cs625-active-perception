@@ -62,6 +62,23 @@ python3 scripts/polarizer_ab.py compare --before runtime/polarizer_ab/<...>_befo
 
 - **作用**：静止采帧并对比"飞点比例 / 点距 / 有效点 / 亮度"。
 - **判读**：飞点降到一半以下 = 有效；亮度不变而飞点也不变 = 膜没进光路或在 830 nm 不工作。
+- **注意**：`--state before/after` 只是标签，程序不知道你什么时候换了光学件。
+  必须在**两条 capture 命令之间**完成贴膜或转动，否则两组数据必然一样（就是今天的误区）。
+
+### 4.1 找投射端偏振片的最佳角度（多组扫描）
+
+```bash
+python3 scripts/polarizer_ab.py capture --state recv_only --frames 6      # 基线：只有接收端膜
+# 贴投射端膜，转到 0°
+python3 scripts/polarizer_ab.py capture --state proj_000 --frames 6
+# 每转 20° 采一组：proj_020 / proj_040 / proj_060 / proj_080 / proj_100 / proj_120
+python3 scripts/polarizer_ab.py sweep --baseline runtime/polarizer_ab/<...>_recv_only \
+    --candidates runtime/polarizer_ab/*_proj_*
+```
+
+- **作用**：把每组与基线比较并按"飞点比例"排序，直接给出飞点最少的那个角度。
+- **正常输出**：某几组飞点明显低于基线（`相对基线` 一列为负且绝对值大）；最好的一组就是正交角。
+- **失败含义**：所有角度都与基线相当 → 膜不消光（换 800–900 nm 专用膜）或投射光本身不偏振。
 
 ## 5. 档位普查（初步实验用）
 

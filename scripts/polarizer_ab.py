@@ -395,6 +395,44 @@ def cmd_compare(args) -> int:
     return 0 if verdict != "FAIL" else 1
 
 
+def cmd_sweep(args) -> int:
+    """把多个 capture 目录与一个基线比较，按飞点比例从低到高排序。
+
+    用于找投射端偏振片的最佳角度：每转 15–20° 采一组，`sweep` 直接告诉你哪一组飞点最少。
+    """
+    baseline = state_metrics(args.baseline, args.roi, args.stride)
+    rows = []
+    for directory in args.candidates:
+        try:
+            metrics = state_metrics(directory, args.roi, args.stride)
+        except SystemExit as exc:
+            print(f"  跳过 {directory}: {exc}")
+            continue
+        rows.append((metrics.get("flying", float("nan")), directory, metrics))
+    if not rows:
+        print("没有可比较的数据")
+        return 2
+    rows.sort(key=lambda item: (math.isnan(item[0]), item[0]))
+    print(f"\n基线 {args.baseline}: 飞点 {baseline.get('flying', float('nan')):.4f} · "
+          f"点距 {baseline.get('spacing_mm', float('nan')):.2f} mm · "
+          f"有效点 {baseline.get('valid_ratio', float('nan')) * 100:.1f}%")
+    print(f"\n{'候选':<40}{'飞点':>8}{'相对基线':>10}{'点距':>9}{'有效点':>9}")
+    print("-" * 78)
+    for flying, directory, metrics in rows:
+        base_flying = baseline.get("flying")
+        if base_flying and not math.isnan(flying) and base_flying > 1e-9:
+            delta = f"{(flying - base_flying) / base_flying * 100:>8.1f}%"
+        else:
+            delta = f"{'n/a':>9}"
+        print(f"{pathlib.Path(directory).name:<40}{flying:>8.4f}{delta:>10}"
+              f"{metrics.get('spacing_mm', float('nan')):>9.2f}"
+              f"{metrics.get('valid_ratio', float('nan')) * 100:>8.1f}%")
+    best = rows[0]
+    print("-" * 78)
+    print(f"飞点最少：{pathlib.Path(best[1]).name}（{best[0]:.4f}）")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -419,6 +457,14 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--stride", type=int, default=2,
                          help="pixel stride for the flying-point cloud (default 2; spacing is always stride-1)")
     compare.set_defaults(func=cmd_compare)
+
+    sweep = sub.add_parser("sweep", help="compare many captures against one baseline")
+    sweep.add_argument("--baseline", required=True)
+    sweep.add_argument("--candidates", nargs="+", required=True)
+    sweep.add_argument("--roi", type=int, nargs=4, default=None,
+                       metavar=("X0", "Y0", "X1", "Y1"))
+    sweep.add_argument("--stride", type=int, default=2)
+    sweep.set_defaults(func=cmd_sweep)
     return parser
 
 
