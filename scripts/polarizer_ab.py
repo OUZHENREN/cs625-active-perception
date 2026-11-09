@@ -313,15 +313,22 @@ def cmd_capture(args) -> int:
                 return raw[..., ::-1].copy()
             raise SystemExit(f"unsupported colour encoding: {msg.encoding}")
 
-    rclpy.init()
+    # sweep-capture 会在同一进程里连续采多组：那时上下文由外层管理，
+    # 这里不能再 init/shutdown（同一进程里重复 init 会抛 RuntimeError）。
+    manage_context = getattr(args, "manage_context", True)
+    if manage_context and not rclpy.ok():
+        rclpy.init()
     node = Capture()
     try:
         deadline = time.time() + args.timeout
         while time.time() < deadline and not node.done:
             rclpy.spin_once(node, timeout_sec=0.2)
+    except KeyboardInterrupt:
+        print("\n采集被中断：已保存的帧仍然有效")
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        if manage_context and rclpy.ok():
+            rclpy.shutdown()
 
     if node.saved == 0:
         print("captured 0 frames.", file=sys.stderr)
@@ -440,6 +447,10 @@ def cmd_sweep_capture(args) -> int:
     这里把"节拍"固定在脚本里：每次只让操作者做一个动作，采完自动存盘，
     全部结束后自动按飞点比例排序。
     """
+    import rclpy
+    if not rclpy.ok():
+        rclpy.init()
+
     root = pathlib.Path(args.out) if args.out else DEFAULT_ROOT
     stamp = time.strftime("%Y%m%d_%H%M%S")
     angles = [args.start + index * args.step for index in range(args.steps)]
@@ -453,9 +464,13 @@ def cmd_sweep_capture(args) -> int:
         have = f"已存 {len(saved)} 组" if saved else ""
         if args.auto_seconds:
             print(f"第 {index + 1}/{len(angles)} 步 ——→ 转到 {angle:3d}°（{args.auto_seconds:.0f} s 后自动采集）{have}")
-            for remaining in range(int(args.auto_seconds), 0, -1):
-                print(f"   {remaining:2d} s ... 转到 {angle:3d}°", flush=True)
-                time.sleep(1.0)
+            try:
+                for remaining in range(int(args.auto_seconds), 0, -1):
+                    print(f"   {remaining:2d} s ... 转到 {angle:3d}°", flush=True)
+                    time.sleep(1.0)
+            except KeyboardInterrupt:
+                print("\n结束扫描（Ctrl+C）——已采的组会照常参与排序")
+                break
         else:
             try:
                 answer = input(f"第 {index + 1}/{len(angles)} 步 ——→ 转到 {angle:3d}°，"
@@ -472,22 +487,34 @@ def cmd_sweep_capture(args) -> int:
         directory = root / f"{stamp}_sweep_{angle:03d}deg"
         namespace = argparse.Namespace(state=f"sweep_{angle:03d}deg", frames=args.frames,
                                        out=str(directory), qos=args.qos,
-                                       timeout=args.timeout, note=f"projector film at {angle} deg")
+                                       timeout=args.timeout, note=f"projector film at {angle} deg",
+                                       manage_context=False)
         print(f"  采集中（{args.frames} 帧，约 {args.frames * 1.3:.0f} s）...", flush=True)
-        if cmd_capture(namespace) == 0:
+        try:
+            ok = cmd_capture(namespace) == 0
+        except KeyboardInterrupt:
+            print("\n结束扫描（Ctrl+C）")
+            break
+        if ok:
             saved.append(str(directory))
 
     if not saved:
         print("一组都没采到。")
+        if rclpy.ok():
+            rclpy.shutdown()
         return 1
     print(f"\n共保存 {len(saved)} 组：")
     for directory in saved:
         print(f"  {directory}")
     if args.baseline:
-        return cmd_sweep(argparse.Namespace(baseline=args.baseline, candidates=saved,
+        code = cmd_sweep(argparse.Namespace(baseline=args.baseline, candidates=saved,
                                             roi=args.roi, stride=args.stride))
-    print("\n加上 --baseline <recv_only 目录> 可以在最后自动排序。")
-    return 0
+    else:
+        print("\n加上 --baseline <recv_only 目录> 可以在最后自动排序。")
+        code = 0
+    if rclpy.ok():
+        rclpy.shutdown()
+    return code
 
 
 def build_parser() -> argparse.ArgumentParser:
