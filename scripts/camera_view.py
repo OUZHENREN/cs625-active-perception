@@ -166,6 +166,7 @@ class CameraWorker(QtCore.QThread):
     status = QtCore.pyqtSignal(str)
 
     RECREATE_AFTER_S = 8.0
+    FIRST_FRAME_AFTER_S = 10.0
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -175,6 +176,8 @@ class CameraWorker(QtCore.QThread):
         self._frames: dict[str, deque] = {key: deque(maxlen=200) for key in
                                           (topic for topics in TOPICS.values() for topic in topics)}
         self._stamp: dict[str, int] = {}
+        self._reliable = True          # camera_mode 启动驱动时用的是 reliable QoS
+        self._rebuilds = 0
         self._emitted: dict[str, int] = {}
         self._last_frame_at = 0.0
 
@@ -229,24 +232,46 @@ class CameraWorker(QtCore.QThread):
         owns_context = not rclpy.ok()
         if owns_context:
             rclpy.init(args=None)
-        qos = QoSProfile(depth=1, history=HistoryPolicy.KEEP_LAST,
-                         reliability=ReliabilityPolicy.BEST_EFFORT,
-                         durability=DurabilityPolicy.VOLATILE)
+        # 1280x960 的彩色约 3.7 MiB、深度约 2.4 MiB，都大于 Fast DDS 默认共享内存段（~512 KiB）。
+        # 用 BEST_EFFORT 订阅时这些大图会被静默丢掉 60-80%（项目里踩过的坑），
+        # 表现为"偶尔来一帧、状态大多时候在等待"。所以默认用 RELIABLE，
+        # 如果对端是 best-effort 发布（匹配不上、一直收不到），看门狗会切换到 best-effort 重试。
+        def make_qos(reliable: bool):
+            profile = QoSProfile(depth=5, history=HistoryPolicy.KEEP_LAST,
+                                 reliability=(ReliabilityPolicy.RELIABLE if reliable
+                                              else ReliabilityPolicy.BEST_EFFORT),
+                                 durability=DurabilityPolicy.VOLATILE)
+            return profile
+
+        qos = make_qos(self._reliable)
         node, latest = self._build_node(rclpy, Image, qos)
+        self.status.emit(f"等待图像（{'reliable' if self._reliable else 'best_effort'} 订阅）")
         self.status.emit("等待图像（相机未启动 / RVS 占用 / 话题名不对都会是这一条）")
 
         last_status = 0.0
+        started_at = time.time()
         try:
             while self._stop is False and rclpy.ok():
                 now = time.time()
-                # 看门狗：收到过帧、随后长时间没有新帧 → 重建订阅（相机换档/重启后常见）
-                if self._last_frame_at and now - self._last_frame_at > self.RECREATE_AFTER_S:
+                # 看门狗：重建订阅能救两类问题——
+                #   ① 相机换档/重启后旧端点不重连（收到过帧，随后一直没新帧）
+                #   ② 一开始就匹配不上（QoS 不兼容），此时换另一种 QoS 再试
+                stale = (self._last_frame_at and now - self._last_frame_at > self.RECREATE_AFTER_S)
+                never = (not self._last_frame_at and now - started_at > self.FIRST_FRAME_AFTER_S)
+                if stale or never:
+                    self._rebuilds += 1
+                    if not self._last_frame_at:
+                        self._reliable = not self._reliable   # 从没收到过：换 QoS
                     node.destroy_node()
                     time.sleep(0.3)
+                    qos = make_qos(self._reliable)
                     node, latest = self._build_node(rclpy, Image, qos)
-                    self._last_frame_at = now
+                    self._last_frame_at = now if self._last_frame_at else 0.0
+                    started_at = now
                     self._emitted.clear()
-                    self.status.emit("重新订阅相机（相机可能刚换档/重启）…")
+                    self.status.emit(
+                        f"重新订阅相机（第 {self._rebuilds} 次，" 
+                        f"{'reliable' if self._reliable else 'best_effort'}）…")
 
                 rclpy.spin_once(node, timeout_sec=0.05)
                 now = time.time()
