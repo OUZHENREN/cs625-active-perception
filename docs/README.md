@@ -33,6 +33,7 @@
 | 3 | [`manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md`](manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md) | **上真机前**：29 条实机经验（含装配工艺、断联排障、安全） |
 | 4 | [`reference/experiment_metrics.md`](reference/experiment_metrics.md) | 要做实验、要出数据之前 |
 | 5 | [`reference/real_cell.md`](reference/real_cell.md) | 换场地、网络异常、开工就绪检查 |
+| 6 | [`manuals/debug/README.md`](manuals/debug/README.md) | **看不到数据时**：相机/ROS 图的常用调试命令，正常输出与失败含义 |
 
 ---
 
@@ -47,7 +48,7 @@ docs/
 │   ├── experiment_metrics.md        六类 18 项指标体系
 │   ├── real_cell.md                 真机工位 + 就绪检查 + 网络排障
 │   └── simulation.md                仿真环境（总述/场景生成/保真度）
-├── manuals/                ← 实机经验手册（29 条）
+├── manuals/                ← 实机经验手册（29 条）+ debug/ 调试命令分册
 ├── plans/                  ← 月度计划（YYYY-MM.md，一个月一份；旧月份不重写）
 ├── decisions/              ← ADR（含 ADR-005 两模式与插入权威）
 ├── worklogs/               ← 工作日志，按月份分目录
