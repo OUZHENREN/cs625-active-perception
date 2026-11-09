@@ -87,7 +87,7 @@ python3 scripts/teaching/teaching_debug.py --stage 14 --repeat 3 --no-settle
 
 ---
 
-## VS Code 任务（只有 5 个）
+## VS Code 任务（7 个）
 
 | # | 任务 | 说明 |
 |---|---|---|
@@ -96,6 +96,8 @@ python3 scripts/teaching/teaching_debug.py --stage 14 --repeat 3 --no-settle
 | ③ | 效率模式 · 调试 | `teaching_debug.py --interactive` |
 | ④ | 面板 · 两模式（4K） | `cs625_panel.py` |
 | ⑤ | 自检 · 离线 | pytest + 文档一致性 + 环境 |
+| ⑥ | DSH · 启动/打开界面 | 复用已在跑的 dsh web 实例 |
+| ⑦ | 相机 · 查看/换档 | `camera_view.py`（只碰相机，不碰机械臂/夹爪） |
 
 ---
 

@@ -42,6 +42,16 @@
       "group": "test"
     },
     {
+      "label": "⑦ 相机 · 查看/换档（只碰相机）",
+      "detail": "打开 ROS 端相机查看器：看彩色/深度/红外原图，按钮切 fast / modeling / high 与查询状态。只操作 runtime/camera.pid 里的相机 launch，不发机械臂指令、不启动夹爪。",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; if [ -f \"$HOME/.cs625_local.env\" ]; then . \"$HOME/.cs625_local.env\"; fi; python3 scripts/camera_view.py",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
+    },
+    {
       "label": "⑥ DSH · 启动/打开界面",
       "detail": "先在系统里找正在运行的 dsh web 实例（不管端口是 3080、8080 还是别的，优先最新的那个）：能找到就用日志里带 token 的 URL 打开，或直接打开 http://127.0.0.1:<端口>/（浏览器 cookie 30 天内有效）。有 dsh 正在启动（例如 npx 正在装包）时只等待，不启动第二个——重复启动才是端口被占用的来源。都没有才后台启动 dsh web。等价于手动执行：cd <workspace> && npx @deepseek-ai/dsh web。",
       "type": "shell",
