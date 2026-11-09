@@ -8,9 +8,14 @@ move between the two captures.  ``capture_dataset.py`` plans and moves the arm,
 so it cannot be used here.  This tool assumes the arm is already parked at the
 observation pose and only listens to the camera.
 
+    # 0) 5-minute diagnostic BEFORE gluing anything: one film only, in front
+    #    of the IR receiver, rotated in ~15 deg steps.  If the flying points on
+    #    the coated face change with the angle, the projector is already
+    #    polarised and the projector film can be skipped; if nothing changes,
+    #    the projector is unpolarised and the crossed pair is mandatory.
     # 1) film NOT installed yet
     python3 scripts/polarizer_ab.py capture --state before
-    # 2) install the film, rotate the analyser to the darkest, then
+    # 2) install the film(s), rotate the analyser to the darkest, then
     python3 scripts/polarizer_ab.py capture --state after
     # 3) compare (pure numpy, no ROS needed)
     python3 scripts/polarizer_ab.py compare \
@@ -385,7 +390,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     capture = sub.add_parser("capture", help="capture N settled frames at the current arm pose")
-    capture.add_argument("--state", required=True, choices=["before", "after"])
+    capture.add_argument("--state", required=True,
+                         help="free tag for this capture: before / recv_only / crossed / after ...")
     capture.add_argument("--frames", type=int, default=10)
     capture.add_argument("--out", default=None)
     capture.add_argument("--qos", choices=["reliable", "best_effort"], default="reliable")
