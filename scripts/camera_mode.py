@@ -115,12 +115,16 @@ MODELING_SPEC = {
     "point_cloud": True,
 }
 
-# 高分辨率档：PS800 系列支持 2560 宽的彩色/深度模式，是否可用由驱动回报为准。
-# 解析力更高、单帧更大（2560x1440 BGR8 约 11 MiB），只建议在做精测量/存档时用。
+# 高分辨率档：只有**彩色**能上 2560 宽，深度最高档仍是 1280x960。
+# 2026-11-09 实测：color=2560x1440 / depth=2560x1440 被驱动直接拒绝
+#   "Unsupported Depth stream resolution: 2560x1440"、"Unsupported Texture stream
+#   resolution: 2560x1440"；同厂 PS800-E1 的档位表里深度的上限就是 1280x960。
+# 所以这里按设备真实能力组合：彩色 2560x1920（RVS 工程也在用这一档）+ 深度 1280x960。
+# 彩色单帧 BGR8 约 14.7 MiB，只建议存档/精测量时用。
 HIGH_SPEC = {
     "label": "high-2560",
-    "color_res": "2560x1440",
-    "depth_res": "2560x1440",
+    "color_res": "2560x1920",
+    "depth_res": "1280x960",
     "depth_enable": True,
     "point_cloud": True,
 }

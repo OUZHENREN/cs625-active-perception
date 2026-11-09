@@ -212,3 +212,57 @@ Qt 高 DPI 属性（AA_EnableHighDpiScaling / AA_UseHighDpiPixmaps）在 QApplic
 
 结论：几何前置对齐且有证据；标定前置导入但未验证；设备参数只对齐了激光功率；
 RVS 的后处理链不可复现——这是"做不到"，不是"没做"，如实写进 memory。
+
+## 12. 18:33–18:50 D0 相机档位普查（初步实验，含图像记录与数据分析）
+
+所有者要求把普查当作初步实验来做，要有图像记录和数据分析。
+
+### 12.1 新增工具
+
+```text
+A scripts/camera_census.py
+  逐档换档（复用 camera_mode.py）→ 采 N 帧 → 算指标 → 存图/存深度 → 出 summary.md + metrics.csv
+  指标复用 scripts/polarizer_ab.py（有效点、飞点、点距、空洞率），避免两套口径
+```
+
+### 12.2 结果（2026-11-09 18:47，laser_power:=100，真机静态工位，未动机械臂/夹爪）
+
+| 档位 | 分辨率 | 彩色 fps | 深度 fps | 有效点 | 中位深度 | 点距 | 飞点 | 空洞率 |
+|---|---|---|---|---|---|---|---|---|
+| fast | 640×480 | 25.0 | —（该档只开彩色） | — | — | — | — | — |
+| modeling | 1280×960 | 0.801 | 0.801 | 76.1% | 1.351 m | 1.48 mm | 3.7% | 23.4% |
+| high | 2560×1920 | 0.801 | 0.799 | 76.1% | 1.351 m | 0.73 mm* | 3.6% | 23.4% |
+
+\* high 档的深度被重采样到彩色分辨率（K 同步放大 2 倍，fx 931.47 → 1862.95），点距变小是插值结果。
+
+### 12.3 过程中修正的两件事
+
+1. **HIGH_SPEC 原本是错的**：`color=2560x1440 / depth=2560x1440` 被驱动直接拒绝
+   （`Unsupported Depth stream resolution: 2560x1440`、`Unsupported Texture stream resolution: 2560x1440`）。
+   按设备真实能力改成 **彩色 2560×1920 + 深度 1280×960**，实测可用（与 RVS 工程用的彩色档一致）。
+2. 普查脚本最初把"fast 无深度"当失败，且会空等满 90 s 并累积彩色帧（约 2 GB）。
+   已改成"彩色够帧后 6 s 无深度即判该档无深度"，并限制缓存帧数。
+
+### 12.4 产物与归档
+
+```text
+runtime/experiments/camera_census_20261109_184714/
+    summary.md / metrics.csv
+    compare_colour.png / compare_depth.png     三档同场对比图
+    fast/color_000.png + meta.json
+    modeling/color_000.png + depth_000/001.npy + meta.json
+    high/color_000.png + depth_000/001.npy + meta.json
+~/cs625_experiment_archive/camera_census_20261109_184714/   （含 README.md）
+```
+
+### 12.5 数据分析结论
+
+```text
+1. 深度帧率是硬瓶颈：modeling 与 high 都锁在 ~0.8 fps（Default 档），换分辨率不改善。
+2. 开深度时彩色同速：fast 档 25 fps 是因为它【只开彩色】；datasheet 的 16 fps@1280x960 同理。
+3. high 不带来深度信息增量：有效点/中位深度/空洞率与 modeling 完全一致，只是插值放大；
+   代价是每帧 4.4 MB 彩色 + 9.8 MB 深度（uint16）。→ D1 默认 modeling。
+4. 三档有效点都是 76.1%，且与 18:14、18:21 两次独立采集一致 → 有效点比例是可复现的指标。
+5. 中位深度在同一静态场景下 1.340 → 1.351 m（相机重启后差约 1 cm）→ 跨重启有约 1 cm 的系统偏移，
+   位姿对比必须在同一会话内闭合，不能跨重启直接比绝对值。
+```
