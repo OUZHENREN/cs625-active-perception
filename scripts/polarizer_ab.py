@@ -450,6 +450,28 @@ def cmd_compare(args) -> int:
     return 0 if verdict != "FAIL" else 1
 
 
+def cmd_frames(args) -> int:
+    """逐帧打印一组采集的有效点/中位深度，用来看"前几帧是不是还没贴好"。"""
+    directory = pathlib.Path(args.directory)
+    files = sorted(directory.glob("depth_*.npy"))
+    if not files:
+        print(f"{directory} 里没有 depth_*.npy")
+        return 1
+    print(f"\n{directory.name}  共 {len(files)} 帧")
+    print(f"{'帧':>4}{'有效点':>9}{'中位深度':>11}{'变化':>10}")
+    print("-" * 38)
+    previous = None
+    for index, path in enumerate(files):
+        depth = depth_to_metres(np.load(path))
+        valid = depth > 0.0
+        ratio = float(valid.mean())
+        median = float(np.median(depth[valid])) if valid.any() else float("nan")
+        delta = "" if previous is None else f"{100 * (ratio - previous):+7.1f}pp"
+        print(f"{index:>4}{ratio * 100:8.1f}%{median:10.3f} m{delta:>10}")
+        previous = ratio
+    return 0
+
+
 def cmd_sweep(args) -> int:
     """把多个 capture 目录与一个基线比较，按飞点比例从低到高排序。
 
@@ -597,6 +619,10 @@ def build_parser() -> argparse.ArgumentParser:
                        metavar=("X0", "Y0", "X1", "Y1"))
     sweep.add_argument("--stride", type=int, default=2)
     sweep.set_defaults(func=cmd_sweep)
+
+    frames = sub.add_parser("frames", help="print per-frame valid ratio for one capture")
+    frames.add_argument("--dir", dest="directory", required=True)
+    frames.set_defaults(func=cmd_frames)
 
     interactive = sub.add_parser("sweep-capture", help="interactive angle sweep: rotate, press Enter, repeat")
     interactive.add_argument("--baseline", default=None,
