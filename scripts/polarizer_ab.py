@@ -433,6 +433,63 @@ def cmd_sweep(args) -> int:
     return 0
 
 
+def cmd_sweep_capture(args) -> int:
+    """交互式角度扫描：转一下 → 按回车（或等倒计时）→ 自动采一组 → 下一步。
+
+    为什么单独做这个：一只手扶着偏振片旋转时，没法同时敲完整条 capture 命令。
+    这里把"节拍"固定在脚本里：每次只让操作者做一个动作，采完自动存盘，
+    全部结束后自动按飞点比例排序。
+    """
+    root = pathlib.Path(args.out) if args.out else DEFAULT_ROOT
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    angles = [args.start + index * args.step for index in range(args.steps)]
+    saved: list[str] = []
+
+    print(f"\n=== 角度扫描：共 {len(angles)} 步，每步 {args.frames} 帧 "
+          f"({'自动 ' + str(args.auto_seconds) + ' s 一拍' if args.auto_seconds else '按回车开始'}) ===")
+    print("提示：膜先贴上去但不要粘死；每步只转投射端那一片，接收端的膜不要动。\n")
+
+    for index, angle in enumerate(angles):
+        have = f"已存 {len(saved)} 组" if saved else ""
+        if args.auto_seconds:
+            print(f"第 {index + 1}/{len(angles)} 步 ——→ 转到 {angle:3d}°（{args.auto_seconds:.0f} s 后自动采集）{have}")
+            for remaining in range(int(args.auto_seconds), 0, -1):
+                print(f"   {remaining:2d} s ... 转到 {angle:3d}°", flush=True)
+                time.sleep(1.0)
+        else:
+            try:
+                answer = input(f"第 {index + 1}/{len(angles)} 步 ——→ 转到 {angle:3d}°，"
+                               f"转好后按回车采集（s=跳过，q=结束）{have}: ").strip().lower()
+            except (EOFError, KeyboardInterrupt):
+                print("\n结束扫描")
+                break
+            if answer == "q":
+                break
+            if answer == "s":
+                print("  跳过")
+                continue
+
+        directory = root / f"{stamp}_sweep_{angle:03d}deg"
+        namespace = argparse.Namespace(state=f"sweep_{angle:03d}deg", frames=args.frames,
+                                       out=str(directory), qos=args.qos,
+                                       timeout=args.timeout, note=f"projector film at {angle} deg")
+        print(f"  采集中（{args.frames} 帧，约 {args.frames * 1.3:.0f} s）...", flush=True)
+        if cmd_capture(namespace) == 0:
+            saved.append(str(directory))
+
+    if not saved:
+        print("一组都没采到。")
+        return 1
+    print(f"\n共保存 {len(saved)} 组：")
+    for directory in saved:
+        print(f"  {directory}")
+    if args.baseline:
+        return cmd_sweep(argparse.Namespace(baseline=args.baseline, candidates=saved,
+                                            roi=args.roi, stride=args.stride))
+    print("\n加上 --baseline <recv_only 目录> 可以在最后自动排序。")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -465,6 +522,22 @@ def build_parser() -> argparse.ArgumentParser:
                        metavar=("X0", "Y0", "X1", "Y1"))
     sweep.add_argument("--stride", type=int, default=2)
     sweep.set_defaults(func=cmd_sweep)
+
+    interactive = sub.add_parser("sweep-capture", help="interactive angle sweep: rotate, press Enter, repeat")
+    interactive.add_argument("--baseline", default=None,
+                             help="recv_only 基线目录；给了就在结束后自动排序")
+    interactive.add_argument("--steps", type=int, default=8)
+    interactive.add_argument("--step", type=int, default=20, help="每步转多少度")
+    interactive.add_argument("--start", type=int, default=0)
+    interactive.add_argument("--frames", type=int, default=4)
+    interactive.add_argument("--auto-seconds", type=float, default=None,
+                             help="不给就等回车；给了就每 N 秒自动采一拍（双手都占用时用）")
+    interactive.add_argument("--qos", choices=["reliable", "best_effort"], default="reliable")
+    interactive.add_argument("--timeout", type=float, default=60.0)
+    interactive.add_argument("--out", default=None)
+    interactive.add_argument("--roi", type=int, nargs=4, default=None)
+    interactive.add_argument("--stride", type=int, default=2)
+    interactive.set_defaults(func=cmd_sweep_capture)
     return parser
 
 

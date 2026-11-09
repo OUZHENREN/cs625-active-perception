@@ -65,7 +65,20 @@ python3 scripts/polarizer_ab.py compare --before runtime/polarizer_ab/<...>_befo
 - **注意**：`--state before/after` 只是标签，程序不知道你什么时候换了光学件。
   必须在**两条 capture 命令之间**完成贴膜或转动，否则两组数据必然一样（就是今天的误区）。
 
-### 4.1 找投射端偏振片的最佳角度（多组扫描）
+### 4.0 一只手扶着膜也能做：交互式角度扫描（推荐）
+
+```bash
+python3 scripts/polarizer_ab.py sweep-capture \
+    --baseline runtime/polarizer_ab/<...>_recv_only \
+    --steps 8 --step 20 --frames 4
+```
+
+- **节拍**：屏幕提示"转到 XX°"→ 你转膜 → 按回车 → 脚本自动采 4 帧（约 5 s，你什么都不用做）→ 下一步。
+- **全自动**：加 `--auto-seconds 15`，每 15 秒自动采一拍，屏幕上倒计时并显示目标角度，双手都能扶着膜。
+- **结束自动排序**：给了 `--baseline` 就会在最后按飞点比例列出所有角度，直接看哪一个是正交角。
+- **注意**：只转投射端那一片，接收端的膜不要动；膜先别粘死，用胶带临时固定。
+
+### 4.1 找投射端偏振片的最佳角度（手动分组方式）
 
 ```bash
 python3 scripts/polarizer_ab.py capture --state recv_only --frames 6      # 基线：只有接收端膜
