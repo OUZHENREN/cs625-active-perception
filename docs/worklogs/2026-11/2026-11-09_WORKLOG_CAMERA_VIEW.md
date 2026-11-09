@@ -115,3 +115,42 @@ percipio_camera 进程：无
 2. 10 秒无图像时在日志里自动提示一次（相机没起 / 另一个终端 ROS_DOMAIN_ID 不同 / RVS 占着）。
 3. 想直接看就点窗口里的 **启动 · modeling 1280×960**（等价 `python3 scripts/camera_mode.py modeling`），
    它会用 `~/.cs625_local.env` 里的相机 IP 起相机 launch。
+
+## 9. 18:0x–18:15 相机后端拉起 + 第一组真实数据
+
+所有者贴的终端显示 `ros2 node list` 为空、没有 `/camera/*`，问"是不是要你搭好后端"。
+处置：直接在本会话拉起相机并验证。
+
+```bash
+$ ping -c 2 192.168.1.120                     # 相机可达，1.9 ms
+$ python3 scripts/camera_mode.py modeling     # 用 ~/.cs625_local.env 的相机 IP
+[camera] stopping pid=143121                   # 清理 11-07 留下的旧 pid
+[camera] starting: color=1280x960 depth=1280x960 point_cloud=on
+[camera] pid=143360 log=runtime/camera.log
+mode=modeling fps=0.796 res=1280x960 depth=0.796fps@1280x960
+```
+
+验证：
+
+```text
+ros2 topic list | grep camera → color/depth image_raw + camera_info + depth_registered/points …
+publisher count = 1（/camera/color/image_raw、/camera/depth/image_raw）
+ros2 node list → /camera/camera, /camera/camera_container
+ros2 topic hz /camera/color/image_raw → 0.764 fps（间隔 1.31 s）
+ros2 topic hz /camera/depth/image_raw → 0.5–0.6 fps（间隔 1.31–2.62 s）
+```
+
+采三帧验证整条链路（`scripts/polarizer_ab.py capture --state check --frames 3`）：
+
+```text
+深度 1280×960，有效点 76.1% / 76.1% / 76.2%，中位深度 1.340 m
+内参 fx 931.473 / fy 931.596 / cx 648.695 / cy 449.319 —— 与 config/real/camera_intrinsics.json 完全一致
+```
+
+**结论：仓库里"1280×960 深度有效点≈0，所以退回 640×480"的旧结论作废。**
+那条是 10-23 测的，`laser_power:=100` 10-24 才落地。今天在激光 100 下 1280×960 有 76% 有效点，
+D1 采集没有理由再降分辨率。
+
+另一个观察：深度开着时彩色也被拖到 ~0.76 fps（datasheet 写 16 fps@1280×960，应是只开彩色流的值）。
+
+界面侧：`python3 scripts/camera_view.py`（VS Code 任务 ⑦）已在本机桌面启动并订阅成功。

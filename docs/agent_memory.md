@@ -2311,3 +2311,12 @@ laser_power = 100, laser_auto_ctrl = 1
    （大概率 LED，非偏振），它的镜面反射交叉偏振压不掉。→ 只能实测。
 3. **我们一直跑在 Default 档（0.8 fps）**：Quality 1.4 / Fast 3.2 fps 从未试过；
    D0 普查必须加 PreSetMode 这一列（代价是测距范围收窄到 400~800 mm）。
+
+### 2026-11-09 晚复测（laser_power=100，mode=modeling）
+```text
+深度 1280×960：有效点 76.1%（三帧一致），中位深度 1.340 m
+内参：fx 931.473 / fy 931.596 / cx 648.695 / cy 449.319，与 config/real/camera_intrinsics.json 一致
+帧率：彩色 0.764 fps、深度 0.5~0.8 fps（camera_mode 实测 0.796）
+→ "1280×960 深度有效点≈0" 的旧结论【作废】：那是在 laser_power 还是 -1 时测的。
+→ 深度开着时彩色也被拖到同一速度（datasheet 的 16 fps@1280×960 应该是只开彩色流时的值）。
+```
