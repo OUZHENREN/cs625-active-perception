@@ -2287,3 +2287,27 @@ laser_power = 100, laser_auto_ctrl = 1
 ### 另加的档
 `camera_mode.py high`（2560×1440 彩色+深度，2026-11-08 加）是否被驱动接受**未实测**；
 深度在 RVS 枚举里没有 2560 档，所以 high 档大概率只能是彩色高清、深度回落。
+
+## 128. 2026-11-09 PS800-E1 官方规格核对（datasheet V4.0 + 中文安全手册 V3.0）
+
+### 官方到底写了什么
+```text
+光源：1 x infrared laser + 1 x infrared floodlight      ← datasheet 只到这里
+      · 没有写波长，没有写偏振，没有写光源类型（LD / VCSEL / DOE 组合）
+      · 中文安全手册 18 页也没有波长与偏振信息
+深度帧率（所有分辨率相同）：
+      Default 0.8 fps / Quality 1.4 fps / Fast 3.2 fps
+出图延迟：Default ≈1781 ms / Quality ≈958 ms / Fast ≈568 ms（软触发到收到 640x480 深度图）
+彩色帧率：4 fps @2560x1920 YUYV（CSI 6 fps）、7 @1920x1440、16 @1280x960、25 @640x480
+测距：推荐 Default 300~1000 mm；Quality/Fast 400~800 mm；最大 260~1300 mm
+激光安全：Class 1；laser_power 范围 0~100（RVS 用 100 + laser_auto_ctrl）
+```
+
+### 三条推论
+1. **"830 nm"不是 PS800-E1 的官方数字**：同厂 FM830-RI 的规格书写明"红外激光器（λ = 830 nm）"，
+   升级方案大概是从这类资料迁移来的。PS800-E1 的波长要向厂商确认，别写进论文当已知量。
+2. **"激光"≠"线偏振"**：边发射激光器输出线偏振，VCSEL 通常非偏振；结构光模组通常还有
+   准直镜 + DOE/扩散片，DOE 多数保留偏振、扩散片会退偏。另外还有一路**红外泛光灯**
+   （大概率 LED，非偏振），它的镜面反射交叉偏振压不掉。→ 只能实测。
+3. **我们一直跑在 Default 档（0.8 fps）**：Quality 1.4 / Fast 3.2 fps 从未试过；
+   D0 普查必须加 PreSetMode 这一列（代价是测距范围收窄到 400~800 mm）。
