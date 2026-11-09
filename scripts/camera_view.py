@@ -155,18 +155,28 @@ def convert_image(message) -> tuple[QtGui.QImage | None, dict]:
 
 
 class CameraWorker(QtCore.QThread):
-    """订阅相机；按界面选中的类型发出最新一帧。"""
+    """订阅相机；只在**收到新帧**时发出，并在长时间无帧时重建订阅。
+
+    为什么要重建订阅：相机换档会重启 launch，WSL + Fast DDS 下旧的订阅端点有时不会
+    重新匹配（现象就是"画面停在最后一帧、状态一直显示等待图像"）。这里做一个看门狗：
+    曾经收到过帧、又连续 8 s 没有新帧，就销毁节点重建一次订阅。
+    """
 
     frame_ready = QtCore.pyqtSignal(str, object, dict)      # kind, QImage, info
     status = QtCore.pyqtSignal(str)
+
+    RECREATE_AFTER_S = 8.0
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._stop = False
         self._want = "color"
         self._arrived: dict[str, float] = {}
-        self._frames: dict[str, deque] = {key: deque(maxlen=120) for key in
+        self._frames: dict[str, deque] = {key: deque(maxlen=200) for key in
                                           (topic for topics in TOPICS.values() for topic in topics)}
+        self._stamp: dict[str, int] = {}
+        self._emitted: dict[str, int] = {}
+        self._last_frame_at = 0.0
 
     def set_kind(self, kind: str) -> None:
         self._want = kind if kind in TOPICS else "color"
@@ -177,12 +187,34 @@ class CameraWorker(QtCore.QThread):
     def _rate(self, topic: str) -> float:
         now = time.time()
         history = self._frames[topic]
-        while history and now - history[0] > 3.0:
+        while history and now - history[0] > 5.0:
             history.popleft()
         if len(history) < 2:
             return 0.0
         span = max(1e-6, history[-1] - history[0])
         return (len(history) - 1) / span
+
+    def _build_node(self, rclpy, Image, qos):
+        node = rclpy.create_node("cs625_camera_view")
+        latest: dict[str, object] = {}
+
+        def make_callback(topic: str):
+            def callback(message) -> None:
+                key = int(message.header.stamp.sec) * 1_000_000_000 + int(message.header.stamp.nanosec)
+                if self._stamp.get(topic) == key:          # 同一帧重复投递
+                    return
+                self._stamp[topic] = key
+                latest[topic] = message
+                now = time.time()
+                self._arrived[topic] = now
+                self._frames[topic].append(now)
+                self._last_frame_at = now
+            return callback
+
+        for topics in TOPICS.values():
+            for topic in topics:
+                node.create_subscription(Image, topic, make_callback(topic), qos)
+        return node, latest
 
     def run(self) -> None:                     # noqa: C901 - one straightforward loop
         try:
@@ -197,39 +229,42 @@ class CameraWorker(QtCore.QThread):
         owns_context = not rclpy.ok()
         if owns_context:
             rclpy.init(args=None)
-        node = rclpy.create_node("cs625_camera_view")
         qos = QoSProfile(depth=1, history=HistoryPolicy.KEEP_LAST,
                          reliability=ReliabilityPolicy.BEST_EFFORT,
                          durability=DurabilityPolicy.VOLATILE)
-        latest: dict[str, object] = {}
-
-        def make_callback(topic: str):
-            def callback(message) -> None:
-                latest[topic] = message
-                self._arrived[topic] = time.time()
-                self._frames[topic].append(time.time())
-            return callback
-
-        for topics in TOPICS.values():
-            for topic in topics:
-                node.create_subscription(Image, topic, make_callback(topic), qos)
+        node, latest = self._build_node(rclpy, Image, qos)
         self.status.emit("等待图像（相机未启动 / RVS 占用 / 话题名不对都会是这一条）")
 
-        last_emit = 0.0
+        last_status = 0.0
         try:
             while self._stop is False and rclpy.ok():
+                now = time.time()
+                # 看门狗：收到过帧、随后长时间没有新帧 → 重建订阅（相机换档/重启后常见）
+                if self._last_frame_at and now - self._last_frame_at > self.RECREATE_AFTER_S:
+                    node.destroy_node()
+                    time.sleep(0.3)
+                    node, latest = self._build_node(rclpy, Image, qos)
+                    self._last_frame_at = now
+                    self._emitted.clear()
+                    self.status.emit("重新订阅相机（相机可能刚换档/重启）…")
+
                 rclpy.spin_once(node, timeout_sec=0.05)
                 now = time.time()
-                if now - last_emit < 0.1:       # 界面最多 10 Hz，不缩放图像
-                    continue
-                last_emit = now
                 candidates = TOPICS[self._want]
                 live = [topic for topic in candidates
-                        if topic in latest and now - self._arrived.get(topic, 0.0) < 2.0]
+                        if topic in latest and now - self._arrived.get(topic, 0.0) < 3.0]
                 if not live:
-                    self.status.emit(f"{KIND_LABEL[self._want]}：等待图像")
+                    if now - last_status > 1.0:
+                        last_status = now
+                        first = candidates[0]
+                        age = (f"已 {now - self._arrived[first]:.0f} s 无新帧"
+                               if self._arrived.get(first) else "没有收到过数据")
+                        self.status.emit(f"{KIND_LABEL[self._want]}：等待图像（{age}）")
                     continue
                 topic = live[0]                 # 驱动话题优先，其次归一化话题
+                if self._emitted.get(topic) == self._stamp.get(topic):
+                    continue                    # 还没有新帧，别把同一帧反复画
+                self._emitted[topic] = self._stamp.get(topic)
                 image, info = convert_image(latest[topic])
                 if image is None:
                     self.status.emit(f"{KIND_LABEL[self._want]}：不支持的编码 {info['encoding']}")
@@ -499,6 +534,11 @@ class CameraWindow(QtWidgets.QMainWindow):
             button.setChecked(key == kind)
         if self._worker is not None:
             self._worker.set_kind(kind)
+        # 立刻给个反馈：深度/红外换过去到第一帧最长要等 1–2 s，不给提示会以为按钮没反应
+        self.status_label.setObjectName("status")
+        self.status_label.style().unpolish(self.status_label) if self.status_label.style() else None
+        self.status_label.style().polish(self.status_label) if self.status_label.style() else None
+        self.status_label.setText(f"{KIND_LABEL[kind]}：切换到该路，等待第一帧…")
 
     def _toggle_fit(self) -> None:
         # Qt 已经替我们翻转了 checked，这里按翻转后的状态处理
@@ -641,6 +681,16 @@ def main() -> int:
     app.setStyleSheet(build_qss(scale))
     window = CameraWindow(scale=scale)
     app.aboutToQuit.connect(window.shutdown)
+
+    # Qt 的事件循环在 C++ 里跑，Python 信号默认得不到处理（kill 不生效，只能 kill -9）。
+    # 一个 250 ms 的空定时器让 Python 有机会执行信号处理器，从而实现干净的退出。
+    import signal
+    for signum in (signal.SIGINT, signal.SIGTERM):
+        signal.signal(signum, lambda *_: app.quit())
+    heartbeat = QtCore.QTimer()
+    heartbeat.timeout.connect(lambda: None)
+    heartbeat.start(250)
+
     window.show()
     return app.exec_()
 
