@@ -349,10 +349,10 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         expected = np.asarray(template[1]) - np.asarray(template[0])
     points, info = extract_workpiece(depth, k, *(depth_window or (MIN_DEPTH_M, MAX_DEPTH_M)),
                                      expected_extent=expected)
+    if T_base_cam is not None:
+        points = remove_table(points, T_base_cam)      # 先剔桌面（在整块云上找平面最稳）
     if T_base_cam is not None and focus is not None:
         points = focus_crop(points, T_base_cam, focus[0], focus[1])
-    if T_base_cam is not None:
-        points = remove_table(points, T_base_cam)
     if len(points) < MIN_POINTS:
         return {"group": directory.name, "error": f"工件区域太小（{len(points)} 点）"}
     info.update(

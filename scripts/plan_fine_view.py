@@ -82,8 +82,11 @@ def object_frame_correction(bbox) -> np.ndarray:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--measurements", required=True, help="coarse_pose 输出的 JSON")
-    parser.add_argument("--group", required=True, help="用哪一组的位姿（应与当前 TCP 同步）")
+    parser.add_argument("--measurements", default=None,
+                        help="coarse_pose 输出的 JSON（与当前 TCP 同一时刻拍的）")
+    parser.add_argument("--group", default=None, help="用哪一组的位姿")
+    parser.add_argument("--centre", type=float, nargs=3, default=None,
+                        metavar=("X", "Y", "Z"), help="已知工件中心(base)，给了就不依赖测量文件")
     parser.add_argument("--distance", type=float, default=0.45)
     parser.add_argument("--elevation", type=float, default=30.0)
     parser.add_argument("--plan-only", action="store_true")
@@ -98,18 +101,24 @@ def main() -> int:
     T_tcp_cam = np.array(handeye["T_tcp_cam"])
     T_base_cam = T_base_tcp @ T_tcp_cam
 
-    rows = json.loads(pathlib.Path(args.measurements).read_text())
-    row = [item for item in rows if item["group"] == args.group][0]
-    T_cam_obj = np.eye(4)
-    T_cam_obj[:3, :3] = np.array(row["pose"]["rotation"])
-    T_cam_obj[:3, 3] = np.array(row["pose"]["translation"])
-
     bbox = cp.load_template_bbox(TEMPLATE)
     correction = object_frame_correction(bbox) if CAD_FLIP_X else np.eye(4)
     centre_obj = (bbox[0] + bbox[1]) / 2
-    T_base_obj = T_base_cam @ T_cam_obj @ correction
-    centre = T_base_obj[:3, :3] @ centre_obj + T_base_obj[:3, 3]
-    print(f"工件中心(base): {np.round(centre, 3)}")
+    if args.centre is not None:
+        centre = np.asarray(args.centre, dtype=float)
+        print(f"工件中心(base, 由参数给出): {np.round(centre, 3)}")
+    else:
+        if not args.measurements or not args.group:
+            print("要么给 --centre，要么给 --measurements + --group", file=sys.stderr)
+            return 2
+        rows = json.loads(pathlib.Path(args.measurements).read_text())
+        row = [item for item in rows if item["group"] == args.group][0]
+        T_cam_obj = np.eye(4)
+        T_cam_obj[:3, :3] = np.array(row["pose"]["rotation"])
+        T_cam_obj[:3, 3] = np.array(row["pose"]["translation"])
+        T_base_obj = T_base_cam @ T_cam_obj @ correction
+        centre = T_base_obj[:3, :3] @ centre_obj + T_base_obj[:3, 3]
+        print(f"工件中心(base, 由测量推出): {np.round(centre, 3)}")
 
     azimuth = np.arctan2(centre[1] - T_base_cam[1, 3], centre[0] - T_base_cam[0, 3])
     elevation = np.radians(args.elevation)
