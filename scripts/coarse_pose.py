@@ -337,6 +337,10 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                 free_obj = np.asarray(refined[:3, :3]).T @ free
                 axis = int(np.argmax(np.abs(free_obj)))
                 result["unconstrained_axis_obj"] = axis
+                result["view_quality"] = {
+                    "planes": len(planes), "weakest_inliers": None,
+                    "unconstrained_axis": axis, "verdict": "NEED_ANOTHER_VIEW",
+                }
                 result["position_note"] = (f"只有两个可见面：沿对象轴 {axis} 的位置由模型先验给出，"
                                            f"无观测约束（该轴不要当精确值用）")
         else:
@@ -381,6 +385,13 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                 chosen, corner = chosen2, corner2      # 后续角点锚定用最后一轮的平面
                 points = kept
             weakest = min(int(item["inliers"]) for item in chosen)
+            result["view_quality"] = {
+                "planes": len(planes),
+                "weakest_inliers": weakest,
+                "unconstrained_axis": None,
+                "verdict": ("OK" if weakest >= CORNER_ANCHOR_MIN_INLIERS
+                            else "NEED_ANOTHER_VIEW"),
+            }
             if weakest >= CORNER_ANCHOR_MIN_INLIERS:
                 matrix, corner_index = anchor_on_corner(
                     refined["transformation"], chosen, corner, template[0], template[1])
