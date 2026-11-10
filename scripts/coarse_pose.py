@@ -147,6 +147,61 @@ def _handle_mask(cad_points: np.ndarray, bbox_min: np.ndarray, bbox_max: np.ndar
     return cad_points[:, 1] < (y_lo + 0.2 * span)
 
 
+def handle_coverage(points: np.ndarray, cad_points: np.ndarray, transformation: np.ndarray,
+                    bbox_min: np.ndarray, bbox_max: np.ndarray,
+                    threshold_m: float = 0.012) -> float:
+    """CAD 扶手点有多少落在观测点云附近——判断"是不是正解"的硬指标。"""
+    from scipy.spatial import cKDTree
+    handle = _handle_mask(cad_points, bbox_min, bbox_max)
+    if handle.sum() < 50:
+        return 0.0
+    tree = cKDTree(points)
+    moved = (transformation[:3, :3] @ cad_points[handle].T).T + transformation[:3, 3]
+    distance, _ = tree.query(moved, k=1)
+    return float((distance < threshold_m).mean())
+
+
+def solve_pose_multistart(points: np.ndarray, cad_points: np.ndarray,
+                          inits: list[np.ndarray], bbox_min: np.ndarray, bbox_max: np.ndarray,
+                          required_handle: float = 0.5) -> dict:
+    """多起点求解：每个初值 × 四个对称候选各配准一次，**用扶手覆盖率选解**。
+
+    为什么要多起点：实测 4 组里只有 1 组从单一初值收敛到正解，其余都掉进了错误盆地，
+    而它们的整体覆盖率仍有 0.88–0.94（光看整体覆盖率发现不了）。
+    扶手是工件唯一的非对称特征，覆盖率在正解约 0.92、错解 0.06–0.10，判别力最强。
+    """
+    centre = (bbox_min + bbox_max) / 2.0
+    variants = [("identity", np.eye(4))]
+    for axis, name in ((0, "flip_x"), (1, "flip_y"), (2, "flip_z")):
+        variants.append((name, _about_centre(
+            R.from_euler("xyz"[axis], 180, degrees=True).as_matrix(), centre)))
+
+    attempts = []
+    for index, init in enumerate(inits):
+        for name, relative in variants:
+            refined = multiscale_icp(cad_points, points, init @ relative)
+            attempts.append({
+                "start": index,
+                "variant": name,
+                "handle": handle_coverage(points, cad_points, refined, bbox_min, bbox_max),
+                "overall": _coverage(points, cad_points, refined),
+                "matrix": refined,
+            })
+    attempts.sort(key=lambda item: (item["handle"], item["overall"]), reverse=True)
+    best = attempts[0]
+    second = attempts[1]["handle"] if len(attempts) > 1 else 0.0
+    return {
+        "matrix": best["matrix"],
+        "chosen": f"start{best['start']}/{best['variant']}",
+        "handle_score": round(best["handle"], 3),
+        "handle_margin": round(best["handle"] - second, 3),
+        "overall": round(best["overall"], 3),
+        "valid": bool(best["handle"] >= required_handle),
+        "attempts": [{k: (round(v, 3) if isinstance(v, float) else v)
+                      for k, v in item.items() if k != "matrix"} for item in attempts],
+    }
+
+
 def choose_symmetry(points: np.ndarray, cad_points: np.ndarray, transformation: np.ndarray,
                     bbox_min: np.ndarray, bbox_max: np.ndarray,
                     margin: float = 0.10) -> dict:
@@ -288,6 +343,17 @@ def filter_planes(planes: list[dict], centre: np.ndarray, max_distance_m: float 
             continue
         kept.append(plane)
     return kept
+
+
+def _quality(points: np.ndarray, cad_points: np.ndarray, transformation: np.ndarray,
+             threshold_m: float = 0.010) -> tuple[float, float]:
+    """返回 (覆盖率, RMSE mm)——与 evaluate_registration 同口径，供两条路径共用。"""
+    observed = _prepared_cloud(points, 0.006)
+    template = o3d.geometry.PointCloud()
+    template.points = o3d.utility.Vector3dVector(cad_points)
+    evaluation = o3d.pipelines.registration.evaluate_registration(
+        observed, template, threshold_m, np.linalg.inv(transformation))
+    return float(evaluation.fitness), float(evaluation.inlier_rmse) * 1000.0
 
 
 def _coverage(points: np.ndarray, cad_points: np.ndarray, transformation: np.ndarray,
@@ -506,22 +572,22 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                 init_k = refined
             refined = multiscale_icp(cad_points, kept, init_k)
             points = kept
+        if cad_points is not None and template is not None:
+            solved = solve_pose_multistart(points, cad_points, [refined], template[0], template[1])
+            refined = solved["matrix"]
+            result["symmetry_check"] = {
+                "chosen": solved["chosen"],
+                "handle_score": solved["handle_score"],
+                "handle_margin": solved["handle_margin"],
+                "overall": solved["overall"],
+                "valid": solved["valid"],
+                "attempts": solved["attempts"][:6],
+            }
         observed = _prepared_cloud(points, 0.006)
         template_cloud = o3d.geometry.PointCloud()
         template_cloud.points = o3d.utility.Vector3dVector(cad_points)
         evaluation = o3d.pipelines.registration.evaluate_registration(
             observed, template_cloud, 0.010, np.linalg.inv(refined))
-        if cad_points is not None and template is not None:
-            check = choose_symmetry(points, cad_points, refined, template[0], template[1])
-            refined = check["matrix"]
-            result["symmetry_check"] = {
-                "chosen": check["chosen"],
-                "handle_score": check["handle_score"],
-                "handle_margin": check["handle_margin"],
-                "overall": check["overall"],
-                "ambiguous": check["ambiguous"],
-                "scores": check["scores"],
-            }
         if T_base_cam is not None and template is not None:
             T_base_object = T_base_cam @ refined
             bbox_centre = (template[0] + template[1]) / 2
@@ -570,73 +636,34 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
             "order": list(pose["order"]),
             "signs": list(pose["signs"]),
         }
-        if cad_points is not None and pose.get("candidates"):
-            refined = cad_register(points, pose["candidates"], cad_points)
-            for _ in range(2):                      # 用位姿筛点、重拟合、再配准（两轮收敛）
-                if not refined:
-                    break
-                kept = reject_with_pose(points, refined["transformation"], cad_points)
-                if len(kept) < MIN_POINTS:
-                    break
-                planes2 = dedup_planes(segment_planes(kept))
-                if len(planes2) < 3:
-                    break
-                triple2 = choose_triple(planes2)
-                if triple2 is None:
-                    break
-                chosen2 = triple2[0]
-                corner2, _ = intersect(chosen2)
-                pose2 = estimate_pose(chosen2, kept, template[0], template[1], corner2)
-                if not pose2.get("candidates"):
-                    break
-                refined2 = cad_register(kept, pose2["candidates"], cad_points)
-                if not refined2:
-                    break
-                refined = refined2
-                chosen, corner = chosen2, corner2      # 后续角点锚定用最后一轮的平面
-                points = kept
+        if cad_points is not None and pose.get("candidates") and template is not None:
+            # 多起点求解：bbox 指派给出的前几个初值 × 四个对称候选，用扶手覆盖率选解
+            inits = []
+            for candidate in pose["candidates"][:4]:
+                init = np.eye(4)
+                init[:3, :3] = candidate["rotation"]
+                init[:3, 3] = candidate["translation"]
+                inits.append(init)
+            solved = solve_pose_multistart(points, cad_points, inits, template[0], template[1])
+            matrix = solved["matrix"]
+            result["symmetry_check"] = {
+                "chosen": solved["chosen"],
+                "handle_score": solved["handle_score"],
+                "handle_margin": solved["handle_margin"],
+                "overall": solved["overall"],
+                "valid": solved["valid"],
+                "attempts": solved["attempts"][:6],
+            }
+            result["position_note"] = ("多起点求解（扶手覆盖率选解）"
+                                       + ("" if solved["valid"] else " ｜ 未收敛到正解，位姿不可用"))
             weakest = min(int(item["inliers"]) for item in chosen)
             result["view_quality"] = {
                 "planes": len(planes),
                 "weakest_inliers": weakest,
                 "unconstrained_axis": None,
-                "verdict": ("OK" if weakest >= CORNER_ANCHOR_MIN_INLIERS
+                "verdict": ("OK" if (weakest >= CORNER_ANCHOR_MIN_INLIERS and solved["valid"])
                             else "NEED_ANOTHER_VIEW"),
             }
-            if weakest >= CORNER_ANCHOR_MIN_INLIERS:
-                matrix, corner_index = anchor_on_corner(
-                    refined["transformation"], chosen, corner, template[0], template[1])
-                # 2026-11-10 教训：角点编号是按"旋转最接近"选的，可能对到错误的 bbox 角，
-                # 结果位姿一致但整体偏一个边长（实测覆盖率从 0.97 掉到 0.26）。
-                # 所以锚定之后必须用数据复核，掉太多就退回 ICP 的平移。
-                anchored_fit = _coverage(points, cad_points, matrix)
-                icp_fit = _coverage(points, cad_points, refined["transformation"])
-                if anchored_fit + 0.15 < icp_fit:
-                    matrix = refined["transformation"]
-                    result["position_note"] = (f"角点锚定被数据否决（覆盖 {anchored_fit:.2f} < "
-                                               f"ICP {icp_fit:.2f}），改用 ICP 平移")
-                else:
-                    result["corner_index"] = corner_index
-                    result["position_note"] = f"位置由三平面角点锚定（最弱面 {weakest} 点）"
-            else:
-                # 第三面太弱时，交点本身抖 10+ mm（实测 rot0），不如用 ICP 的姿态+平移
-                matrix = refined["transformation"]
-                result["position_note"] = (f"最弱面只有 {weakest} 点（<{CORNER_ANCHOR_MIN_INLIERS}），"
-                                           f"不用角点锚定；位置置信度低")
-            if cad_points is not None and template is not None:
-                check = choose_symmetry(points, cad_points, matrix, template[0], template[1])
-                matrix = check["matrix"]
-                result["symmetry_check"] = {
-                    "chosen": check["chosen"],
-                    "handle_score": check["handle_score"],
-                    "handle_margin": check["handle_margin"],
-                    "overall": check["overall"],
-                    "ambiguous": check["ambiguous"],
-                    "scores": check["scores"],
-                }
-                if check["ambiguous"]:
-                    result["position_note"] = (result.get("position_note", "") +
-                                               " ｜ 对称解判别余量不足，位姿有歧义")
             if T_base_cam is not None and template is not None:
                 T_base_object = T_base_cam @ matrix
                 bbox_centre = (template[0] + template[1]) / 2
@@ -652,10 +679,11 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                 "translation": [round(float(v), 5) for v in matrix[:3, 3]],
                 "source": "cad_icp",
             }
-            result["pose_fitness"] = round(refined["fitness"], 3)
-            result["pose_rmse_mm"] = round(refined["rmse_mm"], 2)
+            fit, fit_rmse = _quality(points, cad_points, matrix)
+            result["pose_fitness"] = round(fit, 3)
+            result["pose_rmse_mm"] = round(fit_rmse, 2)
             result["points_kept"] = int(len(points))
-            result["pose_valid"] = bool(refined["fitness"] >= POSE_MIN_COVERAGE)
+            result["pose_valid"] = bool(fit >= POSE_MIN_COVERAGE)
     result.update(
         inliers=[p["inliers"] for p in chosen],
         ratios=[round(p["ratio"], 3) for p in chosen],
