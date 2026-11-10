@@ -246,14 +246,16 @@ def intersect(planes: list[dict]) -> tuple[np.ndarray, float]:
     return solution, condition
 
 
-def extract_workpiece(depth: np.ndarray, k: list[float]) -> tuple[np.ndarray, dict]:
+def extract_workpiece(depth: np.ndarray, k: list[float],
+                      min_depth: float = MIN_DEPTH_M,
+                      max_depth: float = MAX_DEPTH_M) -> tuple[np.ndarray, dict]:
     """先在图像空间把工件抠出来：深度窗 + 最大连通域。
 
     为什么不直接全图分割平面：桌面、幕布、墙面都是大平面，RANSAC 会先抓它们。
     工件在当前观测位是"深度窗内最大的连通块"，这一步之后平面分割才轮到工件的面。
     """
     import cv2
-    mask = np.isfinite(depth) & (depth > MIN_DEPTH_M) & (depth < MAX_DEPTH_M)
+    mask = np.isfinite(depth) & (depth > min_depth) & (depth < max_depth)
     count, labels, stats, _ = cv2.connectedComponentsWithStats(mask.astype(np.uint8), 8)
     info: dict = {"components": int(max(0, count - 1))}
     if count <= 1:
@@ -282,9 +284,10 @@ def reject_with_pose(points: np.ndarray, transformation: np.ndarray,
 
 
 def analyse_group(directory: pathlib.Path, template: tuple | None = None,
-                  cad_points: np.ndarray | None = None) -> dict:
+                  cad_points: np.ndarray | None = None,
+                  depth_window: tuple[float, float] | None = None) -> dict:
     depth, k = load_group(directory)
-    points, info = extract_workpiece(depth, k)
+    points, info = extract_workpiece(depth, k, *(depth_window or (MIN_DEPTH_M, MAX_DEPTH_M)))
     if len(points) < MIN_POINTS:
         return {"group": directory.name, "error": f"工件区域太小（{len(points)} 点）"}
     info.update(
@@ -675,6 +678,9 @@ def main() -> int:
     parser.add_argument("--dataset", default=None, help="vision_dataset 目录（含 g*/）")
     parser.add_argument("--group", default=None, help="只分析一个组目录")
     parser.add_argument("--template", default=None, help="CAD STL（用于尺寸约束与形状消歧）")
+    parser.add_argument("--depth-window", type=float, nargs=2, default=None,
+                        metavar=("MIN_M", "MAX_M"),
+                        help="工件所在深度窗（默认 0.55–1.05；精观测 0.45 m 时应改成 0.2–0.8）")
     parser.add_argument("--cad-points", type=int, default=0,
                         help="用 CAD 采样这么多点做 ICP 消歧（0 = 只用 bbox）")
     parser.add_argument("--out", default=None, help="把结果写成 JSON")
@@ -710,7 +716,8 @@ def main() -> int:
           f"{'打分':>8}{'角点(mm)':>26}")
     print("-" * 88)
     for directory in directories:
-        result = analyse_group(directory, template, cad_points)
+        window = tuple(args.depth_window) if args.depth_window else None
+        result = analyse_group(directory, template, cad_points, window)
         results.append(result)
         if result.get("error"):
             print(f"{result['group']:<14}{'':>4}  ✗ {result['error']}")
