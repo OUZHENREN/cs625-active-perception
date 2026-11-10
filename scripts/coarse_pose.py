@@ -128,6 +128,43 @@ def focus_crop(points: np.ndarray, T_base_cam: np.ndarray,
     return points
 
 
+def guided_extract(depth: np.ndarray, k: list[float], T_cam_object: np.ndarray,
+                   cad_points: np.ndarray, tolerance_m: float = 0.06,
+                   dilate_px: int = 5) -> tuple[np.ndarray, dict]:
+    """模型引导分割：把 CAD 按已知位姿投影到深度图，只在投影附近取点。
+
+    为什么需要它：近距离观测时工件和桌面/墙在深度图里连成一片，
+    "最大连通域""剔桌面""球裁"都只能救回一部分；但工件的位置是已知的
+    （上一帧在 base 系里测出来过），把模型投上去就能直接划出它的像素范围。
+    """
+    import cv2
+    from scipy.spatial import cKDTree
+
+    fx, fy = float(k[0]), float(k[4])
+    cx, cy = float(k[2]), float(k[5])
+    height, width = depth.shape
+    points_cam = (T_cam_object[:3, :3] @ cad_points.T).T + T_cam_object[:3, 3]
+    z = points_cam[:, 2]
+    front = z > 0.05
+    u = np.full(len(z), -1, dtype=int)
+    v = np.full(len(z), -1, dtype=int)
+    u[front] = np.round(fx * points_cam[front, 0] / z[front] + cx).astype(int)
+    v[front] = np.round(fy * points_cam[front, 1] / z[front] + cy).astype(int)
+    inside = front & (u >= 0) & (u < width) & (v >= 0) & (v < height)
+
+    expected = np.full((height, width), np.inf, dtype=np.float32)
+    np.minimum.at(expected, (v[inside], u[inside]), z[inside].astype(np.float32))
+    mask = np.zeros((height, width), dtype=np.uint8)
+    valid = np.isfinite(expected) & (depth > 0)
+    close = valid & (np.abs(depth.astype(np.float32) - expected) < tolerance_m)
+    mask[close] = 1
+    if dilate_px:
+        mask = cv2.dilate(mask, np.ones((dilate_px, dilate_px), np.uint8))
+    points = pab.back_project(np.where(mask.astype(bool), depth, 0.0).astype(np.float32), k)
+    info = {"guided_px": int(mask.sum()), "guided_points": int(len(points))}
+    return points, info
+
+
 def remove_table(points: np.ndarray, T_base_cam: np.ndarray,
                  max_angle_deg: float = 15.0, thickness_m: float = 0.015,
                  attempts: int = 6) -> np.ndarray:
@@ -342,13 +379,19 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                   cad_points: np.ndarray | None = None,
                   depth_window: tuple[float, float] | None = None,
                   T_base_cam: np.ndarray | None = None,
-                  focus: tuple[np.ndarray, float] | None = None) -> dict:
+                  focus: tuple[np.ndarray, float] | None = None,
+                  T_base_object: np.ndarray | None = None,
+                  cad_points_for_guide: np.ndarray | None = None) -> dict:
     depth, k = load_group(directory)
     expected = None
     if template is not None:
         expected = np.asarray(template[1]) - np.asarray(template[0])
     points, info = extract_workpiece(depth, k, *(depth_window or (MIN_DEPTH_M, MAX_DEPTH_M)),
                                      expected_extent=expected)
+    if T_base_cam is not None and T_base_object is not None and cad_points_for_guide is not None:
+        T_cam_object = np.linalg.inv(T_base_cam) @ T_base_object
+        points, guided = guided_extract(depth, k, T_cam_object, cad_points_for_guide)
+        info.update(guided)
     if T_base_cam is not None:
         points = remove_table(points, T_base_cam)      # 先剔桌面（在整块云上找平面最稳）
     if T_base_cam is not None and focus is not None:
@@ -772,6 +815,8 @@ def main() -> int:
     parser.add_argument("--dataset", default=None, help="vision_dataset 目录（含 g*/）")
     parser.add_argument("--group", default=None, help="只分析一个组目录")
     parser.add_argument("--template", default=None, help="CAD STL（用于尺寸约束与形状消歧）")
+    parser.add_argument("--object-pose-base", default=None,
+                        help="T_base_object 的 .npy（上一帧测得）；给了就改用【模型引导分割】")
     parser.add_argument("--focus", type=float, nargs=4, default=None,
                         metavar=("X", "Y", "Z", "R"),
                         help="只保留 base 系里以 (X,Y,Z) 为心、半径 R 的点（近距观测很有效）")
@@ -786,7 +831,7 @@ def main() -> int:
     args = parser.parse_args()
 
     base_cam = None
-    if args.remove_table:
+    if args.remove_table or args.focus or args.object_pose_base:
         base_cam = _read_base_camera()
         if base_cam is None:
             print("读不到 /tcp_pose_broadcaster/pose，无法剔桌面", file=sys.stderr)
@@ -805,6 +850,7 @@ def main() -> int:
 
     template = None
     cad_points = None
+    guide_points = None
     if args.template:
         path = pathlib.Path(args.template).expanduser()
         if path.exists():
@@ -813,6 +859,8 @@ def main() -> int:
             if args.cad_points:
                 mesh = o3d.io.read_triangle_mesh(str(path))
                 cad_points = sample_mesh(mesh, args.cad_points, seed=7)
+                # 引导分割要把 CAD 投到深度图，采样太稀会在掩码里留下空洞（实测 4 万点只剩 1 个面）
+                guide_points = sample_mesh(mesh, max(args.cad_points, 200000), seed=11)
             print(f"模板 {path.name}: 外形 {np.round((bbox_max - bbox_min) * 1000).astype(int)} mm；"
                   f"原点相对 bbox 中心 {np.round((bbox_min + bbox_max) / 2 * 1000, 1)} mm")
         else:
@@ -825,7 +873,11 @@ def main() -> int:
     for directory in directories:
         window = tuple(args.depth_window) if args.depth_window else None
         focus = (np.array(args.focus[:3]), args.focus[3]) if args.focus else None
-        result = analyse_group(directory, template, cad_points, window, base_cam, focus)
+        T_base_object = (np.load(pathlib.Path(args.object_pose_base))
+                         if args.object_pose_base else None)
+        result = analyse_group(directory, template, cad_points, window, base_cam, focus,
+                               T_base_object,
+                               guide_points if args.object_pose_base else None)
         results.append(result)
         if result.get("error"):
             print(f"{result['group']:<14}{'':>4}  ✗ {result['error']}")
