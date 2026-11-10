@@ -34,6 +34,7 @@
 | 4 | [`reference/experiment_metrics.md`](reference/experiment_metrics.md) | 要做实验、要出数据之前 |
 | 5 | [`reference/real_cell.md`](reference/real_cell.md) | 换场地、网络异常、开工就绪检查 |
 | 6 | [`manuals/debug/README.md`](manuals/debug/README.md) | **看不到数据时**：相机/ROS 图的常用调试命令，正常输出与失败含义 |
+| 7 | [`reference/pose_conventions.md`](reference/pose_conventions.md) | **动位姿之前**：相机系/对象系/内参分辨率/模板单位与原点，全部带实测证据 |
 
 ---
 
