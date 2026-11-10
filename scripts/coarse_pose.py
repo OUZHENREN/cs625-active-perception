@@ -33,6 +33,7 @@ import argparse
 import json
 import pathlib
 import sys
+import time
 
 import numpy as np
 import open3d as o3d
@@ -109,6 +110,43 @@ def dedup_planes(planes: list[dict], similarity: float = 0.92) -> list[dict]:
                for other in kept):
             kept.append(plane)
     return kept
+
+
+def remove_table(points: np.ndarray, T_base_cam: np.ndarray,
+                 max_angle_deg: float = 15.0, thickness_m: float = 0.015,
+                 tries: int = 3) -> np.ndarray:
+    """在 base 系里剔掉桌面：找法向接近竖直的大平面，删掉它附近的点。
+
+    为什么必须在 base 系做：相机是斜着装的，"桌面"在相机系里没有简单的法向特征；
+    但在 base 系里桌面法向就是 ±z。这一步依赖已经验明的手眼（2026-11-10）。
+    """
+    if len(points) < MIN_POINTS:
+        return points
+    base_points = (T_base_cam[:3, :3] @ points.T).T + T_base_cam[:3, 3]
+    cloud = o3d.geometry.PointCloud()
+    cloud.points = o3d.utility.Vector3dVector(base_points)
+    keep = np.ones(len(base_points), dtype=bool)
+    for _ in range(tries):
+        remaining = base_points[keep]
+        if len(remaining) < MIN_POINTS:
+            break
+        sub = o3d.geometry.PointCloud()
+        sub.points = o3d.utility.Vector3dVector(remaining)
+        model, inliers = sub.segment_plane(distance_threshold=0.008,
+                                           ransac_n=3, num_iterations=300)
+        a, b, c, d = model
+        normal = np.array([a, b, c])
+        normal /= np.linalg.norm(normal)
+        if abs(normal[2]) < np.cos(np.radians(max_angle_deg)):
+            break                                   # 不是桌面，别再删
+        if len(inliers) < 3000:
+            break
+        distance = np.abs(base_points @ normal + d)
+        keep &= distance > thickness_m
+    removed = int((~keep).sum())
+    if removed:
+        print(f"   [table] 剔除桌面点 {removed} 个（剩 {int(keep.sum())}）", flush=True)
+    return points[keep]
 
 
 def filter_planes(planes: list[dict], centre: np.ndarray, max_distance_m: float = 0.40,
@@ -285,9 +323,12 @@ def reject_with_pose(points: np.ndarray, transformation: np.ndarray,
 
 def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                   cad_points: np.ndarray | None = None,
-                  depth_window: tuple[float, float] | None = None) -> dict:
+                  depth_window: tuple[float, float] | None = None,
+                  T_base_cam: np.ndarray | None = None) -> dict:
     depth, k = load_group(directory)
     points, info = extract_workpiece(depth, k, *(depth_window or (MIN_DEPTH_M, MAX_DEPTH_M)))
+    if T_base_cam is not None:
+        points = remove_table(points, T_base_cam)
     if len(points) < MIN_POINTS:
         return {"group": directory.name, "error": f"工件区域太小（{len(points)} 点）"}
     info.update(
@@ -672,12 +713,43 @@ def cad_register(cloud: np.ndarray, candidates: list[dict], cad_points: np.ndarr
     return best or {}
 
 
+def _read_base_camera() -> np.ndarray | None:
+    """从实时话题读 TCP，并用已验明的手眼链算出 T_base_cam。"""
+    try:
+        import rclpy
+        from geometry_msgs.msg import PoseStamped
+        from rclpy.node import Node
+        from scipy.spatial.transform import Rotation as RotationTool
+    except Exception:                              # noqa: BLE001
+        return None
+    rclpy.init()
+    node = rclpy.create_node("coarse_pose_tcp")
+    holder: dict = {}
+    node.create_subscription(PoseStamped, "/tcp_pose_broadcaster/pose",
+                             lambda msg: holder.__setitem__("tcp", msg), 10)
+    deadline = time.time() + 8.0
+    while time.time() < deadline and "tcp" not in holder:
+        rclpy.spin_once(node, timeout_sec=0.2)
+    if "tcp" not in holder:
+        return None
+    pose = holder["tcp"].pose
+    T_base_tcp = np.eye(4)
+    T_base_tcp[:3, :3] = RotationTool.from_quat([pose.orientation.x, pose.orientation.y,
+                                                 pose.orientation.z, pose.orientation.w]).as_matrix()
+    T_base_tcp[:3, 3] = [pose.position.x, pose.position.y, pose.position.z]
+    handeye = json.loads((pathlib.Path(__file__).resolve().parents[1] /
+                          "config" / "handeye" / "tcp_to_camera.json").read_text())
+    return T_base_tcp @ np.array(handeye["T_tcp_cam"])
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dataset", default=None, help="vision_dataset 目录（含 g*/）")
     parser.add_argument("--group", default=None, help="只分析一个组目录")
     parser.add_argument("--template", default=None, help="CAD STL（用于尺寸约束与形状消歧）")
+    parser.add_argument("--remove-table", action="store_true",
+                        help="用当前 TCP 位姿+手眼在 base 系剔掉桌面（需驱动栈在线）")
     parser.add_argument("--depth-window", type=float, nargs=2, default=None,
                         metavar=("MIN_M", "MAX_M"),
                         help="工件所在深度窗（默认 0.55–1.05；精观测 0.45 m 时应改成 0.2–0.8）")
@@ -685,6 +757,14 @@ def main() -> int:
                         help="用 CAD 采样这么多点做 ICP 消歧（0 = 只用 bbox）")
     parser.add_argument("--out", default=None, help="把结果写成 JSON")
     args = parser.parse_args()
+
+    base_cam = None
+    if args.remove_table:
+        base_cam = _read_base_camera()
+        if base_cam is None:
+            print("读不到 /tcp_pose_broadcaster/pose，无法剔桌面", file=sys.stderr)
+            return 2
+        print(f"手眼：相机在 base {np.round(base_cam[:3, 3], 3)}")
 
     if args.group:
         directories = [pathlib.Path(args.group)]
@@ -717,7 +797,7 @@ def main() -> int:
     print("-" * 88)
     for directory in directories:
         window = tuple(args.depth_window) if args.depth_window else None
-        result = analyse_group(directory, template, cad_points, window)
+        result = analyse_group(directory, template, cad_points, window, base_cam)
         results.append(result)
         if result.get("error"):
             print(f"{result['group']:<14}{'':>4}  ✗ {result['error']}")
