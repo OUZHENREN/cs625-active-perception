@@ -169,7 +169,22 @@ def extract_workpiece(depth: np.ndarray, k: list[float]) -> tuple[np.ndarray, di
     return points, info
 
 
-def analyse_group(directory: pathlib.Path) -> dict:
+def reject_with_pose(points: np.ndarray, transformation: np.ndarray,
+                     cad_points: np.ndarray, threshold_m: float = 0.025) -> np.ndarray:
+    """用当前位姿把"不像工件"的点剔掉：点到 CAD 的最近距离超过阈值的丢掉。
+
+    rotp90 那类朝向里，深度窗内的最大连通域会和桌面/夹具连成一片（extent 917 mm，
+    而工件只有 455 mm）。用 CAD 反过来筛点，比继续调深度窗更稳。
+    """
+    from scipy.spatial import cKDTree
+    tree = cKDTree(cad_points)
+    points_obj = (points - transformation[:3, 3]) @ transformation[:3, :3]
+    distance, _ = tree.query(points_obj, k=1)
+    return points[distance < threshold_m]
+
+
+def analyse_group(directory: pathlib.Path, template: tuple | None = None,
+                  cad_points: np.ndarray | None = None) -> dict:
     depth, k = load_group(directory)
     points, info = extract_workpiece(depth, k)
     if len(points) < MIN_POINTS:
@@ -191,6 +206,48 @@ def analyse_group(directory: pathlib.Path) -> dict:
     chosen, worst = triple
     rotation = orthonormalise([p["normal"] for p in chosen])
     corner, condition = intersect(chosen)
+    if template is not None:
+        pose = estimate_pose(chosen, points, template[0], template[1], corner)
+        result["pose_score"] = round(pose["score"], 3)
+        result["pose"] = {
+            "rotation": pose["rotation"].round(6).tolist(),
+            "translation": [round(float(v), 5) for v in pose["translation"]],
+            "order": list(pose["order"]),
+            "signs": list(pose["signs"]),
+        }
+        if cad_points is not None and pose.get("candidates"):
+            refined = cad_register(points, pose["candidates"], cad_points)
+            for _ in range(2):                      # 用位姿筛点、重拟合、再配准（两轮收敛）
+                if not refined:
+                    break
+                kept = reject_with_pose(points, refined["transformation"], cad_points)
+                if len(kept) < MIN_POINTS:
+                    break
+                planes2 = dedup_planes(segment_planes(kept))
+                if len(planes2) < 3:
+                    break
+                triple2 = choose_triple(planes2)
+                if triple2 is None:
+                    break
+                chosen2 = triple2[0]
+                corner2, _ = intersect(chosen2)
+                pose2 = estimate_pose(chosen2, kept, template[0], template[1], corner2)
+                if not pose2.get("candidates"):
+                    break
+                refined2 = cad_register(kept, pose2["candidates"], cad_points)
+                if not refined2:
+                    break
+                refined = refined2
+                points = kept
+            matrix = refined["transformation"]
+            result["pose"] = {
+                "rotation": np.asarray(matrix[:3, :3]).round(6).tolist(),
+                "translation": [round(float(v), 5) for v in matrix[:3, 3]],
+                "source": "cad_icp",
+            }
+            result["pose_fitness"] = round(refined["fitness"], 3)
+            result["pose_rmse_mm"] = round(refined["rmse_mm"], 2)
+            result["points_kept"] = int(len(points))
     result.update(
         inliers=[p["inliers"] for p in chosen],
         ratios=[round(p["ratio"], 3) for p in chosen],
@@ -203,12 +260,111 @@ def analyse_group(directory: pathlib.Path) -> dict:
     return result
 
 
+def load_template_bbox(path: pathlib.Path) -> tuple[np.ndarray, np.ndarray]:
+    mesh = o3d.io.read_triangle_mesh(str(path))
+    vertices = np.asarray(mesh.vertices)
+    return vertices.min(axis=0), vertices.max(axis=0)
+
+
+def estimate_pose(planes: list[dict], cloud: np.ndarray, bbox_min: np.ndarray,
+                  bbox_max: np.ndarray, corner_cam: np.ndarray,
+                  margin_m: float = 0.006) -> dict:
+    """把"三个可见面 + 角点"变成 T_camera_object。
+
+    三平面只给出姿态和交点；交点对应 CAD bbox 的哪一个角，取决于哪三个面可见。
+    这里穷举 3! 种轴指派 × 2^3 种正负号（只保留右手系），对每种组合：
+      1. 旋转 R 由三个面法向按指派方向排列；
+      2. 平移 t = 角点 - R·bbox 对应角点；
+      3. 打分 = 工件点云落在 bbox（外扩 margin）内的比例。
+    取分数最高的组合。手套形状/扶手带来的 90° 歧义（455 vs 465 mm 很接近）会被记录下来。
+    """
+    from itertools import permutations, product
+    best = None
+    candidates: list[dict] = []
+    for order in permutations(range(3)):
+        for signs in product((1, -1), repeat=3):
+            columns = [planes[order[i]]["normal"] * signs[i] for i in range(3)]
+            rotation = np.column_stack(columns)
+            if np.linalg.det(rotation) < 0:
+                continue
+            corner_obj = np.array([bbox_max[i] if signs[i] > 0 else bbox_min[i]
+                                   for i in range(3)])
+            translation = corner_cam - rotation @ corner_obj
+            points_obj = (cloud - translation) @ rotation          # 行向量形式
+            inside = np.all(points_obj >= bbox_min - margin_m, axis=1) & \
+                     np.all(points_obj <= bbox_max + margin_m, axis=1)
+            # 视角约束：相机看到的是"离镜头最近的那个角"。把 8 个 bbox 角变换到相机系，
+            # 真正的解必须让观测角点正好是最靠近相机原点的那个——这条能消掉 90°/180° 翻转。
+            corners = np.array([[bbox_max[0] if bx else bbox_min[0],
+                                 bbox_max[1] if by else bbox_min[1],
+                                 bbox_max[2] if bz else bbox_min[2]]
+                                for bx in (0, 1) for by in (0, 1) for bz in (0, 1)])
+            corners_cam = corners @ rotation.T + translation
+            nearest = int(np.argmin(np.linalg.norm(corners_cam, axis=1)))
+            observed_index = int(np.argmin(np.linalg.norm(corners - corner_obj, axis=1)))
+            view_ok = nearest == observed_index
+            score = float(inside.mean()) * (1.0 if view_ok else 0.2)
+            candidate = {"score": score, "order": order, "signs": signs,
+                         "rotation": rotation, "translation": translation,
+                         "corner_obj": corner_obj}
+            candidates.append(candidate)
+            if best is None or score > best["score"]:
+                best = candidate
+    candidates.sort(key=lambda item: item["score"], reverse=True)
+    if best is not None:
+        best["candidates"] = candidates[:8]
+    return best
+
+
+def cad_register(cloud: np.ndarray, candidates: list[dict], cad_points: np.ndarray) -> dict:
+    """用 CAD 形状（含扶手）把 bbox 拟合的歧义解开。
+
+    纯 bbox 拟合对"近立方的工件"天生有 24 种等价解（455/465 mm 只差 2%）；
+    扶手的凸起是唯一能把它们分开的形状信息，所以这里对每个候选做一次 ICP，
+    用"观测点云到 CAD 的距离"挑最好的那个。
+    """
+    observed = o3d.geometry.PointCloud()
+    observed.points = o3d.utility.Vector3dVector(cloud)
+    observed = observed.voxel_down_sample(0.006)
+    observed.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=0.02, max_nn=30))
+    template = o3d.geometry.PointCloud()
+    template.points = o3d.utility.Vector3dVector(cad_points)
+
+    best = None
+    for candidate in candidates:
+        init = np.eye(4)
+        init[:3, :3] = candidate["rotation"]
+        init[:3, 3] = candidate["translation"]
+        try:
+            result = o3d.pipelines.registration.registration_icp(
+                template, observed, 0.03, init,
+                o3d.pipelines.registration.TransformationEstimationPointToPlane(),
+                o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=40))
+        except Exception:                       # noqa: BLE001
+            continue
+        # 选择指标要看"观测点云有多少落在 CAD 上"（覆盖率），而不是反过来：
+        # 只看到 3 个面时，CAD→观测的 fitness 上限本来就只有 ~0.5。
+        # evaluate_registration 把 transformation 作用在 source 上：
+        # source=观测（相机系）、target=CAD（对象系），所以要传 T_object_camera = inv(T_camera_object)
+        evaluation = o3d.pipelines.registration.evaluate_registration(
+            observed, template, 0.010, np.linalg.inv(result.transformation))
+        entry = {"transformation": result.transformation,
+                 "fitness": float(evaluation.fitness),
+                 "rmse_mm": float(evaluation.inlier_rmse) * 1000.0,
+                 "bbox_score": candidate["score"]}
+        if best is None or (entry["fitness"], -entry["rmse_mm"]) > (best["fitness"], -best["rmse_mm"]):
+            best = entry
+    return best or {}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--dataset", default=None, help="vision_dataset 目录（含 g*/）")
     parser.add_argument("--group", default=None, help="只分析一个组目录")
-    parser.add_argument("--template", default=None, help="CAD STL（只用来核对尺寸，可选）")
+    parser.add_argument("--template", default=None, help="CAD STL（用于尺寸约束与形状消歧）")
+    parser.add_argument("--cad-points", type=int, default=0,
+                        help="用 CAD 采样这么多点做 ICP 消歧（0 = 只用 bbox）")
     parser.add_argument("--out", default=None, help="把结果写成 JSON")
     args = parser.parse_args()
 
@@ -222,29 +378,43 @@ def main() -> int:
         print("没有找到组目录", file=sys.stderr)
         return 2
 
+    template = None
+    cad_points = None
     if args.template:
         path = pathlib.Path(args.template).expanduser()
         if path.exists():
-            mesh = o3d.io.read_triangle_mesh(str(path))
-            extent = np.asarray(mesh.vertices).max(0) - np.asarray(mesh.vertices).min(0)
-            print(f"模板 {path.name}: {len(mesh.triangles)} 面，外形 "
-                  f"{np.round(extent * 1000).astype(int)} mm")
+            bbox_min, bbox_max = load_template_bbox(path)
+            template = (bbox_min, bbox_max)
+            if args.cad_points:
+                mesh = o3d.io.read_triangle_mesh(str(path))
+                cad_points = np.asarray(
+                    mesh.sample_points_uniformly(args.cad_points).points)
+            print(f"模板 {path.name}: 外形 {np.round((bbox_max - bbox_min) * 1000).astype(int)} mm；"
+                  f"原点相对 bbox 中心 {np.round((bbox_min + bbox_max) / 2 * 1000, 1)} mm")
         else:
-            print(f"模板不存在：{path}（继续，不影响平面分割）")
+            print(f"模板不存在：{path}（继续，只做三平面，不出位姿）")
 
     results = []
-    print(f"{'组':<14}{'面数':>4}{'工件点数':>9}{'内点':>22}{'正交':>7}{'cond':>7}{'角点(mm)':>28}")
+    print(f"{'组':<14}{'面数':>4}{'工件点数':>9}{'内点':>22}{'正交':>7}{'cond':>7}"
+          f"{'打分':>8}{'角点(mm)':>26}")
     print("-" * 88)
     for directory in directories:
-        result = analyse_group(directory)
+        result = analyse_group(directory, template, cad_points)
         results.append(result)
         if result.get("error"):
             print(f"{result['group']:<14}{'':>4}  ✗ {result['error']}")
             continue
         inliers = ",".join(str(v) for v in result["inliers"])
         corner = ",".join(f"{v:+.1f}" for v in result["corner_mm"])
+        if "pose_fitness" in result:
+            score = f"{result['pose_fitness']:.2f}/{result['pose_rmse_mm']:.1f}"
+        elif "pose_score" in result:
+            score = f"{result['pose_score']:.3f}"
+        else:
+            score = "  -  "
         print(f"{result['group']:<14}{result['planes']:>4}{result.get('area_px', 0):>9}"
-              f"{inliers:>22}{result['orthogonality']:>7.3f}{result['condition']:>7.1f}  [{corner}]")
+              f"{inliers:>22}{result['orthogonality']:>7.3f}{result['condition']:>7.1f}"
+              f"{score:>8}  [{corner}]")
 
     if args.out:
         pathlib.Path(args.out).write_text(json.dumps(results, ensure_ascii=False, indent=2))
