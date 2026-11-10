@@ -104,6 +104,53 @@ def insert_from_slot(slot_xyz, slot_quat, tilt_deg=None, extra_height_m=0.0,
     return to_pose(insert), to_pose(rotated), to_pose(pre_insert)
 
 
+def lock_from_insert(insert_tcp, insert_quat, tilt_deg: float = None):
+    """转正（lock）位姿：位置不变，姿态绕工具 y 轴把进槽倾角转回来。
+
+    进槽时是 ``rotated = insert * Ry(tilt)``（tilt 默认 -10°），转正就是乘回 +10°。
+    2026-11-10 核对：``teaching_insert_end.tcp/quat`` 乘 Ry(+10°) 得到的姿态与
+    ``teaching_insert_end.flat_quat`` 一致（四元数分量差 <2e-4）。
+    """
+    angle = -(TILT_DEG if tilt_deg is None else tilt_deg)
+    straighten = np.eye(4)
+    straighten[:3, :3] = R.from_euler("y", angle, degrees=True).as_matrix()
+    return to_pose(to_matrix(insert_tcp, insert_quat) @ straighten)
+
+
+def derive_task_poses(part_xyz, part_quat, slot_xyz, slot_quat,
+                      tilt_deg=None, extra_height_m=0.0, lateral_shift_mm=0.0):
+    """一次给出四类任务位姿（RVS/师兄 tcp_server 的链条）。
+
+        grasp      = part * T_b_tcp
+        pre_grasp  = grasp * translate(+120 mm, tool x)
+        insert     = slot * T_s_tcp
+        rotated    = insert * Ry(-10 deg)
+        pre_insert = rotated * translate(-350 mm, tool z) [+ extra height]
+        lock       = insert * Ry(+10 deg)      （位置不变，姿态转正）
+
+    ``lateral_shift_mm`` 是 2026-11-04 所有者对整条插入链做的横向修正
+    （world -x，累计 45.5 mm）。**校验过的 slot 位姿已经包含它**，所以默认 0，
+    只有喂"原始 slot 测量值"时才需要显式传入。
+    """
+    slot_xyz = list(slot_xyz)
+    if lateral_shift_mm:
+        slot_xyz[0] -= float(lateral_shift_mm) / 1000.0
+    grasp, pre_grasp = grasp_from_box(part_xyz, part_quat)
+    insert, rotated, pre_insert = insert_from_slot(
+        slot_xyz, slot_quat, tilt_deg=tilt_deg, extra_height_m=extra_height_m)
+    # 转正作用在"倾斜进入位姿"上（rotated），不是未倾斜的 insert：
+    # 进槽时 insert -> rotated = insert*Ry(-10°)，转正就是 rotated*Ry(+10°)，位置不变。
+    lock = lock_from_insert(rotated[0], rotated[1], tilt_deg=tilt_deg)
+    return {
+        "grasp": grasp,
+        "pre_grasp": pre_grasp,
+        "insert": insert,
+        "rotated": rotated,
+        "pre_insert": pre_insert,
+        "lock": lock,
+    }
+
+
 if __name__ == "__main__":
     # sanity check against the values the senior's tcp_server printed on 2026-10-27
     box = ([0.5957, 0.7492, 0.3554], [0.0069, -0.0022, 0.5412, 0.8408])
