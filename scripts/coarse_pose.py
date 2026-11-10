@@ -44,6 +44,7 @@ import polarizer_ab as pab
 PLANE_DIST_M = 0.003          # RANSAC 内点阈值 3 mm
 MIN_POINTS = 800              # 一个面至少这么多点才算数
 POSE_MIN_COVERAGE = 0.70      # 位姿置信门槛：观测点落在 CAD 附近的比例（低于它标"不可信"）
+CORNER_ANCHOR_MIN_INLIERS = 5000  # 最弱面少于这么多点时不拿交点锚定位置（交点会抖 10+ mm）
 MIN_DEPTH_M = 0.55            # 工件所在深度窗（背景幕布 1.35 m，桌面 ~1.0 m）
 MAX_DEPTH_M = 1.05
 
@@ -128,6 +129,38 @@ def filter_planes(planes: list[dict], centre: np.ndarray, max_distance_m: float 
             continue
         kept.append(plane)
     return kept
+
+
+def anchor_on_corner(transformation: np.ndarray, planes: list[dict],
+                    corner_cam: np.ndarray, bbox_min: np.ndarray,
+                    bbox_max: np.ndarray) -> tuple[np.ndarray, int]:
+    """用三平面角点锚定位置，ICP 只保留姿态。
+
+    为什么：ICP 在近立方体上会把平移推进不同的浅局部极小（实测 rot0/rotp30 重复性 11/25 mm），
+    而三平面交点的重复性是 2–7 mm。所以姿态用 ICP 的，平移用角点反解。
+    返回 (新的 4×4, 所用角点在 bbox 里的编号)。
+    """
+    from itertools import permutations, product
+    rotation = transformation[:3, :3]
+    best = None
+    for order in permutations(range(3)):
+        for signs in product((1, -1), repeat=3):
+            columns = [planes[order[i]]["normal"] * signs[i] for i in range(3)]
+            candidate_rotation = np.column_stack(columns)
+            if np.linalg.det(candidate_rotation) < 0:
+                continue
+            trace = float(np.trace(rotation.T @ candidate_rotation))
+            corner_obj = np.array([bbox_max[i] if signs[i] > 0 else bbox_min[i]
+                                   for i in range(3)])
+            if best is None or trace > best[0]:
+                best = (trace, corner_obj, signs)
+    if best is None:
+        return transformation, -1
+    _, corner_obj, signs = best
+    result = transformation.copy()
+    result[:3, 3] = corner_cam - rotation @ corner_obj
+    index = int(np.sum([1 << i for i in range(3) if signs[i] > 0]))
+    return result, index
 
 
 def refine_rotation(transformation: np.ndarray, planes: list[dict],
@@ -297,6 +330,17 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         result["pose_rmse_mm"] = round(float(evaluation.inlier_rmse) * 1000.0, 2)
         result["fallback"] = "global"
         result["points_kept"] = int(len(points))
+        if len(planes) >= 2:
+            free = np.cross(planes[0]["normal"], planes[1]["normal"])
+            if np.linalg.norm(free) > 1e-9:
+                free /= np.linalg.norm(free)
+                free_obj = np.asarray(refined[:3, :3]).T @ free
+                axis = int(np.argmax(np.abs(free_obj)))
+                result["unconstrained_axis_obj"] = axis
+                result["position_note"] = (f"只有两个可见面：沿对象轴 {axis} 的位置由模型先验给出，"
+                                           f"无观测约束（该轴不要当精确值用）")
+        else:
+            result["position_note"] = "可见面不足，位置全部依赖模型先验"
         result["pose_valid"] = bool(evaluation.fitness >= POSE_MIN_COVERAGE)
         return result
     chosen, worst = triple
@@ -334,8 +378,19 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                 if not refined2:
                     break
                 refined = refined2
+                chosen, corner = chosen2, corner2      # 后续角点锚定用最后一轮的平面
                 points = kept
-            matrix = refined["transformation"]
+            weakest = min(int(item["inliers"]) for item in chosen)
+            if weakest >= CORNER_ANCHOR_MIN_INLIERS:
+                matrix, corner_index = anchor_on_corner(
+                    refined["transformation"], chosen, corner, template[0], template[1])
+                result["corner_index"] = corner_index
+                result["position_note"] = f"位置由三平面角点锚定（最弱面 {weakest} 点）"
+            else:
+                # 第三面太弱时，交点本身抖 10+ mm（实测 rot0），不如用 ICP 的姿态+平移
+                matrix = refined["transformation"]
+                result["position_note"] = (f"最弱面只有 {weakest} 点（<{CORNER_ANCHOR_MIN_INLIERS}），"
+                                           f"不用角点锚定；位置置信度低")
             result["pose"] = {
                 "rotation": np.asarray(matrix[:3, :3]).round(6).tolist(),
                 "translation": [round(float(v), 5) for v in matrix[:3, 3]],
