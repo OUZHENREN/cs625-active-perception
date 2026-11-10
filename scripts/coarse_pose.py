@@ -131,6 +131,16 @@ def filter_planes(planes: list[dict], centre: np.ndarray, max_distance_m: float 
     return kept
 
 
+def _coverage(points: np.ndarray, cad_points: np.ndarray, transformation: np.ndarray,
+              threshold_m: float = 0.010) -> float:
+    observed = _prepared_cloud(points, 0.003)
+    template = o3d.geometry.PointCloud()
+    template.points = o3d.utility.Vector3dVector(cad_points)
+    evaluation = o3d.pipelines.registration.evaluate_registration(
+        observed, template, threshold_m, np.linalg.inv(transformation))
+    return float(evaluation.fitness)
+
+
 def anchor_on_corner(transformation: np.ndarray, planes: list[dict],
                     corner_cam: np.ndarray, bbox_min: np.ndarray,
                     bbox_max: np.ndarray) -> tuple[np.ndarray, int]:
@@ -395,8 +405,18 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
             if weakest >= CORNER_ANCHOR_MIN_INLIERS:
                 matrix, corner_index = anchor_on_corner(
                     refined["transformation"], chosen, corner, template[0], template[1])
-                result["corner_index"] = corner_index
-                result["position_note"] = f"位置由三平面角点锚定（最弱面 {weakest} 点）"
+                # 2026-11-10 教训：角点编号是按"旋转最接近"选的，可能对到错误的 bbox 角，
+                # 结果位姿一致但整体偏一个边长（实测覆盖率从 0.97 掉到 0.26）。
+                # 所以锚定之后必须用数据复核，掉太多就退回 ICP 的平移。
+                anchored_fit = _coverage(points, cad_points, matrix)
+                icp_fit = _coverage(points, cad_points, refined["transformation"])
+                if anchored_fit + 0.15 < icp_fit:
+                    matrix = refined["transformation"]
+                    result["position_note"] = (f"角点锚定被数据否决（覆盖 {anchored_fit:.2f} < "
+                                               f"ICP {icp_fit:.2f}），改用 ICP 平移")
+                else:
+                    result["corner_index"] = corner_index
+                    result["position_note"] = f"位置由三平面角点锚定（最弱面 {weakest} 点）"
             else:
                 # 第三面太弱时，交点本身抖 10+ mm（实测 rot0），不如用 ICP 的姿态+平移
                 matrix = refined["transformation"]

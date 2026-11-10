@@ -42,7 +42,7 @@ def fine_icp(cloud: np.ndarray, cad_points: np.ndarray, init: np.ndarray) -> np.
     template = template.voxel_down_sample(0.002)
     template.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=0.008, max_nn=30))
     transformation = init.copy()
-    for threshold in (0.008, 0.004, 0.002):
+    for threshold in (0.006, 0.003, 0.0015):
         result = o3d.pipelines.registration.registration_icp(
             template, observed, threshold, transformation,
             o3d.pipelines.registration.TransformationEstimationPointToPlane(),
@@ -69,9 +69,17 @@ def analyse(directory: pathlib.Path, cad_points: np.ndarray, template: tuple) ->
     pose = np.eye(4)
     pose[:3, :3], pose[:3, 3] = rotation, translation
     cloud = cp.extract_workpiece(*cp.load_group(directory))[0]
-    cloud = cp.reject_with_pose(cloud, pose, cad_points, threshold_m=0.03)
+    cloud = cp.reject_with_pose(cloud, pose, cad_points, threshold_m=0.02)
 
     refined = fine_icp(cloud, cad_points, pose)
+    # 精配准只应当"微调"。实测（2026-11-10）细尺度 ICP 会被桌面上离工件底面很近的点拖走 50 mm，
+    # 覆盖率反而从 0.97 跌到 0.87；所以这里加一道守卫：位移 >10 mm 或转角 >2° 就拒绝它。
+    shift_mm = float(np.linalg.norm(refined[:3, 3] - pose[:3, 3]) * 1000.0)
+    angle_deg = float(np.degrees((R.from_matrix(np.array(refined[:3, :3]))
+                                  * R.from_matrix(np.array(pose[:3, :3])).inv()).magnitude()))
+    refine_rejected = shift_mm > 10.0 or angle_deg > 2.0
+    if refine_rejected:
+        refined = pose
     flipped_init = refined @ FLIP
     flipped = fine_icp(cloud, cad_points, flipped_init)
 
@@ -98,6 +106,9 @@ def analyse(directory: pathlib.Path, cad_points: np.ndarray, template: tuple) ->
         "flip_coverage": round(fit_flip, 4),
         "flip_margin": round(margin, 4),
         "flip_ambiguous": bool(ambiguous),
+        "refine_shift_mm": round(shift_mm, 2),
+        "refine_angle_deg": round(angle_deg, 2),
+        "refine_rejected": bool(refine_rejected),
         "chosen": "normal" if fit_ok >= fit_flip else "flipped",
         "corner_error_mm": None if corner_error is None else round(corner_error, 2),
         "corner_valid": None if corner_error is None else bool(corner_error <= CORNER_TOL_M * 1000),
@@ -127,7 +138,7 @@ def main() -> int:
     cad_points = cp.sample_mesh(mesh, args.cad_points, seed=7)
 
     results = []
-    print(f"{'组':<14}{'覆盖率':>8}{'RMSE':>8}{'翻转覆盖':>9}{'判定':>8}{'角点误差':>10}")
+    print(f"{'组':<14}{'覆盖率':>8}{'RMSE':>8}{'翻转覆盖':>9}{'判定':>8}{'角点误差':>10}{'精修位移':>10}")
     print("-" * 60)
     for directory in directories:
         result = analyse(directory, cad_points, (bbox_min, bbox_max))
@@ -137,9 +148,10 @@ def main() -> int:
             continue
         corner = ("  -  " if result["corner_error_mm"] is None
                   else f"{result['corner_error_mm']:.2f}mm")
+        mark = "拒绝" if result.get("refine_rejected") else "采纳"
         print(f"{result['group']:<14}{result['coverage']:>8.3f}{result['rmse_mm']:>8.2f}"
               f"{result['flip_coverage']:>9.3f}{('有歧义' if result['flip_ambiguous'] else result['chosen']):>8}"
-              f"{corner:>10}")
+              f"{corner:>10}{result.get('refine_shift_mm', 0):>7.1f}{mark:>4}")
     if args.out:
         pathlib.Path(args.out).write_text(json.dumps(results, ensure_ascii=False, indent=2))
         print(f"\n结果写入 {args.out}")
