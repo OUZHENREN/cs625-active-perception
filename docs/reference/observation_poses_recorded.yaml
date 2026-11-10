@@ -11,4 +11,19 @@
 #
 # 字段：recorded_at / name / source / note / joints(names,rad) / tcp(xyz,quat_xyzw) /
 #       dataset(可选) / camera(可选统计)
-poses: []
+poses:
+  - recorded_at: 2026-11-10T11:47:40+08:00
+    name: workpiece_coarse_20261110
+    source: ROS: /joint_states + /tcp_pose_broadcaster/pose
+    note: '粗观测位有效记录，不替代效率模式配置；对应 20 组朝向数据'
+    joints:
+      elbow_joint: -2.172060
+      shoulder_lift_joint: -0.825561
+      shoulder_pan_joint: 0.768012
+      wrist_1_joint: -0.658295
+      wrist_2_joint: 1.566055
+      wrist_3_joint: 1.655411
+    tcp:
+      xyz: [0.562996, 0.297247, 0.786888]
+      quat_xyzw: [0.288288, -0.814162, -0.206552, -0.459746]
+    dataset: runtime/vision_dataset/20261110_1115_orient5

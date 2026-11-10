@@ -108,3 +108,56 @@ ping 192.168.1.200      → 通（0.8 ms）
 **共同模式：几乎全部是坐标口径 / 参考系 / 旧常量复用，而不是算法精度不足。**
 这也是"总是偏"的原因——每一处口径错误都是几十到几百毫米的**系统偏差**，
 不消除就一直在，且会被下一个环节继承。
+
+## 8. 11:4x 驱动栈为什么没起来（根因）与修复
+
+### 8.1 根因：VS Code 任务里的 pgrep 匹配到了自己
+
+任务「① 开工 · 真机」里这一行：
+
+```bash
+if pgrep -f "ros2 launch cs625_bringup" >/dev/null; then echo "[开工] 驱动栈已在运行"; else ...启动...; fi
+```
+
+这个 `bash -c` 的命令行里**本身就包含** `ros2 launch cs625_bringup`（else 分支的启动命令），
+所以 `pgrep -f` 匹配到了正在执行任务的这个 shell 自己 → 判定"已在运行" → **跳过启动**，
+然后直接 `sleep 45; control_health --activate`，自然什么也没激活。
+
+证据：`runtime/logs/driver_*.log` 今天**一个都没有**（nohup 的重定向会先建文件，说明启动分支根本没执行）；
+在本机复现：`bash -c 'pgrep -af "ros2 launch cs625_bringup"'` 的输出就是它自己。
+
+### 8.2 修复
+
+`.vscode/tasks.json` 的判断改为匹配真实进程的完整路径：
+
+```bash
+pgrep -f "/opt/ros/jazzy/bin/ros2 launch cs625_bringup"
+```
+
+任务自己的命令行里没有 `/opt/ros/jazzy/bin/` 这一段，因此不会再自匹配。
+
+### 8.3 手动起栈（本轮验证）
+
+第一次手动起失败，是我自己笔误：写成 `description_file=...`（应为 `description_file:=...`），
+launch 报 `malformed launch argument`。改对后：
+
+```text
+driver_114542.log：控制器逐个加载/激活，tcp_pose_broadcaster 正常
+ros2 node list：/cs625、/eli_ros2_control_node、/arm_controller、/dashboard_client、
+                /io_and_status_controller、/force_torque_sensor_broadcaster …
+ros2 topic list：/joint_states、/tcp_pose_broadcaster/pose 都在
+control_health --activate → arm_controller: active（sockets/controller/joint_states 全 True）
+preflight_motion.py → PREFLIGHT_OK（effort 流 n=374、Σ|effort|=10.28）
+```
+
+### 8.4 位姿已记录
+
+```yaml
+name: workpiece_coarse_20261110
+joints: elbow -2.172060 / shoulder_lift -0.825561 / shoulder_pan 0.768012 /
+        wrist_1 -0.658295 / wrist_2 1.566055 / wrist_3 1.655411   (rad)
+tcp: xyz [0.562996, 0.297247, 0.786888]  quat_xyzw [0.288288, -0.814162, -0.206552, -0.459746]
+dataset: runtime/vision_dataset/20261110_1115_orient5
+```
+
+写入 `docs/reference/observation_poses_recorded.yaml`（只追加，不改任何模式配置）。
