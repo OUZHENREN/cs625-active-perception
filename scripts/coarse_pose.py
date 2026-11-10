@@ -188,6 +188,13 @@ def solve_pose_multistart(points: np.ndarray, cad_points: np.ndarray,
                 "matrix": refined,
             })
     attempts.sort(key=lambda item: (item["handle"], item["overall"]), reverse=True)
+    # 前几名再做一次"更细"的精修，缩小姿态的随机差异
+    for item in attempts[:3]:
+        item["matrix"] = multiscale_icp(cad_points, points, item["matrix"],
+                                        scales=(0.006, 0.003, 0.002))
+        item["handle"] = handle_coverage(points, cad_points, item["matrix"], bbox_min, bbox_max)
+        item["overall"] = _coverage(points, cad_points, item["matrix"])
+    attempts.sort(key=lambda item: (item["handle"], item["overall"]), reverse=True)
     best = attempts[0]
     second = attempts[1]["handle"] if len(attempts) > 1 else 0.0
     return {
@@ -303,11 +310,12 @@ def remove_table(points: np.ndarray, T_base_cam: np.ndarray,
         return points
     base_points = (T_base_cam[:3, :3] @ points.T).T + T_base_cam[:3, 3]
     remaining = base_points.copy()
-    for _ in range(attempts):
+    for attempt in range(attempts):
         if len(remaining) < MIN_POINTS:
             break
         cloud = o3d.geometry.PointCloud()
         cloud.points = o3d.utility.Vector3dVector(remaining)
+        o3d.utility.random.seed(101 + attempt)     # 固定种子：否则每次剔掉的点不一样
         model, inliers = cloud.segment_plane(distance_threshold=0.010,
                                              ransac_n=3, num_iterations=600)
         normal = np.array(model[:3])
