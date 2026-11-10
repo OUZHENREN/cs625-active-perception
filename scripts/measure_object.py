@@ -87,7 +87,7 @@ def main() -> int:
         float(np.degrees((rotations[i].inv() * rotations[j]).magnitude()))
         for i in range(len(rotations)) for j in range(len(rotations)))
     coverage = float(np.median([row.get("pose_fitness", 0.0) for row in good]))
-    ambiguous = sum(1 for row in good if row.get("flip_check", {}).get("ambiguous"))
+    ambiguous = sum(1 for row in good if row.get("symmetry_check", {}).get("ambiguous"))
 
     verdict = "OK"
     reasons = []
@@ -119,7 +119,7 @@ def main() -> int:
         "verdict": verdict,
         "reasons": reasons,
         "per_group": [{k: row.get(k) for k in
-                       ("group", "planes", "pose_fitness", "pose_rmse_mm", "pose_base", "flip_check")}
+                       ("group", "planes", "pose_fitness", "pose_rmse_mm", "pose_base", "symmetry_check")}
                       for row in results],
     }
     print(json.dumps({k: summary[k] for k in

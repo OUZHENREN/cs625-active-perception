@@ -130,52 +130,69 @@ def focus_crop(points: np.ndarray, T_base_cam: np.ndarray,
     return points
 
 
-def flip_check(points: np.ndarray, cad_points: np.ndarray, transformation: np.ndarray,
-               bbox_min: np.ndarray, bbox_max: np.ndarray,
-               upright_axis: np.ndarray | None = None) -> dict:
-    """翻转消歧：用"工件必须站着"这条物理先验选解，覆盖率只作为置信度参考。
-
-    为什么不再靠覆盖率差：本工件接近立方体（455×131×465），正反两解的覆盖率
-    只差 5–15%，用"差 >10%"当阈值会在边界上反复误判（实测同一批数据时对时错）。
-    但物理事实是确定的——工件站在桌面上，它的"向上"方向在世界系里是 +z。
-
-    做法：把翻转解也做一次多尺度 ICP，然后看两个解的对象系 z 轴在 base 系里的朝向，
-    选朝上的那个；同时记录两者覆盖率之差作为置信度（差 <3% 记 low_confidence）。
-    """
-    axis = np.array([0.0, 0.0, 1.0]) if upright_axis is None else np.asarray(upright_axis)
-    centre = (bbox_min + bbox_max) / 2.0
-    flip = np.eye(4)
-    flip[:3, :3] = R.from_euler("x", 180, degrees=True).as_matrix()
-    about_centre = np.eye(4)
-    about_centre[:3, 3] = centre
-    about_centre = about_centre @ flip
+def _about_centre(rotation: np.ndarray, centre: np.ndarray) -> np.ndarray:
+    move = np.eye(4)
+    move[:3, 3] = centre
     back = np.eye(4)
     back[:3, 3] = -centre
-    about_centre = about_centre @ back
-    # CAD 坐标上下反了（所有者 2026-11-10 确认）：先把它摆正，再谈"哪个解朝上"
-    cad_frame_fix = about_centre
-    upright_reference = transformation @ cad_frame_fix
+    body = np.eye(4)
+    body[:3, :3] = rotation
+    return move @ body @ back
 
-    alternative = multiscale_icp(cad_points, points, transformation @ about_centre)
-    coverage_positive = _coverage(points, cad_points, transformation)
-    coverage_flipped = _coverage(points, cad_points, alternative)
 
-    def up_score(matrix: np.ndarray) -> float:
-        fixed = matrix @ cad_frame_fix
-        return float(np.dot(fixed[:3, 2], axis))
+def _handle_mask(cad_points: np.ndarray, bbox_min: np.ndarray, bbox_max: np.ndarray) -> np.ndarray:
+    """扶手区域：CAD 厚度轴上"凸出主体"的那一小撮点（实测占表面点 1.4%）。"""
+    y_lo, y_hi = bbox_min[1], bbox_max[1]
+    span = y_hi - y_lo
+    return cad_points[:, 1] < (y_lo + 0.2 * span)
 
-    score_positive, score_flipped = up_score(transformation), up_score(alternative)
-    choose_flipped = score_flipped > score_positive
-    chosen = alternative if choose_flipped else transformation
-    difference = abs(coverage_positive - coverage_flipped)
+
+def choose_symmetry(points: np.ndarray, cad_points: np.ndarray, transformation: np.ndarray,
+                    bbox_min: np.ndarray, bbox_max: np.ndarray,
+                    margin: float = 0.10) -> dict:
+    """在"长方体的对称解"里选一个：用【扶手区域覆盖率】当判别量。
+
+    为什么不能用整体覆盖率：工件 455×131×465，换一个对称解整体贴合度几乎一样
+    （实测覆盖率都在 0.98 以上），只有扶手/侧板这种非对称特征才能分开。
+    候选：原解、绕 x/y/z 各转 180°（都保持"工件站着"），各自做一次多尺度 ICP，
+    然后看"CAD 扶手点有多少落在观测点云附近"。
+    """
+    centre = (bbox_min + bbox_max) / 2.0
+    handle = _handle_mask(cad_points, bbox_min, bbox_max)
+    handle_points = cad_points[handle]
+    from scipy.spatial import cKDTree
+    tree = cKDTree(points)
+
+    candidates = {"identity": np.eye(4)}
+    for axis, name in ((0, "flip_x"), (1, "flip_y"), (2, "flip_z")):
+        candidates[name] = _about_centre(R.from_euler("xyz"[axis], 180, degrees=True).as_matrix(),
+                                         centre)
+    best = None
+    scores = {}
+    for name, relative in candidates.items():
+        refined = multiscale_icp(cad_points, points, transformation @ relative)
+        moved = (refined[:3, :3] @ handle_points.T).T + refined[:3, 3]
+        distance, _ = tree.query(moved, k=1)
+        handle_score = float((distance < 0.012).mean())
+        overall = _coverage(points, cad_points, refined)
+        scores[name] = {"handle": round(handle_score, 3), "overall": round(overall, 3)}
+        if best is None or handle_score > best[0]:
+            best = (handle_score, name, refined, overall)
+    handle_score, name, matrix, overall = best
+    ordered = sorted(scores.values(), key=lambda item: item["handle"], reverse=True)
+    second = ordered[1]["handle"] if len(ordered) > 1 else 0.0
+    # 硬判据：正解的扶手覆盖率实测约 0.92；错解只有 0.06–0.10。
+    # 所以"扶手覆盖率 <0.5"说明这组数据根本没收敛到正解，位姿不可用。
+    valid = handle_score >= 0.5
     return {
-        "coverage": round(coverage_positive, 4),
-        "flip_coverage": round(coverage_flipped, 4),
-        "upright": "flipped" if choose_flipped else "normal",
-        "chosen": "flipped" if choose_flipped else "normal",
-        "low_confidence": bool(difference < 0.03),
-        "ambiguous": False,
-        "matrix": chosen,
+        "chosen": name,
+        "handle_score": round(handle_score, 3),
+        "handle_margin": round(handle_score - second, 3),
+        "overall": round(overall, 3),
+        "scores": scores,
+        "valid": bool(valid),
+        "ambiguous": bool((handle_score - second < margin) or not valid),
+        "matrix": matrix,
     }
 
 
@@ -495,13 +512,15 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         evaluation = o3d.pipelines.registration.evaluate_registration(
             observed, template_cloud, 0.010, np.linalg.inv(refined))
         if cad_points is not None and template is not None:
-            check = flip_check(points, cad_points, refined, template[0], template[1])
+            check = choose_symmetry(points, cad_points, refined, template[0], template[1])
             refined = check["matrix"]
-            result["flip_check"] = {
-                "coverage": check["coverage"],
-                "flip_coverage": check["flip_coverage"],
-                "ambiguous": check["ambiguous"],
+            result["symmetry_check"] = {
                 "chosen": check["chosen"],
+                "handle_score": check["handle_score"],
+                "handle_margin": check["handle_margin"],
+                "overall": check["overall"],
+                "ambiguous": check["ambiguous"],
+                "scores": check["scores"],
             }
         if T_base_cam is not None and template is not None:
             T_base_object = T_base_cam @ refined
@@ -605,17 +624,19 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                 result["position_note"] = (f"最弱面只有 {weakest} 点（<{CORNER_ANCHOR_MIN_INLIERS}），"
                                            f"不用角点锚定；位置置信度低")
             if cad_points is not None and template is not None:
-                check = flip_check(points, cad_points, matrix, template[0], template[1])
+                check = choose_symmetry(points, cad_points, matrix, template[0], template[1])
                 matrix = check["matrix"]
-                result["flip_check"] = {
-                    "coverage": check["coverage"],
-                    "flip_coverage": check["flip_coverage"],
-                    "ambiguous": check["ambiguous"],
+                result["symmetry_check"] = {
                     "chosen": check["chosen"],
+                    "handle_score": check["handle_score"],
+                    "handle_margin": check["handle_margin"],
+                    "overall": check["overall"],
+                    "ambiguous": check["ambiguous"],
+                    "scores": check["scores"],
                 }
                 if check["ambiguous"]:
                     result["position_note"] = (result.get("position_note", "") +
-                                               " ｜ 正反解覆盖率接近（<10%），位姿有歧义")
+                                               " ｜ 对称解判别余量不足，位姿有歧义")
             if T_base_cam is not None and template is not None:
                 T_base_object = T_base_cam @ matrix
                 bbox_centre = (template[0] + template[1]) / 2
@@ -990,10 +1011,10 @@ def main() -> int:
         print(f"{result['group']:<14}{result['planes']:>4}{result.get('area_px', 0):>9}"
               f"{inliers:>22}{orth_text:>7}{cond_text:>7}"
               f"{score:>8}{'' if result.get('pose_valid', True) else '?'}  [{corner}]")
-        if "flip_check" in result:
-            flip = result["flip_check"]
-            print(f"{'':<14}{'':>4}  翻转检查: 正解 {flip['coverage']:.3f} / 翻转 "
-                  f"{flip['flip_coverage']:.3f} → {'有歧义' if flip['ambiguous'] else flip['chosen']}",
+        if "symmetry_check" in result:
+            check = result["symmetry_check"]
+            print(f"{'':<14}{'':>4}  对称解: {check['chosen']} 扶手分 {check['handle_score']:.3f}"
+                  f"（余量 {check['handle_margin']:.3f}）{'有歧义' if check['ambiguous'] else ''}",
                   flush=True)
         if "pose_base" in result:
             print(f"{'':<14}{'':>4}  base 中心(mm): {result['pose_base']['centre_mm']}", flush=True)
