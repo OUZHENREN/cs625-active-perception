@@ -36,6 +36,7 @@ import sys
 
 import numpy as np
 import open3d as o3d
+from scipy.spatial.transform import Rotation as R
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import polarizer_ab as pab
@@ -107,6 +108,59 @@ def dedup_planes(planes: list[dict], similarity: float = 0.92) -> list[dict]:
                for other in kept):
             kept.append(plane)
     return kept
+
+
+def filter_planes(planes: list[dict], centre: np.ndarray, max_distance_m: float = 0.40,
+                  min_inliers: int = 1500, max_rms_mm: float = 3.0) -> list[dict]:
+    """只留下"像工件外表面"的面。
+
+    rotp60 的失败原因：加工件和夹具在深度图里连成一片，夹具的大平面也被当成候选面，
+    于是两平面定向搜索选了一个错误的组合。判据很朴素——面要够大、够平、且离工件
+    中心足够近（工件最大边长 455 mm，半对角线约 0.33 m）。
+    """
+    kept = []
+    for plane in planes:
+        if plane["inliers"] < min_inliers:
+            continue
+        if plane["rms_mm"] > max_rms_mm:
+            continue
+        if float(np.linalg.norm(plane["centroid"] - centre)) > max_distance_m:
+            continue
+        kept.append(plane)
+    return kept
+
+
+def refine_rotation(transformation: np.ndarray, planes: list[dict],
+                    bbox_min: np.ndarray, bbox_max: np.ndarray) -> np.ndarray:
+    """用三个面的法向把姿态"拧正"：把观测法向对齐到对象轴上。
+
+    ICP 会让姿态在浅局部极小里差几度；平面法向是更硬的约束（三面互orthogonal），
+    所以最后用它做一次小角度修正。
+    """
+    rotation = transformation[:3, :3].copy()
+    corrections = []
+    for plane in planes:
+        normal_obj = rotation.T @ plane["normal"]
+        axis = int(np.argmax(np.abs(normal_obj)))
+        target = np.zeros(3)
+        target[axis] = np.sign(normal_obj[axis]) or 1.0
+        # 观测法向 -> 目标轴 的最小旋转
+        current = normal_obj / np.linalg.norm(normal_obj)
+        cross = np.cross(current, target)
+        dot = float(np.clip(np.dot(current, target), -1.0, 1.0))
+        angle = np.arctan2(np.linalg.norm(cross), dot)
+        if np.linalg.norm(cross) > 1e-9:
+            axis_cam = rotation @ (cross / np.linalg.norm(cross))
+            corrections.append(R.from_rotvec(axis_cam * angle).as_matrix())
+    if not corrections:
+        return transformation
+    average = np.mean(corrections, axis=0)
+    # 重新正交化
+    u, _, vt = np.linalg.svd(average @ rotation)
+    fixed = u @ vt
+    result = transformation.copy()
+    result[:3, :3] = fixed
+    return result
 
 
 def choose_triple(planes: list[dict]) -> tuple[list[dict], float] | None:
@@ -195,8 +249,11 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                    ((points.max(axis=0) - points.min(axis=0)) * 1000.0)],
         centroid_mm=[round(float(v) * 1000.0, 1) for v in points.mean(axis=0)],
     )
-    planes = dedup_planes(segment_planes(points))
-    result = {"group": directory.name, "planes": len(planes), **info}
+    centre = points.mean(axis=0)
+    planes_all = dedup_planes(segment_planes(points))
+    planes = filter_planes(planes_all, centre)
+    result = {"group": directory.name, "planes": len(planes),
+              "planes_raw": len(planes_all), **info}
     triple = choose_triple(planes) if len(planes) >= 3 else None
     if triple is None:
         # 退化情况（只有两个可见面，或第三个面不正交）：交给形状配准
@@ -214,6 +271,18 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
             result["error"] = "全局配准（FPFH+RANSAC）失败"
             return result
         refined = multiscale_icp(cad_points, points, init)
+        for _ in range(2):                     # 与三平面路径一致：剔点后重跑，覆盖率按剩下的点算
+            kept = reject_with_pose(points, refined, cad_points)
+            if len(kept) < MIN_POINTS or len(kept) >= len(points):
+                break
+            planes_k = filter_planes(dedup_planes(segment_planes(kept)), kept.mean(axis=0))
+            init_k = None
+            if len(planes_k) >= 2:
+                init_k = guided_two_plane(planes_k, kept, template[0], template[1], cad_points)
+            if init_k is None:
+                init_k = refined
+            refined = multiscale_icp(cad_points, kept, init_k)
+            points = kept
         observed = _prepared_cloud(points, 0.006)
         template_cloud = o3d.geometry.PointCloud()
         template_cloud.points = o3d.utility.Vector3dVector(cad_points)
@@ -227,6 +296,7 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         result["pose_fitness"] = round(float(evaluation.fitness), 3)
         result["pose_rmse_mm"] = round(float(evaluation.inlier_rmse) * 1000.0, 2)
         result["fallback"] = "global"
+        result["points_kept"] = int(len(points))
         result["pose_valid"] = bool(evaluation.fitness >= POSE_MIN_COVERAGE)
         return result
     chosen, worst = triple
