@@ -5,6 +5,9 @@ Kept deliberately small so it starts in about a second: one rclpy context, one
 node, a single subscription, then a step loop of cartesian plans.
 
   python3 scripts/move_tcp_linear.py X Y Z [step_mm] [velocity] [time_scale]
+
+  # 原地绕工具 z 轴旋转（手眼验证用：纯平移验证不了旋转口径）
+  python3 scripts/move_tcp_linear.py X Y Z step velocity time_scale ROTATE_DEG
 """
 
 from __future__ import annotations
@@ -29,6 +32,7 @@ def main() -> int:
     step = float(sys.argv[4]) if len(sys.argv) > 4 else 20.0
     velocity = float(sys.argv[5]) if len(sys.argv) > 5 else 0.02
     time_scale = float(sys.argv[6]) if len(sys.argv) > 6 else 2.0
+    rotate_deg = float(sys.argv[7]) if len(sys.argv) > 7 else 0.0
 
     rclpy.init()
     node = Node("move_tcp_linear")
@@ -63,6 +67,50 @@ def main() -> int:
         print("NO_POSE")
         return 2
     print(f"from {np.round(current, 4).tolist()} to {np.round(xyz, 4).tolist()}")
+
+    if rotate_deg:
+        # 原地转：目标位置不变，姿态绕工具 z 轴转 rotate_deg
+        from scipy.spatial.transform import Rotation as _R
+        goal_quat = (_R.from_quat(quat) * _R.from_euler("z", rotate_deg, degrees=True)).as_quat()
+        pose = Pose()
+        pose.position.x, pose.position.y, pose.position.z = current
+        (pose.orientation.x, pose.orientation.y,
+         pose.orientation.z, pose.orientation.w) = [float(v) for v in goal_quat]
+        request = GetCartesianPath.Request()
+        request.header.frame_id = "world"
+        request.group_name = "cs625_arm"
+        request.link_name = "my_end_effector_link"
+        request.waypoints = [pose]
+        request.max_step = 0.002
+        request.jump_threshold = 0.0
+        request.avoid_collisions = True
+        request.max_velocity_scaling_factor = velocity
+        request.max_acceleration_scaling_factor = velocity
+        future = client.call_async(request)
+        rclpy.spin_until_future_complete(node, future, timeout_sec=30)
+        result = future.result()
+        points = result.solution.joint_trajectory.points if result else []
+        if not points:
+            print(f"ROTATE_PLAN_FAIL fraction={result.fraction if result else '?'}")
+            return 3
+        trajectory = result.solution.joint_trajectory
+        payload = {"joint_names": list(trajectory.joint_names),
+                   "points": [{"q": list(pt.positions),
+                               "t": pt.time_from_start.sec + pt.time_from_start.nanosec * 1e-9}
+                              for pt in points]}
+        with open("/tmp/mtl.json", "w", encoding="utf-8") as handle:
+            json.dump(payload, handle)
+        run = subprocess.run(
+            ["python3", "-u", "scripts/execute_assembly_chunks.py", "/tmp/mtl.json",
+             "--time-scale", str(time_scale), "--dwell", "1.0",
+             "--goal-tolerance", "0.002"],
+            capture_output=True)
+        if b"ALL_ASSEMBLY_CHUNKS_OK" not in (run.stdout or b""):
+            message = (run.stdout or b"").decode("utf-8", "replace").strip().splitlines()
+            print("ROTATE_FAILED", message[-1] if message else "")
+            return 4
+        print(f"ROTATED {rotate_deg:+.1f} deg in place")
+        return 0
 
     while True:
         current, quat = read_pose()

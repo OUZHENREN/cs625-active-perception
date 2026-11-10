@@ -2405,6 +2405,10 @@ GenICam 名称（SDK 里只有枚举，不等于 XML 名字），属于"可尝�
 ⇒ 正确链路：T_base_cam = T_base_tcp @ T_tcp_cam（= JSON 的 frame_chain）
 ⇒ 文档里的"0.16 m 口径差"是记账错误（法兰系相机安装位 vs TCP 系 T_tcp_cam），不是标定错
 复现：python3 scripts/verify_handeye.py --draw
-待办：口径对≠精度够；绝对精度需标定板或"槽心投影落槽口"量化，目前目视约 1–2 cm
+精度已实测（2026-11-10 16:2x，棋盘格 Q12-340-25，格距 25 mm）：
+  两姿态一致性：纯平移 50 mm → 0.19 mm / 0.013°；原地旋转 15° → 0.71 mm / 0.038°
+  换算手眼平移误差上界 |δ| ≈ 0.71/(2·sin7.5°) ≈ 2.7 mm
+  ⇒ 链路可用（≤3 mm 量级）；亚毫米需多姿态最小二乘重标（未做）
+  验证工具：scripts/verify_handeye_board.py（--record / --consistency）
 ```
 
