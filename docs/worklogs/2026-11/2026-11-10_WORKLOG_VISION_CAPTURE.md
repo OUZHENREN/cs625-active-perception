@@ -126,15 +126,36 @@ if pgrep -f "ros2 launch cs625_bringup" >/dev/null; then echo "[开工] 驱动�
 证据：`runtime/logs/driver_*.log` 今天**一个都没有**（nohup 的重定向会先建文件，说明启动分支根本没执行）；
 在本机复现：`bash -c 'pgrep -af "ros2 launch cs625_bringup"'` 的输出就是它自己。
 
-### 8.2 修复
+### 8.2 修复（第一次改错了，第二次才对）
 
-`.vscode/tasks.json` 的判断改为匹配真实进程的完整路径：
+第一次把判断改成 `pgrep -f "/opt/ros/jazzy/bin/ros2 launch cs625_bringup"` —— **还是自匹配**：
+这个字符串本身也写在任务的命令行里（pgrep 的参数），所以照样匹配到自己。
+实测：`bash -c 'pgrep -af "/opt/ros/jazzy/bin/ros2 launch cs625_bringup"'` 输出两行，
+一行是真进程、一行是执行 pgrep 的 shell。
+
+最终改成 **括号法**，让模式串本身不出现在会匹配的文本里：
 
 ```bash
-pgrep -f "/opt/ros/jazzy/bin/ros2 launch cs625_bringup"
+pgrep -f "[r]os2 launch cs625_bringup"
 ```
 
-任务自己的命令行里没有 `/opt/ros/jazzy/bin/` 这一段，因此不会再自匹配。
+命令行里出现的是 `[r]os2`（带方括号），正则 `[r]os2` 匹配的是 `ros2`，所以任务自己的
+shell 不会命中，只有真正的 launch 进程会命中。
+
+### 8.2.1 冷启动验证（本轮实测）
+
+```text
+1) 先 SIGINT 停掉手动起的栈 → 节点只剩相机，无残留进程
+2) 用任务①的原始命令冷启动：
+     [开工] 已在后台启动驱动栈
+     activated: arm_controller: active
+     health: sockets=True controller=True joint_states=True
+     PREFLIGHT_OK
+3) 再执行一次任务①：
+     activated: arm_controller is already active
+     PREFLIGHT_OK
+     → 没有起第二个栈（launch 进程数 = 1，日志文件没增加）
+```
 
 ### 8.3 手动起栈（本轮验证）
 
