@@ -42,6 +42,7 @@ import polarizer_ab as pab
 
 PLANE_DIST_M = 0.003          # RANSAC 内点阈值 3 mm
 MIN_POINTS = 800              # 一个面至少这么多点才算数
+POSE_MIN_COVERAGE = 0.70      # 位姿置信门槛：观测点落在 CAD 附近的比例（低于它标"不可信"）
 MIN_DEPTH_M = 0.55            # 工件所在深度窗（背景幕布 1.35 m，桌面 ~1.0 m）
 MAX_DEPTH_M = 1.05
 
@@ -196,12 +197,37 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
     )
     planes = dedup_planes(segment_planes(points))
     result = {"group": directory.name, "planes": len(planes), **info}
-    if len(planes) < 3:
-        result["error"] = f"去重后只剩 {len(planes)} 个不同的面（换朝向时侧面可能接近侧视）"
-        return result
-    triple = choose_triple(planes)
+    triple = choose_triple(planes) if len(planes) >= 3 else None
     if triple is None:
-        result["error"] = f"没找到互相正交的三平面（候选 {len(planes)} 个）"
+        # 退化情况（只有两个可见面，或第三个面不正交）：交给形状配准
+        if cad_points is None:
+            result["error"] = (f"只有 {len(planes)} 个可用的面，且没有给 CAD（--cad-points）"
+                               if len(planes) < 3 else
+                               f"没有互相正交的三平面（候选 {len(planes)} 个）")
+            return result
+        init = None
+        if len(planes) >= 2 and template is not None:
+            init = guided_two_plane(planes, points, template[0], template[1], cad_points)
+        if init is None:
+            init = global_register(cad_points, points)
+        if init is None:
+            result["error"] = "全局配准（FPFH+RANSAC）失败"
+            return result
+        refined = multiscale_icp(cad_points, points, init)
+        observed = _prepared_cloud(points, 0.006)
+        template_cloud = o3d.geometry.PointCloud()
+        template_cloud.points = o3d.utility.Vector3dVector(cad_points)
+        evaluation = o3d.pipelines.registration.evaluate_registration(
+            observed, template_cloud, 0.010, np.linalg.inv(refined))
+        result["pose"] = {
+            "rotation": np.asarray(refined[:3, :3]).round(6).tolist(),
+            "translation": [round(float(v), 5) for v in refined[:3, 3]],
+            "source": "global+icp",
+        }
+        result["pose_fitness"] = round(float(evaluation.fitness), 3)
+        result["pose_rmse_mm"] = round(float(evaluation.inlier_rmse) * 1000.0, 2)
+        result["fallback"] = "global"
+        result["pose_valid"] = bool(evaluation.fitness >= POSE_MIN_COVERAGE)
         return result
     chosen, worst = triple
     rotation = orthonormalise([p["normal"] for p in chosen])
@@ -248,6 +274,7 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
             result["pose_fitness"] = round(refined["fitness"], 3)
             result["pose_rmse_mm"] = round(refined["rmse_mm"], 2)
             result["points_kept"] = int(len(points))
+            result["pose_valid"] = bool(refined["fitness"] >= POSE_MIN_COVERAGE)
     result.update(
         inliers=[p["inliers"] for p in chosen],
         ratios=[round(p["ratio"], 3) for p in chosen],
@@ -258,6 +285,22 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         rotation=rotation.round(6).tolist(),
     )
     return result
+
+
+def sample_mesh(mesh: o3d.geometry.TriangleMesh, count: int, seed: int = 7) -> np.ndarray:
+    """按面积均匀采样网格表面，结果可复现（Open3D 的 sample_points_uniformly 不接受 seed）。"""
+    triangles = np.asarray(mesh.triangles)
+    vertices = np.asarray(mesh.vertices)
+    a, b, c = vertices[triangles[:, 0]], vertices[triangles[:, 1]], vertices[triangles[:, 2]]
+    areas = 0.5 * np.linalg.norm(np.cross(b - a, c - a), axis=1)
+    rng = np.random.default_rng(seed)
+    picks = rng.choice(len(areas), size=count, p=areas / areas.sum())
+    u = rng.random(count)[:, None]
+    v = rng.random(count)[:, None]
+    flip = (u + v) > 1.0
+    u[flip] = 1.0 - u[flip]
+    v[flip] = 1.0 - v[flip]
+    return a[picks] + u * (b[picks] - a[picks]) + v * (c[picks] - a[picks])
 
 
 def load_template_bbox(path: pathlib.Path) -> tuple[np.ndarray, np.ndarray]:
@@ -316,6 +359,122 @@ def estimate_pose(planes: list[dict], cloud: np.ndarray, bbox_min: np.ndarray,
     return best
 
 
+def _prepared_cloud(points: np.ndarray, voxel: float) -> o3d.geometry.PointCloud:
+    cloud = o3d.geometry.PointCloud()
+    cloud.points = o3d.utility.Vector3dVector(points)
+    cloud = cloud.voxel_down_sample(voxel)
+    cloud.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=voxel * 4, max_nn=30))
+    return cloud
+
+
+def multiscale_icp(template_points: np.ndarray, observed_points: np.ndarray,
+                   init: np.ndarray, scales=(0.03, 0.015, 0.008)) -> np.ndarray:
+    """从粗到细的 ICP：每级用更小的对应距离继续收敛，避免停在近立方体的浅局部极小。"""
+    transformation = init.copy()
+    observed = _prepared_cloud(observed_points, 0.004)
+    template = o3d.geometry.PointCloud()
+    template.points = o3d.utility.Vector3dVector(template_points)
+    template = template.voxel_down_sample(0.004)
+    template.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=0.016, max_nn=30))
+    for threshold in scales:
+        result = o3d.pipelines.registration.registration_icp(
+            template, observed, threshold, transformation,
+            o3d.pipelines.registration.TransformationEstimationPointToPlane(),
+            o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=80))
+        transformation = result.transformation
+    return transformation
+
+
+def guided_two_plane(planes: list[dict], points: np.ndarray, bbox_min: np.ndarray,
+                    bbox_max: np.ndarray, cad_points: np.ndarray,
+                    lam_range=0.35, lam_steps=9) -> np.ndarray | None:
+    """只有两个可见面时的定向搜索：两个面固定两条轴，第三条轴用叉积，沿自由方向扫平移。
+
+    两平面能给出：哪两条对象轴、各自的符号（共 3 种"缺哪条轴" × 2 种指派 × 4 种符号组合），
+    以及三个平移分量中的两个；剩下一个沿两法向的叉积方向自由。
+    这里把这个自由度扫一遍，用"观测点落在 CAD 附近的比例"粗筛，再交给多尺度 ICP。
+    """
+    from itertools import product
+    from scipy.spatial import cKDTree
+    if len(planes) < 2:
+        return None
+    coarse_cad = cad_points[::max(1, len(cad_points) // 6000)]
+    tree = cKDTree(coarse_cad)
+    observed = points[::max(1, len(points) // 12000)]
+
+    best = None
+    axes = [0, 1, 2]
+    for missing in axes:
+        others = [axis for axis in axes if axis != missing]
+        for flip in (0, 1):
+            i1, i2 = others if flip == 0 else others[::-1]
+            for s1, s2 in product((1, -1), repeat=2):
+                n1 = planes[0]["normal"] * s1
+                n2 = planes[1]["normal"] * s2
+                if abs(float(np.dot(n1, n2))) > 0.20:
+                    continue
+                e1 = n1 / np.linalg.norm(n1)
+                e2 = n2 - np.dot(e1, n2) * e1
+                if np.linalg.norm(e2) < 1e-9:
+                    continue
+                e2 /= np.linalg.norm(e2)
+                e3 = np.cross(e1, e2)
+                rotation = np.zeros((3, 3))
+                rotation[:, i1], rotation[:, i2], rotation[:, i3 if False else missing] = e1, e2, e3
+                if np.linalg.det(rotation) < 0:
+                    continue
+                c1 = bbox_max[i1] if s1 > 0 else bbox_min[i1]
+                c2 = bbox_max[i2] if s2 > 0 else bbox_min[i2]
+                matrix = np.stack([n1, n2])
+                rhs = np.array([-planes[0]["d"] - s1 * c1, -planes[1]["d"] - s2 * c2])
+                base, *_ = np.linalg.lstsq(matrix, rhs, rcond=None)
+                direction = np.cross(n1, n2)
+                norm = np.linalg.norm(direction)
+                if norm < 1e-9:
+                    continue
+                direction /= norm
+                for step in range(-lam_steps, lam_steps + 1):
+                    translation = base + direction * (lam_range * step / lam_steps)
+                    points_obj = (observed - translation) @ rotation
+                    distance, _ = tree.query(points_obj, k=1)
+                    score = float((distance < 0.02).mean())
+                    if best is None or score > best[0]:
+                        best = (score, rotation, translation)
+    if best is None:
+        return None
+    init = np.eye(4)
+    init[:3, :3] = best[1]
+    init[:3, 3] = best[2]
+    return init
+
+
+def global_register(template_points: np.ndarray, observed_points: np.ndarray) -> np.ndarray | None:
+    """三平面不够时（只有两个可见面）用 FPFH + RANSAC 做全局配准，再交给多尺度 ICP。
+
+    为什么需要它：工件转到某些角度只剩两个面可见，三平面求交退化，
+    bbox 指派也无从谈起；此时只能靠形状特征（扶手、凹槽）把位姿找回来。
+    """
+    observed = _prepared_cloud(observed_points, 0.006)
+    template = o3d.geometry.PointCloud()
+    template.points = o3d.utility.Vector3dVector(template_points)
+    template = template.voxel_down_sample(0.006)
+    template.estimate_normals(o3d.geometry.KDTreeSearchParamHybrid(radius=0.024, max_nn=30))
+    radius = 0.02
+    observed_fpfh = o3d.pipelines.registration.compute_fpfh_feature(
+        observed, o3d.geometry.KDTreeSearchParamHybrid(radius=radius * 2, max_nn=100))
+    template_fpfh = o3d.pipelines.registration.compute_fpfh_feature(
+        template, o3d.geometry.KDTreeSearchParamHybrid(radius=radius * 2, max_nn=100))
+    result = o3d.pipelines.registration.registration_ransac_based_on_feature_matching(
+        template, observed, template_fpfh, observed_fpfh, True, 0.02,
+        o3d.pipelines.registration.TransformationEstimationPointToPoint(False), 3,
+        [o3d.pipelines.registration.CorrespondenceCheckerBasedOnEdgeLength(0.9),
+         o3d.pipelines.registration.CorrespondenceCheckerBasedOnDistance(0.02)],
+        o3d.pipelines.registration.RANSACConvergenceCriteria(400000, 0.999))
+    if result.fitness <= 0.0:
+        return None
+    return result.transformation
+
+
 def cad_register(cloud: np.ndarray, candidates: list[dict], cad_points: np.ndarray) -> dict:
     """用 CAD 形状（含扶手）把 bbox 拟合的歧义解开。
 
@@ -336,10 +495,7 @@ def cad_register(cloud: np.ndarray, candidates: list[dict], cad_points: np.ndarr
         init[:3, :3] = candidate["rotation"]
         init[:3, 3] = candidate["translation"]
         try:
-            result = o3d.pipelines.registration.registration_icp(
-                template, observed, 0.03, init,
-                o3d.pipelines.registration.TransformationEstimationPointToPlane(),
-                o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=40))
+            refined = multiscale_icp(cad_points, cloud, init)
         except Exception:                       # noqa: BLE001
             continue
         # 选择指标要看"观测点云有多少落在 CAD 上"（覆盖率），而不是反过来：
@@ -347,8 +503,8 @@ def cad_register(cloud: np.ndarray, candidates: list[dict], cad_points: np.ndarr
         # evaluate_registration 把 transformation 作用在 source 上：
         # source=观测（相机系）、target=CAD（对象系），所以要传 T_object_camera = inv(T_camera_object)
         evaluation = o3d.pipelines.registration.evaluate_registration(
-            observed, template, 0.010, np.linalg.inv(result.transformation))
-        entry = {"transformation": result.transformation,
+            observed, template, 0.010, np.linalg.inv(refined))
+        entry = {"transformation": refined,
                  "fitness": float(evaluation.fitness),
                  "rmse_mm": float(evaluation.inlier_rmse) * 1000.0,
                  "bbox_score": candidate["score"]}
@@ -387,8 +543,7 @@ def main() -> int:
             template = (bbox_min, bbox_max)
             if args.cad_points:
                 mesh = o3d.io.read_triangle_mesh(str(path))
-                cad_points = np.asarray(
-                    mesh.sample_points_uniformly(args.cad_points).points)
+                cad_points = sample_mesh(mesh, args.cad_points, seed=7)
             print(f"模板 {path.name}: 外形 {np.round((bbox_max - bbox_min) * 1000).astype(int)} mm；"
                   f"原点相对 bbox 中心 {np.round((bbox_min + bbox_max) / 2 * 1000, 1)} mm")
         else:
@@ -404,17 +559,21 @@ def main() -> int:
         if result.get("error"):
             print(f"{result['group']:<14}{'':>4}  ✗ {result['error']}")
             continue
-        inliers = ",".join(str(v) for v in result["inliers"])
-        corner = ",".join(f"{v:+.1f}" for v in result["corner_mm"])
+        inliers = ",".join(str(v) for v in result.get("inliers", [])) or "（全局配准）"
+        corner = ",".join(f"{v:+.1f}" for v in result.get("corner_mm", [])) or "-"
         if "pose_fitness" in result:
             score = f"{result['pose_fitness']:.2f}/{result['pose_rmse_mm']:.1f}"
         elif "pose_score" in result:
             score = f"{result['pose_score']:.3f}"
         else:
             score = "  -  "
+        orth = result.get("orthogonality")
+        cond = result.get("condition")
+        orth_text = f"{orth:.3f}" if orth is not None else "  -- "
+        cond_text = f"{cond:.1f}" if cond is not None else "  --  "
         print(f"{result['group']:<14}{result['planes']:>4}{result.get('area_px', 0):>9}"
-              f"{inliers:>22}{result['orthogonality']:>7.3f}{result['condition']:>7.1f}"
-              f"{score:>8}  [{corner}]")
+              f"{inliers:>22}{orth_text:>7}{cond_text:>7}"
+              f"{score:>8}{'' if result.get('pose_valid', True) else '?'}  [{corner}]")
 
     if args.out:
         pathlib.Path(args.out).write_text(json.dumps(results, ensure_ascii=False, indent=2))
