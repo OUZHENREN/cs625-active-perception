@@ -112,41 +112,57 @@ def dedup_planes(planes: list[dict], similarity: float = 0.92) -> list[dict]:
     return kept
 
 
+def focus_crop(points: np.ndarray, T_base_cam: np.ndarray,
+               centre: np.ndarray, radius: float = 0.35) -> np.ndarray:
+    """只保留"已知工件中心附近"的点（base 系球裁）。
+
+    近距观测时深度窗里会同时出现桌面、墙、夹具，连通域和平面剔除都分不干净；
+    但我们其实知道工件大致在哪（上一帧的测量结果），按球裁最省事、最可靠。
+    """
+    base_points = (T_base_cam[:3, :3] @ points.T).T + T_base_cam[:3, 3]
+    keep = np.linalg.norm(base_points - np.asarray(centre), axis=1) < radius
+    if keep.sum() >= MIN_POINTS:
+        print(f"   [focus] 球裁 {np.round(centre,2)} r={radius} m：保留 {int(keep.sum())} 点", flush=True)
+        return points[keep]
+    print("   [focus] 球内点太少，跳过", flush=True)
+    return points
+
+
 def remove_table(points: np.ndarray, T_base_cam: np.ndarray,
                  max_angle_deg: float = 15.0, thickness_m: float = 0.015,
-                 tries: int = 3) -> np.ndarray:
+                 attempts: int = 6) -> np.ndarray:
     """在 base 系里剔掉桌面：找法向接近竖直的大平面，删掉它附近的点。
 
     为什么必须在 base 系做：相机是斜着装的，"桌面"在相机系里没有简单的法向特征；
     但在 base 系里桌面法向就是 ±z。这一步依赖已经验明的手眼（2026-11-10）。
+
+    注意：RANSAC 第一次通常抓到的是墙/幕布（竖直大平面），不能一看到"不是桌面"就退出，
+    要继续往下找（实测：面0 是墙 34 万点，面1 才是桌面 15.7 万点、高度 −0.110 m）。
     """
     if len(points) < MIN_POINTS:
         return points
     base_points = (T_base_cam[:3, :3] @ points.T).T + T_base_cam[:3, 3]
-    cloud = o3d.geometry.PointCloud()
-    cloud.points = o3d.utility.Vector3dVector(base_points)
-    keep = np.ones(len(base_points), dtype=bool)
-    for _ in range(tries):
-        remaining = base_points[keep]
+    remaining = base_points.copy()
+    for _ in range(attempts):
         if len(remaining) < MIN_POINTS:
             break
-        sub = o3d.geometry.PointCloud()
-        sub.points = o3d.utility.Vector3dVector(remaining)
-        model, inliers = sub.segment_plane(distance_threshold=0.008,
-                                           ransac_n=3, num_iterations=300)
-        a, b, c, d = model
-        normal = np.array([a, b, c])
+        cloud = o3d.geometry.PointCloud()
+        cloud.points = o3d.utility.Vector3dVector(remaining)
+        model, inliers = cloud.segment_plane(distance_threshold=0.010,
+                                             ransac_n=3, num_iterations=600)
+        normal = np.array(model[:3])
         normal /= np.linalg.norm(normal)
-        if abs(normal[2]) < np.cos(np.radians(max_angle_deg)):
-            break                                   # 不是桌面，别再删
-        if len(inliers) < 3000:
-            break
-        distance = np.abs(base_points @ normal + d)
-        keep &= distance > thickness_m
-    removed = int((~keep).sum())
-    if removed:
-        print(f"   [table] 剔除桌面点 {removed} 个（剩 {int(keep.sum())}）", flush=True)
-    return points[keep]
+        plane_points = remaining[inliers]
+        if abs(normal[2]) >= np.cos(np.radians(max_angle_deg)) and len(inliers) >= 20000:
+            height = float(np.mean(plane_points[:, 2]))
+            distance = np.abs(base_points[:, 2] - height)
+            keep = distance > thickness_m
+            print(f"   [table] 桌面在 base z={height:.3f} m，剔除 {int((~keep).sum())} 点"
+                  f"（剩 {int(keep.sum())}）", flush=True)
+            return points[keep]
+        remaining = np.delete(remaining, inliers, axis=0)
+    print("   [table] 没找到近水平的大平面，跳过剔除", flush=True)
+    return points
 
 
 def filter_planes(planes: list[dict], centre: np.ndarray, max_distance_m: float = 0.40,
@@ -286,7 +302,8 @@ def intersect(planes: list[dict]) -> tuple[np.ndarray, float]:
 
 def extract_workpiece(depth: np.ndarray, k: list[float],
                       min_depth: float = MIN_DEPTH_M,
-                      max_depth: float = MAX_DEPTH_M) -> tuple[np.ndarray, dict]:
+                      max_depth: float = MAX_DEPTH_M,
+                      expected_extent=None) -> tuple[np.ndarray, dict]:
     """先在图像空间把工件抠出来：深度窗 + 最大连通域。
 
     为什么不直接全图分割平面：桌面、幕布、墙面都是大平面，RANSAC 会先抓它们。
@@ -299,10 +316,10 @@ def extract_workpiece(depth: np.ndarray, k: list[float],
     if count <= 1:
         return np.zeros((0, 3)), info
     areas = stats[1:, cv2.CC_STAT_AREA]
-    best = 1 + int(np.argmax(areas))
+    best = 1 + int(np.argmax(areas))       # 用最大连通域，再由 --remove-table 剔除桌面
     selected = labels == best
-    info["area_px"] = int(areas.max())
-    info["area_ratio"] = round(float(areas.max() / mask.size), 4)
+    info["area_px"] = int(stats[best, cv2.CC_STAT_AREA])
+    info["area_ratio"] = round(float(stats[best, cv2.CC_STAT_AREA] / mask.size), 4)
     points = pab.back_project(np.where(selected, depth, 0.0).astype(np.float32), k)
     return points, info
 
@@ -324,9 +341,16 @@ def reject_with_pose(points: np.ndarray, transformation: np.ndarray,
 def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                   cad_points: np.ndarray | None = None,
                   depth_window: tuple[float, float] | None = None,
-                  T_base_cam: np.ndarray | None = None) -> dict:
+                  T_base_cam: np.ndarray | None = None,
+                  focus: tuple[np.ndarray, float] | None = None) -> dict:
     depth, k = load_group(directory)
-    points, info = extract_workpiece(depth, k, *(depth_window or (MIN_DEPTH_M, MAX_DEPTH_M)))
+    expected = None
+    if template is not None:
+        expected = np.asarray(template[1]) - np.asarray(template[0])
+    points, info = extract_workpiece(depth, k, *(depth_window or (MIN_DEPTH_M, MAX_DEPTH_M)),
+                                     expected_extent=expected)
+    if T_base_cam is not None and focus is not None:
+        points = focus_crop(points, T_base_cam, focus[0], focus[1])
     if T_base_cam is not None:
         points = remove_table(points, T_base_cam)
     if len(points) < MIN_POINTS:
@@ -748,6 +772,9 @@ def main() -> int:
     parser.add_argument("--dataset", default=None, help="vision_dataset 目录（含 g*/）")
     parser.add_argument("--group", default=None, help="只分析一个组目录")
     parser.add_argument("--template", default=None, help="CAD STL（用于尺寸约束与形状消歧）")
+    parser.add_argument("--focus", type=float, nargs=4, default=None,
+                        metavar=("X", "Y", "Z", "R"),
+                        help="只保留 base 系里以 (X,Y,Z) 为心、半径 R 的点（近距观测很有效）")
     parser.add_argument("--remove-table", action="store_true",
                         help="用当前 TCP 位姿+手眼在 base 系剔掉桌面（需驱动栈在线）")
     parser.add_argument("--depth-window", type=float, nargs=2, default=None,
@@ -797,7 +824,8 @@ def main() -> int:
     print("-" * 88)
     for directory in directories:
         window = tuple(args.depth_window) if args.depth_window else None
-        result = analyse_group(directory, template, cad_points, window, base_cam)
+        focus = (np.array(args.focus[:3]), args.focus[3]) if args.focus else None
+        result = analyse_group(directory, template, cad_points, window, base_cam, focus)
         results.append(result)
         if result.get("error"):
             print(f"{result['group']:<14}{'':>4}  ✗ {result['error']}")
