@@ -151,6 +151,63 @@ def derive_task_poses(part_xyz, part_quat, slot_xyz, slot_quat,
     }
 
 
+# --- 示教模式实际使用的修正（2026-11-03/04/05 所有者实测） -------------------
+APPROACH_HEIGHT_M = 0.150        # 预抓取改到抓取点正上方 150 mm（世界 +z）
+GRASP_CLEARANCE_M = 0.010        # 抓取点沿工具 x 回退 10 mm（避开电机保护座）
+PRE_INSERT_EXTRA_HEIGHT_M = 0.100  # 预插入再抬高 100 mm（世界 +z，插入终点不变）
+
+
+def snap_vertical(pose):
+    """把姿态压成"严格垂直"：工具 z 轴指向世界 −z，保留实测 yaw。
+
+    为什么：RVS 给的工件姿态约有 0.8° 不垂直，夹爪的电机保护座会蹭到工件凹槽。
+    做法与 teaching_sequence 完全一致：``Rz(yaw) * Rx(180°)``。
+    """
+    matrix = R.from_quat(pose[1]).as_matrix()
+    jaw = matrix @ np.array([1.0, 0.0, 0.0])
+    yaw = float(np.arctan2(jaw[1], jaw[0]))
+    quat = (R.from_euler("z", yaw) * R.from_euler("x", 180.0, degrees=True)).as_quat()
+    return (list(pose[0]), [float(v) for v in quat])
+
+
+def teaching_task_poses(part_xyz, part_quat, slot_xyz, slot_quat,
+                        approach_height_m: float = APPROACH_HEIGHT_M,
+                        clearance_m: float = GRASP_CLEARANCE_M,
+                        extra_height_m: float = PRE_INSERT_EXTRA_HEIGHT_M,
+                        tilt_deg: float | None = None):
+    """示教模式**实际执行**的四类任务位姿（与 senior 链条的差别都在这里）。
+
+    抓取侧（2026-11-03/04/05 所有者改的）：
+        grasp0     = part * T_b_tcp                       senior 的原始解
+        grasp      = snap_vertical(grasp0) 后沿工具 x 回退 10 mm
+        pre_grasp  = grasp + (0, 0, +150 mm)              正上方，不是横向 120 mm
+    插槽侧：
+        insert     = slot * T_s_tcp
+        rotated    = insert * Ry(-10 deg)
+        pre_insert = rotated * T(-350 mm, 工具 z) + (0, 0, +100 mm)
+        lock       = rotated * Ry(+10 deg)
+    注意：``slot_xyz/slot_quat`` 必须用**校验过的插槽位姿**；RVS 的原始 R1 会差 30–50 mm。
+    """
+    grasp, _senior_pre = grasp_from_box(part_xyz, part_quat)
+    grasp = snap_vertical(grasp)
+    matrix = R.from_quat(grasp[1]).as_matrix()
+    pull = matrix @ np.array([clearance_m, 0.0, 0.0])
+    grasp_xyz = [float(grasp[0][i] - pull[i]) for i in range(3)]
+    pre_grasp = ([grasp_xyz[0], grasp_xyz[1], grasp_xyz[2] + approach_height_m], grasp[1])
+
+    insert, rotated, pre_insert = insert_from_slot(
+        slot_xyz, slot_quat, tilt_deg=tilt_deg, extra_height_m=extra_height_m)
+    lock = lock_from_insert(rotated[0], rotated[1], tilt_deg=tilt_deg)
+    return {
+        "grasp": (grasp_xyz, grasp[1]),
+        "pre_grasp": pre_grasp,
+        "insert": insert,
+        "rotated": rotated,
+        "pre_insert": pre_insert,
+        "lock": lock,
+    }
+
+
 if __name__ == "__main__":
     # sanity check against the values the senior's tcp_server printed on 2026-10-27
     box = ([0.5957, 0.7492, 0.3554], [0.0069, -0.0022, 0.5412, 0.8408])

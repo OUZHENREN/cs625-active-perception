@@ -1,81 +1,93 @@
 # 任务位姿推导（抓取 / 预插入 / 插入 / 转正）
 
-> 建立：2026-11-10。依据：师兄 `tcp_server` 的链条（已实现在
-> `scripts/teaching/pose_math.py`）+ 本仓库 2026-11-04/05 的所有者实测修正。
-> 用途：给定"工件原始位姿"和"插槽原始位姿"，直接算出四类任务位姿，
-> 而不是散落在配置里的常量。
+> 建立：2026-11-10；**2026-11-10 修订**：补上示教模式实际使用的三处修改
+> （所有者指出）。实现：`scripts/teaching/pose_math.py`
+> （`derive_task_poses` = 师兄原始链条；`teaching_task_poses` = 现在真正跑的链条）。
 
-## 1. 链条（RVS 图上的 ①②③ 就是这三步）
+## 1. 两条链：师兄原始 vs 示教模式实际
 
 ```text
-抓取侧
-  grasp      = part_raw  × T_b_tcp          T_b_tcp = diag(-1, 1, -1) + (-4, -215, -411) mm
-  pre_grasp  = grasp     × T(+120 mm, 工具 x)          ← 图里 ②
+【师兄原始链】（配置里那批常量的来源，保留作参考）
+  grasp      = part * T_b_tcp          T_b_tcp = diag(-1,1,-1) + (-4, -215, -411) mm
+  pre_grasp  = grasp * T(+120 mm, 工具 x)
+  insert     = slot * T_s_tcp          T_s_tcp = diag(-1,1,-1) + (-82, -193, -412.5) mm
+  rotated    = insert * Ry(-10°)
+  pre_insert = rotated * T(-350 mm, 工具 z)
+  lock       = rotated * Ry(+10°)
 
-插槽侧
-  insert     = slot_raw  × T_s_tcp          T_s_tcp = diag(-1, 1, -1) + (-82, -193, -412.5) mm
-  rotated    = insert    × Ry(-10°)                    ← 图里 ①，倾斜进槽
-  pre_insert = rotated   × T(-350 mm, 工具 z)          ← 图里 ③，沿倾斜轴后退
-  lock(转正) = rotated   × Ry(+10°)                    ← 位置不变，姿态转正
+【示教模式实际链】（2026-11-03/04/05 所有者改的，现在真机跑的是这条）
+  grasp      = snap_vertical(part * T_b_tcp) 后，沿【工具 x】再回退 10 mm
+  pre_grasp  = grasp + (0, 0, +150 mm)          ← 正上方，不是横向 120 mm
+  insert     = slot * T_s_tcp
+  rotated    = insert * Ry(-10°)
+  pre_insert = rotated * T(-350 mm, 工具 z) + (0, 0, +100 mm)
+  lock       = rotated * Ry(+10°)
 ```
 
-单位：米；四元数 (x, y, z, w)；全部在 base 系（= 控制器 TCP 系）。
-
-## 2. 验证：用原始位姿反推，能否复现配置里的常量
-
-输入：`part_raw = [0.6534, 0.7035, 0.3551] / [0.0075, -0.0018, 0.4835, 0.8753]`
-（10-22 那次抓取所依据的工件位姿，由配置 grasp 反解得到）；
-`slot_raw = slot_origin = [1.241629, 0.181709, 0.443245] / slot_origin_q`。
-
-| 位姿 | 推导值 (m) | 配置值 (m) | 差 |
-|---|---|---|---|
-| grasp | [0.8316, 0.5918, -0.0583] | [0.8316, 0.5918, -0.0583] | **0.06 mm** |
-| pre_grasp | [0.7677, 0.4902, -0.0596] | [0.7677, 0.4903, -0.0595] | **0.13 mm** |
-| insert | [1.1574, -0.0132, 0.0321] | [1.1574, -0.0132, 0.0321] | **0.04 mm** |
-| pre_insert | [1.0996, -0.0125, 0.3773] | [1.0996, -0.0125, 0.3773] | **0.04 mm** |
-
-→ **链条是对的**，四个姿态都能从两个"原始位姿"推出来，误差 <0.15 mm。
-
-转正验证：`teaching_insert_end` 的姿态 × Ry(+10°) = flat_quat，姿态差 <0.02°。
-（若用公式里的 `rotated` 去转正，会差 1.1°——那是**实测姿态与理想 -10° 的偏差**，
-  与 `teaching_grasp_geometry` 里记的"RVS 姿态约 0.8° 不垂直"属于同一类误差。）
-
-## 3. 所有者实测修正（必须叠加在上面链条之上）
+三处修改的原因（都在 `teaching_sequence.py` 的注释里）：
 
 ```text
-① 插入终点比公式浅 39.7 mm
-   formula_end = [1.1362, -0.0547, 0.0324]；owner 实测 = [1.1471, -0.0551, 0.0721]
-   原因：371–372 mm 处三面接触、保护停止触发；三次尝试重复性 1.1 mm
-   → 终点要用实测值，不能直接用公式终点
+① snap_vertical：RVS 给的工件姿态约 0.8° 不垂直，夹爪的电机保护座会蹭到工件凹槽；
+   压成"工具 z 指向世界 −z、保留实测 yaw"（Rz(yaw)·Rx(180°)）。
+② 正上方 150 mm：工具本体宽 294.6 mm，师兄的横向 pre_grasp 在工件 yaw 变化时会撞夹具框；
+   垂直下降实测 0.199 mm / 0.031°，无保护停止。150 mm 是 2026-11-04 从 120 mm 加上去的。
+③ 回退 10 mm：电机保护座与工件外表面凹槽干涉（真实碰撞后 1.5→3→6→10 mm 逐步加到 10）。
+④ 预插入再抬高 100 mm：350 mm 后退后工具太低、看不到槽口；**插入终点不变，只是下降起点更高**。
+```
 
-② 横向修正 45.5 mm（world −x，朝机械臂基座）
-   施加在"slot 参考位姿"上，所以 pre_insert 与 insert 一起移动
-   累计 [8.0, 5.0, 27.5, 5.0] mm（2026-11-04）
-   → 喂"原始 slot 测量值"时用 derive_task_poses(..., lateral_shift_mm=45.5)；
-     校验过的 slot 位姿（teaching_slot_reference / runtime 文件）已经包含它，不要再减
+## 2. 数值（用校验过的插槽位姿 + 历史工件位姿算出）
 
-③ pre-insert 站高不足 → 后退 350 mm 之后还要再抬（world +z），插入终点不变
+输入：`part = [0.6534, 0.7035, 0.3551] / [0.0075,-0.0018,0.4835,0.8753]`；
+`slot = teaching_slot_reference = [1.219397, 0.138884, 0.444411]`。
 
-④ 槽内转正不能一步到底：每次 ≤1.5°，且先把夹爪退出槽口再转；2° 已卡死
+| 位姿 | TCP (m) | 姿态 (x,y,z,w) |
+|---|---|---|
+| grasp（示教） | [0.8369, 0.6002, −0.0583] | [0.4835, −0.8753, 0, 0]（工具 z 严格朝下） |
+| pre_grasp（示教） | [0.8369, 0.6002, **0.0917**] | 同上（正上方 +150 mm） |
+| insert（公式终点） | [1.1352, −0.0560, 0.0332] | [−0.0034, 1.0, −0.0016, −0.0043] |
+| rotated（倾斜进槽） | 同上 | [−0.0035, 0.9965, −0.0013, 0.0829]（Ry −10°） |
+| pre_insert（示教） | [1.0774, −0.0553, **0.4784**] | 同上 |
+| lock（转正） | 插到为止的位置 | flat：Ry +10°，位置不变 |
+
+**插入段长度变了**：
+
+```text
+pre_insert → insert(公式)       = 448.9 mm
+pre_insert → insert_end(实测座) = 412.3 mm      ← 实际下降行程
+（师兄原链是 350 mm 后退、没有额外 100 mm，所以旧的 350 mm 不能再用）
+```
+
+插入终点必须用**实测座** `teaching_insert_end.tcp = [1.1471, −0.0551, 0.0721]`：
+公式终点比它深 39.7 mm（371–372 mm 处三面接触、保护停止，三次重复性 1.1 mm）。
+
+## 3. 插槽位姿：RVS 的原始 R1 不能直接用
+
+```text
+RVS 的插槽位姿跨会话漂移 30–50 mm（2026-11-03 实测：用 74 小时前的 R1 推出 insert y = −0.0094，
+用当天 R1 推出 −0.0447，差 35 mm；现场观察"往左偏 3–5 cm"与之一致）。
+→ 插入链的输入必须是【校验过的插槽位姿】：
+   runtime/slot_reference_verified.json（优先）或 config/tasks/common.yaml 的
+   teaching_slot_reference；RVS 的原始 R1 只作参考，永不作权威。
+   （common.yaml 里那条 45.5 mm 横向修正就是施加在"插槽参考位姿"上的。）
 ```
 
 ## 4. 怎么用
 
 ```python
-from scripts.teaching.pose_math import derive_task_poses
+from scripts.teaching.pose_math import teaching_task_poses, derive_task_poses
 
-poses = derive_task_poses(part_xyz, part_quat, slot_xyz, slot_quat)
-# -> {'grasp', 'pre_grasp', 'insert', 'rotated', 'pre_insert', 'lock'}
+# 现在真机跑的那条链（含垂直修正/150 mm/10 mm/100 mm）
+poses = teaching_task_poses(part_xyz, part_quat, slot_xyz_verified, slot_quat)
+# 师兄原始链（复算历史常量用）
+legacy = derive_task_poses(part_xyz, part_quat, slot_xyz, slot_quat)
 ```
 
-## 5. 前提与限制
+## 5. 验证与限制
 
 ```text
-· 需要 base 系下的 part_raw / slot_raw。本仓库自研视觉目前只在【相机系】里工作，
-  还没有验证手眼，所以 base 系位姿目前来自：
-    - RVS 的原始位姿（离线采集），或
-    - 配置里已记录的常量（即上面反解出来的那份）
-  在手眼验明之前，本链条只能复算历史常量，不能直接用相机测出来的新位姿驱动机械臂。
-· 公式假设工件是长方体且 T_b_tcp/T_s_tcp 与当前夹具一致；
-  换夹具/换工件必须重新标定这两个常量。
+· 师兄原始链复现配置常量：grasp 0.06 mm / pre_grasp 0.13 mm / insert 0.04 mm / pre_insert 0.04 mm
+· 示教链的四个值见上表；lock 的姿态与 teaching_insert_end.flat_quat 差 0.02°（对实测座施加）
+· 需要 base 系下的 part/slot 位姿：自研视觉目前只在相机系，手眼未验明 →
+  暂时只能用 RVS 原始位姿（工件侧）或校验过的插槽位姿；
+  手眼验明后，`teaching_task_poses` 才能直接吃相机算出来的工件位姿。
 ```
