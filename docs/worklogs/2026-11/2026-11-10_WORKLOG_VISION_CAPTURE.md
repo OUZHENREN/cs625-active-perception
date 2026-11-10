@@ -64,3 +64,47 @@ OUT=runtime/vision_dataset/$(date +%Y%m%d_%H%M)_orient5
 python3 scripts/vision_capture.py --groups 4 --frames 5 --tag rot0   --out $OUT --delay 2
 # 工件转 +30° 后重复 --tag rotp30；+60° → rotp60；+90° → rotp90；-30° → rotm30
 ```
+
+## 7. 11:3x 开工检查（失败）+ 三维度问题回答
+
+### 7.1 机械臂驱动栈仍未启动
+
+```text
+ros2 node list          → 只有 /camera/* 与 /cs625_camera_view、/control_health_activate
+ros2 topic list         → 没有 /joint_states、没有 /tcp_pose_broadcaster/pose
+pgrep cs625_bringup     → 无进程
+runtime/logs/driver_*.log → 不存在（说明 launch 根本没跑起来）
+python3 scripts/control_health.py → sockets False / controller False / joint_states False
+ping 192.168.1.200      → 通（0.8 ms）
+```
+
+结论：机器人网络可达，但驱动栈没在跑 → **六轴位姿记录做不了**（`scripts/record_pose.py` 已就绪，
+驱动起来一条命令即可写入 `docs/reference/observation_poses_recorded.yaml`）。
+
+### 7.2 粗精配准开发的前置条件核对
+
+```text
+数据：runtime/vision_dataset/20261110_1115_orient5（20 组，重复性 1.60 mm）  ✅
+内参：/camera/color/camera_info = config/real/camera_intrinsics.json        ✅
+模板：~/cs625_rvs_archive/models_20261023/弹仓_装配导出.STL（13.8 MB）      ✅
+库：Open3D 0.20.0（含 GICP）+ scipy 1.11.4                                   ✅
+手眼：不需要（本月全部在相机系内验收）                                       ✅
+→ 可以开始 D2（粗测量）
+```
+
+### 7.3 六模式偏差的历史根因（按量级排序，全部有文档出处）
+
+| 量级 | 原因 | 出处 |
+|---|---|---|
+| **353 mm** | RVS 的 T1/T3 是**法兰**位姿，我们发了**工具 TCP**（差 -46,0,353 mm） | `2026-10-20_WORKLOG_P4_REALTIME_TCP_POSE.md` §16 |
+| **~160 / 106 mm** | RVS 返回**几何中心**，而 `T_b_tcp` 按 box.ply **模型原点**写；中心偏移 (10.5,-215,-105.2) mm | 同上 §15 |
+| **~100 mm** | ICP"稳定但错"：近正方形面四重对称，自洽的错误解 | `docs/agent_memory.md`（稳定性≠正确性） |
+| **35 mm** | 复用 74 小时前的旧 R1 插槽位姿 → 2026-11-03 三次碰撞 | `2026-11-03_WORKLOG_COLLISION_INCIDENT_AND_MOTION_GATES.md` |
+| **33 mm** | RVS R1 本身的跨会话漂移（系统偏置，单次测量不可靠） | 同上 / 交接文档 |
+| **20 mm** | 规划终点关节容差 0.02 rad ≈ 1.15°（0.6 m 力臂） | `config/tasks/common.yaml` 注释 |
+| **13 mm** | 示教与六模式两套插入常量并存、会漂移 | `2026-11-02_WORKLOG_IMPROVED_AND_REMAINING.md` #16 |
+| **毫米级** | 附着碰撞体用简化 `box_collision.STL`（无扶手），低估真实外廓 | `docs/agent_memory.md` |
+
+**共同模式：几乎全部是坐标口径 / 参考系 / 旧常量复用，而不是算法精度不足。**
+这也是"总是偏"的原因——每一处口径错误都是几十到几百毫米的**系统偏差**，
+不消除就一直在，且会被下一个环节继承。
