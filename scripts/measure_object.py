@@ -42,13 +42,24 @@ MAX_ROTATION_DEG = 2.0
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--template", required=True)
+    parser.add_argument("--preset", choices=["workpiece", "slot"], default="workpiece",
+                        help="workpiece=弹仓（用扶手判据）；slot=插槽夹具（用整体覆盖率判据）")
+    parser.add_argument("--template", default=None)
     parser.add_argument("--groups", type=int, default=4, help="采集组数（每组 3 帧取中位）")
     parser.add_argument("--depth-window", type=float, nargs=2, default=(0.5, 1.2),
                         metavar=("MIN_M", "MAX_M"))
     parser.add_argument("--cad-points", type=int, default=40000)
     parser.add_argument("--out", default=None)
     args = parser.parse_args()
+
+    presets = {
+        "workpiece": str(pathlib.Path.home() / "cs625_rvs_archive/models_20261023/弹仓_装配导出.STL"),
+        "slot": str(REPO / "src/cs625_simulation/assets/cs625_real_cell/slot_fixture/meshes/slot_fixture_collision.stl"),
+    }
+    template_arg = args.template or presets[args.preset]
+    use_feature = args.preset == "workpiece"
+    if args.template is None:
+        print(f"preset {args.preset} → 模板 {template_arg}，特征判据 {'用' if use_feature else '不用'}")
 
     stamp = time.strftime("%Y%m%d_%H%M%S")
     dataset = REPO / "runtime" / "vision_dataset" / f"measure_{stamp}"
@@ -61,7 +72,7 @@ def main() -> int:
         return 2
     print(f"采集完成：{dataset}")
 
-    template_path = pathlib.Path(args.template).expanduser()
+    template_path = pathlib.Path(template_arg).expanduser()
     bbox = cp.load_template_bbox(template_path)
     import open3d as o3d
     mesh = o3d.io.read_triangle_mesh(str(template_path))
@@ -73,7 +84,8 @@ def main() -> int:
 
     results = []
     for directory in sorted(dataset.glob("g*")):
-        results.append(cp.analyse_group(directory, bbox, cad, tuple(args.depth_window), base_cam))
+        results.append(cp.analyse_group(directory, bbox, cad, tuple(args.depth_window), base_cam,
+                                        use_feature=use_feature))
     good = [row for row in results if "pose_base" in row]
     if not good:
         print("所有组都没出位姿", file=sys.stderr)

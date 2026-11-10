@@ -141,7 +141,10 @@ def _about_centre(rotation: np.ndarray, centre: np.ndarray) -> np.ndarray:
 
 
 def _handle_mask(cad_points: np.ndarray, bbox_min: np.ndarray, bbox_max: np.ndarray) -> np.ndarray:
-    """扶手区域：CAD 厚度轴上"凸出主体"的那一小撮点（实测占表面点 1.4%）。"""
+    """工件（弹仓）的扶手区域：CAD 厚度轴上"凸出主体"的那一小撮点（占表面点 1.4%）。
+
+    只对弹仓有意义；插槽夹具（200×745×508）本身强非对称，不需要这类局部判据。
+    """
     y_lo, y_hi = bbox_min[1], bbox_max[1]
     span = y_hi - y_lo
     return cad_points[:, 1] < (y_lo + 0.2 * span)
@@ -149,10 +152,14 @@ def _handle_mask(cad_points: np.ndarray, bbox_min: np.ndarray, bbox_max: np.ndar
 
 def handle_coverage(points: np.ndarray, cad_points: np.ndarray, transformation: np.ndarray,
                     bbox_min: np.ndarray, bbox_max: np.ndarray,
-                    threshold_m: float = 0.012) -> float:
+                    threshold_m: float = 0.012, feature_region=None) -> float:
     """CAD 扶手点有多少落在观测点云附近——判断"是不是正解"的硬指标。"""
     from scipy.spatial import cKDTree
-    handle = _handle_mask(cad_points, bbox_min, bbox_max)
+    if feature_region is None:
+        handle = _handle_mask(cad_points, bbox_min, bbox_max)
+    else:
+        lo, hi = np.asarray(feature_region[0], float), np.asarray(feature_region[1], float)
+        handle = np.all((cad_points >= lo) & (cad_points <= hi), axis=1)
     if handle.sum() < 50:
         return 0.0
     tree = cKDTree(points)
@@ -163,7 +170,8 @@ def handle_coverage(points: np.ndarray, cad_points: np.ndarray, transformation: 
 
 def solve_pose_multistart(points: np.ndarray, cad_points: np.ndarray,
                           inits: list[np.ndarray], bbox_min: np.ndarray, bbox_max: np.ndarray,
-                          required_handle: float = 0.5) -> dict:
+                          required_handle: float = 0.5, feature_region=None,
+                          use_feature: bool = True) -> dict:
     """多起点求解：每个初值 × 四个对称候选各配准一次，**用扶手覆盖率选解**。
 
     为什么要多起点：实测 4 组里只有 1 组从单一初值收敛到正解，其余都掉进了错误盆地，
@@ -180,11 +188,14 @@ def solve_pose_multistart(points: np.ndarray, cad_points: np.ndarray,
     for index, init in enumerate(inits):
         for name, relative in variants:
             refined = multiscale_icp(cad_points, points, init @ relative)
+            overall = _coverage(points, cad_points, refined)
+            feature = (handle_coverage(points, cad_points, refined, bbox_min, bbox_max,
+                                       feature_region=feature_region) if use_feature else overall)
             attempts.append({
                 "start": index,
                 "variant": name,
-                "handle": handle_coverage(points, cad_points, refined, bbox_min, bbox_max),
-                "overall": _coverage(points, cad_points, refined),
+                "handle": feature,
+                "overall": overall,
                 "matrix": refined,
             })
     attempts.sort(key=lambda item: (item["handle"], item["overall"]), reverse=True)
@@ -192,7 +203,8 @@ def solve_pose_multistart(points: np.ndarray, cad_points: np.ndarray,
     for item in attempts[:3]:
         item["matrix"] = multiscale_icp(cad_points, points, item["matrix"],
                                         scales=(0.006, 0.003, 0.002))
-        item["handle"] = handle_coverage(points, cad_points, item["matrix"], bbox_min, bbox_max)
+        item["handle"] = (handle_coverage(points, cad_points, item["matrix"], bbox_min, bbox_max,
+                                          feature_region=feature_region) if use_feature else item["overall"])
         item["overall"] = _coverage(points, cad_points, item["matrix"])
     attempts.sort(key=lambda item: (item["handle"], item["overall"]), reverse=True)
     best = attempts[0]
@@ -523,7 +535,9 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                   T_base_cam: np.ndarray | None = None,
                   focus: tuple[np.ndarray, float] | None = None,
                   T_base_object: np.ndarray | None = None,
-                  cad_points_for_guide: np.ndarray | None = None) -> dict:
+                  cad_points_for_guide: np.ndarray | None = None,
+                  use_feature: bool = True,
+                  feature_region=None) -> dict:
     o3d.utility.random.seed(7)          # RANSAC 可复现：不加这句同一组数据两次跑出不同结果
     depth, k = load_group(directory)
     expected = None
@@ -581,7 +595,9 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
             refined = multiscale_icp(cad_points, kept, init_k)
             points = kept
         if cad_points is not None and template is not None:
-            solved = solve_pose_multistart(points, cad_points, [refined], template[0], template[1])
+            solved = solve_pose_multistart(points, cad_points, [refined], template[0], template[1],
+                                           feature_region=feature_region,
+                                           use_feature=use_feature)
             refined = solved["matrix"]
             result["symmetry_check"] = {
                 "chosen": solved["chosen"],
@@ -652,7 +668,9 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                 init[:3, :3] = candidate["rotation"]
                 init[:3, 3] = candidate["translation"]
                 inits.append(init)
-            solved = solve_pose_multistart(points, cad_points, inits, template[0], template[1])
+            solved = solve_pose_multistart(points, cad_points, inits, template[0], template[1],
+                                           feature_region=feature_region,
+                                           use_feature=use_feature)
             matrix = solved["matrix"]
             result["symmetry_check"] = {
                 "chosen": solved["chosen"],
@@ -965,6 +983,8 @@ def main() -> int:
     parser.add_argument("--dataset", default=None, help="vision_dataset 目录（含 g*/）")
     parser.add_argument("--group", default=None, help="只分析一个组目录")
     parser.add_argument("--template", default=None, help="CAD STL（用于尺寸约束与形状消歧）")
+    parser.add_argument("--no-feature", action="store_true",
+                        help="不用局部特征判据（插槽这类强非对称目标用整体覆盖率选解）")
     parser.add_argument("--object-pose-base", default=None,
                         help="T_base_object 的 .npy（上一帧测得）；给了就改用【模型引导分割】")
     parser.add_argument("--focus", type=float, nargs=4, default=None,
@@ -1027,7 +1047,8 @@ def main() -> int:
                          if args.object_pose_base else None)
         result = analyse_group(directory, template, cad_points, window, base_cam, focus,
                                T_base_object,
-                               guide_points if args.object_pose_base else None)
+                               guide_points if args.object_pose_base else None,
+                               use_feature=not args.no_feature)
         results.append(result)
         if result.get("error"):
             print(f"{result['group']:<14}{'':>4}  ✗ {result['error']}")
