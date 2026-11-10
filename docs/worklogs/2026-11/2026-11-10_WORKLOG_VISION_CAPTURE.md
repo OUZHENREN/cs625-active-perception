@@ -1234,3 +1234,39 @@ src/cs625_simulation/assets/cs625_real_cell/slot_fixture/meshes/slot_fixture_col
 2. 插槽观测要 8/8：slot_coarse 只差右下角一点，可微调观测位或后退 5–10 cm；
 3. 深度窗按 frame_check 的建议值写进 preset，不再沿用工件那套 0.2–0.8。
 ```
+
+## 34. 23:3x 取景检查接入测量接口 + 深度窗按目标预置
+
+### 34.1 改动
+
+```text
+frame_check.check()  抽成可复用函数（返回 dict）
+measure_object       --observe-pose <名字>：采集前先做取景检查，BAD 直接退出码 2、不采集
+                     --object-pose <json>：工件取景检查需要上一帧位姿（插槽用 slot_origin/q）
+                     preset 内置建议深度窗：工件 0.41–1.10 / 插槽 0.48–1.35
+                     （--depth-window 仍可覆盖）
+```
+
+### 34.2 实测（相机/机械臂已关闭，只验证前两道闸）
+
+```text
+workpiece_coarse：取景检查 BAD（5/8 角入画）→ 直接拒绝，退出码 2，不采集 ✅
+workpiece_fine  ：取景检查 OK（8/8 角入画，深度 0.51–1.00）→ 继续到采集，
+                  因相机已关闭报"没收到深度或内参"，流程行为正确 ✅
+```
+
+### 34.3 现在的采集前闸门
+
+```text
+1. 取景检查（能不能框住目标、深度窗多少）—— 新增
+2. 深度窗按 preset 走 —— 新增
+3. 采集后：三平面 + 配准质量、重复性、扶手/整体覆盖率、对称歧义 —— 已有
+```
+
+### 34.4 下一步
+
+```text
+· 有硬件时：跑到 observe.workpiece_fine，用 preset 默认深度窗做一次完整测量，
+  确认 0.73 mm / 0.87° 可复现；
+· 插槽：先把 slot_coarse 调到 8/8（后退 5–10 cm 或微调角度），再采一组做首测。
+```

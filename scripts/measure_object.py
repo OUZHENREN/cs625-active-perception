@@ -46,20 +46,48 @@ def main() -> int:
                         help="workpiece=弹仓（用扶手判据）；slot=插槽夹具（用整体覆盖率判据）")
     parser.add_argument("--template", default=None)
     parser.add_argument("--groups", type=int, default=4, help="采集组数（每组 3 帧取中位）")
-    parser.add_argument("--depth-window", type=float, nargs=2, default=(0.5, 1.2),
-                        metavar=("MIN_M", "MAX_M"))
+    parser.add_argument("--depth-window", type=float, nargs=2, default=None,
+                        metavar=("MIN_M", "MAX_M"),
+                        help="默认用 preset 的建议深度窗（工件 0.41–1.10 / 插槽 0.48–1.35）")
+    parser.add_argument("--observe-pose", default=None,
+                        help="观测位名字（config 里）；给了就先做取景检查，BAD 直接拒绝采集")
+    parser.add_argument("--object-pose", default=None,
+                        help="工件的上一帧测量结果（取景检查用）；插槽不需要")
     parser.add_argument("--cad-points", type=int, default=40000)
     parser.add_argument("--out", default=None)
     args = parser.parse_args()
 
     presets = {
-        "workpiece": str(pathlib.Path.home() / "cs625_rvs_archive/models_20261023/弹仓_装配导出.STL"),
-        "slot": str(REPO / "src/cs625_simulation/assets/cs625_real_cell/slot_fixture/meshes/slot_fixture_collision.stl"),
+        "workpiece": {
+            "template": str(pathlib.Path.home()
+                            / "cs625_rvs_archive/models_20261023/弹仓_装配导出.STL"),
+            "window": (0.41, 1.10),      # frame_check(workpiece_fine) 建议值
+        },
+        "slot": {
+            "template": str(REPO / "src/cs625_simulation/assets/cs625_real_cell/slot_fixture"
+                            / "meshes/slot_fixture_collision.stl"),
+            "window": (0.48, 1.35),      # frame_check(slot_coarse) 建议值
+        },
     }
-    template_arg = args.template or presets[args.preset]
+    template_arg = args.template or presets[args.preset]["template"]
     use_feature = args.preset == "workpiece"
     if args.template is None:
         print(f"preset {args.preset} → 模板 {template_arg}，特征判据 {'用' if use_feature else '不用'}")
+
+    if args.observe_pose:
+        import frame_check
+        try:
+            frame = frame_check.check(args.preset, args.observe_pose, args.object_pose)
+        except (KeyError, ValueError) as error:
+            print(f"取景检查跳过：{error}")
+            frame = None
+        if frame:
+            print(f"取景检查：{frame['verdict']}，{frame['corners_inside']}/8 角入画，"
+                  f"深度 {frame['depth_range_m'][0]:.2f}–{frame['depth_range_m'][1]:.2f} m，"
+                  f"建议窗 {frame['suggested_window_m']}")
+            if frame["verdict"] == "BAD":
+                print("取景判定 BAD：先调整观测位，不采集", file=sys.stderr)
+                return 2
 
     stamp = time.strftime("%Y%m%d_%H%M%S")
     dataset = REPO / "runtime" / "vision_dataset" / f"measure_{stamp}"
@@ -82,9 +110,11 @@ def main() -> int:
         print("读不到 TCP，无法换算到 base 系", file=sys.stderr)
         return 2
 
+    depth_window = tuple(args.depth_window or presets[args.preset]["window"])
+    print(f"深度窗：{depth_window[0]:.2f}–{depth_window[1]:.2f} m")
     results = []
     for directory in sorted(dataset.glob("g*")):
-        results.append(cp.analyse_group(directory, bbox, cad, tuple(args.depth_window), base_cam,
+        results.append(cp.analyse_group(directory, bbox, cad, depth_window, base_cam,
                                         use_feature=use_feature))
     good = [row for row in results if "pose_base" in row]
     if not good:
