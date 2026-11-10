@@ -66,6 +66,7 @@ def segment_planes(points: np.ndarray, max_planes: int = 8) -> list[dict]:
     for _ in range(max_planes):
         if len(working.points) < MIN_POINTS:
             break
+        o3d.utility.random.seed(7 + len(planes))   # 每轮固定种子 → 同一份数据结果可复现
         model, inliers = working.segment_plane(PLANE_DIST_M, 3, 2000)
         if len(inliers) < MIN_POINTS:
             break
@@ -131,13 +132,17 @@ def focus_crop(points: np.ndarray, T_base_cam: np.ndarray,
 
 def flip_check(points: np.ndarray, cad_points: np.ndarray, transformation: np.ndarray,
                bbox_min: np.ndarray, bbox_max: np.ndarray,
-               margin: float = 0.10) -> dict:
-    """翻转消歧：把"工件被上下装反"那个解也精配准一遍，比较覆盖率。
+               upright_axis: np.ndarray | None = None) -> dict:
+    """翻转消歧：用"工件必须站着"这条物理先验选解，覆盖率只作为置信度参考。
 
-    为什么必须做：近立方体工件（455×131×465）正反两个解的覆盖率可能只差 3–5%，
-    实测有一组翻了 180° 却拿到 0.894 的覆盖率，光看覆盖率拦不住。
-    翻转绕 bbox 中心做（绕模型原点会把工件甩出去，那不是"另一个解"）。
+    为什么不再靠覆盖率差：本工件接近立方体（455×131×465），正反两解的覆盖率
+    只差 5–15%，用"差 >10%"当阈值会在边界上反复误判（实测同一批数据时对时错）。
+    但物理事实是确定的——工件站在桌面上，它的"向上"方向在世界系里是 +z。
+
+    做法：把翻转解也做一次多尺度 ICP，然后看两个解的对象系 z 轴在 base 系里的朝向，
+    选朝上的那个；同时记录两者覆盖率之差作为置信度（差 <3% 记 low_confidence）。
     """
+    axis = np.array([0.0, 0.0, 1.0]) if upright_axis is None else np.asarray(upright_axis)
     centre = (bbox_min + bbox_max) / 2.0
     flip = np.eye(4)
     flip[:3, :3] = R.from_euler("x", 180, degrees=True).as_matrix()
@@ -147,17 +152,30 @@ def flip_check(points: np.ndarray, cad_points: np.ndarray, transformation: np.nd
     back = np.eye(4)
     back[:3, 3] = -centre
     about_centre = about_centre @ back
+    # CAD 坐标上下反了（所有者 2026-11-10 确认）：先把它摆正，再谈"哪个解朝上"
+    cad_frame_fix = about_centre
+    upright_reference = transformation @ cad_frame_fix
 
     alternative = multiscale_icp(cad_points, points, transformation @ about_centre)
     coverage_positive = _coverage(points, cad_points, transformation)
     coverage_flipped = _coverage(points, cad_points, alternative)
+
+    def up_score(matrix: np.ndarray) -> float:
+        fixed = matrix @ cad_frame_fix
+        return float(np.dot(fixed[:3, 2], axis))
+
+    score_positive, score_flipped = up_score(transformation), up_score(alternative)
+    choose_flipped = score_flipped > score_positive
+    chosen = alternative if choose_flipped else transformation
     difference = abs(coverage_positive - coverage_flipped)
     return {
         "coverage": round(coverage_positive, 4),
         "flip_coverage": round(coverage_flipped, 4),
-        "ambiguous": bool(difference < margin),
-        "chosen": "flipped" if coverage_flipped > coverage_positive else "normal",
-        "matrix": alternative if coverage_flipped > coverage_positive else transformation,
+        "upright": "flipped" if choose_flipped else "normal",
+        "chosen": "flipped" if choose_flipped else "normal",
+        "low_confidence": bool(difference < 0.03),
+        "ambiguous": False,
+        "matrix": chosen,
     }
 
 
@@ -415,6 +433,7 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                   focus: tuple[np.ndarray, float] | None = None,
                   T_base_object: np.ndarray | None = None,
                   cad_points_for_guide: np.ndarray | None = None) -> dict:
+    o3d.utility.random.seed(7)          # RANSAC 可复现：不加这句同一组数据两次跑出不同结果
     depth, k = load_group(directory)
     expected = None
     if template is not None:
