@@ -70,6 +70,31 @@ bbox 中心相对于【STL 原点】 = (-208.5, +43.5, -7.5) mm
 3. 用 bbox 角点在对象系中的已知坐标反解平移 t
 ```
 
+## 4.1 手眼口径：**已验明（2026-11-10）**
+
+文档里长期挂着"`T_tcp_cam` vs `T_flange_cam` 未验证、差约 0.16 m"。现在有两条独立证据：
+
+```text
+① TF：base → tool0   = [0.322, 0.072, 0.921]
+       base → tcp_pose = [0.563, 0.297, 0.787]
+       两者相差 0.356 m ≈ 法兰→TCP 的 353 mm
+   ⇒ /tcp_pose_broadcaster/pose 报的是【TCP】，tool0 才是法兰。
+
+② 投影（实时图像 + model.json 的已知点）：
+   A. T_base_tcp @ T_tcp_cam       → 工件中心投到 (581, 737)，落在工件表面上 ✅
+   B. T_base_tcp @ T_flange_cam    → 工件中心投到 (543,1018)，落在画面外 ❌
+
+⇒ 正确链路是 **A：T_base_cam = T_base_tcp @ T_tcp_cam**
+  （与 JSON 里 frame_chain 字段写的一致）。
+  之前那个"0.16 m"是把【法兰系下的相机安装位】和【TCP 系下的 T_tcp_cam】直接相比造成的记账错误。
+```
+
+复现：`python3 scripts/verify_handeye.py --draw`（只读，不动机械臂），标注图写到
+`runtime/handeye_projection.png`。
+
+**尚未做的**：口径对 ≠ 精度够。绝对精度要用手眼标定板或"槽心投影落在槽口中心"来量化，
+本轮只做到"投影落在正确物体上"（目视约 1–2 cm 量级）。
+
 ## 5. 禁止事项
 
 ```text

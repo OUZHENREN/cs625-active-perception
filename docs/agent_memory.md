@@ -2395,3 +2395,16 @@ GenICam 名称（SDK 里只有枚举，不等于 XML 名字），属于"可尝�
   重跑 0°/90° 对照（方法见 docs/plans/2026-11.md D0.5）。
 ```
 
+## 131. 2026-11-10 手眼口径验明：T_base_tcp @ T_tcp_cam 正确
+
+```text
+证据 1（TF）：base→tool0 = [0.322, 0.072, 0.921]；base→tcp_pose = [0.563, 0.297, 0.787]
+             相差 0.356 m ≈ 353 mm ⇒ tcp_pose_broadcaster 报的是 TCP，tool0 是法兰
+证据 2（投影）：用 T_base_tcp @ T_tcp_cam 把 model.json 工件中心投到实时图像 (581,737)，
+             正好落在工件表面；把它当 T_flange_cam 用则投到 (543,1018)，画面外
+⇒ 正确链路：T_base_cam = T_base_tcp @ T_tcp_cam（= JSON 的 frame_chain）
+⇒ 文档里的"0.16 m 口径差"是记账错误（法兰系相机安装位 vs TCP 系 T_tcp_cam），不是标定错
+复现：python3 scripts/verify_handeye.py --draw
+待办：口径对≠精度够；绝对精度需标定板或"槽心投影落槽口"量化，目前目视约 1–2 cm
+```
+
