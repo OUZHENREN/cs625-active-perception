@@ -38,6 +38,7 @@ import time
 import numpy as np
 import open3d as o3d
 from scipy.spatial.transform import Rotation as R
+from scipy.spatial.transform import Rotation as _Rotation
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import polarizer_ab as pab
@@ -442,6 +443,16 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         template_cloud.points = o3d.utility.Vector3dVector(cad_points)
         evaluation = o3d.pipelines.registration.evaluate_registration(
             observed, template_cloud, 0.010, np.linalg.inv(refined))
+        if T_base_cam is not None and template is not None:
+            T_base_object = T_base_cam @ refined
+            bbox_centre = (template[0] + template[1]) / 2
+            result["pose_base"] = {
+                "translation": [round(float(v), 5) for v in T_base_object[:3, 3]],
+                "quaternion": [round(float(v), 6) for v in _Rotation.from_matrix(
+                    np.array(T_base_object[:3, :3])).as_quat()],
+                "centre_mm": [round(float(v) * 1000, 1) for v in
+                              (T_base_object[:3, :3] @ bbox_centre + T_base_object[:3, 3])],
+            }
         result["pose"] = {
             "rotation": np.asarray(refined[:3, :3]).round(6).tolist(),
             "translation": [round(float(v), 5) for v in refined[:3, 3]],
@@ -533,6 +544,16 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                 matrix = refined["transformation"]
                 result["position_note"] = (f"最弱面只有 {weakest} 点（<{CORNER_ANCHOR_MIN_INLIERS}），"
                                            f"不用角点锚定；位置置信度低")
+            if T_base_cam is not None and template is not None:
+                T_base_object = T_base_cam @ matrix
+                bbox_centre = (template[0] + template[1]) / 2
+                result["pose_base"] = {
+                    "translation": [round(float(v), 5) for v in T_base_object[:3, 3]],
+                    "quaternion": [round(float(v), 6) for v in _Rotation.from_matrix(
+                        np.array(T_base_object[:3, :3])).as_quat()],
+                    "centre_mm": [round(float(v) * 1000, 1) for v in
+                                  (T_base_object[:3, :3] @ bbox_centre + T_base_object[:3, 3])],
+                }
             result["pose"] = {
                 "rotation": np.asarray(matrix[:3, :3]).round(6).tolist(),
                 "translation": [round(float(v), 5) for v in matrix[:3, 3]],
@@ -897,6 +918,8 @@ def main() -> int:
         print(f"{result['group']:<14}{result['planes']:>4}{result.get('area_px', 0):>9}"
               f"{inliers:>22}{orth_text:>7}{cond_text:>7}"
               f"{score:>8}{'' if result.get('pose_valid', True) else '?'}  [{corner}]")
+        if "pose_base" in result:
+            print(f"{'':<14}{'':>4}  base 中心(mm): {result['pose_base']['centre_mm']}", flush=True)
 
     if args.out:
         pathlib.Path(args.out).write_text(json.dumps(results, ensure_ascii=False, indent=2))
