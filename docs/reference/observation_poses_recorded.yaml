@@ -1,0 +1,14 @@
+# 已记录的机械臂位姿（只做记录，不改任何模式配置）
+#
+# 用途：把现场确认可用的观测位姿留档（六轴角度 + TCP），便于以后复现或对比。
+# 与 config/tasks/common.yaml 里的 teaching_observation_poses 分开：
+#   那份是示教/效率模式实际使用的配置，会被 set_observation_pose.py 改写；
+#   这份只追加，不参与任何流程。
+#
+# 追加方式：
+#   source scripts/source_dev_env.sh --full
+#   python3 scripts/record_pose.py --name <名字> --note "<备注>" [--dataset <数据目录>]
+#
+# 字段：recorded_at / name / source / note / joints(names,rad) / tcp(xyz,quat_xyzw) /
+#       dataset(可选) / camera(可选统计)
+poses: []
