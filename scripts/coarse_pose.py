@@ -129,6 +129,38 @@ def focus_crop(points: np.ndarray, T_base_cam: np.ndarray,
     return points
 
 
+def flip_check(points: np.ndarray, cad_points: np.ndarray, transformation: np.ndarray,
+               bbox_min: np.ndarray, bbox_max: np.ndarray,
+               margin: float = 0.10) -> dict:
+    """翻转消歧：把"工件被上下装反"那个解也精配准一遍，比较覆盖率。
+
+    为什么必须做：近立方体工件（455×131×465）正反两个解的覆盖率可能只差 3–5%，
+    实测有一组翻了 180° 却拿到 0.894 的覆盖率，光看覆盖率拦不住。
+    翻转绕 bbox 中心做（绕模型原点会把工件甩出去，那不是"另一个解"）。
+    """
+    centre = (bbox_min + bbox_max) / 2.0
+    flip = np.eye(4)
+    flip[:3, :3] = R.from_euler("x", 180, degrees=True).as_matrix()
+    about_centre = np.eye(4)
+    about_centre[:3, 3] = centre
+    about_centre = about_centre @ flip
+    back = np.eye(4)
+    back[:3, 3] = -centre
+    about_centre = about_centre @ back
+
+    alternative = multiscale_icp(cad_points, points, transformation @ about_centre)
+    coverage_positive = _coverage(points, cad_points, transformation)
+    coverage_flipped = _coverage(points, cad_points, alternative)
+    difference = abs(coverage_positive - coverage_flipped)
+    return {
+        "coverage": round(coverage_positive, 4),
+        "flip_coverage": round(coverage_flipped, 4),
+        "ambiguous": bool(difference < margin),
+        "chosen": "flipped" if coverage_flipped > coverage_positive else "normal",
+        "matrix": alternative if coverage_flipped > coverage_positive else transformation,
+    }
+
+
 def guided_extract(depth: np.ndarray, k: list[float], T_cam_object: np.ndarray,
                    cad_points: np.ndarray, tolerance_m: float = 0.06,
                    dilate_px: int = 5) -> tuple[np.ndarray, dict]:
@@ -443,6 +475,15 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         template_cloud.points = o3d.utility.Vector3dVector(cad_points)
         evaluation = o3d.pipelines.registration.evaluate_registration(
             observed, template_cloud, 0.010, np.linalg.inv(refined))
+        if cad_points is not None and template is not None:
+            check = flip_check(points, cad_points, refined, template[0], template[1])
+            refined = check["matrix"]
+            result["flip_check"] = {
+                "coverage": check["coverage"],
+                "flip_coverage": check["flip_coverage"],
+                "ambiguous": check["ambiguous"],
+                "chosen": check["chosen"],
+            }
         if T_base_cam is not None and template is not None:
             T_base_object = T_base_cam @ refined
             bbox_centre = (template[0] + template[1]) / 2
@@ -544,6 +585,18 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                 matrix = refined["transformation"]
                 result["position_note"] = (f"最弱面只有 {weakest} 点（<{CORNER_ANCHOR_MIN_INLIERS}），"
                                            f"不用角点锚定；位置置信度低")
+            if cad_points is not None and template is not None:
+                check = flip_check(points, cad_points, matrix, template[0], template[1])
+                matrix = check["matrix"]
+                result["flip_check"] = {
+                    "coverage": check["coverage"],
+                    "flip_coverage": check["flip_coverage"],
+                    "ambiguous": check["ambiguous"],
+                    "chosen": check["chosen"],
+                }
+                if check["ambiguous"]:
+                    result["position_note"] = (result.get("position_note", "") +
+                                               " ｜ 正反解覆盖率接近（<10%），位姿有歧义")
             if T_base_cam is not None and template is not None:
                 T_base_object = T_base_cam @ matrix
                 bbox_centre = (template[0] + template[1]) / 2
@@ -918,6 +971,11 @@ def main() -> int:
         print(f"{result['group']:<14}{result['planes']:>4}{result.get('area_px', 0):>9}"
               f"{inliers:>22}{orth_text:>7}{cond_text:>7}"
               f"{score:>8}{'' if result.get('pose_valid', True) else '?'}  [{corner}]")
+        if "flip_check" in result:
+            flip = result["flip_check"]
+            print(f"{'':<14}{'':>4}  翻转检查: 正解 {flip['coverage']:.3f} / 翻转 "
+                  f"{flip['flip_coverage']:.3f} → {'有歧义' if flip['ambiguous'] else flip['chosen']}",
+                  flush=True)
         if "pose_base" in result:
             print(f"{'':<14}{'':>4}  base 中心(mm): {result['pose_base']['centre_mm']}", flush=True)
 
