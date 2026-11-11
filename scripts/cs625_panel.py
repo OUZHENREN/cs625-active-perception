@@ -33,6 +33,8 @@ import sys
 import time
 from typing import Sequence
 
+import yaml
+
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
@@ -84,6 +86,45 @@ C_BAD = "#e05252"
 C_ACCENT = "#2fd6c9"
 
 # 示教链阶段（第 2 步「插槽粗观测」已删除，不再出现在面板里）
+EFFICIENCY_SCOPE = "load"
+EFFICIENCY_MODE = "efficient"
+PHASE_LABELS = {
+    "observe:workpiece_coarse": "工件粗观测",
+    "observe:workpiece_fine": "工件精观测",
+    "observe:tables": "桌面观测",
+    "observe:slot_coarse": "插槽粗观测",
+    "observe:slot_fine": "插槽精观测",
+    "baseline": "基准位",
+    "pre_grasp": "预抓取",
+    "gripper_init": "夹爪初始化",
+    "grasp": "进入抓取",
+    "grip": "张开涨紧",
+    "lift": "抬升",
+    "transit": "转运",
+    "staging": "槽前分级",
+    "pre_insert": "预插入",
+    "insert": "插入",
+    "straighten": "转正",
+    "release": "释放",
+    "withdraw": "退出",
+}
+
+
+def efficiency_phases() -> list[str]:
+    """效率流程的真实阶段序列（读 config/tasks/<scope>_<mode>.yaml）。
+
+    面板以前用的是示教链的静态阶段表，其中"插槽粗观测"被删掉了，
+    所以效率模式里看不到这一步——其实流程配置里一直有。
+    """
+    path = REPO / "config" / "tasks" / f"{EFFICIENCY_SCOPE}_{EFFICIENCY_MODE}.yaml"
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        phases = [str(v) for v in (data.get("phases") or [])]
+        return phases or []
+    except OSError:
+        return []
+
+
 STAGES = [
     (0, "环境模型"), (1, "插槽精观测"), (3, "工件粗观测"), (4, "工件精观测"),
     (5, "预抓取"), (6, "进入抓取"), (7, "张爪夹持"), (8, "抬升"),
@@ -1086,14 +1127,18 @@ class EfficiencyTab(QtWidgets.QWidget):
         stage_grid.setContentsMargins(8, 6, 8, 6)
         stage_grid.setHorizontalSpacing(10)
         stage_grid.setVerticalSpacing(4)
-        self.stage_checks: dict[int, QtWidgets.QCheckBox] = {}
-        row = 0
-        for index, (number, name) in enumerate(STAGES):
-            if number == 16:
-                continue
-            check = QtWidgets.QCheckBox(f"{number:02d} {name}")
-            check.setChecked(number in (5, 6))
-            self.stage_checks[number] = check
+        # 阶段列表直接来自效率流程配置（含 observe:slot_coarse 等观测点）
+        self.efficiency_phase_keys = efficiency_phases()
+        self.stage_checks: dict[str, QtWidgets.QCheckBox] = {}
+        if not self.efficiency_phase_keys:
+            fallback = QtWidgets.QLabel("读不到 config/tasks/load_efficient.yaml 的阶段表")
+            fallback.setProperty("level", "bad")
+            stage_grid.addWidget(fallback, 0, 0)
+        for index, key in enumerate(self.efficiency_phase_keys):
+            label = PHASE_LABELS.get(key, key)
+            check = QtWidgets.QCheckBox(f"{index + 1:02d} {label}")
+            check.setChecked(key in ("pre_grasp", "grasp", "grip"))
+            self.stage_checks[key] = check
             stage_grid.addWidget(check, index // 2, index % 2)
         left_layout.addWidget(stage_box, 0)
 
@@ -1204,22 +1249,29 @@ class EfficiencyTab(QtWidgets.QWidget):
         root.addWidget(right, 1)
 
     def _build_command(self) -> list[str]:
-        stages = [number for number, check in self.stage_checks.items() if check.isChecked()]
-        first, last = (min(stages), max(stages)) if stages else (5, 5)
-        command = [sys.executable, str(DEBUG), "--from", str(first), "--to", str(last)]
-        if self.check_nogates.isChecked():
-            command.append("--no-gates")
-        if self.check_nosettle.isChecked():
-            command.append("--no-settle")
+        """效率模式跑的是【新流程】run_task.py，不再是示教链。
+
+        选中的阶段用 --until 截断（runner 支持"跑到某个阶段就停"）；
+        若要从中途开始，runner 目前没有 --start-from，这里只提示、仍然从流程开头跑。
+        """
+        selected = [key for key, check in self.stage_checks.items() if check.isChecked()]
+        command = [sys.executable, str(REPO / "scripts" / "run_task.py"),
+                   "--scope", EFFICIENCY_SCOPE, "--mode", EFFICIENCY_MODE,
+                   "--world", "real"]
         if self.check_dry.isChecked():
             command.append("--dry-run")
-        repeat = self.repeat_edit.text().strip()
-        if repeat.isdigit() and int(repeat) > 1:
-            command += ["--repeat", repeat]
-        for phase, edit in self.speed_edits.items():
-            value = edit.text().strip()
-            if value:
-                command += ["--speed-override", f"{phase}={value}"]
+        else:
+            command.append("--confirm")
+        if selected:
+            order = [k for k in self.efficiency_phase_keys if k in selected]
+            if order:
+                last = order[-1]
+                command += ["--until", last]
+                first = order[0]
+                if first != self.efficiency_phase_keys[0]:
+                    self.log.append_line(
+                        f"[面板] 选中起点 {first}，但 runner 不支持 --start-from："
+                        f"将从流程开头跑到 {last}", "warn")
         return command
 
     def _run(self) -> None:
