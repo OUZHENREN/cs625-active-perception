@@ -168,6 +168,27 @@ def handle_coverage(points: np.ndarray, cad_points: np.ndarray, transformation: 
     return float((distance < threshold_m).mean())
 
 
+def prior_register(points: np.ndarray, cad_points: np.ndarray, init: np.ndarray,
+                   iterations: int = 2, reject_m: float = 0.03) -> dict:
+    """先验引导配准：用已知位姿初始化 → 剔点 → 精配准，迭代两轮。
+
+    为什么插槽需要它：夹具 745 mm 长、旁边就是桌面，深度窗内最大连通域是桌面，
+    三平面指派在那种云上不可靠；但夹具位置已知（标定点 slot_origin + slot_origin_q），
+    拿它当初值再按"点到 CAD 的距离"剔掉桌面，就能收敛（实测覆盖率 0.20 → 0.92）。
+    """
+    transformation = multiscale_icp(cad_points, points, init)
+    kept = points
+    for _ in range(iterations):
+        filtered = reject_with_pose(kept, transformation, cad_points, threshold_m=reject_m)
+        if len(filtered) < MIN_POINTS:
+            break
+        kept = filtered
+        transformation = multiscale_icp(cad_points, kept, transformation)
+    coverage = _coverage(kept, cad_points, transformation)
+    return {"matrix": transformation, "coverage": coverage, "points": kept,
+            "valid": bool(coverage >= POSE_MIN_COVERAGE)}
+
+
 def solve_pose_multistart(points: np.ndarray, cad_points: np.ndarray,
                           inits: list[np.ndarray], bbox_min: np.ndarray, bbox_max: np.ndarray,
                           required_handle: float = 0.5, feature_region=None,
@@ -537,7 +558,8 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                   T_base_object: np.ndarray | None = None,
                   cad_points_for_guide: np.ndarray | None = None,
                   use_feature: bool = True,
-                  feature_region=None) -> dict:
+                  feature_region=None,
+                  prior_pose_base: np.ndarray | None = None) -> dict:
     o3d.utility.random.seed(7)          # RANSAC 可复现：不加这句同一组数据两次跑出不同结果
     depth, k = load_group(directory)
     expected = None
@@ -555,6 +577,28 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         points = focus_crop(points, T_base_cam, focus[0], focus[1])
     if len(points) < MIN_POINTS:
         return {"group": directory.name, "error": f"工件区域太小（{len(points)} 点）"}
+    if prior_pose_base is not None and T_base_cam is not None and cad_points is not None:
+        # 先验引导路径：目标位置已知、但场景里有更大的干扰物（插槽夹具）
+        solved = prior_register(points, cad_points,
+                                np.linalg.inv(T_base_cam) @ prior_pose_base)
+        result = {"group": directory.name, "planes": 0, "source": "prior+icp", **info}
+        matrix = solved["matrix"]
+        result["pose"] = {"rotation": np.asarray(matrix[:3, :3]).round(6).tolist(),
+                          "translation": [round(float(v), 5) for v in matrix[:3, 3]],
+                          "source": "prior+icp"}
+        result["pose_fitness"] = round(float(solved["coverage"]), 3)
+        result["pose_valid"] = bool(solved["valid"])
+        T_base_object = T_base_cam @ matrix
+        bbox_centre = (template[0] + template[1]) / 2
+        result["pose_base"] = {
+            "translation": [round(float(v), 5) for v in T_base_object[:3, 3]],
+            "quaternion": [round(float(v), 6) for v in _Rotation.from_matrix(
+                np.array(T_base_object[:3, :3])).as_quat()],
+            "centre_mm": [round(float(v) * 1000, 1) for v in
+                          (T_base_object[:3, :3] @ bbox_centre + T_base_object[:3, 3])],
+        }
+        result["position_note"] = "先验引导配准（已知目标位置 + 剔点 + 精配准）"
+        return result
     info.update(
         extent_mm=[round(float(v), 0) for v in
                    ((points.max(axis=0) - points.min(axis=0)) * 1000.0)],

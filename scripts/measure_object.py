@@ -112,6 +112,7 @@ def main() -> int:
 
     depth_window = tuple(args.depth_window or presets[args.preset]["window"])
     focus = None
+    prior_pose_base = None
     if args.preset == "slot":
         # 夹具比工件大得多，深度窗内的最大连通域往往是桌面/背景，必须按已知位置球裁。
         # 夹具模型原点就是 config 的 slot_origin，姿态是 slot_origin_q。
@@ -125,12 +126,14 @@ def main() -> int:
         centre = T_base_slot[:3, :3] @ bbox_centre + T_base_slot[:3, 3]
         radius = float(np.linalg.norm(bbox[1] - bbox[0]) / 2 + 0.06)
         focus = (centre, radius)
-        print(f"夹具球裁：中心 {np.round(centre, 3)}，半径 {radius:.2f} m")
+        prior_pose_base = T_base_slot.copy()      # 夹具位置已知 → 走先验引导配准
+        print(f"夹具先验：中心 {np.round(centre, 3)}，球裁半径 {radius:.2f} m")
     print(f"深度窗：{depth_window[0]:.2f}–{depth_window[1]:.2f} m")
     results = []
     for directory in sorted(dataset.glob("g*")):
         results.append(cp.analyse_group(directory, bbox, cad, depth_window, base_cam,
-                                        focus=focus, use_feature=use_feature))
+                                        focus=focus, use_feature=use_feature,
+                                        prior_pose_base=prior_pose_base))
     good = [row for row in results if "pose_base" in row]
     if not good:
         print("所有组都没出位姿", file=sys.stderr)
