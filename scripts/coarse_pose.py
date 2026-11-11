@@ -328,6 +328,25 @@ def guided_extract(depth: np.ndarray, k: list[float], T_cam_object: np.ndarray,
     return points, info
 
 
+# 最近一次剔桌面找到的桌面高度（base z，米）。height_crop 用它把"躺在桌面上的薄物体"
+# （例如桌面上多出来的圆盘/垫片）一并裁掉——它们和工件连在同一个连通域里。
+LAST_TABLE_HEIGHT: list = [None]
+
+
+def height_crop(points: np.ndarray, T_base_cam: np.ndarray, clearance_m: float = 0.03) -> np.ndarray:
+    """只保留"高于桌面 clearance 以上"的点：桌上平放的薄件会被剔掉，站立的工件保留。"""
+    height = LAST_TABLE_HEIGHT[0]
+    if height is None:
+        return points
+    base_z = (T_base_cam[:3, :3] @ points.T).T[:, 2] + T_base_cam[2, 3]
+    keep = base_z > height + clearance_m
+    if keep.sum() >= MIN_POINTS:
+        print(f"   [height] 桌面以上 {clearance_m*1000:.0f} mm 过滤：保留 {int(keep.sum())} 点",
+              flush=True)
+        return points[keep]
+    return points
+
+
 def remove_table(points: np.ndarray, T_base_cam: np.ndarray,
                  max_angle_deg: float = 15.0, thickness_m: float = 0.015,
                  attempts: int = 6) -> np.ndarray:
@@ -360,6 +379,7 @@ def remove_table(points: np.ndarray, T_base_cam: np.ndarray,
             keep = distance > thickness_m
             print(f"   [table] 桌面在 base z={height:.3f} m，剔除 {int((~keep).sum())} 点"
                   f"（剩 {int(keep.sum())}）", flush=True)
+            LAST_TABLE_HEIGHT[0] = height
             return points[keep]
         remaining = np.delete(remaining, inliers, axis=0)
     print("   [table] 没找到近水平的大平面，跳过剔除", flush=True)
@@ -572,7 +592,9 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         points, guided = guided_extract(depth, k, T_cam_object, cad_points_for_guide)
         info.update(guided)
     if T_base_cam is not None:
+        LAST_TABLE_HEIGHT[0] = None
         points = remove_table(points, T_base_cam)      # 先剔桌面（在整块云上找平面最稳）
+        points = height_crop(points, T_base_cam)       # 再把"躺在桌面上的薄件"裁掉
     if T_base_cam is not None and focus is not None:
         points = focus_crop(points, T_base_cam, focus[0], focus[1])
     if len(points) < MIN_POINTS:

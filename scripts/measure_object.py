@@ -113,6 +113,15 @@ def main() -> int:
     depth_window = tuple(args.depth_window or presets[args.preset]["window"])
     focus = None
     prior_pose_base = None
+    if args.preset == "workpiece":
+        # 工件侧也可能出现"桌面/背景与工件连成一片"（实测 738k 点的连通域覆盖整张桌子）。
+        # 在已知工件附近做球裁最稳；中心/半径由 config 的 workpiece_focus 提供。
+        import yaml
+        config = yaml.safe_load((REPO / "config/tasks/common.yaml").read_text()) or {}
+        spec = config.get("workpiece_focus")
+        if spec and len(spec) >= 4:
+            focus = (np.array(spec[:3], dtype=float), float(spec[3]))
+            print(f"工件球裁：中心 {np.round(focus[0], 3)}，半径 {focus[1]:.2f} m")
     if args.preset == "slot":
         # 夹具比工件大得多，深度窗内的最大连通域往往是桌面/背景，必须按已知位置球裁。
         # 夹具模型原点就是 config 的 slot_origin，姿态是 slot_origin_q。

@@ -1,348 +1,462 @@
-# 六类模式公共配置（唯一权威来源）：世界常量 + 所有可复用位姿
-# 位姿全部原样搬自两个已验证基线，未改任何数值：
-#   - config/pick_place_real.yaml（2026-10-22 真机跑通，load 流程）
-#   - config/unload_real.yaml（unload 流程）
-# 用法：run_task 先读本文件，再把 config/tasks/<scope>_<mode>.yaml 浅合并覆盖上去，
-#      合并结果直接交给 scripts/run_pick_and_place.py --config。
-# 说明：浅合并意味着模式文件里的 phase_speeds 会整段替换，因此每份模式文件都自带完整
-#      phase_speeds；本文件只放与 scope/mode 无关的位姿、夹爪与几何常量。
-# 坐标系：全部为世界系（base_link）下的 TCP 位置，单位 m；四元数为 (x, y, z, w)。
-
-# ---- 抓取目标（工件台上待抓工件） ----
-# 2026-10-27 更正：上一步曾用精观测 ICP 的测量值把位姿改成 [0.8448,...]/[0.9132,...]，
-# 但那张"瞄准实测中心"的采集图里工件明显偏离画面中心，说明 ICP 测量本身偏了约 100 mm
-# （稳定性≠正确性，四重对称/特征锁定都可能给出一个自洽但错误的解）。
-# 因此恢复 10-22/10-24 真机跑通时使用的位姿，作为唯一已验证的基线。
-# 新的测量必须先经视觉核验（icp_pose_once --dump-projection 叠加图确认模板贴合工件），
-# 才能替换这里的值。
-pre_grasp: [0.7677, 0.4903, -0.0595]      # 抓取接近点（距 grasp 约 120 mm）
-grasp: [0.8316, 0.5918, -0.0583]          # 抓取点（夹爪闭合处）
-grasp_q: [-0.4835, 0.8753, 0.0075, 0.0018]
-workpiece_reference:                      # 上述位姿所依据的工件位姿（10-24 实测）
-  xyz: [0.5029, 0.6351, 0.1254]
-  quat: [0.1910, 0.9816, 0.0019, -0.0068]
-
-# ---- 空中巡航与装入链 ----
-transit: [0.95, 0.45, 0.55]               # 抬升后的空中过渡点（装入/取出共用）
-# 朝向沿用抓取朝向（真机 20261022_transit_selection 的实测朝向）
-transit_q: [-0.4835, 0.8753, 0.0075, 0.0018]
-staging: [1.0748, -0.0122, 0.5252]        # 槽位外侧准备点
-pre_insert: [1.0996, -0.0125, 0.3773]     # 插入前点（沿倾斜轴后退 150 mm）
-insert: [1.1574, -0.0132, 0.0321]         # 插入终点（= unload 的 insert_tcp）
-
-pre_insert_q: [-0.004, 0.997, -0.001, 0.083]   # 进槽倾角（约 -10°）
-insert_q: [-0.003, 1.000, -0.002, -0.004]      # 整平后姿态
-
-# ---- 安全回撤位 ----
-baseline: [1.044, -0.011, 0.726]          # 每段流程开始/结束的机位
-baseline_q: [-0.059, 0.938, 0.060, 0.336]
-
-# ---- 夹爪与行程常量 ----
+pre_grasp:
+- 0.7677
+- 0.4903
+- -0.0595
+grasp:
+- 0.8316
+- 0.5918
+- -0.0583
+grasp_q:
+- -0.4835
+- 0.8753
+- 0.0075
+- 0.0018
+workpiece_reference:
+  xyz:
+  - 0.5029
+  - 0.6351
+  - 0.1254
+  quat:
+  - 0.191
+  - 0.9816
+  - 0.0019
+  - -0.0068
+transit:
+- 0.95
+- 0.45
+- 0.55
+transit_q:
+- -0.4835
+- 0.8753
+- 0.0075
+- 0.0018
+staging:
+- 1.0748
+- -0.0122
+- 0.5252
+pre_insert:
+- 1.0996
+- -0.0125
+- 0.3773
+insert:
+- 1.1574
+- -0.0132
+- 0.0321
+pre_insert_q:
+- -0.004
+- 0.997
+- -0.001
+- 0.083
+insert_q:
+- -0.003
+- 1.0
+- -0.002
+- -0.004
+baseline:
+- 1.044
+- -0.011
+- 0.726
+baseline_q:
+- -0.059
+- 0.938
+- 0.06
+- 0.336
 grip_width_mm: 50.0
 grip_current: 0.1
-lift_total_mm: 155.0                      # 抬升总高度
-safe_clear_mm: 150.0                      # 轴向安全脱开距离（>= 100 才算合法）
-extract_steps_mm: 20                      # unload 每次抽出的步长（350 mm 行程 = 18 步）
-
-# ---- 全局保守标定（模式文件会覆盖其中速度/时间项） ----
-velocity_scale: 0.02                      # 普通接近速度缩放
-assembly_velocity_scale: 0.01             # 装配段速度缩放
+lift_total_mm: 155.0
+safe_clear_mm: 150.0
+extract_steps_mm: 20
+velocity_scale: 0.02
+assembly_velocity_scale: 0.01
 time_scale: 2.0
 dwell_sec: 1.0
 goal_tolerance: 0.002
-# 规划器允许的关节终点偏差（rad）。0.02 rad = 1.15 deg，在 0.6 m 力臂上就是 ~20 mm；
-# 验收判据是 3 mm，所以真实流程必须把规划终点钉在 IK 解上。仿真覆盖层早已用 0.002，
-# 真机此前一直用默认 0.02 —— 2026-10-26 实测 pre_grasp 偏 21.3 mm 就来自这里。
 goal_joint_tolerance: 0.002
 max_chunks: 7
-
-# ---- unload 专用固定链（槽位机械固定，无需重新检测） ----
-slot_origin: [1.241629, 0.181709, 0.443245]
-slot_origin_q: [-0.0016287871280747132, 0.004253108458370272, 0.003384045809911108, 0.9999839030478886]
-box_in_slot: [1.1635, 0.2032, 0.4423]          # 工件就位后的位姿
-box_in_slot_q: [-0.0016, 0.0043, 0.0034, 1.0]
-
-insert_tcp: [1.1574, -0.0132, 0.0321]          # = load 的 insert
-insert_tcp_q: [-0.003, 1.000, -0.002, -0.004]  # 整平姿态
-entrance_q: [-0.004, 0.997, -0.001, 0.083]     # 抽出时的 -10° 倾角
-
-# ---- unload 的放置目标（默认放回原工件台） ----
-place_pre_grasp: [0.7677, 0.4903, -0.0595]
-place_grasp: [0.8316, 0.5918, -0.0583]
-place_grasp_q: [-0.4835, 0.8753, 0.0075, 0.0018]
-
-# ============================================================================
-# environment：环境模型门禁阈值（run_pick_and_place.py 会忽略本段，由 run_task 读取）
-# 语义：位姿/点云与机械臂运动前的环境模型加载检查。
-# ============================================================================
+slot_origin:
+- 1.241629
+- 0.181709
+- 0.443245
+slot_origin_q:
+- -0.0016287871280747132
+- 0.004253108458370272
+- 0.003384045809911108
+- 0.9999839030478886
+box_in_slot:
+- 1.1635
+- 0.2032
+- 0.4423
+box_in_slot_q:
+- -0.0016
+- 0.0043
+- 0.0034
+- 1.0
+insert_tcp:
+- 1.1574
+- -0.0132
+- 0.0321
+insert_tcp_q:
+- -0.003
+- 1.0
+- -0.002
+- -0.004
+entrance_q:
+- -0.004
+- 0.997
+- -0.001
+- 0.083
+place_pre_grasp:
+- 0.7677
+- 0.4903
+- -0.0595
+place_grasp:
+- 0.8316
+- 0.5918
+- -0.0583
+place_grasp_q:
+- -0.4835
+- 0.8753
+- 0.0075
+- 0.0018
 environment:
   thresholds:
-    slot_mm: 1.0            # 槽位定位误差上限
-    slot_deg: 0.5           # 槽位姿态误差上限
-    workpiece_mm: 3.0       # 工件位姿误差上限
-    workpiece_deg: 1.0      # 工件姿态误差上限
-    min_points: 20000       # 环境点云最少点数
-    max_age_h: 2.0          # 环境模型最大允许陈旧时间（小时）
-  required: true            # 每次流程前必须加载环境模型
-
-# ============================================================================
-# verification：每阶段实测验收阈值（run_task 读取，runner 忽略）
-# ============================================================================
+    slot_mm: 1.0
+    slot_deg: 0.5
+    workpiece_mm: 3.0
+    workpiece_deg: 1.0
+    min_points: 20000
+    max_age_h: 2.0
+  required: true
 verification:
-  pos_mm: 3.0               # 阶段结束 TCP 位置偏差上限
-  rot_rad: 0.01             # 阶段结束姿态偏差上限
-
-# ---- 观测点（观察位姿，2026-10-24 推导/实测） -------------------------
-# 粗观测位来自真机实测定标（agent_memory §118/§119）；
-# 精观测位由 capture_dataset.camera_target() 以 0.68 m / 俯角 20° / 方位 +10° 算出，
-# 夹爪间距 0.449 m（>0.38 门禁）。tables 是宽视角，用于复核两张桌面位姿。
-# check：该观测点的校验命令，退出码 0 才算通过；空字符串表示只取景不判定。
+  pos_mm: 3.0
+  rot_rad: 0.01
 process_images: true
 observe:
   workpiece_coarse:
-    xyz: [0.5886, 0.3482, 0.7075]
-    quat: [0.2954, -0.7023, -0.2539, -0.5958]
-    check: ""
+    xyz:
+    - 0.5886
+    - 0.3482
+    - 0.7075
+    quat:
+    - 0.2954
+    - -0.7023
+    - -0.2539
+    - -0.5958
+    check: ''
   workpiece_fine:
-    # check 分两段：①位姿可重复性（3 帧）；②实测工件位姿与"抓取位姿所依据的参考位姿"
-    # 的漂移。②是 2026-10-26 撞倒工件事故后的守卫：工件被移动 >5 mm/1° 时直接拒绝，
-    # 不再拿旧常量去抓。
-    # 2026-10-26: the previous pose (0.5301,0.3222,0.4126) is geometrically identical
-    # to camera_target(part, 0.68 m, az=10, el=20) -- i.e. it was correct, but so
-    # frontal that the 441x465 mm near-square face is four-fold ambiguous and the
-    # stability check measured a 429 mm spread over three frames.  This pose is the
-    # same distance/orbit at az=25, el=30: oblique enough to break the ambiguity
-    # (IK solvable, projection area 37 %, centre offset 0.08).
-    xyz: [0.63539, 0.33191, 0.46905]
-    quat: [-0.46740, 0.72884, 0.27878, 0.41546]
-    check: >-
-      python3 scripts/check_pose_stability.py --repeat 3 --weights ~/cs625_yolo_seg/runs/segment/runs/segment/box_slot_1280/weights/best.pt --template "$HOME/cs625_rvs_archive/models_20261023/弹仓_装配导出.STL"
-      && python3 scripts/grasp_from_measurement.py --measure --check --tol-mm 5 --tol-deg 1
+    xyz:
+    - 0.63539
+    - 0.33191
+    - 0.46905
+    quat:
+    - -0.4674
+    - 0.72884
+    - 0.27878
+    - 0.41546
+    check: python3 scripts/check_pose_stability.py --repeat 3 --weights ~/cs625_yolo_seg/runs/segment/runs/segment/box_slot_1280/weights/best.pt
+      --template "$HOME/cs625_rvs_archive/models_20261023/弹仓_装配导出.STL" && python3
+      scripts/grasp_from_measurement.py --measure --check --tol-mm 5 --tol-deg 1
   tables:
-    xyz: [0.5886, 0.3482, 0.7075]
-    quat: [0.2954, -0.7023, -0.2539, -0.5958]
-    check: >-
-      python3 scripts/model_environment.py --out runtime/environment --verify-only
+    xyz:
+    - 0.5886
+    - 0.3482
+    - 0.7075
+    quat:
+    - 0.2954
+    - -0.7023
+    - -0.2539
+    - -0.5958
+    check: python3 scripts/model_environment.py --out runtime/environment --verify-only
   slot_coarse:
-    xyz: [0.7802, -0.1458, 0.7986]
-    quat: [0.1834, -0.8502, -0.1133, -0.4803]
-    check: ""
+    xyz:
+    - 0.7802
+    - -0.1458
+    - 0.7986
+    quat:
+    - 0.1834
+    - -0.8502
+    - -0.1133
+    - -0.4803
+    check: ''
   slot_fine:
-    xyz: [0.7036, -0.0945, 0.8146]
-    quat: [-0.16424, 0.8023, 0.12511, 0.56007]
-    check: >-
-      python3 scripts/model_environment.py --out runtime/environment --verify-only
-
-# ---- 夹爪几何（外撑式撑紧机构，真机 EFG80 驱动） --------------------------
-# 所有者确认：EFG 最大张开 50 mm。连杆把 0–50 mm 的行程换成两支撑臂的外撑跨距：
-# 全闭 204.00 mm、全张 246.57 mm（SolidWorks 实测）。仿真手指走跨距变化的一半。
-# 这条换算关系是 finger_position_m() 的唯一数据来源，不要在代码里另写一份。
+    xyz:
+    - 0.7036
+    - -0.0945
+    - 0.8146
+    quat:
+    - -0.16424
+    - 0.8023
+    - 0.12511
+    - 0.56007
+    check: python3 scripts/model_environment.py --out runtime/environment --verify-only
 gripper_max_opening_mm: 50.0
 gripper_span_min_mm: 204.0
 gripper_span_max_mm: 246.57
-
-# ---- 工具几何基准（2026-10-31 所有者确认） -------------------------
-# TCP 在法兰前方 353 mm（控制器设定，实测与 tcp_pose_broadcaster 差 0.0 mm）。
-# 工具【静止实体】是 SolidWorks 导出的同一刚体 gripper_0920.stl
-# （cs625_active_perception.urdf.xacro 的 tool0 碰撞几何，单位米、法兰坐标系）：
-#   X 对称 -147.285..+147.285（宽轴 294.6 mm，装配时绕工具轴 +90°）
-#   Y ±42.5 mm，Z -7.0（安装面后方定位凸台）.. +207.0 mm
-# 电机保护座就是这个刚体的一部分（2026-10-31 所有者确认），不在任何"缺失件"之列。
-# 张开时支撑臂会向前伸出 146–203 mm，这部分连杆无模型。
-#
-# 2026-10-30 事故：夹爪下方的电机保护座扫到插槽桌面（slot_table 足迹
-# x∈[1.01,1.70] y∈[-0.45,0.40]）。模型按上述刚体包络逐点检查时，规划路径
-# 离两张桌最近约 189 mm——即规划路径本身无接触，事故高度怀疑为 2 倍速执行
-# 偏离规划路径所致（待复验确认）。因此下降段必须分段慢速执行 + 每段实测校验。
 tool_flange_to_tcp_mm: 353.0
 tool_body_forward_from_flange_mm: 207.0
 tool_body_half_extent_xy_m: 0.1473
-tool_safety_note: >-
-  The tool rigid body (incl. the motor protection seat) spans flange-frame
-  Z -7..+207 mm and X +/-147.3 mm after mounting rotation. Any TCP path whose
-  z drops below (table_top + 0.15) must run the envelope check
-  scripts/check_tool_envelope.py against BOTH measured table footprints and be
-  executed slowly, in segments with verification (2026-10-30 accident lesson).
-
-# ---- RVS 视角位姿（S0 / S2）的参考系 ----------------------------------------
-# 唯一事实来源。两张容易混淆的事实，都必须记住：
-#   1) RVS 内部的手眼标定 DepthToRobotTCP 以【法兰】为参照
-#      （config/handeye 的 T_flange_cam 与它四位小数一致）——这是标定事实；
-#   2) 但 RVS 经 9999 发出的视位姿 S0/S2 已经是【TCP 位姿】——这是实测事实：
-#      2026-11-03 16:17 站在 S0-as-TCP (1.0785,0.0101,0.6172) 触发 T1，
-#      3.5-4.2 s 三帧匹配成功（0.2 mm / 0.07°）；10-30 的成功记录同样是
-#      S0-as-TCP (1.0841,0.049,0.6145)。若按法兰解释，相机距插槽仅 0.23 m，
-#      与全链路 0.5-0.7 m 的工作距离不符。
-# 允许值：tcp | flange。任何新脚本都必须读这里，不得自行假设。
-# 目标位姿（R1 插槽 / S3 工件）永远是物体位姿，经 pose_math 换算，不受本条影响。
-rvs_view_pose_frame: "tcp"
-
-# ---- 师兄 RVS 工程里教过的记录（2026-11-03 提取，仅作参考/审计，不作插入权威）--
-# 来源：CS625_SlotBox_VisualGuidance_RVS20260627-01_WSL.rvs（最新工程，2026-11-02 20:17）
-#       该工程是 JSON，节点参数 send_message 里保存着每次教过的成功报文。
-# 关键发现：同一个固定插槽，工程里存了三条 R1，y 值从 154.5 到 196.0 mm 不等
-#   （跨度 41.5 mm）；说明 RVS 的插槽精匹配本身就有几十毫米量级的离散，
-#   不能当作 1 mm 级的标定权威。
-#   R1,1256.059,195.993,442.693   ← 与机械标定(181.7)最近，差 14 mm
-#   R1,1232.115,159.616,443.912   ← 差 22 mm
-#   R1,1189.329,154.476,444.371   ← 差 27 mm
-#   S0,1084.404,48.970,614.883    ← 与 2026-10-30 的实测 S0 一致
-#   S0,1059.446,25.854,611.218
-# 因此插入链的权威仍取机械标定（config/cs625_real_cell_scene.yaml 的 fixture），
-# R1 只作健康检查；本段记录用于审计与将来核对，不得用于生成插入轨迹。
+tool_safety_note: The tool rigid body (incl. the motor protection seat) spans flange-frame
+  Z -7..+207 mm and X +/-147.3 mm after mounting rotation. Any TCP path whose z drops
+  below (table_top + 0.15) must run the envelope check scripts/check_tool_envelope.py
+  against BOTH measured table footprints and be executed slowly, in segments with
+  verification (2026-10-30 accident lesson).
+rvs_view_pose_frame: tcp
 rvs_taught_reference:
-  project: "CS625_SlotBox_VisualGuidance_RVS20260627-01_WSL.rvs"
-  project_mtime: "2026-11-02T20:17"
-  r1_taught: [[1.256059, 0.195993, 0.442693],
-              [1.232115, 0.159616, 0.443912],
-              [1.189329, 0.154476, 0.444371]]
-  s0_taught: [[1.084404, 0.048970, 0.614883],
-              [1.059446, 0.025854, 0.611218]]
+  project: CS625_SlotBox_VisualGuidance_RVS20260627-01_WSL.rvs
+  project_mtime: 2026-11-02T20:17
+  r1_taught:
+  - - 1.256059
+    - 0.195993
+    - 0.442693
+  - - 1.232115
+    - 0.159616
+    - 0.443912
+  - - 1.189329
+    - 0.154476
+    - 0.444371
+  s0_taught:
+  - - 1.084404
+    - 0.04897
+    - 0.614883
+  - - 1.059446
+    - 0.025854
+    - 0.611218
   r1_span_y_mm: 41.5
-
-# ---- RVS 教学参照（视位姿漂移检测的基准） -----------------------------------
-# 来源：RVS 工程 CS625_SlotBox_VisualGuidance_RVS20260627-01_WSL.rvs 里
-# send_message 节点存储的教学位姿（所有者 10-30/11-02 的实测输出）。
-# 用途：同一个固定目标的粗匹配输出（T0/T2）跨会话漂移实测 21-39 mm，
-# 站位偏离教学位后精匹配（T1）随之偏置（2026-11-03：站位偏 41 mm → R1 偏 50 mm）。
-# 因此每次 T0/T2 输出都要与这里比对；超差说明粗匹配锁错特征，不得继续。
-# 单位：m + 四元数 [x,y,z,w]。
 rvs_taught_views:
-  S0: {position: [1.084404, 0.048970, 0.614883],
-       quat: [-0.0266, -0.9304, 0.0535, -0.3617]}
-  S2: {position: [0.784368, 0.292779, 0.572254],
-       quat: [-0.5935, 0.6472, 0.2667, 0.3971]}
+  S0:
+    position:
+    - 1.084404
+    - 0.04897
+    - 0.614883
+    quat:
+    - -0.0266
+    - -0.9304
+    - 0.0535
+    - -0.3617
+  S2:
+    position:
+    - 0.784368
+    - 0.292779
+    - 0.572254
+    quat:
+    - -0.5935
+    - 0.6472
+    - 0.2667
+    - 0.3971
 rvs_view_drift_warn_mm: 10.0
 rvs_view_drift_refuse_mm: 20.0
-
-# ---- 示教链路的"粗观测基准点"（所有者手动摆位后登记） ----------------------
-# 这两个点是固定常量，但位置会随工件摆放/工位调整而需要重新登记。
-# 登记方式（所有者手动把机械臂摆到"RVS 能认出工件"的位置后）：
-#     python3 scripts/teaching/set_observation_pose.py --name workpiece_coarse --from-current
-# 脚本会把旧值写进本文件的历史注释并更新下面这两项。
 teaching_observation_poses:
   slot_coarse:
-    position: [0.7802, -0.1458, 0.7986]
-    quat: [0.1834, -0.8502, -0.1133, -0.4803]
-  # 2026-11-03 19:48 replaced workpiece_coarse: was [0.5886, 0.3482, 0.7075] / [0.2954, -0.7023, -0.2539, -0.5958]
-  # 2026-11-03 19:59 replaced workpiece_coarse: was [0.3434, 0.5604, 0.5960] / [0.2189, -0.7517, -0.2087, -0.5860]
+    position:
+    - 0.7802
+    - -0.1458
+    - 0.7986
+    quat:
+    - 0.1834
+    - -0.8502
+    - -0.1133
+    - -0.4803
   workpiece_coarse:
-    position: [0.5886, 0.3482, 0.7075]
-    quat: [0.2954, -0.7023, -0.2539, -0.5958]
-
-# ---- 粗观测基准候选位（2026-11-03 搜索生成，约束=工具前端高于工件顶 + 俯视 + 画面余量）--
-# 三个候选覆盖工件桌 y 方向：A 近端 / B 中段 / C 远端。均通过 IK（avoid_collisions）
-# 与 MoveIt 状态有效性检查。使用时把选中项复制到 teaching_observation_poses 生效。
+    position:
+    - 0.5886
+    - 0.3482
+    - 0.7075
+    quat:
+    - 0.2954
+    - -0.7023
+    - -0.2539
+    - -0.5958
 teaching_observation_candidates:
-  a:   # A 近端, 目标 [0.62, 0.4, 0.2], 俯角 56.8°, 画面余量 334 mm
-    position: [0.3582, 0.1511, 0.4878]
-    quat: [0.8719, 0.3976, 0.2609, -0.1164]
-    joints_deg: [120.7, -18.8, -119.2, -120.6, 58.6, -21.5]
-  b:   # B 中段, 目标 [0.62, 0.6, 0.2], 俯角 56.8°, 画面余量 334 mm
-    position: [0.3027, 0.4273, 0.4878]
-    quat: [0.9164, 0.2804, 0.2738, -0.0814]
-    joints_deg: [101.0, -51.4, -122.5, -82.0, 59.6, -26.9]
-  c:   # C 远端, 目标 [0.62, 0.8, 0.2], 俯角 52.8°, 画面余量 303 mm
-    position: [0.3193, 0.6390, 0.4100]
-    quat: [0.9064, 0.2771, 0.3055, -0.0917]
-    joints_deg: [97.4, -71.1, -123.9, -56.4, 57.2, -32.1]
-
-# ---- 示教链路的粗观测基准（A / B 两套，2026-11-03 实机验证） -----------------
-# 用途：RVS 的粗匹配对"看到哪个面"很敏感（见 docs/manuals/
-#       2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md 第 14 条）：
-#   基准 A：工件扶手面朝向机械臂、转角在 −45°~0° 时用，识别率 ≈0.9
-#   基准 B：工件逆时针转到 +45° 附近时用，把观测方位跟着转，让扶手面重新正对相机
-# 两个基准都用 T2 三帧验证过：
-#   A（当前工作位姿，2026-11-03 由所有者手摆）：识别成功
-#   B（下面这组关节）：三帧 3.0 mm / 0.52°，识别成功
+  a:
+    position:
+    - 0.3582
+    - 0.1511
+    - 0.4878
+    quat:
+    - 0.8719
+    - 0.3976
+    - 0.2609
+    - -0.1164
+    joints_deg:
+    - 120.7
+    - -18.8
+    - -119.2
+    - -120.6
+    - 58.6
+    - -21.5
+  b:
+    position:
+    - 0.3027
+    - 0.4273
+    - 0.4878
+    quat:
+    - 0.9164
+    - 0.2804
+    - 0.2738
+    - -0.0814
+    joints_deg:
+    - 101.0
+    - -51.4
+    - -122.5
+    - -82.0
+    - 59.6
+    - -26.9
+  c:
+    position:
+    - 0.3193
+    - 0.639
+    - 0.41
+    quat:
+    - 0.9064
+    - 0.2771
+    - 0.3055
+    - -0.0917
+    joints_deg:
+    - 97.4
+    - -71.1
+    - -123.9
+    - -56.4
+    - 57.2
+    - -32.1
 teaching_observation_baselines:
-  # 2026-11-05 21:04 rewritten by promote_baseline.py (successful fine view -> B, old B -> C)
   A:
-    note: 2026-11-04 重设：相机 z=0.758（旧 0.883）、距离 0.77 m（旧 0.93）、 俯角 46.7°；T2 实测 2/2 帧 0.9 mm（旧 A 连续 3 次失败）
-    position: [0.5313, 0.4406, 0.6737]
-    quat: [-0.4616, 0.8075, 0.0912, 0.3559]
-    joints_deg: [63.6, -55.1, -119.1, -54.3, 76.8, 89.1]
+    note: 2026-11-04 重设：相机 z=0.758（旧 0.883）、距离 0.77 m（旧 0.93）、 俯角 46.7°；T2 实测 2/2
+      帧 0.9 mm（旧 A 连续 3 次失败）
+    position:
+    - 0.5313
+    - 0.4406
+    - 0.6737
+    quat:
+    - -0.4616
+    - 0.8075
+    - 0.0912
+    - 0.3559
+    joints_deg:
+    - 63.6
+    - -55.1
+    - -119.1
+    - -54.3
+    - 76.8
+    - 89.1
   B:
     note: promoted from a successful fine capture
-    position: [0.7279, 0.4006, 0.5731]
-    quat: [-0.5202, 0.7091, 0.2209, 0.4217]
+    position:
+    - 0.7279
+    - 0.4006
+    - 0.5731
+    quat:
+    - -0.5202
+    - 0.7091
+    - 0.2209
+    - 0.4217
   C:
     note: previous B (demoted)
-    position: [0.7253, 0.4001, 0.5721]
-    quat: [-0.5190, 0.7090, 0.2218, 0.4228]
-# --- teaching insert end (owner-verified 2026-11-04) ---------------------------
-# The formula end point (slot x T_s_tcp -> z = 0.0324) is ~40 mm TOO DEEP: the real seat
-# is where the pendant-side protective stop fires, not where the formula says.  The owner
-# confirmed this pose as the true insert end after the first complete vertical insert.
+    position:
+    - 0.7253
+    - 0.4001
+    - 0.5721
+    quat:
+    - -0.519
+    - 0.709
+    - 0.2218
+    - 0.4228
 teaching_insert_end:
-  tcp: [1.1471, -0.0551, 0.0721]      # 2026-11-04 16:42 measurement
-  tcp_repeat: [1.1419, -0.0561, 0.0710]  # repeated attempt, same depth within 1 mm
-  quat: [-0.0047, -0.9961, 0.0021, -0.0881]      # tilted entry attitude (-10 deg)
-  flat_quat: [0.0048, 1.0, -0.0017, 0.0008]      # straightened attitude after seating
-  formula_end_tcp: [1.1362, -0.0547, 0.0324]     # what the chain computes; 39.7 mm deeper
+  tcp:
+  - 1.1471
+  - -0.0551
+  - 0.0721
+  tcp_repeat:
+  - 1.1419
+  - -0.0561
+  - 0.071
+  quat:
+  - -0.0047
+  - -0.9961
+  - 0.0021
+  - -0.0881
+  flat_quat:
+  - 0.0048
+  - 1.0
+  - -0.0017
+  - 0.0008
+  formula_end_tcp:
+  - 1.1362
+  - -0.0547
+  - 0.0324
   depth_below_fixture_mm: 371
   travel_along_tool_mm: 352
-  verdict: "protective stop under the single-direction strategy; NOT the physical bottom"
-  owner_correction: "2026-11-05: this depth is not the physical bottom -- the part jammed
-    because the rotation space had closed; the real strategy rotates about x while inserting"
-  repeatability_mm: 1.1               # three independent attempts stopped at 371-372 mm
-  obstructions: "workpiece touches the slot bottom AND two side walls at this depth"
-  stamp: "2026-11-04T16:42:00"
-
-# Lateral correction the owner applied to the whole insert chain on 2026-11-04, in
-# cumulative millimetres toward the robot base (world -x).  Applied to the slot reference,
-# so both the pre-insert and the insert end move together (manual entry 19).
+  verdict: protective stop under the single-direction strategy; NOT the physical bottom
+  owner_correction: '2026-11-05: this depth is not the physical bottom -- the part
+    jammed because the rotation space had closed; the real strategy rotates about
+    x while inserting'
+  repeatability_mm: 1.1
+  obstructions: workpiece touches the slot bottom AND two side walls at this depth
+  stamp: '2026-11-04T16:42:00'
 teaching_insert_lateral_shift:
   total_mm: 45.5
-  increments_mm: [8.0, 5.0, 27.5, 5.0]
-  axis: "world -x (toward the robot base)"
-  stamp: "2026-11-04T16:20:00"
-
-# Partial straightening while a part is inside the slot (owner, 2026-11-04).
-# Rotating the tool inside the slot is the only way to free clearance, but too much at
-# once jams against the walls: 2 deg completed but cost +7.2 effort, 1 deg at full depth
-# tripped the protective stop instantly.  The owner's rule: 1.5 deg per step, never 2.
+  increments_mm:
+  - 8.0
+  - 5.0
+  - 27.5
+  - 5.0
+  axis: world -x (toward the robot base)
+  stamp: '2026-11-04T16:20:00'
 teaching_rotation_policy:
   step_deg: 1.5
   max_step_deg: 1.5
-  note: "rotate only after backing the gripper out of the slot; 2 deg was already too much"
-  stamp: "2026-11-04T17:00:00"
-
-# Owner-taught assembly strategy (2026-11-05).  This is the authoritative procedure for this
-# workpiece; it supersedes the single-direction insert attempt of 2026-11-04.
+  note: rotate only after backing the gripper out of the slot; 2 deg was already too
+    much
+  stamp: '2026-11-04T17:00:00'
 teaching_assembly_strategy:
   early_rotation:
-    axis: "world x"
-    note: "rotate about x during the early insert stage to gain a looser region"
-  angle_space_shrinks: "as depth grows the free rotation space closes to almost nothing"
-  steady_free_rotation_deg: [0.5, 1.0]   # the minimum-resistance attitude once deep
+    axis: world x
+    note: rotate about x during the early insert stage to gain a looser region
+  angle_space_shrinks: as depth grows the free rotation space closes to almost nothing
+  steady_free_rotation_deg:
+  - 0.5
+  - 1.0
   at_bottom:
-    motion: "lateral y sweep"
+    motion: lateral y sweep
     side_gap_mm: 2.0
-    note: "the two side gaps unbalance easily; use that to widen the clearance"
-  verdict: "this sequence is what completes the assembly; position accuracy alone cannot"
-  stamp: "2026-11-05T16:48:00"
-
-# Grasp/insert geometry rules proven on the real cell (2026-11-05).  The source of truth is
-# the code (teaching_sequence.GRASP_CLEARANCE_M / GRASP_SNAP_VERTICAL); this block documents
-# the values so automation and future sessions see them without reading the source.
+    note: the two side gaps unbalance easily; use that to widen the clearance
+  verdict: this sequence is what completes the assembly; position accuracy alone cannot
+  stamp: '2026-11-05T16:48:00'
 teaching_grasp_geometry:
   surface_clearance_mm: 10.0
-  clearance_scope: ["grasp", "pre_insert", "insert", "straighten"]
-  clearance_axis: "tool x (retract)"
+  clearance_scope:
+  - grasp
+  - pre_insert
+  - insert
+  - straighten
+  clearance_axis: tool x (retract)
   snap_grasp_vertical: true
-  snap_note: "tool z axis forced to world -z, measured yaw kept; costs the measured 0.8 deg"
-  why: "RVS box attitude is ~0.8 deg off vertical and the gripper's motor-protection seat
-    then clips the workpiece groove; 1.5, 3 and 6 mm all failed on 2026-11-05"
-  stamp: "2026-11-05T21:34:00"
-
-# Last owner-verified slot pose (backup of runtime/slot_reference_verified.json).
-# runtime/ is not version-controlled, so this block is what survives a cleanup.
-# slot_pose_for_insert() reads the runtime file first, then this block, and only falls back
-# to the live R1 when neither exists.  The live R1 is NEVER the authority (2026-11-05: a
-# live-driven target sat 33 mm away from the verified pose and drove the arm into the slot).
+  snap_note: tool z axis forced to world -z, measured yaw kept; costs the measured
+    0.8 deg
+  why: RVS box attitude is ~0.8 deg off vertical and the gripper's motor-protection
+    seat then clips the workpiece groove; 1.5, 3 and 6 mm all failed on 2026-11-05
+  stamp: '2026-11-05T21:34:00'
 teaching_slot_reference:
-  slot: [1.219397, 0.138884, 0.444411]
-  slot_quat: [-0.001664, -0.000814, -0.004822, 0.999987]
-  source: "manual verified pose 2026-11-04, chain shifted 45.5 mm toward the robot in x"
-  stamp: "2026-11-07T19:40:00"
+  slot:
+  - 1.219397
+  - 0.138884
+  - 0.444411
+  slot_quat:
+  - -0.001664
+  - -0.000814
+  - -0.004822
+  - 0.999987
+  source: manual verified pose 2026-11-04, chain shifted 45.5 mm toward the robot
+    in x
+  stamp: '2026-11-07T19:40:00'
+workpiece_focus:
+- 0.85
+- 0.65
+- 0.13
+- 0.34
+workpiece_bbox:
+- -0.4358
+- -0.022
+- -0.24
+- 0.0188
+- 0.109
+- 0.225

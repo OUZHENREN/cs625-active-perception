@@ -76,8 +76,17 @@ class CameraWorker(QtCore.QThread):
                 latest["depth"] = msg
                 self._last["depth"] = time.time()
 
-            node.create_subscription(Image, COLOR_TOPIC, on_color, qos)
-            node.create_subscription(Image, DEPTH_TOPIC, on_depth, qos)
+            # launch_sensor_adapter:=false 时 /sensors/camera/* 不存在（归一化话题没发布），
+            # 所以同时订阅相机原始话题——否则面板永远是"等待图像"。
+            topics = {
+                "color": (COLOR_TOPIC, "/camera/color/image_raw"),
+                "depth": (DEPTH_TOPIC, "/camera/depth/image_raw"),
+            }
+            for kind, names in topics.items():
+                for topic in names:
+                    node.create_subscription(
+                        Image, topic,
+                        on_color if kind == "color" else on_depth, qos)
             self.status = "等待图像"
             reemit = 0.0
             while not self._stop and rclpy.ok():

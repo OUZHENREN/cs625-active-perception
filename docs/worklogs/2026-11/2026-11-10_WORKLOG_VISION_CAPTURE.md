@@ -1673,3 +1673,47 @@ plan-only：pre_grasp 上方150mm → gripper_init → grasp 回退10mm → grip
 4. 把打印的 workpiece_frame_offset 写进 common.yaml；
 5. plan-only 复核：[grasp target] 应显示"已按实测位姿平移 …"，且平移量在几十毫米内。
 ```
+
+## 45. 11-11 21:0x 效率模式面板与 RViz：三个问题定位 + 一处修复
+
+### 45.1 抓取点高度（所有者质疑的对账）
+
+```text
+桌面 z = −105 mm（实测），工件底面 = −104.8 mm
+grasp 点 z = −58.3 mm → 距桌面 46.5 mm，在桌面【上方】，不是下方
+          → 对应手柄下端；夹爪从这里进入，余量只有 46 mm，是风险点但可抓
+pre_grasp z = 91.7 mm → 比工件顶面(360 mm)低 268 mm
+```
+
+**更正**：我上一轮建议"抬到工件顶面+100 mm"是错的——那会让路径长 400+ mm，
+而"抓取点上方 150 mm"是已经验证过可执行的。真正该修的是**碰撞场景**与**接近段速度**，
+不是把接近点抬得更高。
+
+### 45.2 面板为什么没有图像/日志/阶段
+
+```text
+① 图像：panel_camera.py 订阅 /sensors/camera/color|depth/image_raw（归一化话题），
+   而 launch_sensor_adapter:=false 时这些话题不存在 → 永远"等待图像"。
+   已修：同时订阅 /camera/color/image_raw、/camera/depth/image_raw。
+② 日志：面板只显示"它自己启动的子进程"的输出；在终端里跑的流程它看不到。
+③ 阶段表：cs625_panel.py 的阶段表是【示教链的静态列表】，注释里写着
+   "第 2 步「插槽粗观测」已删除" —— 所以效率流程里的 observe:slot_coarse 根本不显示。
+```
+
+### 45.3 插槽粗观测其实在流程里
+
+```text
+load_efficient / full_efficient 观测点：
+  workpiece_coarse, workpiece_fine, tables, slot_coarse, slot_fine, slot_coarse(收尾)
+unload_efficient：slot_coarse, slot_fine, tables, workpiece_coarse
+⇒ 流程有，面板没显示（见 45.2 ③）。
+```
+
+### 45.4 新增两个效率模式 RViz
+
+```text
+scripts/rviz_efficiency.sh --planning | --cloud | --both
+  planning → src/cs625_bringup/config/cs625_moveit.rviz（碰撞与规划）
+  cloud    → src/cs625_bringup/config/environment_point_cloud.rviz（点云）
+面板顶栏新增 "RViz ▾" 按钮（碰撞与规划 / 点云 / 两个都开），与示教 RViz 分开。
+```

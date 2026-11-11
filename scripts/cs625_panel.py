@@ -616,6 +616,18 @@ class SafeTab(QtWidgets.QWidget):
         menu.addAction("状态", lambda: self._camera("status"))
         self.btn_camera.setMenu(menu)
         top.addWidget(self.btn_camera, 0)
+
+        # 效率模式的两个 RViz：一个看碰撞与规划，一个看点云（与示教模式的 RViz 分开）
+        self.btn_rviz = QtWidgets.QPushButton("RViz ▾")
+        self.btn_rviz.setFixedWidth(76)
+        self.btn_rviz.setToolTip("效率模式观察用 RViz：碰撞/规划 与 点云 分开打开")
+        rviz_menu = QtWidgets.QMenu(self.btn_rviz)
+        rviz_menu.addAction("碰撞与规划", lambda: self._rviz("planning"))
+        rviz_menu.addAction("点云", lambda: self._rviz("cloud"))
+        rviz_menu.addSeparator()
+        rviz_menu.addAction("两个都开", lambda: self._rviz("both"))
+        self.btn_rviz.setMenu(rviz_menu)
+        top.addWidget(self.btn_rviz, 0)
         root.addLayout(top)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Horizontal)
@@ -833,6 +845,20 @@ class SafeTab(QtWidgets.QWidget):
             lambda code, _status: self.log.append_line(
                 f"[夹爪] {command} 结束 code={code}", "ok" if code == 0 else "err"))
         process.start(sys.executable, [str(script), command])
+
+    def _rviz(self, mode: str) -> None:
+        """打开效率模式的 RViz（独立进程，不阻塞面板）。"""
+        command = ["bash", str(REPO / "scripts" / "rviz_efficiency.sh"), f"--{mode}"]
+        self.log.append_line("$ " + " ".join(command), "info")
+        process = QtCore.QProcess(self)
+        process.setWorkingDirectory(str(REPO))
+        process.setProcessChannelMode(QtCore.QProcess.MergedChannels)
+        process.readyReadStandardOutput.connect(
+            lambda: [self.log.append_line(line) for line in
+                     bytes(process.readAllStandardOutput()).decode("utf-8", "replace").splitlines()])
+        process.finished.connect(lambda code, _status: self.log.append_line(
+            f"[rviz] {mode} 结束 code={code}", "ok" if code == 0 else "err"))
+        process.start(command[0], command[1:])
 
     def _camera(self, action: str) -> None:
         """在后台跑 camera_mode.py（子进程），输出进日志，不阻塞界面。"""

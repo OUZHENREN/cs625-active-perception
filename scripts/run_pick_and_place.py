@@ -135,6 +135,8 @@ class Config:
     workpiece_measurement: str = "runtime/measurements/workpiece_latest.json"
     workpiece_frame_offset: list = field(default_factory=list)
     workpiece_reference: dict = field(default_factory=dict)
+    # CAD 包围盒（米，6 个数）：用来检查"抓取点是否落在实测工件里"，不依赖坐标系换算。
+    workpiece_bbox: list = field(default_factory=list)
     lift_total_mm: float = 155.0
     safe_clear_mm: float = 150.0
     velocity_scale: float = 0.02
@@ -203,6 +205,7 @@ def load_config(path: str) -> Config:
                                   or "runtime/measurements/workpiece_latest.json"),
         workpiece_frame_offset=list(raw.get("workpiece_frame_offset") or []),
         workpiece_reference=dict(raw.get("workpiece_reference") or {}),
+        workpiece_bbox=list(raw.get("workpiece_bbox") or []),
         lift_total_mm=float(raw.get("lift_total_mm", 155.0)),
         safe_clear_mm=float(raw.get("safe_clear_mm", 150.0)),
         velocity_scale=float(raw.get("velocity_scale", 0.02)),
@@ -1443,6 +1446,8 @@ class UnloadConfig:
     workpiece_measurement: str = "runtime/measurements/workpiece_latest.json"
     workpiece_frame_offset: list = field(default_factory=list)
     workpiece_reference: dict = field(default_factory=dict)
+    # CAD 包围盒（米，6 个数）：用来检查"抓取点是否落在实测工件里"，不依赖坐标系换算。
+    workpiece_bbox: list = field(default_factory=list)
     extract_steps_mm: float = 40.0
     lift_total_mm: float = 155.0
     velocity_scale: float = 0.02
@@ -1497,6 +1502,7 @@ def load_unload_config(path: str) -> UnloadConfig:
                                   or "runtime/measurements/workpiece_latest.json"),
         workpiece_frame_offset=list(raw.get("workpiece_frame_offset") or []),
         workpiece_reference=dict(raw.get("workpiece_reference") or {}),
+        workpiece_bbox=list(raw.get("workpiece_bbox") or []),
         extract_steps_mm=float(raw.get("extract_steps_mm", 40.0)),
         lift_total_mm=float(raw.get("lift_total_mm", 155.0)),
         velocity_scale=float(raw.get("velocity_scale", 0.02)),
@@ -2382,10 +2388,24 @@ def main() -> int:
         measured = measured_box_pose(
             str(getattr(cfg, "workpiece_measurement", "") or ""),
             getattr(cfg, "workpiece_frame_offset", None))
+        # 合理性检查：把抓取点投到实测工件坐标里，必须落在 CAD 包围盒外扩 60 mm 内。
+        # 这条不依赖任何"两套坐标系"的换算——直接用测量出来的工件位姿反查。
+        plausibility = "抓取点合理性未检查（没有可用测量）"
+        if measured is not None and getattr(cfg, "workpiece_bbox", None):
+            bbox_min = np.asarray(cfg.workpiece_bbox[:3], dtype=float)
+            bbox_max = np.asarray(cfg.workpiece_bbox[3:6], dtype=float)
+            local = np.linalg.inv(measured) @ np.append(np.asarray(grasp_xyz, float), 1.0)
+            inside = np.all(local[:3] >= bbox_min - 0.06) and np.all(local[:3] <= bbox_max + 0.06)
+            plausibility = (f"抓取点在工件局部坐标 {np.round(local[:3],3)}（"
+                            f"{'OK' if inside else 'OUTSIDE bbox+60mm'}）")
+            if not inside:
+                raise SystemExit(f"grasp target rejected: {plausibility}；"
+                                 f"请先标定 workpiece_frame_offset 或重新示教抓取点")
         grasp_xyz, pre_xyz, note = adjust_grasp_with_measurement(
             grasp_xyz, pre_xyz, measured,
             getattr(cfg, "workpiece_reference", None),
             calibrated=bool(getattr(cfg, "workpiece_frame_offset", None)))
+        note = f"{note}；{plausibility}"
         item = (grasp_xyz, grasp_quat, pre_xyz, note)
         grip_targets_cache["value"] = item
         node.get_logger().info(f"[grasp target] {note}; grasp={np.round(grasp_xyz,4)}")
