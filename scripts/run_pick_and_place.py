@@ -130,9 +130,6 @@ class Config:
     grip_width_mm: float
     # 夹持电流（A）。以前只在调用处用 getattr(..., 0.1) 兜底，配置里改了也不生效。
     grip_current: float = 0.1
-    # 闭合目标宽度（mm）：张开是 grip_width_mm（50），闭合到工件外形的这个宽度并顶住。
-    # 以前的流程只有"张开"，没有闭合——效率模式因此永远夹不住工件。
-    grip_close_mm: float = 12.0
     # 测量结果参与抓取点修正：measure_object 的输出路径 + 我们的 CAD 系到示教 box 系的固定偏移
     # （offset = [x,y,z,qx,qy,qz,qw]；未标定时为空，抓取仍用常数并在日志里说明）。
     workpiece_measurement: str = "runtime/measurements/workpiece_latest.json"
@@ -202,7 +199,6 @@ def load_config(path: str) -> Config:
         advance_axis=axis / np.linalg.norm(axis),
         grip_width_mm=float(raw.get("grip_width_mm", 52.2)),
         grip_current=float(raw.get("grip_current", 0.1)),
-        grip_close_mm=float(raw.get("grip_close_mm", 12.0)),
         workpiece_measurement=str(raw.get("workpiece_measurement")
                                   or "runtime/measurements/workpiece_latest.json"),
         workpiece_frame_offset=list(raw.get("workpiece_frame_offset") or []),
@@ -1443,8 +1439,6 @@ class UnloadConfig:
     slot_origin: np.ndarray
     grip_width_mm: float
     grip_current: float = 0.1
-    # 闭合目标宽度（mm）——见 Config.grip_close_mm 的说明。
-    grip_close_mm: float = 12.0
     # 测量结果参与抓取点修正（见 Config 里同名字段的说明）。
     workpiece_measurement: str = "runtime/measurements/workpiece_latest.json"
     workpiece_frame_offset: list = field(default_factory=list)
@@ -1499,7 +1493,6 @@ def load_unload_config(path: str) -> UnloadConfig:
         slot_origin=g("slot_origin"),
         grip_width_mm=float(raw.get("grip_width_mm", 52.2)),
         grip_current=float(raw.get("grip_current", 0.1)),
-        grip_close_mm=float(raw.get("grip_close_mm", 12.0)),
         workpiece_measurement=str(raw.get("workpiece_measurement")
                                   or "runtime/measurements/workpiece_latest.json"),
         workpiece_frame_offset=list(raw.get("workpiece_frame_offset") or []),
@@ -2249,9 +2242,8 @@ def phase_plan() -> list[tuple[str, str]]:
     return [
         ("pre_grasp", "joint"),
         ("gripper_init", "special"),
-        ("grip", "special"),
         ("grasp", "joint"),
-        ("close", "special"),
+        ("grip", "special"),
         ("lift", "cartesian"),
         ("transit", "joint"),
         ("staging", "joint"),
@@ -2554,18 +2546,17 @@ def main() -> int:
                     ready = node.ensure_gripper_initialized()
                     step(name, ready, "" if ready else "gripper init did not reach 5")
                 elif name == "grip":
-                    # 张开到最大开度，为进入抓取位做准备（不是夹住！）
+                    # 涨紧夹持：init 已把手指闭合归零，进入抓取位后再张开到 grip_width，
+                    # 靠"从内侧撑开"夹住手柄（示教模式的 [7] open to grip width 同义）。
                     gripped = node.grip_and_wait(cfg.grip_width_mm, cfg.grip_current)
-                    step(name, gripped,
-                         f"张开 {cfg.grip_width_mm} mm" if gripped
-                         else "grip did not settle")
-                elif name == "close":
-                    # 真正夹住：闭合到 grip_close_mm 并顶住工件（顶住时位置会停在中途）
-                    closed = node.grip_and_wait(cfg.grip_close_mm, cfg.grip_current)
                     position = node.gripper("status").get("position_mm")
-                    step(name, closed,
-                         f"闭合到 {cfg.grip_close_mm} mm（实测 {position} mm）"
-                         if closed else "close did not settle")
+                    held = position is not None and position >= min(40.0, cfg.grip_width_mm - 5.0)
+                    if gripped and not held:
+                        # 手指没到位 = 没撑到工件内侧，继续抬臂会把工件留在原地
+                        gripped = False
+                    step(name, gripped,
+                         f"张开涨紧 {cfg.grip_width_mm} mm（实测 {position} mm）"
+                         if gripped else f"grip did not hold (position {position} mm)")
                 else:  # release
                     # 释放 = 张开手指，必须由所有者当次授权（与 unload 的 d8 同一门槛）。
                     if not getattr(args, "allow_release", False):

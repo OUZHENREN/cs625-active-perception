@@ -1602,3 +1602,44 @@ plan-only：pre_grasp 上方150mm → grip(张开) → grasp 回退10mm → clos
 · workpiece_frame_offset：工件在示教位姿时采一次测量，算出 CAD 系→box 系的固定变换，写进配置；
 · 夹爪电流寄存器映射：需要厂商寄存器表，或夹爪运动时采一组原始报文对比（当前按"未采集"处理）。
 ```
+
+## 43. 11-11 20:0x 更正：夹爪是"涨紧夹持"，闭合 = init（不是新增 close 阶段）
+
+### 43.1 翻代码得到的答案（teaching_sequence.py 步骤 [6][7]）
+
+```text
+[6] init + enter grasp (jaws closed)     → gripper("init")：闭合手指并归零
+    move("grasp")                        → 闭着手指进入抓取位
+[7] open to grip width                   → gripper("grip")：张开到 ~50 mm
+grip_still_holding(min_open_mm=40):
+    "The expanding grasp holds the part with the jaws OPEN at ~50 mm;
+     if the position fell back near zero the part is no longer gripped."
+```
+
+**结论：这是"从内侧撑开"的涨紧夹持**——先 init 闭合归零、闭爪进入，再张开撑住手柄内侧。
+所以：
+- "闭合夹爪"这个动作就是 `gripper("init")`（已有的 `gripper_init` 阶段做的就是它）；
+- `grip`（张开到 grip_width）必须放在 **grasp 之后**，而不是之前；
+- 我上一轮新增的 `close`（闭合到 12 mm）方向完全错了，已删除。
+
+### 43.2 现在的顺序（与示教模式一致）
+
+```text
+baseline → pre_grasp(正上方150mm) → gripper_init(init 闭合归零) → grasp(回退10mm)
+        → grip(张开涨紧，并校验 position ≥ 40 mm 才算夹住) → lift
+```
+
+### 43.3 顺带修掉
+
+```text
+· grip 阶段新增"撑开校验"：张开后 position < 40 mm 视为没撑到工件，判失败（示教的同款判据）；
+· 删除 grip_close_mm 配置与 close 阶段，避免两套"闭合"语义并存；
+· 四个模式配置的阶段表统一改为 ...grasp, grip, lift...。
+```
+
+### 43.4 验证
+
+```text
+296 项测试通过；
+plan-only：pre_grasp 上方150mm → gripper_init → grasp 回退10mm → grip ——顺序正确
+```
