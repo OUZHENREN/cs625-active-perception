@@ -95,3 +95,7 @@ echo "[开工] 等待驱动栈起来（约 45 s）…"
 sleep 45
 python3 scripts/control_health.py --activate
 python3 scripts/preflight_motion.py
+
+# 夹爪不是 ROS 驱动（Windows COM9 + 可选常驻桥）；这里只确保"桥在或明确报告不在"，
+# 失败不中断开工——测量/观测不需要夹爪，示教/插取件才需要。
+bash scripts/gripper_link.sh --ensure || true

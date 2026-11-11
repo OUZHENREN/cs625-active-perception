@@ -87,7 +87,13 @@ if [ -n "${CAM_PID:-}" ]; then
   [ "$DRY" = "1" ] || { kill_tree "$CAM_PID"; sleep 4; kill -TERM "$CAM_PID" 2>/dev/null; }
 fi
 
-# 3) 相机查看器
+# 3) 夹爪常驻桥（Windows 侧，COM9）——不是 ROS 驱动
+if [ -x scripts/gripper_link.sh ]; then
+  echo "[收工] 处理夹爪常驻桥"
+  [ "$DRY" = "1" ] || bash scripts/gripper_link.sh --stop || true
+fi
+
+# 4) 相机查看器
 for VIEWER in $(pgrep -f "^python3 scripts/camera_view.py" 2>/dev/null); do
   echo "[收工] 停止相机查看器（PID $VIEWER）"
   stopped_any=1
