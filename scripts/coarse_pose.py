@@ -1070,9 +1070,9 @@ def main() -> int:
               f"{score:>8}{'' if result.get('pose_valid', True) else '?'}  [{corner}]")
         if "symmetry_check" in result:
             check = result["symmetry_check"]
-            print(f"{'':<14}{'':>4}  对称解: {check['chosen']} 扶手分 {check['handle_score']:.3f}"
-                  f"（余量 {check['handle_margin']:.3f}）{'有歧义' if check['ambiguous'] else ''}",
-                  flush=True)
+            mark = "有歧义" if not check.get("valid", True) else ""
+            print(f"{'':<14}{'':>4}  对称解: {check['chosen']} 特征分 {check['handle_score']:.3f}"
+                  f"（余量 {check['handle_margin']:.3f}）{mark}", flush=True)
         if "pose_base" in result:
             print(f"{'':<14}{'':>4}  base 中心(mm): {result['pose_base']['centre_mm']}", flush=True)
 
