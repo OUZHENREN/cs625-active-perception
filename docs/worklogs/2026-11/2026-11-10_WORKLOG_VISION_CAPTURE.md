@@ -1486,3 +1486,41 @@ workpiece_fine  ：取景检查 OK（8/8 角入画，深度 0.51–1.00）→ �
 插槽粗观测（slot_coarse）  ：覆盖率 0.965，平移 0.32 mm，旋转 0.027°，OK
 ⇒ 效率模式的观测环节已经具备两个目标的可测量接口
 ```
+
+## 40. 11-11 16:3x 效率模式接入：观测检查按模式覆盖（不碰示教/安全模式）
+
+### 40.1 机制
+
+```text
+run_pick_and_place.py：
+  Config 新增 observe_checks: {waypoint: "shell 命令"}
+  观测位检查处改为：cfg.observe_checks[waypoint] 优先，否则用 observe[waypoint].check
+  ⇒ 位姿仍来自 common.yaml 的 observe，只替换"用什么算子检查/测量"
+  ⇒ 示教/安全模式文件里没有 observe_checks，继续用原检查，完全不受影响
+```
+
+### 40.2 已配置（三个 efficiency 配置文件）
+
+```yaml
+observe_checks:
+  workpiece_fine: "python3 scripts/measure_object.py --preset workpiece --observe-pose workpiece_fine --groups 3 --out runtime/measurements/workpiece_latest.json"
+  slot_coarse:    "python3 scripts/measure_object.py --preset slot --observe-pose slot_coarse --groups 3 --out runtime/measurements/slot_latest.json"
+```
+
+### 40.3 验证
+
+```text
+run_task.py --scope load --mode efficient --world real --dry-run
+  → 配置合并成功，effective 里 observe_checks 生效（已用 load_config 读回确认）
+  → 计划表正常列出 13 个阶段 + 观测位
+  → 但 dry-run 的环境门给出 REJECT（模型过期），提示"先重测环境模型"
+```
+
+### 40.4 结论与下一步
+
+```text
+· "观测检查换成新测量管线"这一步已经落地，且只影响效率模式；
+· 剩下的最后一块是【环境模型门】：它仍然要求 model_environment.py 的新鲜模型。
+  用新管线替代后，这个门应该改为"工件/插槽测量是否 OK"，而不是"模型是否新鲜"。
+· 这一步会改变真实流程的行为，建议先与所有者确认再动。
+```

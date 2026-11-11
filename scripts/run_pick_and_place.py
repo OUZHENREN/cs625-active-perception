@@ -157,6 +157,10 @@ class Config:
     gripper_span_max_mm: float = 246.57
     action: str = "/arm_controller/follow_joint_trajectory"
     observe: dict = field(default_factory=dict)
+    # 观测位检查命令的按模式覆盖：{waypoint: "shell 命令"}。
+    # 位姿仍由 common.yaml 的 observe 提供，这里只换"用什么算子检查/测量"，
+    # 这样效率模式可以换成本仓库的测量管线，而示教/安全模式继续用原检查。
+    observe_checks: dict = field(default_factory=dict)
     process_images: bool = True
     verify: bool = True
     verify_pos_mm: float = 3.0
@@ -209,6 +213,7 @@ def load_config(path: str) -> Config:
         gripper_span_max_mm=float(raw.get("gripper_span_max_mm", 246.57)),
         action=str(raw.get("action", "/arm_controller/follow_joint_trajectory")),
         observe=dict(raw.get("observe", {}) or {}),
+        observe_checks=dict(raw.get("observe_checks", {}) or {}),
         process_images=bool(raw.get("process_images", True)),
         verify=bool(verification.get("enabled", True)),
         verify_pos_mm=float(verification.get("pos_mm", 3.0)),
@@ -1443,6 +1448,10 @@ class UnloadConfig:
     world: str = "real"
     action: str = "/arm_controller/follow_joint_trajectory"
     observe: dict = field(default_factory=dict)
+    # 观测位检查命令的按模式覆盖：{waypoint: "shell 命令"}。
+    # 位姿仍由 common.yaml 的 observe 提供，这里只换"用什么算子检查/测量"，
+    # 这样效率模式可以换成本仓库的测量管线，而示教/安全模式继续用原检查。
+    observe_checks: dict = field(default_factory=dict)
     phases: list[str] = field(default_factory=list)
     process_images: bool = True
 
@@ -1484,6 +1493,7 @@ def load_unload_config(path: str) -> UnloadConfig:
         world=str(raw.get("world", "real")),
         action=str(raw.get("action", "/arm_controller/follow_joint_trajectory")),
         observe=dict(raw.get("observe", {}) or {}),
+        observe_checks=dict(raw.get("observe_checks", {}) or {}),
         phases=list(raw.get("phases", []) or []),
         process_images=bool(raw.get("process_images", True)),
     )
@@ -1553,7 +1563,8 @@ def run_observe_list(node, cfg: UnloadConfig, entries: list[tuple[str, str]],
         time.sleep(1.0)
         if cfg.process_images:
             capture_process_image(f"observe:{waypoint}", "enter")
-        check = (pose.get("check") or "").strip()
+        check = ((cfg.observe_checks or {}).get(waypoint)
+                 or pose.get("check") or "").strip()
         if check and cfg.world == "sim":
             # 仿真里这一步只走流程，不真正执行检查。
             #
@@ -2495,7 +2506,8 @@ def main() -> int:
                 time.sleep(0.2)
                 if cfg.process_images:
                     capture_process_image(f"observe:{waypoint}", "enter")
-                check = (pose.get("check") or "").strip()
+                check = ((cfg.observe_checks or {}).get(waypoint)
+                 or pose.get("check") or "").strip()
                 if check and cfg.world == "sim":
                     # 仿真里只走流程，不真正跑检查。理由同 observe_all：
                     # Gazebo 渲染无贴图 → YOLO 必然 "no mask"；而仿真的规划用的是
