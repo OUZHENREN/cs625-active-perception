@@ -1642,6 +1642,10 @@ def run_unload(node, args, cfg: UnloadConfig) -> list[dict]:
         record.append({"phase": name, "ok": ok, "detail": detail,
                        "tcp": current_tcp().round(4).tolist(),
                        "plan_only": plan_only})
+        publish_task_log(node, f"[{name}] {'OK' if ok else 'FAIL'} {detail}")
+        # 面板的"当前流程/当前阶段"靠这个实时更新（以前只在开头结尾发一次）
+        publish_task_state(node, {"flow": getattr(cfg, "scope", "") or args.flow,
+                                  "phase": name, "ok": ok, "detail": detail})
         node.get_logger().info(f"[{name}] ok={ok} {detail}")
         Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
         if not ok:
@@ -2010,6 +2014,16 @@ def run_cartesian_profile(node, name: str, xyz, quat, profile: SpeedProfile,
     return False
 
 
+def publish_task_log(node, text: str) -> None:
+    """把阶段日志发到 /task_log（面板订阅它，就能看到"终端里跑的流程"的日志）。"""
+    try:
+        if getattr(node, "task_log_pub", None) is None:
+            node.task_log_pub = node.create_publisher(String, "/task_log", 10)
+        node.task_log_pub.publish(String(data=str(text)[:1000]))
+    except Exception:  # noqa: BLE001 - 日志推送不能影响流程
+        pass
+
+
 def publish_task_state(node, state: dict) -> None:
     """Publish the live flow/phase state for the Qt and RViz panels.
 
@@ -2376,6 +2390,38 @@ def main() -> int:
         """Plan-only works on the simulated state; a real run on the measured one."""
         return node.current_tcp(plan_only)
 
+    collision_applied = {"done": False}
+
+    def ensure_workpiece_collision() -> bool:
+        """把【实测】工件位姿发布到 MoveIt 规划场景。
+
+        为什么必须做：run_pick_and_place 从不发布碰撞场景，MoveIt 在"空世界"里规划，
+        路径可以贴着工件甚至穿过它（2026-11-11 真机差点撞上工件就是这么来的）。
+        apply_environment_collision.py 的 --workpiece-xyz/quat 正好吃【CAD 系】位姿，
+        和测量管线输出一致。
+        """
+        if collision_applied["done"]:
+            return True
+        measured = measured_box_pose(
+            str(getattr(cfg, "workpiece_measurement", "") or ""), None)
+        if measured is None:
+            node.get_logger().warn("[collision] 没有测量结果，跳过工件碰撞体发布")
+            return False
+        from scipy.spatial.transform import Rotation as _R
+        quat = _R.from_matrix(measured[:3, :3].copy()).as_quat()
+        xyz = measured[:3, 3]
+        code, text = run([sys.executable, "-u",
+                          str(REPO / "scripts" / "apply_environment_collision.py"),
+                          "--workpiece-xyz", *[f"{v:.4f}" for v in xyz],
+                          "--workpiece-quat", *[f"{v:.5f}" for v in quat]],
+                         timeout=180.0)
+        tail = (text or "").strip().splitlines()
+        node.get_logger().info(
+            f"[collision] 工件碰撞体 {'已发布' if code == 0 else '发布失败'}："
+            f"{tail[-1] if tail else 'no output'}")
+        collision_applied["done"] = code == 0
+        return code == 0
+
     grip_targets_cache: dict = {}
 
     def grip_targets() -> tuple[np.ndarray, tuple, np.ndarray, str]:
@@ -2434,6 +2480,10 @@ def main() -> int:
         record.append({"phase": name, "ok": ok, "detail": detail,
                        "tcp": current_tcp().round(4).tolist(),
                        "plan_only": plan_only})
+        publish_task_log(node, f"[{name}] {'OK' if ok else 'FAIL'} {detail}")
+        # 面板的"当前流程/当前阶段"靠这个实时更新（以前只在开头结尾发一次）
+        publish_task_state(node, {"flow": getattr(cfg, "scope", "") or args.flow,
+                                  "phase": name, "ok": ok, "detail": detail})
         # 仿真：阶段验收换成工件判据（工件跟着走 / 进插槽）。放在这里而不是各个
         # 阶段分支里，是为了让搬运链上每个阶段都得到同一条判据，而真机路径
         # （cfg.world != "sim"）一行都不执行。verification.enabled=false 时两边
@@ -2596,6 +2646,8 @@ def main() -> int:
                 if not record[-1]["ok"]:
                     break
             elif name == "pre_grasp":
+                if cfg.world == "real" and not plan_only:
+                    ensure_workpiece_collision()
                 # 抓取点先算出来：压垂直 + 沿工具 x 回退（与示教流程一致），
                 # 预抓取点取"正上方 150 mm"，而不是配置里那个横向 120 mm 的旧位姿。
                 grasp_xyz, grasp_quat, pre, note = grip_targets()
@@ -2603,7 +2655,7 @@ def main() -> int:
                                       cfg.time_scale, 6)
                 here = current_tcp()
                 distance = float(np.linalg.norm(pre - here)) if here is not None else 1.0
-                velocity = proximity_velocity(distance, profile.velocity)
+                velocity = proximity_velocity(distance, min(profile.velocity, 0.02))
                 goal = node.ik(pre, grasp_quat, seed=start_positions())
                 points = (node.plan_joint(goal, velocity, start_positions())
                           if goal else None)
@@ -2618,7 +2670,7 @@ def main() -> int:
                                       cfg.time_scale, 4)
                 here = current_tcp()
                 distance = float(np.linalg.norm(grasp_xyz - here)) if here is not None else 1.0
-                velocity = proximity_velocity(distance, profile.velocity)
+                velocity = proximity_velocity(distance, min(profile.velocity, 0.01))
                 goal = node.ik(grasp_xyz, grasp_quat, seed=start_positions())
                 points = (node.plan_joint(goal, velocity, start_positions())
                           if goal else None)

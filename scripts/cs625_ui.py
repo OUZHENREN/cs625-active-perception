@@ -999,6 +999,8 @@ class Dashboard(QtWidgets.QMainWindow):
             WrenchStamped, "/force_torque_sensor_broadcaster/wrench",
             self._on_wrench, 10)
         self._ros.create_subscription(RosString, "/task_state", self._on_task_state, 10)
+        # 阶段日志：run_task 在终端里跑时，面板也能看到它在做什么
+        self._ros.create_subscription(RosString, "/task_log", self._on_task_log, 10)
         self._ros.create_subscription(JointState, "/joint_states", self._on_joint_state, 10)
         self._ros.create_subscription(
             JointTrajectoryControllerState,
@@ -1160,6 +1162,15 @@ class Dashboard(QtWidgets.QMainWindow):
         return box
 
     # ---------------------------------------------------------- monitor card
+    def _on_task_log(self, msg) -> None:  # noqa: ANN001 - ROS callback
+        """把 /task_log 的一行追加到任务日志视图（终端里跑的流程也能看到）。"""
+        try:
+            log = getattr(self, "log", None)
+            if log is not None:
+                log.appendPlainText(f"{time.strftime('%H:%M:%S')} {msg.data}")
+        except Exception:  # noqa: BLE001 - UI 日志不能影响 ROS 回调
+            pass
+
     def _on_task_state(self, msg) -> None:  # noqa: ANN001 - ROS callback
         """Live flow/phase feed from scripts/run_pick_and_place.py."""
         try:
