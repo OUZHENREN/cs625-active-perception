@@ -1643,3 +1643,33 @@ baseline → pre_grasp(正上方150mm) → gripper_init(init 闭合归零) → g
 296 项测试通过；
 plan-only：pre_grasp 上方150mm → gripper_init → grasp 回退10mm → grip ——顺序正确
 ```
+
+## 44. 11-11 20:1x 标定工具：CAD 系 → 示教 box 系
+
+### 44.1 `scripts/calibrate_workpiece_frame.py`
+
+```text
+输入：measure_object 的输出（T_base_object，CAD 系）+ config 的 workpiece_reference（box 系）
+输出：workpiece_frame_offset = inv(T_measured) @ T_box，打印成可直接粘贴的 YAML
+安全：必须显式 --confirm（确认工件此刻就在示教位姿），否则拒绝计算；不自动写配置
+```
+
+### 44.2 现在跑出来的数（说明工件被移动过，**不能**当标定值用）
+
+```text
+测量位姿 (CAD 系): 0.6396, 0.6147, 0.1208
+参考位姿 (box 系): 0.5029, 0.6351, 0.1254
+两者距离 138.3 mm，姿态差 19.90°
+→ 这 138 mm / 20° 是【工件被转过】造成的，不是坐标系固定变换。
+   标定必须先把工件摆回示教位姿，再跑 measure_object + 本工具。
+```
+
+### 44.3 使用顺序（等真机可用）
+
+```text
+1. 工件摆回示教位姿（与 workpiece_reference 描述一致）；
+2. 在 workpiece_fine 观测位跑 measure_object --preset workpiece --groups 3；
+3. 确认工件确实在示教位姿后，跑 calibrate_workpiece_frame.py --confirm；
+4. 把打印的 workpiece_frame_offset 写进 common.yaml；
+5. plan-only 复核：[grasp target] 应显示"已按实测位姿平移 …"，且平移量在几十毫米内。
+```
