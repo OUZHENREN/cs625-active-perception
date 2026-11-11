@@ -60,6 +60,17 @@
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "⑧ 收工 · 关闭所有驱动",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; bash scripts/stop_all_drivers.sh; echo '[收工] 完成：机械臂驱动 / 相机 / 查看器 已全部关闭'",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "clear": true
+      }
     }
   ]
 }
