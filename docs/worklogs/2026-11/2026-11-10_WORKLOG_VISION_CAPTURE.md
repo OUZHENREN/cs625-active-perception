@@ -1270,3 +1270,54 @@ workpiece_fine  ：取景检查 OK（8/8 角入画，深度 0.51–1.00）→ �
   确认 0.73 mm / 0.87° 可复现；
 · 插槽：先把 slot_coarse 调到 8/8（后退 5–10 cm 或微调角度），再采一组做首测。
 ```
+
+## 35. 11-11 14:0x 开工任务起不来：陈旧驱动栈 + 孤儿进程占端口
+
+### 35.1 现象
+
+```text
+任务① 输出：[开工] 驱动栈已在运行
+            health: {'sockets': False, 'controller': True, 'joint_states': True}
+            FAIL: reverse-control ports (50001/50003/50004) are not ESTAB
+```
+
+### 35.2 根因（两层）
+
+```text
+① 昨天关机后驱动栈的 launch 进程还在（11-10 11:36 启动），任务①只判断
+   "有没有 ros2 launch 进程" → 认为"已在运行" → 跳过启动；
+   但它的控制连接早已断开 → health sockets=False → FAIL。
+② 我停掉 launch 后，它的驱动子进程（eli_components_loader / eli_ros2_control_node /
+   controller_stopper）变成孤儿继续跑并占着端口；新驱动起来立刻报
+   `bind: Address already in use` → ros2_control 节点 6 号信号崩溃 →
+   连 arm_controller 都起不来（spawner 一直 "Failed to acquire lock"）。
+```
+
+### 35.3 修复：`scripts/start_real_stack.sh`
+
+```text
+· 就绪判据 = 进程存在 AND control_health 的 sockets 为 True（复用同一套判据，不另写端口逻辑）
+· 进程在但 sockets 断 → 判定陈旧 → 用 setsid 记下的进程组整组 SIGINT/TERM，
+  再用 kill_tree() 递归清理残留子树（不用 pkill/通配，避免误伤自己的 shell）
+· 启动前先 ping 机器人；启动后等待 45 s → control_health --activate → preflight
+· --check-only 只诊断不启动
+```
+
+任务① 从 1005 字符的内联命令改成一行调用该脚本。
+
+### 35.4 修复后实测
+
+```text
+首次（陈旧）：识别"进程在但控制端口未建立"→ 整组停 → 重启 → health 全 True、PREFLIGHT_OK
+再次（幂等）：[开工] 驱动栈已在运行，控制连接正常（PID 448227）→ 跳过启动 → health 全 True
+当前状态：单实例 launch（448227）+ 其子进程，到机器人 30001 的连接正常，
+          arm_controller active，PREFLIGHT_OK（Σ|effort| ≈ 11.1）
+```
+
+### 35.5 教训
+
+```text
+· "进程活着"不等于"连接活着"：机器人关机后驱动进程会赖着不走，必须用连接状态判就绪；
+· 杀 launch 不等于杀干净：setsid 的进程组 + 递归子树才可靠；
+· 判据要单点维护：脚本里复用 control_health，而不是自己数端口。
+```
