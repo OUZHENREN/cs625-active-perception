@@ -130,6 +130,14 @@ class Config:
     grip_width_mm: float
     # 夹持电流（A）。以前只在调用处用 getattr(..., 0.1) 兜底，配置里改了也不生效。
     grip_current: float = 0.1
+    # 闭合目标宽度（mm）：张开是 grip_width_mm（50），闭合到工件外形的这个宽度并顶住。
+    # 以前的流程只有"张开"，没有闭合——效率模式因此永远夹不住工件。
+    grip_close_mm: float = 12.0
+    # 测量结果参与抓取点修正：measure_object 的输出路径 + 我们的 CAD 系到示教 box 系的固定偏移
+    # （offset = [x,y,z,qx,qy,qz,qw]；未标定时为空，抓取仍用常数并在日志里说明）。
+    workpiece_measurement: str = "runtime/measurements/workpiece_latest.json"
+    workpiece_frame_offset: list = field(default_factory=list)
+    workpiece_reference: dict = field(default_factory=dict)
     lift_total_mm: float = 155.0
     safe_clear_mm: float = 150.0
     velocity_scale: float = 0.02
@@ -194,6 +202,11 @@ def load_config(path: str) -> Config:
         advance_axis=axis / np.linalg.norm(axis),
         grip_width_mm=float(raw.get("grip_width_mm", 52.2)),
         grip_current=float(raw.get("grip_current", 0.1)),
+        grip_close_mm=float(raw.get("grip_close_mm", 12.0)),
+        workpiece_measurement=str(raw.get("workpiece_measurement")
+                                  or "runtime/measurements/workpiece_latest.json"),
+        workpiece_frame_offset=list(raw.get("workpiece_frame_offset") or []),
+        workpiece_reference=dict(raw.get("workpiece_reference") or {}),
         lift_total_mm=float(raw.get("lift_total_mm", 155.0)),
         safe_clear_mm=float(raw.get("safe_clear_mm", 150.0)),
         velocity_scale=float(raw.get("velocity_scale", 0.02)),
@@ -521,9 +534,12 @@ class Runner(Node):
         # took whatever was in the buffer, which can be the pre-move view.  The
         # adapter publishes with sensor-data QoS, so this subscription must too.
         self._camera_stamp_ns: int = 0
-        self.create_subscription(
-            Image, "/sensors/camera/color/image", self._on_camera_frame,
-            qos_profile_sensor_data)
+        # 注意：launch 里 launch_sensor_adapter:=false 时"归一化话题"根本不存在，
+        # 这时必须退回相机原始话题，否则这里的帧时间戳永远不更新，
+        # 每个观测位都会报 "no camera frame newer than the motion within 10 s"。
+        for topic in ("/sensors/camera/color/image", "/camera/color/image_raw"):
+            self.create_subscription(Image, topic, self._on_camera_frame,
+                                     qos_profile_sensor_data)
         self._tf_buffer = tf2_ros.Buffer()
         self._tf_listener = tf2_ros.TransformListener(self._tf_buffer, self)
         self._ik = self.create_client(GetPositionIK, "/compute_ik")
@@ -1427,6 +1443,12 @@ class UnloadConfig:
     slot_origin: np.ndarray
     grip_width_mm: float
     grip_current: float = 0.1
+    # 闭合目标宽度（mm）——见 Config.grip_close_mm 的说明。
+    grip_close_mm: float = 12.0
+    # 测量结果参与抓取点修正（见 Config 里同名字段的说明）。
+    workpiece_measurement: str = "runtime/measurements/workpiece_latest.json"
+    workpiece_frame_offset: list = field(default_factory=list)
+    workpiece_reference: dict = field(default_factory=dict)
     extract_steps_mm: float = 40.0
     lift_total_mm: float = 155.0
     velocity_scale: float = 0.02
@@ -1477,6 +1499,11 @@ def load_unload_config(path: str) -> UnloadConfig:
         slot_origin=g("slot_origin"),
         grip_width_mm=float(raw.get("grip_width_mm", 52.2)),
         grip_current=float(raw.get("grip_current", 0.1)),
+        grip_close_mm=float(raw.get("grip_close_mm", 12.0)),
+        workpiece_measurement=str(raw.get("workpiece_measurement")
+                                  or "runtime/measurements/workpiece_latest.json"),
+        workpiece_frame_offset=list(raw.get("workpiece_frame_offset") or []),
+        workpiece_reference=dict(raw.get("workpiece_reference") or {}),
         extract_steps_mm=float(raw.get("extract_steps_mm", 40.0)),
         lift_total_mm=float(raw.get("lift_total_mm", 155.0)),
         velocity_scale=float(raw.get("velocity_scale", 0.02)),
@@ -2126,12 +2153,105 @@ def resolve_phase_list(cfg) -> list[tuple[str, str]]:
     return resolved
 
 
+# --- 抓取接近的几何细节（与示教流程 teaching_sequence.py 保持一致）-------------
+APPROACH_HEIGHT_M = 0.150      # 从抓取点正上方 150 mm 垂直接近
+GRASP_CLEARANCE_M = 0.010      # 抓取点沿工具 x 回退 10 mm（避开夹爪电机保护座）
+GRASP_SNAP_VERTICAL = True     # 姿态压垂直：工具 z 指向世界 -z，保留实测 yaw
+GRASP_SLOW_RADIUS_M = 0.15     # 距目标这么近时按距离降速
+GRASP_SLOW_VELOCITY = 0.01     # 最近处的速度标度
+
+
+def snap_vertical_quat(quat) -> tuple[float, float, float, float]:
+    """把姿态压成严格垂直（工具 z → 世界 -z），保留 yaw。"""
+    from scipy.spatial.transform import Rotation as _R
+    matrix = _R.from_quat(quat).as_matrix()
+    jaw = matrix @ np.array([1.0, 0.0, 0.0])
+    yaw = float(np.arctan2(jaw[1], jaw[0]))
+    snapped = (_R.from_euler("z", yaw) * _R.from_euler("x", 180.0, degrees=True)).as_quat()
+    return tuple(float(v) for v in snapped)
+
+
+def grasp_pose_with_clearance(xyz, quat) -> tuple[np.ndarray, tuple]:
+    """抓取点：压垂直后沿工具 x 回退固定距离（避免电机保护座蹭工件）。"""
+    from scipy.spatial.transform import Rotation as _R
+    orientation = snap_vertical_quat(quat) if GRASP_SNAP_VERTICAL else quat
+    rotation = _R.from_quat(orientation).as_matrix()
+    back = rotation @ np.array([GRASP_CLEARANCE_M, 0.0, 0.0])
+    return np.asarray(xyz, dtype=float) - back, orientation
+
+
+def approach_pose(grasp_xyz) -> np.ndarray:
+    """预抓取点：抓取点正上方 APPROACH_HEIGHT_M（垂直接近，而不是横向 120 mm）。"""
+    point = np.asarray(grasp_xyz, dtype=float).copy()
+    point[2] += APPROACH_HEIGHT_M
+    return point
+
+
+def proximity_velocity(distance_m: float, base_velocity: float) -> float:
+    """按距离降速：越靠近目标越慢，最少降到 GRASP_SLOW_VELOCITY。"""
+    if distance_m >= GRASP_SLOW_RADIUS_M:
+        return base_velocity
+    ratio = max(0.0, distance_m) / GRASP_SLOW_RADIUS_M
+    return max(GRASP_SLOW_VELOCITY, base_velocity * (0.3 + 0.7 * ratio))
+
+
+# --- 用实测工件位姿修正抓取点 -------------------------------------------------
+# 本仓库的测量管线输出 T_base_object（CAD 系）；示教常数用的是另一套"box 系"。
+# 两者之间差一个固定变换，用 config 的 workpiece_frame_offset 标定一次即可：
+#   box_pose = T_base_object @ offset
+# 没标定时保持原行为（用常数），并在日志里说明"测量结果未参与抓取计算"。
+def measured_box_pose(measurement_path: str, offset_cfg) -> np.ndarray | None:
+    from scipy.spatial.transform import Rotation as _R
+    path = Path(measurement_path)
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        group = (data.get("per_group") or [{}])[0]
+        place = group.get("pose_base") or {}
+        translation = place.get("translation")
+        quaternion = place.get("quaternion")
+        if translation is None or quaternion is None:
+            return None
+    except (OSError, ValueError, IndexError):
+        return None
+    base = np.eye(4)
+    base[:3, :3] = _R.from_quat(quaternion).as_matrix()
+    base[:3, 3] = translation
+    if not offset_cfg:
+        return base
+    offset = np.eye(4)
+    offset[:3, :3] = _R.from_quat(list(offset_cfg)[3:7]).as_matrix()
+    offset[:3, 3] = list(offset_cfg)[:3]
+    return base @ offset
+
+
+def adjust_grasp_with_measurement(grasp_xyz, pre_xyz, measured: np.ndarray | None,
+                                  reference, calibrated: bool = False
+                                  ) -> tuple[np.ndarray, np.ndarray, str]:
+    """按"实测工件 box 位姿 vs 参考 box 位姿"的差，把抓取点/预抓取点平移过去。
+
+    前提：workpiece_frame_offset 已标定 —— 测量输出是【CAD 系】，示教常数是【box 系】，
+    两者差一个固定变换。没标定时若照样平移，会按错误的坐标系差把抓取点推偏
+    （实测这会把抓取点推 137 mm），所以这里必须显式要求 calibrated。
+    """
+    if not calibrated:
+        return grasp_xyz, pre_xyz, "测量未参与（workpiece_frame_offset 未标定）"
+    if measured is None or reference is None:
+        return grasp_xyz, pre_xyz, "测量未参与（缺测量文件或参考位姿）"
+    reference_xyz = np.asarray(reference.get("xyz"), dtype=float)
+    delta = measured[:3, 3] - reference_xyz
+    return (np.asarray(grasp_xyz, float) + delta, np.asarray(pre_xyz, float) + delta,
+            f"已按实测位姿平移 {np.round(delta, 4).tolist()} m")
+
+
 def phase_plan() -> list[tuple[str, str]]:
     return [
         ("pre_grasp", "joint"),
         ("gripper_init", "special"),
         ("grip", "special"),
         ("grasp", "joint"),
+        ("close", "special"),
         ("lift", "cartesian"),
         ("transit", "joint"),
         ("staging", "joint"),
@@ -2257,6 +2377,27 @@ def main() -> int:
     def current_tcp() -> np.ndarray:
         """Plan-only works on the simulated state; a real run on the measured one."""
         return node.current_tcp(plan_only)
+
+    grip_targets_cache: dict = {}
+
+    def grip_targets() -> tuple[np.ndarray, tuple, np.ndarray, str]:
+        """抓取点 / 预抓取点（含实测位姿修正）——整轮只算一次，两个阶段共用。"""
+        if grip_targets_cache:
+            item = grip_targets_cache["value"]
+            return item
+        grasp_xyz, grasp_quat = grasp_pose_with_clearance(cfg.grasp, cfg.grasp_q)
+        pre_xyz = approach_pose(grasp_xyz)
+        measured = measured_box_pose(
+            str(getattr(cfg, "workpiece_measurement", "") or ""),
+            getattr(cfg, "workpiece_frame_offset", None))
+        grasp_xyz, pre_xyz, note = adjust_grasp_with_measurement(
+            grasp_xyz, pre_xyz, measured,
+            getattr(cfg, "workpiece_reference", None),
+            calibrated=bool(getattr(cfg, "workpiece_frame_offset", None)))
+        item = (grasp_xyz, grasp_quat, pre_xyz, note)
+        grip_targets_cache["value"] = item
+        node.get_logger().info(f"[grasp target] {note}; grasp={np.round(grasp_xyz,4)}")
+        return item
 
     def record_verdict(verdict: dict) -> None:
         """把一条仿真判据结果写进刚结束的阶段记录（verified / verify_detail / 数字）。"""
@@ -2413,10 +2554,18 @@ def main() -> int:
                     ready = node.ensure_gripper_initialized()
                     step(name, ready, "" if ready else "gripper init did not reach 5")
                 elif name == "grip":
-                    # 同理：命令被接受 ≠ 手指到位。等它真的停在请求开度（或顶住工件）。
+                    # 张开到最大开度，为进入抓取位做准备（不是夹住！）
                     gripped = node.grip_and_wait(cfg.grip_width_mm, cfg.grip_current)
                     step(name, gripped,
-                         f"{cfg.grip_width_mm} mm" if gripped else "grip did not settle")
+                         f"张开 {cfg.grip_width_mm} mm" if gripped
+                         else "grip did not settle")
+                elif name == "close":
+                    # 真正夹住：闭合到 grip_close_mm 并顶住工件（顶住时位置会停在中途）
+                    closed = node.grip_and_wait(cfg.grip_close_mm, cfg.grip_current)
+                    position = node.gripper("status").get("position_mm")
+                    step(name, closed,
+                         f"闭合到 {cfg.grip_close_mm} mm（实测 {position} mm）"
+                         if closed else "close did not settle")
                 else:  # release
                     # 释放 = 张开手指，必须由所有者当次授权（与 unload 的 d8 同一门槛）。
                     if not getattr(args, "allow_release", False):
@@ -2436,29 +2585,37 @@ def main() -> int:
                 if not record[-1]["ok"]:
                     break
             elif name == "pre_grasp":
-                # Was hard-coded to 6 chunks at the global velocity, so the phase
-                # profile in the config file never applied to the longest move.
+                # 抓取点先算出来：压垂直 + 沿工具 x 回退（与示教流程一致），
+                # 预抓取点取"正上方 150 mm"，而不是配置里那个横向 120 mm 的旧位姿。
+                grasp_xyz, grasp_quat, pre, note = grip_targets()
                 profile = profile_for(cfg.speeds, name, cfg.velocity_scale,
                                       cfg.time_scale, 6)
-                goal = node.ik(cfg.pre_grasp, cfg.grasp_q, seed=start_positions())
-                points = (node.plan_joint(goal, profile.velocity, start_positions())
+                here = current_tcp()
+                distance = float(np.linalg.norm(pre - here)) if here is not None else 1.0
+                velocity = proximity_velocity(distance, profile.velocity)
+                goal = node.ik(pre, grasp_quat, seed=start_positions())
+                points = (node.plan_joint(goal, velocity, start_positions())
                           if goal else None)
                 ok = deliver(points, profile)
-                step(name, ok, f"v={profile.velocity} ts={profile.time_scale}"
-                               f" {detail(goal, points)}")
+                step(name, ok, f"v={velocity:.3f} ts={profile.time_scale}"
+                               f" 上方{APPROACH_HEIGHT_M*1000:.0f}mm {detail(goal, points)}")
                 if ok:
-                    ok = verify(name, cfg.pre_grasp, cfg.grasp_q)
+                    ok = verify(name, pre, grasp_quat)
             elif name == "grasp":
+                grasp_xyz, grasp_quat, _pre, _note = grip_targets()
                 profile = profile_for(cfg.speeds, name, cfg.assembly_velocity_scale,
                                       cfg.time_scale, 4)
-                goal = node.ik(cfg.grasp, cfg.grasp_q, seed=start_positions())
-                points = (node.plan_joint(goal, profile.velocity, start_positions())
+                here = current_tcp()
+                distance = float(np.linalg.norm(grasp_xyz - here)) if here is not None else 1.0
+                velocity = proximity_velocity(distance, profile.velocity)
+                goal = node.ik(grasp_xyz, grasp_quat, seed=start_positions())
+                points = (node.plan_joint(goal, velocity, start_positions())
                           if goal else None)
                 ok = deliver(points, profile)
-                step(name, ok, f"v={profile.velocity} ts={profile.time_scale}"
-                               f" {detail(goal, points)}")
+                step(name, ok, f"v={velocity:.3f} ts={profile.time_scale}"
+                               f" 回退{GRASP_CLEARANCE_M*1000:.0f}mm {detail(goal, points)}")
                 if ok:
-                    ok = verify(name, cfg.grasp, cfg.grasp_q)
+                    ok = verify(name, grasp_xyz, grasp_quat)
                 if ok and not plan_only:
                     # 抓取点实测超差时绝不继续"夹住/抬臂"：以前这里不看 verify 结果，
                     # 偏 50 mm 也会照常发 grasp_confirmed 并把工件带上去。

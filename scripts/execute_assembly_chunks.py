@@ -185,6 +185,47 @@ def main() -> int:
                 efforts.append(sum(abs(v) for v in values))
         del efforts[:-64]  # keep only the newest window
 
+    def robot_status_snapshot() -> dict:
+        """抓一次 safety_mode / robot_mode，用于给 EFFORT_DEAD 定性。
+
+        只报"力矩死流"无法区分：保护停止（safety_mode 变了）、模式切换
+        （robot_mode 复归）还是单纯话题掉线——三者处置完全不同。
+        """
+        snapshot: dict = {}
+        try:
+            from eli_common_interface.msg import RobotMode, SafetyMode
+        except Exception as error:  # noqa: BLE001
+            return {"note": f"status msg unavailable: {error}"}
+
+        captured: dict = {}
+
+        def _on_safety(msg) -> None:
+            captured["safety"] = int(getattr(msg, "mode", -1))
+
+        def _on_mode(msg) -> None:
+            captured["mode"] = int(getattr(msg, "mode", -1))
+
+        # 这两个话题是 transient_local（latched）：用默认 volatile 订阅收不到
+        # 历史的那一条，只有状态变化时才可能收到。必须显式声明 durability。
+        from rclpy.qos import (DurabilityPolicy, HistoryPolicy, QoSProfile,
+                               ReliabilityPolicy)
+        latched = QoSProfile(depth=1, history=HistoryPolicy.KEEP_LAST,
+                             reliability=ReliabilityPolicy.RELIABLE,
+                             durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        subs = [
+            node.create_subscription(SafetyMode, "/io_and_status_controller/safety_mode",
+                                     _on_safety, latched),
+            node.create_subscription(RobotMode, "/io_and_status_controller/robot_mode",
+                                     _on_mode, latched),
+        ]
+        # 这两个话题是"状态变化时发布 + 低频重发"，1.5 s 有时抓不到（实测 3 s 更稳）
+        deadline = time.time() + 3.0
+        while time.time() < deadline and len(captured) < 2:
+            rclpy.spin_once(node, timeout_sec=0.1)
+        for sub in subs:
+            node.destroy_subscription(sub)
+        return captured or {"note": "no safety/mode samples within 3 s"}
+
     def effort_alive() -> tuple[bool, float]:
         """The torque interface must show a plausible load before any motion.
 
@@ -331,11 +372,14 @@ def main() -> int:
             return 7
         alive, peak = effort_alive()
         if not alive:
+            # 记录失败瞬间的机器人状态：只报"力矩死流"无法区分是保护停止、
+            # 模式切换还是话题掉线，而这三者的处置完全不同。
+            status = robot_status_snapshot()
             print(
                 f"EFFORT_DEAD: the torque interface shows no plausible load "
                 f"(peak {peak:.3f}); every contact detector would be blind, so "
                 "this trajectory is refused.  Restart the driver stack and "
-                "re-check before moving again."
+                f"re-check before moving again.  robot_status={status}"
             )
             return 11
         print(f"[{index}/{len(files)}] start {path} time_scale={args.time_scale} "

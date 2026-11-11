@@ -1564,3 +1564,41 @@ run_task.check_environment() 支持 environment.gate：
 · 完整替换还需要：把"tables"（桌面建模）也纳入测量管线，或明确它不再需要；
 · 真机完整跑一遍效率流程还没做（需要夹爪上电 + 工件在位 + 你在场）。
 ```
+
+## 42. 11-11 18:0x 效率流程 7 项缺陷修复
+
+### 42.1 已修（代码级）
+
+| # | 问题 | 修法 |
+|---|---|---|
+| ① | 全程没有闭合夹爪 | 新增 `close` 阶段（grasp 之后）：`grip_and_wait(grip_close_mm=12)`；`grip` 明确为"张开到 50 mm" |
+| ② | 没有 150 mm 垂降/压垂直/10 mm 回退 | `pre_grasp` = 抓取点正上方 150 mm；两阶段都做 `snap_vertical_quat`；抓取点沿工具 x 回退 10 mm |
+| ④ | 近工件无降速 | `proximity_velocity()`：距目标 <0.15 m 时线性降速到 0.01 |
+| ③ | 测量不参与抓取 | 新增 `measured_box_pose()` + `adjust_grasp_with_measurement()` + 配置 `workpiece_measurement`/`workpiece_frame_offset` |
+| ⑤ | EFFORT_DEAD 无上下文 | 失败时打印 `safety_mode`/`robot_mode`（transient_local QoS，实测瞬时拿到 1/7） |
+| ⑥ | 夹爪电流读成 -7e6 | 寄存器映射未确认 → 明确报 `null`（未采集），不再输出假数 |
+| ⑦ | 观测取帧永远超时 | 根因：订阅了 `/sensors/camera/color/image`，launch 里 `launch_sensor_adapter:=false` 时该话题不存在 → 同时订阅 `/camera/color/image_raw` |
+
+### 42.2 修③时踩到的坑（重要）
+
+```text
+第一版直接拿"测量位姿 - 参考位姿"的差去平移抓取点，plan-only 显示平移了 137 mm。
+但我们的测量输出是【CAD 系】，示教常数是【box 系】，两者差一个固定变换；
+未标定就平移等于按错误的坐标系推偏抓取点。
+⇒ 现在必须显式配置 workpiece_frame_offset 才参与，否则日志写"测量未参与（未标定）"。
+```
+
+### 42.3 验证
+
+```text
+296 项测试全通过；
+plan-only：pre_grasp 上方150mm → grip(张开) → grasp 回退10mm → close（顺序正确）
+           [grasp target] 测量未参与（workpiece_frame_offset 未标定）; grasp=[0.8369, 0.6003, −0.0583]
+```
+
+### 42.4 仍需真机/标定的两件事
+
+```text
+· workpiece_frame_offset：工件在示教位姿时采一次测量，算出 CAD 系→box 系的固定变换，写进配置；
+· 夹爪电流寄存器映射：需要厂商寄存器表，或夹爪运动时采一组原始报文对比（当前按"未采集"处理）。
+```
