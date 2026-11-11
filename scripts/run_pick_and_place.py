@@ -1563,8 +1563,12 @@ def run_observe_list(node, cfg: UnloadConfig, entries: list[tuple[str, str]],
         time.sleep(1.0)
         if cfg.process_images:
             capture_process_image(f"observe:{waypoint}", "enter")
-        check = ((cfg.observe_checks or {}).get(waypoint)
-                 or pose.get("check") or "").strip()
+        override = (cfg.observe_checks or {}).get(waypoint)
+        # 约定：覆盖值写 "none" 表示这个观测位不做检查（新管线不需要旧的建模检查时用）
+        if isinstance(override, str) and override.strip().lower() in ("none", "skip"):
+            check = ""
+        else:
+            check = (override or pose.get("check") or "").strip()
         if check and cfg.world == "sim":
             # 仿真里这一步只走流程，不真正执行检查。
             #
@@ -2506,8 +2510,12 @@ def main() -> int:
                 time.sleep(0.2)
                 if cfg.process_images:
                     capture_process_image(f"observe:{waypoint}", "enter")
-                check = ((cfg.observe_checks or {}).get(waypoint)
-                 or pose.get("check") or "").strip()
+                override = (cfg.observe_checks or {}).get(waypoint)
+                # 约定：覆盖值写 "none" 表示这个观测位不做检查
+                if isinstance(override, str) and override.strip().lower() in ("none", "skip"):
+                    check = ""
+                else:
+                    check = (override or pose.get("check") or "").strip()
                 if check and cfg.world == "sim":
                     # 仿真里只走流程，不真正跑检查。理由同 observe_all：
                     # Gazebo 渲染无贴图 → YOLO 必然 "no mask"；而仿真的规划用的是
