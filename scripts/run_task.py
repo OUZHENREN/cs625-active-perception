@@ -164,8 +164,27 @@ def pointerlib_resolve(pointer: pathlib.Path) -> pathlib.Path:
 
 
 def check_environment(merged: dict, model_path: pathlib.Path | None) -> tuple[bool, list[str], dict]:
-    """Evaluate the environment gate; returns (ok, reasons, model)."""
-    thresholds = dict((merged.get("environment") or {}).get("thresholds") or {})
+    """Evaluate the environment gate; returns (ok, reasons, model).
+
+    两种门（由 config 的 environment.gate 选择）：
+      · "model"（默认）——原来那套：环境模型必须存在、新鲜、偏差在阈值内；
+      · "measurement"——效率模式用的：模型门让位给观测阶段的测量判定，
+        这里只检查"每个目标都配置了 measure_object 检查命令"，
+        真正的质量判定由观测位上的 measure_object 完成（不合格会让该阶段失败）。
+    """
+    environment = merged.get("environment") or {}
+    # 注意用顶层 environment_gate：模式文件是浅合并，若在模式文件里写 environment
+    # 会把 common.yaml 的阈值整块覆盖掉
+    if str(merged.get("environment_gate", "model")).lower() == "measurement":
+        checks = merged.get("observe_checks") or {}
+        targets = list(merged.get("measurement_targets")
+                       or (environment.get("measurement_targets"))
+                       or ["workpiece_fine", "slot_coarse"])
+        missing = [name for name in targets if not checks.get(name)]
+        if missing:
+            return False, [f"measurement 门要求这些观测位配置 observe_checks：{missing}"], {}
+        return True, [f"measurement 门：由观测位的 measure_object 判定（{', '.join(targets)}）"], {}
+    thresholds = dict(environment.get("thresholds") or {})
     required = bool((merged.get("environment") or {}).get("required", True))
     if model_path is None or not pathlib.Path(model_path).exists():
         reason = [f"环境模型缺失：{model_path} 不存在，先运行 "

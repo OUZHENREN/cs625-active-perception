@@ -1524,3 +1524,43 @@ run_task.py --scope load --mode efficient --world real --dry-run
   用新管线替代后，这个门应该改为"工件/插槽测量是否 OK"，而不是"模型是否新鲜"。
 · 这一步会改变真实流程的行为，建议先与所有者确认再动。
 ```
+
+## 41. 11-11 16:4x 环境模型门按模式切换：效率模式用"测量门"
+
+### 41.1 改动
+
+```text
+run_task.check_environment() 支持 environment.gate：
+  · "model"（默认）——原门：环境模型存在/新鲜/偏差在阈值内
+  · "measurement"——效率模式用：只要求每个目标都配置了 observe_checks，
+    真正的质量判定交给观测位上的 measure_object（不合格会让该阶段失败）
+三个 efficiency 配置文件：environment_gate: measurement（顶层键）
+                          + measurement_targets: [workpiece_fine, slot_coarse]
+为什么用顶层键：模式文件是【浅合并】，若写 environment: {...} 会把 common.yaml 的
+阈值块整块覆盖掉（第一次实现就踩了，3 个测试立刻报警）。
+```
+
+### 41.2 实测（dry-run）
+
+```text
+效率模式：environment gate : PASS
+          - measurement 门：由观测位的 measure_object 判定（workpiece_fine, slot_coarse）
+安全模式：environment gate : REJECT（原模型门，未改动）
+```
+
+### 41.3 这一步意味着什么
+
+```text
+· 效率模式的"开工前置条件"从"环境模型新鲜"变成"观测阶段必须测出合格位姿"；
+· 示教/安全模式的保守路径完全不受影响（仍是模型门）；
+· 质量责任从"开工前一次性建模"转移到"每次观测的实测判定"，这正是新管线的价值所在。
+```
+
+### 41.4 剩下的空档（诚实记录）
+
+```text
+· 现在效率模式的观测检查只配了两个位姿（workpiece_fine / slot_coarse），
+  workpiece_coarse、slot_fine、tables 仍是原检查或空检查；
+· 完整替换还需要：把"tables"（桌面建模）也纳入测量管线，或明确它不再需要；
+· 真机完整跑一遍效率流程还没做（需要夹爪上电 + 工件在位 + 你在场）。
+```

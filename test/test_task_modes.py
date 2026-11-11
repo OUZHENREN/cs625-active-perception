@@ -39,6 +39,15 @@ def model_env():
 
 @pytest.fixture(scope="module")
 def merged(run_task):
+    """common + 安全模式：模型门那组测试针对的是保守路径（效率模式已切到测量门）。"""
+    common = yaml.safe_load((REPO / "config/tasks/common.yaml").read_text(encoding="utf-8"))
+    mode_cfg = yaml.safe_load(
+        (REPO / "config/tasks/load_safe.yaml").read_text(encoding="utf-8"))
+    return run_task.merge_configs(common, mode_cfg)
+
+
+@pytest.fixture()
+def merged_efficient(run_task):
     common = yaml.safe_load((REPO / "config/tasks/common.yaml").read_text(encoding="utf-8"))
     mode_cfg = yaml.safe_load(
         (REPO / "config/tasks/load_efficient.yaml").read_text(encoding="utf-8"))
@@ -71,10 +80,11 @@ def test_merge_keeps_world_constants(run_task, merged):
     assert "environment" in merged and "thresholds" in merged["environment"]
 
 
-def test_merge_mode_wins(run_task, merged):
-    assert merged["mode"] == "efficient"
-    assert float(merged["dwell_sec"]) == 0.0
-    assert str(merged["scope"]) == "load"
+def test_merge_mode_wins(run_task, merged_efficient):
+    """模式文件覆盖 common：这里用效率模式做样本（单段、无 dwell）。"""
+    assert merged_efficient["mode"] == "efficient"
+    assert float(merged_efficient["dwell_sec"]) == 0.0
+    assert str(merged_efficient["scope"]) == "load"
 
 
 # ------------------------------------------------------------ runner contract
@@ -210,3 +220,19 @@ def test_check_environment_loads_a_real_model(run_task, merged):
     assert isinstance(model, dict) and model
     assert isinstance(ok, bool)
     assert isinstance(reasons, list)
+
+
+def test_efficiency_gate_is_the_measurement_gate(run_task, merged_efficient, tmp_path):
+    """效率模式的开工门 = 观测阶段的测量判定，不再要求环境模型新鲜。"""
+    ok, reasons, model = run_task.check_environment(merged_efficient, tmp_path / "nope.json")
+    assert ok, reasons
+    assert model == {}
+    assert any("measurement" in reason.lower() or "测量" in reason for reason in reasons)
+
+
+def test_measurement_gate_requires_configured_targets(run_task, merged_efficient):
+    stripped = dict(merged_efficient)
+    stripped["observe_checks"] = {}
+    ok, reasons, _ = run_task.check_environment(stripped, None)
+    assert not ok
+    assert any("observe_checks" in reason for reason in reasons)

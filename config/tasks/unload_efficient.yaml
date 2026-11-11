@@ -104,3 +104,7 @@ observe_checks:
     workpiece_fine --groups 3 --out runtime/measurements/workpiece_latest.json
   slot_coarse: python3 scripts/measure_object.py --preset slot --observe-pose slot_coarse
     --groups 3 --out runtime/measurements/slot_latest.json
+environment_gate: measurement
+measurement_targets:
+- workpiece_fine
+- slot_coarse
