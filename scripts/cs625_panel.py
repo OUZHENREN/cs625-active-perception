@@ -1129,7 +1129,9 @@ class EfficiencyTab(QtWidgets.QWidget):
         stage_grid.setVerticalSpacing(4)
         # 阶段列表直接来自效率流程配置（含 observe:slot_coarse 等观测点）
         self.efficiency_phase_keys = efficiency_phases()
-        self.stage_checks: dict[str, QtWidgets.QCheckBox] = {}
+        # 注意：流程里 observe:slot_coarse 出现两次（开头和收尾），
+        # 所以勾选框按【序号】而不是阶段名做 key，否则两个会互相覆盖。
+        self.stage_checks: dict[int, QtWidgets.QCheckBox] = {}
         if not self.efficiency_phase_keys:
             fallback = QtWidgets.QLabel("读不到 config/tasks/load_efficient.yaml 的阶段表")
             fallback.setProperty("level", "bad")
@@ -1138,7 +1140,7 @@ class EfficiencyTab(QtWidgets.QWidget):
             label = PHASE_LABELS.get(key, key)
             check = QtWidgets.QCheckBox(f"{index + 1:02d} {label}")
             check.setChecked(key in ("pre_grasp", "grasp", "grip"))
-            self.stage_checks[key] = check
+            self.stage_checks[index] = check
             stage_grid.addWidget(check, index // 2, index % 2)
         left_layout.addWidget(stage_box, 0)
 
@@ -1254,7 +1256,8 @@ class EfficiencyTab(QtWidgets.QWidget):
         选中的阶段用 --until 截断（runner 支持"跑到某个阶段就停"）；
         若要从中途开始，runner 目前没有 --start-from，这里只提示、仍然从流程开头跑。
         """
-        selected = [key for key, check in self.stage_checks.items() if check.isChecked()]
+        selected = [self.efficiency_phase_keys[index]
+                    for index, check in self.stage_checks.items() if check.isChecked()]
         command = [sys.executable, str(REPO / "scripts" / "run_task.py"),
                    "--scope", EFFICIENCY_SCOPE, "--mode", EFFICIENCY_MODE,
                    "--world", "real"]

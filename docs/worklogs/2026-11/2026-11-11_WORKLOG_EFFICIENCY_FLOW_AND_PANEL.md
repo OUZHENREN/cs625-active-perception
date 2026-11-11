@@ -525,3 +525,21 @@ efficiency_phases() 读出 19 个阶段，观测点：
   observe:workpiece_coarse / workpiece_fine / tables / slot_coarse / slot_fine / slot_coarse
 前几个中文标签：工件粗观测、工件精观测、桌面观测、插槽粗观测、插槽精观测、基准位
 ```
+
+### 14.4 又修一个：重复阶段被勾选框覆盖
+
+```text
+流程里 observe:slot_coarse 出现两次（开头 + 收尾），勾选框原来按"阶段名"做 key，
+两个同名阶段互相覆盖，界面上只剩"19 插槽粗观测"、第 4 个消失。
+已改成按【序号】索引：19 个阶段全部显示（01 工件粗观测 … 04 插槽粗观测 …）。
+```
+
+### 14.5 无头验证（不用开显示器）
+
+```text
+QT_QPA_PLATFORM=offscreen 实例化 EfficiencyTab：
+  阶段数 19
+  前 7 个：01 工件粗观测 / 02 工件精观测 / 03 桌面观测 / 04 插槽粗观测 /
+           05 插槽精观测 / 06 基准位 / 07 预抓取
+  构造命令：run_task.py --scope load --mode efficient --world real --confirm --until grip
+```
