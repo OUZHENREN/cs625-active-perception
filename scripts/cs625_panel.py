@@ -160,10 +160,10 @@ STAGE_NOTES = {
 }
 
 def build_style(scale: float) -> str:
-    body = 10.5 * scale
-    small = 9.0 * scale
-    mono = 10.5 * scale
-    title = 13.0 * scale
+    body = 12.0 * scale
+    small = 10.5 * scale
+    mono = 12.0 * scale
+    title = 14.5 * scale
     return f"""
 QWidget {{ background: {C_BG}; color: {C_TEXT}; font-family: {UI_FAMILY}; font-size: {body:.1f}pt; }}
 QLabel {{ background: transparent; }}
@@ -825,7 +825,11 @@ class SafeTab(QtWidgets.QWidget):
         layout.setSpacing(3)
 
         self.camera = CameraView(probe=self._probe)
-        layout.addWidget(make_group("相机（1:1 原始像素）", self.camera), 1)
+        camera_group = make_group("相机（1:1 原始像素）", self.camera)
+        # 所有者要求：安全页把相机区域缩小，右下角那段留空（暂时不填充东西）
+        camera_group.setFixedHeight(660)
+        layout.addWidget(camera_group, 0)
+        layout.addStretch(1)
         return panel
 
     # --------------------------------------------------------------- actions
@@ -1140,7 +1144,7 @@ class VisionPipelineView(QtWidgets.QWidget):
             self.table.setItem(row, 2, QtWidgets.QTableWidgetItem("—"))
             self.table.setItem(row, 3, QtWidgets.QTableWidgetItem("—"))
             self.table.setItem(row, 4, QtWidgets.QTableWidgetItem("—"))
-            self.table.setRowHeight(row, 64)
+            self.table.setRowHeight(row, 78)
         self.table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.table.setColumnWidth(0, 90)
@@ -1256,7 +1260,7 @@ class VisionDataBox(QtWidgets.QGroupBox):
         self.table.horizontalHeader().setStretchLastSection(True)
         for row, name in enumerate(self.ROWS):
             self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(name))
-            self.table.setRowHeight(row, 26)
+            self.table.setRowHeight(row, 34)
         self.table.setColumnWidth(0, 190)
         self.table.setColumnWidth(1, 250)
         self.table.setColumnWidth(2, 250)
@@ -1423,12 +1427,14 @@ class EfficiencyTab(QtWidgets.QWidget):
 
         self.pipeline = VisionPipelineView(probe=self._probe)
         pipeline_group = make_group("视觉流程（每一步的输入/输出）", self.pipeline)
-        pipeline_group.setMinimumWidth(720)
+        pipeline_group.setMinimumWidth(760)
         camera_row_layout.addWidget(pipeline_group, 1)
 
         self.vision_data = VisionDataBox(compact=True)
+        self.vision_data.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                       QtWidgets.QSizePolicy.Expanding)
         data_group = make_group("视觉实验数据", self.vision_data)
-        data_group.setMinimumWidth(760)
+        data_group.setMinimumWidth(700)
         camera_row_layout.addWidget(data_group, 1)
 
         right_layout.addWidget(camera_row, 3)
