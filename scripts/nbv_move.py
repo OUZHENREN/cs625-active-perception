@@ -1,17 +1,22 @@
 #!/usr/bin/env python3
-"""把机械臂移到"能看到手柄面 + 一个侧面"的精观测位，并保证 J6 不缠线。
+"""NBV：把机械臂移到"能看到手柄面 + 一个侧面"的精观测位，并闭环验收。
 
-约束（所有者 2026-11-12）
---------------------------
-* J6（wrist_3）相对当前角度变化不得超过 ±45°，否则电机与相机的线会缠绕；
-* 观测方向只能在当前视线 ±45° 内微调（这个范围足够看到两个侧面）。
+为什么这么写（2026-11-12 的教训）
+---------------------------------
+* 只按"可见面积"打分选视角，在真机上会翻车：选出来的视角有时 1 组都测不出。
+  所以必须【到位 → 测 1 组 → 不合格就换下一个候选】。
+* 代价函数里只要有"少动"的奖励，优化器就会选"完全不动"的候选（实测 Δ方位 = 0°），
+  于是机械臂只是上下动。所以"最小横向位移"要当硬约束（|Δ方位| ≥ 25°）。
+* J6 相对当前角度变化必须 ≤ ±45°，否则电机与相机的线会缠绕；
+  前三轴可以大范围移动（真正的换位主力），后三轴只做微调。
+* 为了让画面别横着/倒着，姿态用"从当前姿态到目标光轴的最短弧摆动"（保滚转），
+  再叠几种滚转（0/±45/±90/180）逐个试。
 
-做法
+用法
 ----
-1. 读粗位姿（measure_object --stage coarse 的输出）；
-2. 在当前视线 ±45°、俯角 {15,30,45}° 内生成候选方向，按"可见面积 + 窄面加权"打分；
-3. 对每个候选、每个滚转（0/±45/±90）做 IK，筛掉 |ΔJ6|>45° 的解；
-4. 规划（动程护栏）后执行，输出最终 TCP 与 J6。
+    python3 scripts/nbv_move.py --measurements runtime/measurements/workpiece_coarse.json \
+        --group g00_m --execute
+不带 --execute 时只评分 + 规划，不移动。
 """
 
 from __future__ import annotations
@@ -25,10 +30,7 @@ import sys
 
 import numpy as np
 import rclpy
-from geometry_msgs.msg import PoseStamped
-from moveit_msgs.srv import GetPositionIK
 from rclpy.node import Node
-from rclpy.qos import DurabilityPolicy, QoSProfile
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import JointState
 
@@ -39,40 +41,64 @@ import nbv_score as nbv  # noqa: E402
 
 ARM = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
        "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"]
+ROLLS = (0, -45, 45, -90, 90, 180)
+ELEVATIONS = (10.0, 20.0, 30.0)
+MIN_AZIMUTH_STEP = 25.0
+PLAN_OUT = pathlib.Path("/tmp/nbv_plan.json")
+PROBE_OUT = pathlib.Path("/tmp/nbv_probe.json")
 
 
-def current_state(node):
-    got = {}
-    node.create_subscription(JointState, "/joint_states", lambda m: got.setdefault("j", m), 10)
+def current_joints(node) -> dict:
+    got: dict = {}
+    node.create_subscription(JointState, "/joint_states",
+                             lambda msg: got.setdefault("j", msg), 10)
     import time
-    t0 = time.time()
-    while time.time() - t0 < 5 and "j" not in got:
+    deadline = time.time() + 5
+    while time.time() < deadline and "j" not in got:
         rclpy.spin_once(node, timeout_sec=0.2)
     msg = got["j"]
     names = list(msg.name)
-    return {n: float(msg.position[names.index(n)]) for n in ARM}
+    return {name: float(msg.position[names.index(name)]) for name in ARM}
 
 
-def solve_ik(node, client, positions, tcp, quat, seed_names, seed_positions):
-    request = GetPositionIK.Request()
-    request.ik_request.group_name = "arm"
-    request.ik_request.ik_link_name = "tcp_pose"
-    request.ik_request.avoid_collisions = False
-    pose = PoseStamped()
-    pose.header.frame_id = "base_link"
-    pose.pose.position.x, pose.pose.position.y, pose.pose.position.z = map(float, tcp)
-    (pose.pose.orientation.x, pose.pose.orientation.y,
-     pose.pose.orientation.z, pose.pose.orientation.w) = map(float, quat)
-    request.ik_request.pose_stamped = pose
-    request.ik_request.robot_state.joint_state.name = seed_names
-    request.ik_request.robot_state.joint_state.position = seed_positions
-    future = client.call_async(request)
-    rclpy.spin_until_future_complete(node, future, timeout_sec=20)
-    response = future.result()
-    if response is None or response.error_code.val != 1:
-        return None
-    return dict(zip(response.solution.joint_state.name,
-                    response.solution.joint_state.position))
+def plan_pose(tcp: np.ndarray, quat: np.ndarray) -> tuple[bool, str]:
+    """规划到目标 TCP 位姿；成功返回 (True, 末点关节角列表)。"""
+    command = [sys.executable, str(REPO / "scripts" / "plan_pose_once.py"),
+               *[f"{v:.4f}" for v in tcp], *[f"{v:.5f}" for v in quat],
+               "--output", str(PLAN_OUT)]
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=240)
+    text = (completed.stdout or "").strip().splitlines()
+    last = text[-1] if text else ""
+    if "code 1 " not in (completed.stdout or ""):
+        return False, last
+    plan = json.loads(PLAN_OUT.read_text())
+    return True, plan["points"][-1]["q"]
+
+
+def execute_plan() -> tuple[bool, str]:
+    completed = subprocess.run(
+        [sys.executable, str(REPO / "scripts" / "execute_assembly_chunks.py"),
+         str(PLAN_OUT), "--time-scale", "2.0", "--dwell", "0.5",
+         "--goal-tolerance", "0.005"], capture_output=True, text=True, timeout=900)
+    lines = (completed.stdout or "").strip().splitlines()
+    return completed.returncode == 0, lines[-1] if lines else ""
+
+
+def probe_view(preset: str = "workpiece") -> tuple[bool, float, float]:
+    """到位后测 1 组，返回 (是否可用, 扶手分, 覆盖率)。"""
+    command = [sys.executable, str(REPO / "scripts" / "measure_object.py"),
+               "--preset", preset, "--stage", "coarse", "--groups", "1",
+               "--out", str(PROBE_OUT)]
+    subprocess.run(command, capture_output=True, text=True, timeout=600)
+    try:
+        data = json.loads(PROBE_OUT.read_text())
+    except (OSError, ValueError):
+        return False, 0.0, 0.0
+    handles = [(group.get("symmetry_check") or {}).get("handle_score") or 0.0
+               for group in data.get("per_group", [])]
+    coverage = float(data.get("coverage_median") or 0.0)
+    best = max(handles) if handles else 0.0
+    return (best >= 0.70 and coverage >= 0.90), best, coverage
 
 
 def main() -> int:
@@ -80,63 +106,59 @@ def main() -> int:
     parser.add_argument("--measurements", required=True)
     parser.add_argument("--group", default="g00_m")
     parser.add_argument("--distance", type=float, default=0.75)
-    parser.add_argument("--j6-limit", type=float, default=45.0, help="J6 允许变化（度）")
+    parser.add_argument("--j6-limit", type=float, default=45.0)
+    parser.add_argument("--max-moves", type=int, default=3,
+                        help="最多真正移动几次（每次移动后都做 1 组探针验收）")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
 
     rclpy.init()
     node = rclpy.create_node("nbv_move")
-    state = current_state(node)
-    names = ARM
-    seed = [state[n] for n in names]
+    state = current_joints(node)
+    seed = [state[name] for name in ARM]
     j6_now = state["wrist_3_joint"]
     print(f"当前 J6 = {math.degrees(j6_now):+.1f}°")
 
     handeye = json.loads((REPO / "config/handeye/tcp_to_camera.json").read_text())
     T_tcp_cam = np.array(handeye["T_tcp_cam"])
     tcp_now = nbv.read_tcp()
+    if tcp_now is None:
+        print("读不到 TCP", file=sys.stderr)
+        return 2
     T_base_cam = tcp_now @ T_tcp_cam
 
     payload = json.loads(pathlib.Path(args.measurements).read_text(encoding="utf-8"))
     rows = payload.get("per_group") if isinstance(payload, dict) else payload
-    row = [r for r in rows if r.get("group") == args.group][0]
+    row = [item for item in rows if item.get("group") == args.group][0]
     base = np.eye(4)
     base[:3, :3] = R.from_quat(row["pose_base"]["quaternion"]).as_matrix()
     base[:3, 3] = row["pose_base"]["translation"]
     bbox = cp.load_template_bbox(nbv.TEMPLATE)
-    centre = base[:3, :3] @ ((bbox[0] + bbox[1]) / 2) + base[:3, 3]
-    faces = nbv.box_faces(bbox[0], bbox[1])
     size = bbox[1] - bbox[0]
     narrow_area = float(max(min(size[1] * size[2], size[0] * size[1]), 1e-6))
+    centre = base[:3, :3] @ ((bbox[0] + bbox[1]) / 2) + base[:3, 3]
+    faces = nbv.box_faces(bbox[0], bbox[1])
 
-    # 所有者 2026-11-12：J6 只允许微调 ±45°，但 **前三轴可以大范围移动**（在既有工作空间内）。
-    # 所以候选不再限制在"当前视线 ±45°"，而是绕工件整圈；代价函数里把
-    # "前三轴大位移"当作正常、"后三轴（尤其 J6）位移"当作应避免的。
     to_part = centre - T_base_cam[:3, 3]
     azimuth0 = math.degrees(math.atan2(-to_part[1], -to_part[0]))
-    # 关键修正（所有者 2026-11-12 指出）：NBV 必须真的"横向挪动"才能看到侧面。
-    # 之前的代价函数偏向"腕部变化最小"，结果选中的是 Δ方位 = 0° 的候选——
-    # 机械臂只是上下动了动，视角根本没变。现在要求 |Δ方位| ≥ 25°。
     candidates = []
     for offset in range(-180, 180, 20):
-        if abs(offset) < 25:
+        if abs(offset) < MIN_AZIMUTH_STEP:
             continue
-        for elevation in (10.0, 20.0, 30.0):
+        for elevation in ELEVATIONS:
             az, el = math.radians(azimuth0 + offset), math.radians(elevation)
             direction = np.array([math.cos(el) * math.cos(az),
                                   math.cos(el) * math.sin(az), math.sin(el)])
-            if not nbv.handle_face_visible(direction, base, bbox[0], bbox[1], min_cosine=0.5):
+            if not nbv.handle_face_visible(direction, base, bbox[0], bbox[1],
+                                           min_cosine=0.5):
                 continue
-            candidates.append((nbv.score_direction(direction, base, faces, narrow_area),
-                               offset, elevation, direction))
+            score = nbv.score_direction(direction, base, faces, narrow_area)
+            candidates.append((score, offset, elevation, direction))
     candidates.sort(key=lambda item: -item[0])
-    print(f"候选 {len(candidates)} 个，最高分 {candidates[0][0]:.4f}" if candidates else "无候选")
+    print(f"候选 {len(candidates)} 个（要求 |Δ方位| ≥ {MIN_AZIMUTH_STEP:.0f}°，"
+          f"手柄面 cos ≥ 0.5）")
 
-    # 不直接调用 IK 服务（链路名/组名与 MoveIt 内部约定不一致会全失败），
-    # 改成"让 plan_pose_once 规划，再从轨迹末点读 J6"——这是真正会执行的解。
-    ik_ok = 0
-    best_delta = None
-    best_cost = None
+    moves = 0
     for score, offset, elevation, direction in candidates:
         camera = centre + direction * args.distance
         axis = (centre - camera) / np.linalg.norm(centre - camera)
@@ -146,63 +168,42 @@ def main() -> int:
         cosine = float(np.dot(current_axis, axis))
         swing = (np.eye(3) if sine < 1e-9
                  else R.from_rotvec(cross / sine * math.atan2(sine, cosine)).as_matrix())
-        for roll_deg in (0, -45, 45, -90, 90, 180):
+        for roll_deg in ROLLS:
             roll = R.from_rotvec(np.array([0, 0, 1.0]) * math.radians(roll_deg)).as_matrix()
             rotation = swing @ T_base_cam[:3, :3] @ roll
             tcp = camera - rotation @ T_tcp_cam[:3, 3]
             quat = R.from_matrix(rotation).as_quat()
-            command = [sys.executable, str(REPO / "scripts" / "plan_pose_once.py"),
-                       *[f"{v:.4f}" for v in tcp], *[f"{v:.5f}" for v in quat],
-                       "--output", "/tmp/nbv_move_plan.json"]
-            planned = subprocess.run(command, capture_output=True, text=True, timeout=180)
-            out = planned.stdout or ""
-            if "code 1 " not in out:
+            reachable, detail = plan_pose(tcp, quat)
+            if not reachable:
                 continue
-            ik_ok += 1
-            plan = json.loads(pathlib.Path("/tmp/nbv_move_plan.json").read_text())
-            last = plan["points"][-1]["q"]
-            j6_new = last[names.index("wrist_3_joint")]
+            j6_new = detail[ARM.index("wrist_3_joint")]
             delta = math.degrees((j6_new - j6_now + math.pi) % (2 * math.pi) - math.pi)
-            if best_delta is None or abs(delta) < abs(best_delta):
-                best_delta = delta
-            # 前三轴=主运动（允许大），后三轴=微调（越少越好）
-            wrist = sum(abs(last[i] - seed[i]) for i in (3, 4, 5))
-            proximal = sum(abs(last[i] - seed[i]) for i in (0, 1, 2))
-            cost = score - 0.02 * wrist
-            print(f"  方位偏移 {offset:+d}° 俯角 {elevation:.0f}° 滚转 {roll_deg:+d}° "
-                  f"得分 {score:.4f} ΔJ6 {delta:+.1f}° 腕 {wrist:.2f} rad "
-                  f"前三轴 {proximal:.2f} rad → 代价 {cost:.4f}")
             if abs(delta) > args.j6_limit:
                 continue
-            if best_cost is None or cost > best_cost[0]:
-                best_cost = (cost, offset, elevation, roll_deg, tcp, quat, score, delta)
-                # 立刻把这条轨迹另存：循环结束后用的就是它（之前多写了一个 continue，
-                # 导致保存语句永远执行不到，执行阶段报 NO_CHUNKS）。
-                pathlib.Path("/tmp/nbv_best_plan.json").write_text(
-                    pathlib.Path("/tmp/nbv_move_plan.json").read_text())
-    print(f"规划成功 {ik_ok} 个；|ΔJ6| 最小 = "
-          f"{None if best_delta is None else round(abs(best_delta), 1)}°")
-    if best_cost is not None:
-        cost, offset, elevation, roll_deg, tcp, quat, score, delta = best_cost
-        camera_now = T_base_cam[:3, 3]
-        camera_new = centre + direction * args.distance
-        print(f"选定：方位偏移 {offset:+d}° 俯角 {elevation:.0f}° 滚转 {roll_deg:+d}° "
-              f"得分 {score:.4f} ΔJ6 {delta:+.1f}° 代价 {cost:.4f}")
-        print(f"      相机 {np.round(camera_now,3)} → {np.round(camera_new,3)}"
-              f"（横向位移 {np.linalg.norm((camera_new-camera_now)[:2])*1000:.0f} mm）")
-        json.dump({"tcp": list(map(float, tcp)), "quat": list(map(float, quat))},
-                  open("/tmp/nbv_move.json", "w"))
-        if args.execute:
-            moved = subprocess.run(
-                [sys.executable, str(REPO / "scripts" / "execute_assembly_chunks.py"),
-                 "/tmp/nbv_best_plan.json", "--time-scale", "2.0", "--dwell", "0.5",
-                 "--goal-tolerance", "0.005"], capture_output=True, text=True, timeout=600)
-            print("   执行:", (moved.stdout or "").strip().splitlines()[-1])
-            return 0 if moved.returncode == 0 else 1
-        print("（未执行）")
-        return 0
-    print("没有满足约束（J6 ±45° + 可达）的候选")
-    return 2
+            lateral = float(np.linalg.norm((camera - T_base_cam[:3, 3])[:2]) * 1000)
+            print(f"候选：Δ方位 {offset:+d}° 俯角 {elevation:.0f}° 滚转 {roll_deg:+d}° "
+                  f"得分 {score:.4f} ΔJ6 {delta:+.1f}° 横向 {lateral:.0f} mm")
+            if not args.execute:
+                json.dump({"tcp": list(map(float, tcp)), "quat": list(map(float, quat))},
+                          open("/tmp/nbv_move.json", "w"))
+                print("（未执行）")
+                return 0
+            ok, message = execute_plan()
+            print(f"   执行：{message}")
+            if not ok:
+                continue
+            moves += 1
+            good, handle, coverage = probe_view()
+            print(f"   探针：扶手 {handle:.2f} 覆盖 {coverage:.3f} → "
+                  f"{'可用' if good else '不可用'}")
+            if good:
+                print("选定此视角")
+                return 0
+            if moves >= args.max_moves:
+                print(f"已移动 {moves} 次仍不可用，停止（避免无休止换位）")
+                return 3
+    print("没有可用视角")
+    return 3
 
 
 if __name__ == "__main__":

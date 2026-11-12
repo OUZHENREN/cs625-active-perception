@@ -67,6 +67,11 @@ def main() -> int:
     parser.add_argument("--frame", default=FRAME)
     parser.add_argument("--max-joint-delta", type=float, default=2.0,
                         help="允许的单关节最大变化（rad）；超过就拒绝该规划（默认 2.0 rad ≈ 115°）")
+    parser.add_argument("--max-wrist-delta", type=float, default=45.0,
+                        help="腕部三个关节（J4/J5/J6）相对起始姿态的最大变化（度）；"
+                             "超过就拒绝——大角度转腕会让法兰与机械臂自碰撞")
+    parser.add_argument("--check-collision", action="store_true", default=True,
+                        help="用 /check_state_validity 抽样验证规划轨迹（默认开）")
     parser.add_argument("--max-duration", type=float, default=90.0,
                         help="允许的轨迹最长时长（s）；超过就拒绝")
     arguments = parser.parse_args()
@@ -142,12 +147,59 @@ def main() -> int:
     import numpy as _np
     max_delta = max(float(_np.max(_np.abs(_np.asarray(p.positions) - _np.asarray(points[0].positions))))
                     for p in points)
+    # 腕部限位（2026-11-12：因为大角度转腕导致法兰与机械臂自碰撞，所有者明确指出）
+    wrist_indices = [i for i, name in enumerate(trajectory.joint_names)
+                     if name in ("wrist_1_joint", "wrist_2_joint", "wrist_3_joint")]
+    base_positions = list(points[0].positions)
+    wrist_delta = max(
+        (abs(point.positions[index] - base_positions[index]) for point in points
+         for index in wrist_indices),
+        default=0.0)
+    wrist_limit = float(np.radians(arguments.max_wrist_delta))
+    if wrist_delta > wrist_limit:
+        print(f"code 3 points {len(points)} duration {duration:.2f}s "
+              f"wrist_delta {wrist_delta:.2f} rad -- REFUSED: 腕部转动超过 "
+              f"{arguments.max_wrist_delta:.0f}°（会自碰撞）")
+        return 3
+
     if max_delta > arguments.max_joint_delta or duration > arguments.max_duration:
         print(f"code 2 points {len(points)} duration {duration:.2f}s "
               f"max_joint_delta {max_delta:.2f} rad -- REFUSED by motion bounds "
               f"(limit {arguments.max_joint_delta:.2f} rad / {arguments.max_duration:.1f} s); "
               f"split into shorter segments")
         return 2
+    # 自碰撞抽样验证：MoveIt 的规划器会检查碰撞，但"关节空间远距离规划"仍可能给出
+    # 擦着自身走的路径；这里用 /check_state_validity 对轨迹抽样复核（含自碰撞）。
+    # 2026-11-12 就是因为大角度转腕导致法兰撞到机械臂本体，所有者当场指出。
+    if arguments.check_collision and wrist_indices:
+        from moveit_msgs.msg import RobotState as _RobotState
+        from moveit_msgs.srv import GetStateValidity as _GetStateValidity
+        checker = node.create_client(_GetStateValidity, "/check_state_validity")
+        if checker.wait_for_service(timeout_sec=5.0):
+            import numpy as _np2
+            sample_indices = sorted(set(
+                _np2.linspace(0, len(points) - 1, min(8, len(points))).astype(int).tolist()))
+            bad = None
+            for index in sample_indices:
+                request = _GetStateValidity.Request()
+                state = _RobotState()
+                state.joint_state.name = list(trajectory.joint_names)
+                state.joint_state.position = [float(v) for v in points[index].positions]
+                request.robot_state = state
+                request.group_name = GROUP
+                future_valid = checker.call_async(request)
+                rclpy.spin_until_future_complete(node, future_valid, timeout_sec=8.0)
+                result = future_valid.result()
+                if result is not None and not result.valid:
+                    bad = index
+                    break
+            if bad is not None:
+                print(f"code 4 points {len(points)} duration {duration:.2f}s "
+                      f"collision_at_point {bad} -- REFUSED: 轨迹抽样处于自碰撞/非法状态")
+                return 4
+        else:
+            print("warn: /check_state_validity 不可用，跳过碰撞抽样")
+
     pathlib.Path(arguments.output).write_text(json.dumps({
         "joint_names": list(trajectory.joint_names),
         "points": [{"q": list(p.positions), "t": p.time_from_start.sec
