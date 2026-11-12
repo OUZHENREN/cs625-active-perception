@@ -35,8 +35,11 @@ sys.path.insert(0, str(REPO / "scripts"))
 import coarse_pose as cp                                        # noqa: E402
 
 MIN_COVERAGE = 0.95
-MAX_TRANSLATION_MM = 5.0
-MAX_ROTATION_DEG = 2.0
+# 精观测门（2026-11-12 收紧）：扶手与工件之间的插入间隙每侧只有 2 mm，
+# 5 mm / 2° 的"重复性"根本保证不了能插进去。历史实测能做到 0.3–0.5 mm，
+# 所以精观测要求 ≤1.0 mm / ≤0.5°；达不到就应当换视角重测，而不是带着误差去抓。
+MAX_TRANSLATION_MM = 1.0
+MAX_ROTATION_DEG = 0.5
 
 
 def publish_stage(node, stage: str, payload: dict) -> None:

@@ -202,3 +202,34 @@ runner 新增 nbv 阶段类型（kind="nbv"），plan-only 时只推算+规划�
 plan-only：observe:workpiece_coarse → nbv:workpiece（规划 9 点/0.71 s）→ observe:workpiece_fine
            → tables → slot_coarse → slot_fine → pre_grasp → grasp → grip → … → 收尾观测
 ```
+
+## 9. 15:0x 按所有者要求收紧的三件事
+
+### 9.1 夹爪开度：必须 50 mm 才完全撑住扶手
+
+```text
+config/tasks/common.yaml: grip_width_mm = 50.0（一直如此）
+runner 的"撑开判据"从历史遗留的 40 mm 改成 ≥ grip_width − 5 = 45 mm：
+  位置回到 40 附近说明没撑到工件内侧，继续抬臂会把工件留在原地。
+```
+
+### 9.2 插槽也有同样的"视觉流程"数据了
+
+```text
+插槽走的是"先验引导配准"（没有三平面），之前不发进度事件。
+现在同样发：
+  planes   → planes=0（走的是先验路径）
+  register → chosen="prior_register"、覆盖率、是否可信
+面板上工件与插槽共用同一条流程表，一眼能看出"用的哪条路径、收敛得怎么样"。
+实测在 probe_slot 数据集上确认三条事件都能发出。
+```
+
+### 9.3 精观测门：5 mm / 2° → 1.0 mm / 0.5°
+
+```text
+理由（所有者的工程约束）：扶手与工件的插入间隙每侧只有 2 mm，
+  5 mm/2° 的"重复性"根本保证不了插得进去；历史实测能做到 0.3–0.5 mm。
+新阈值：MAX_TRANSLATION_MM = 1.0、MAX_ROTATION_DEG = 0.5（粗观测仍是 20 mm/20°）。
+实测（当前 NBV 精观测位）：0.71 mm / 0.179° → 通过；
+  昨天那类 2.26 mm 的测量会被拒绝——这正是收紧的意义。
+```

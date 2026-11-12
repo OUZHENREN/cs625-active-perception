@@ -664,6 +664,16 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                           (T_base_object[:3, :3] @ bbox_centre + T_base_object[:3, 3])],
         }
         result["position_note"] = "先验引导配准（已知目标位置 + 剔点 + 精配准）"
+        if progress:
+            # 插槽走的是"先验引导"这条路，没有三平面，所以平面数记 0、解记 prior_register，
+            # 面板上与工件共用同一条"视觉流程"，一眼能看出它用的是哪条路径。
+            progress("planes", {"group": directory.name, "planes": 0,
+                                "inliers": [], "orthogonal_triple": False})
+            progress("register", {"group": directory.name,
+                                  "chosen": "prior_register",
+                                  "handle_score": round(float(solved["coverage"]), 3),
+                                  "overall": round(float(solved["coverage"]), 3),
+                                  "valid": bool(solved["valid"])})
         return result
     info.update(
         extent_mm=[round(float(v), 0) for v in

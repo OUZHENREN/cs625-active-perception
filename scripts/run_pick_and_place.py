@@ -2663,7 +2663,10 @@ def main() -> int:
                     # 靠"从内侧撑开"夹住手柄（示教模式的 [7] open to grip width 同义）。
                     gripped = node.grip_and_wait(cfg.grip_width_mm, cfg.grip_current)
                     position = node.gripper("status").get("position_mm")
-                    held = position is not None and position >= min(40.0, cfg.grip_width_mm - 5.0)
+                    # 示教经验（2026-11-12 所有者确认）：必须张开到 50 mm 才能完全撑住扶手，
+                    # 所以判据用"接近目标开度"，而不是历史遗留的 40 mm。
+                    held = (position is not None
+                            and position >= float(cfg.grip_width_mm) - 5.0)
                     if gripped and not held:
                         # 手指没到位 = 没撑到工件内侧，继续抬臂会把工件留在原地
                         gripped = False
