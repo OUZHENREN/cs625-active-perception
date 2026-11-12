@@ -35,6 +35,7 @@
 | 5 | [`reference/real_cell.md`](reference/real_cell.md) | 换场地、网络异常、开工就绪检查 |
 | 6 | [`manuals/debug/README.md`](manuals/debug/README.md) | **看不到数据时**：相机/ROS 图的常用调试命令，正常输出与失败含义 |
 | 7 | [`reference/pose_conventions.md`](reference/pose_conventions.md) | **动位姿之前**：相机系/对象系/内参分辨率/模板单位与原点，全部带实测证据 |
+| 8 | [`reference/robot_status_codes.md`](reference/robot_status_codes.md) | **机器人不动时**：safety_mode / robot_mode 全部取值、常见组合与处置顺序 |
 
 ---
 

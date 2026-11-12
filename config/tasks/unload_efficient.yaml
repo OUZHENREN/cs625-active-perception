@@ -101,9 +101,9 @@ phase_speeds:
     chunks: 1
 observe_checks:
   workpiece_fine: python3 scripts/measure_object.py --preset workpiece --observe-pose
-    workpiece_fine --groups 3 --out runtime/measurements/workpiece_latest.json
+    workpiece_fine --groups 5 --out runtime/measurements/workpiece_latest.json
   slot_coarse: python3 scripts/measure_object.py --preset slot --observe-pose slot_coarse
-    --groups 3 --out runtime/measurements/slot_latest.json
+    --groups 5 --out runtime/measurements/slot_latest.json
   tables: none
   slot_fine: none
 environment_gate: measurement

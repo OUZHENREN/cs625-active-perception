@@ -556,6 +556,44 @@ def extract_workpiece(depth: np.ndarray, k: list[float],
     return points, info
 
 
+def refine_rotation_with_planes(matrix: np.ndarray, planes: list[dict],
+                               bbox_min: np.ndarray, bbox_max: np.ndarray,
+                               max_deg: float = 10.0) -> tuple[np.ndarray, float]:
+    """用三平面法向把姿态的偏航"拧正"（Kabsch），绕工件几何中心旋转。
+
+    工件近正方形（455×465），大面几乎无纹理，ICP 的偏航约束很弱：
+    实测同一批 5 组中心差 4.5 mm、偏航散布却达 5°；
+    平面法向由几千点拟合（RMS ~1.5 mm），方向精度比 ICP 偏航高得多。
+    """
+    rotation = np.asarray(matrix[:3, :3], dtype=float)
+    observed, model = [], []
+    for plane in planes:
+        normal = np.asarray(plane["normal"], dtype=float)
+        local = rotation.T @ normal
+        axis = int(np.argmax(np.abs(local)))
+        sign = 1.0 if local[axis] >= 0 else -1.0
+        target = np.zeros(3)
+        target[axis] = sign
+        observed.append(normal / np.linalg.norm(normal))
+        model.append(rotation @ target)
+    if len(observed) < 2:
+        return matrix, 0.0
+    a = np.column_stack(observed)
+    b = np.column_stack(model)
+    u, _s, vt = np.linalg.svd(a @ b.T)
+    correction = u @ np.diag([1.0, 1.0, float(np.sign(np.linalg.det(u @ vt)))]) @ vt
+    angle = float(np.degrees(np.linalg.norm(R.from_matrix(correction).as_rotvec())))
+    if angle > max_deg:
+        return matrix, angle
+    new_rotation = np.asarray(correction @ rotation, dtype=float)
+    centre = (np.asarray(bbox_min) + np.asarray(bbox_max)) / 2.0
+    centre_world = rotation @ centre + matrix[:3, 3]
+    result = matrix.copy()
+    result[:3, :3] = new_rotation
+    result[:3, 3] = centre_world - new_rotation @ centre
+    return result, angle
+
+
 def reject_with_pose(points: np.ndarray, transformation: np.ndarray,
                      cad_points: np.ndarray, threshold_m: float = 0.025) -> np.ndarray:
     """用当前位姿把"不像工件"的点剔掉：点到 CAD 的最近距离超过阈值的丢掉。
@@ -738,6 +776,9 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                                            feature_region=feature_region,
                                            use_feature=use_feature)
             matrix = solved["matrix"]
+            matrix, yaw_fix = refine_rotation_with_planes(
+                solved["matrix"], chosen, template[0], template[1])
+            result["plane_rotation_fix_deg"] = round(yaw_fix, 2)
             result["symmetry_check"] = {
                 "chosen": solved["chosen"],
                 "handle_score": solved["handle_score"],

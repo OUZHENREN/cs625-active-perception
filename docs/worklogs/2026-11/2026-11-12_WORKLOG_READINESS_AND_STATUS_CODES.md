@@ -1,0 +1,72 @@
+# 2026-11-12 工作日志：真机可达性检查、状态码速查、效率流程试跑受阻
+
+## 1. 真机可达性（所有者开启全部真机后）
+
+```text
+驱动栈：ros2 launch cs625_bringup 在运行（PID 3125）
+health：{'sockets': True, 'controller': True, 'joint_states': True}
+arm_controller：active
+safety_mode = 1 (NORMAL)     robot_mode = 7 (RUNNING)
+preflight：PREFLIGHT_OK（effort n=381，max|effort|=9.198，Σ|effort|=16.958）
+相机：未启动 → 已用 percipio_camera launch 启动，出图正常（0.8 fps 档）
+⇒ 结论：真机可达、可运动
+```
+
+## 2. 新增文档：机械臂状态码速查
+
+`docs/reference/robot_status_codes.md`
+
+```text
+· safety_mode 全部 15 个取值（NORMAL=1、PROTECTIVE_STOP=3、ROBOT_EMERGENCY_STOP=7 …）
+· robot_mode 全部 12 个取值（IDLE=5、RUNNING=7 …）
+· 常见组合的含义与处置（(7,7) 急停未复位 → 重启驱动栈；(1,5) 未使能 …）
+· 读法：这两个话题是 transient_local，普通订阅收不到，必须声明 durability
+· 与执行器的关系：急停 → 力矩读数为 0 → EFFORT_DEAD；运动途中急停 → ESTOP_OR_PROTECTIVE_STOP
+```
+
+已加入 `docs/README.md` 索引（第 8 项）。
+
+## 3. 效率流程试跑：卡在工件测量的质量门
+
+```text
+run_task --scope load --mode efficient --world real --confirm --until pre_grasp
+（给 run_task 增加了 --until 透传，用于分段真机验证）
+
+结果：观测阶段完成，但 observe:workpiece_fine 的测量检查不合格（退出码 2）：
+  · 某一轮 3 组里 2 组退化（扶手覆盖率 <0.5，判"未收敛"）；
+  · 另一轮 5 组全部可信、覆盖率 0.976、中心差 4.5 mm，但【偏航散布 5.01° > 2°】。
+```
+
+### 3.1 根因分析
+
+```text
+工件 455×131×465：大面几乎无纹理，侧视面很小。
+  · ICP 对"绕竖直轴的偏航"约束很弱 → 同一批多次测量偏航散布 4–5°；
+  · 扶手判据对偏航不敏感（扶手是竖杆，绕自身轴线附近转动时覆盖率变化很小），
+    所以"扶手覆盖率 0.9"并不能保证偏航正确。
+```
+
+### 3.2 本轮加的改进
+
+```text
+refine_rotation_with_planes()：用三平面法向做 Kabsch 修正，把观测法向精确对齐到模型面法向，
+                              并绕工件几何中心旋转（不改位置）。平面法向由几千点拟合，
+                              方向精度高于 ICP 偏航。修正角度 >10° 时不采纳。
+```
+
+### 3.3 仍未解决
+
+```text
+· 退化组（扶手覆盖率 <0.5）出现频率仍高：同一视角、同一工件，有的组 0.95、有的组 0.18，
+  说明多起点搜索仍会落到错误盆地；
+· 偏航阈值（2°）对这类近正方形工件偏紧；但放宽会影响抓取精度（偏航 5° ≈ 手柄处 17 mm）。
+```
+
+## 4. 待办
+
+```text
+1. 让"合格性"对偏航敏感：例如用扶手的竖直杆位置（而不是覆盖率）作为判据；
+2. 提高多起点的成功率：把三平面的每个指派都作为起点，而不是前 4 个；
+3. 或者换一个"第三个面更大"的观测位（视角决定可观测性，这是论文主线）；
+4. 之后再做 --until pre_grasp 真机验证（碰撞体 + 接近速度）。
+```

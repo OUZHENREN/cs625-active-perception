@@ -148,15 +148,29 @@ def main() -> int:
         print("所有组都没出位姿", file=sys.stderr)
         return 2
 
-    centres = np.array([row["pose_base"]["centre_mm"] for row in good])
+    # 只统计"可信组"：位姿有效 + 对称解未判不可用。
+    # 退化组（例如只有两个可见面）的解本身是错的，若把它算进重复性，
+    # 会把一次本来合格的测量判成不合格（实测：3 组正解 0.1°，1 组退化把重复性拉到 3.9°）。
+    def credible(row) -> bool:
+        check = row.get("symmetry_check") or {}
+        return bool(row.get("pose_valid", True)) and bool(check.get("valid", True))
+
+    credible_rows = [row for row in good if credible(row)]
+    dropped = len(good) - len(credible_rows)
+    if len(credible_rows) < 3:
+        summary_reason = f"可信组只有 {len(credible_rows)} 组（需要 ≥3），其余 {dropped} 组退化"
+        print(summary_reason, file=sys.stderr)
+        return 2
+
+    centres = np.array([row["pose_base"]["centre_mm"] for row in credible_rows])
     from scipy.spatial.transform import Rotation as R
-    rotations = [R.from_matrix(np.array(row["pose"]["rotation"])) for row in good]
+    rotations = [R.from_matrix(np.array(row["pose"]["rotation"])) for row in credible_rows]
     translation_spread = float(np.linalg.norm(centres.max(axis=0) - centres.min(axis=0)))
     rotation_spread = max(
         float(np.degrees((rotations[i].inv() * rotations[j]).magnitude()))
         for i in range(len(rotations)) for j in range(len(rotations)))
-    coverage = float(np.median([row.get("pose_fitness", 0.0) for row in good]))
-    ambiguous = sum(1 for row in good if row.get("symmetry_check", {}).get("ambiguous"))
+    coverage = float(np.median([row.get("pose_fitness", 0.0) for row in credible_rows]))
+    ambiguous = sum(1 for row in credible_rows if row.get("symmetry_check", {}).get("ambiguous"))
 
     verdict = "OK"
     reasons = []
@@ -185,6 +199,7 @@ def main() -> int:
                           "rotation_deg": round(rotation_spread, 3)},
         "coverage_median": round(coverage, 4),
         "flip_ambiguous_groups": ambiguous,
+        "degenerate_groups_dropped": dropped,
         "verdict": verdict,
         "reasons": reasons,
         "per_group": [{k: row.get(k) for k in
@@ -193,7 +208,8 @@ def main() -> int:
     }
     print(json.dumps({k: summary[k] for k in
                       ("pose_base_centre_mm", "repeatability", "coverage_median",
-                       "flip_ambiguous_groups", "verdict", "reasons")},
+                       "flip_ambiguous_groups", "degenerate_groups_dropped",
+                       "verdict", "reasons")},
                      ensure_ascii=False, indent=2))
     if args.out:
         pathlib.Path(args.out).parent.mkdir(parents=True, exist_ok=True)

@@ -231,6 +231,8 @@ def runner_command(effective: pathlib.Path, step: str, args) -> list[str]:
         command.append("--confirm")
     if args.phases:
         command += ["--phases", args.phases]
+    if getattr(args, "until", ""):
+        command += ["--until", args.until]
     start_joints = getattr(args, "start_joints", "")
     if args.plan_only and start_joints:
         command += ["--start-joints", start_joints]
@@ -257,6 +259,8 @@ def main() -> int:
     parser.add_argument("--model", default="",
                         help="environment model.json to use (default: runtime/environment/latest)")
     parser.add_argument("--phases", default="", help="restrict a single step to these phases")
+    parser.add_argument("--until", default="",
+                        help="跑到这个阶段就停（透传给 run_pick_and_place.py，用于分段真机验证）")
     parser.add_argument("--start-joints", default="",
                         help="plan-only: six comma-separated joint angles to chain the "
                              "plans from (default: the measured state)")
