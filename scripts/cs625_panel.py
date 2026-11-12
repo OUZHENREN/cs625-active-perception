@@ -96,6 +96,8 @@ PHASE_LABELS = {
     "observe:slot_coarse": "插槽粗观测",
     "observe:slot_fine": "插槽精观测",
     "nbv:workpiece": "NBV 换精观测位",
+    "measure:workpiece_fine": "工件精观测（原地）",
+    "measure:slot_fine": "插槽精观测（原地）",
     "nbv:slot": "NBV 换槽精观测位",
     "baseline": "基准位",
     "pre_grasp": "预抓取",

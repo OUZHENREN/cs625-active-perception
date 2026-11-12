@@ -199,8 +199,11 @@ def main() -> int:
 
     credible_rows = [row for row in good if credible(row)]
     dropped = len(good) - len(credible_rows)
-    if len(credible_rows) < 3:
-        summary_reason = f"可信组只有 {len(credible_rows)} 组（需要 ≥3），其余 {dropped} 组退化"
+    # 粗观测只用来"定视角"，两组可信就够；精观测必须要三组，否则重复性没意义。
+    min_credible = 2 if coarse_stage else 3
+    if len(credible_rows) < min_credible:
+        summary_reason = (f"可信组只有 {len(credible_rows)} 组（需要 ≥{min_credible}），"
+                          f"其余 {dropped} 组退化")
         print(summary_reason, file=sys.stderr)
         if stage_node is not None:
             publish_stage(stage_node, "gate", {

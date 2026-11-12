@@ -2196,6 +2196,10 @@ def resolve_phase_list(cfg) -> list[tuple[str, str]]:
         entry = str(entry).strip()
         if not entry:
             continue
+        if entry.startswith("measure:") or entry.startswith("measure_"):
+            name = entry.split(":", 1)[1] if ":" in entry else entry[len("measure_"):]
+            resolved.append((f"measure:{name}", "measure"))
+            continue
         if entry.startswith("nbv:") or entry.startswith("nbv_"):
             name = entry.split(":", 1)[1] if ":" in entry else entry[len("nbv_"):]
             resolved.append((f"nbv:{name}", "nbv"))
@@ -2743,6 +2747,21 @@ def main() -> int:
                         # A) 抓取基线：必须在 attached 之后取（见上面
                         # capture_grasp_baseline 的说明）。真机走不到这里。
                         capture_grasp_baseline()
+            elif kind == "measure":
+                # 原地测量：NBV 已经把机械臂放到精观测位，这里不再移动，只跑测量检查
+                target = name.split(":", 1)[1]
+                check = (cfg.observe_checks or {}).get(target) or ""
+                if not check:
+                    step(name, False, f"MEASURE_CHECK_MISSING ({target})")
+                    continue
+                if plan_only:
+                    step(name, True, f"measure {target} (planned only)")
+                    continue
+                ok_check, check_detail = run_observation_check(check, {})
+                record[-1]["check"] = {"name": check, "ok": ok_check,
+                                       "detail": check_detail}
+                Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
+                step(name, ok_check, f"measure {target}: {check_detail}")
             elif kind == "nbv":
                 # NBV：由粗观测位姿推算精观测位，然后有界移动过去。
                 # 粗位姿只要"够用来定视角"（5–20 mm），精确位姿由随后的精观测给出。

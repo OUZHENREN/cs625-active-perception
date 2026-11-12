@@ -89,6 +89,8 @@ def main() -> int:
                         metavar=("X", "Y", "Z"), help="已知工件中心(base)，给了就不依赖测量文件")
     parser.add_argument("--distance", type=float, default=0.45)
     parser.add_argument("--elevation", type=float, default=30.0)
+    parser.add_argument("--from-object", action="store_true",
+                        help="用工件自身坐标系决定视角方向（朝手柄面+侧面+顶面的角看）")
     parser.add_argument("--plan-only", action="store_true")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
@@ -101,6 +103,7 @@ def main() -> int:
     T_tcp_cam = np.array(handeye["T_tcp_cam"])
     T_base_cam = T_base_tcp @ T_tcp_cam
 
+    T_base_obj = None
     bbox = cp.load_template_bbox(TEMPLATE)
     correction = object_frame_correction(bbox) if CAD_FLIP_X else np.eye(4)
     centre_obj = (bbox[0] + bbox[1]) / 2
@@ -131,11 +134,33 @@ def main() -> int:
         centre = T_base_obj[:3, :3] @ centre_obj + T_base_obj[:3, 3]
         print(f"工件中心(base, 由测量推出): {np.round(centre, 3)}")
 
-    azimuth = np.arctan2(centre[1] - T_base_cam[1, 3], centre[0] - T_base_cam[0, 3])
-    elevation = np.radians(args.elevation)
-    camera_target = centre - args.distance * np.array(
-        [np.cos(elevation) * np.cos(azimuth), np.cos(elevation) * np.sin(azimuth),
-         -np.sin(elevation)])
+    if args.from_object and T_base_obj is not None:
+        # 角视方向：从工件自身坐标系出发，朝着"手柄面(-y) + 一个侧面(+x) + 顶面(+z)"
+        # 那个角看过去。这样三个面都能进画面——只按"当前相机方位"绕圈，
+        # 很容易正好绕到工件的窄边，位姿就会多解（实测中心差 111 mm）。
+        # 四个"角"方向：手柄面 ± 一个侧面；挑离当前相机最近的那个，
+        # 免得为了换视角把机械臂绕到工件背面（多半不可达，而且腕部要转一百多度）。
+        current_dir = T_base_cam[:3, 3] - centre
+        current_dir = current_dir / max(np.linalg.norm(current_dir), 1e-9)
+        best = None
+        for sx in (1.0, -1.0):
+            for sy in (-1.0, 1.0):
+                d_obj = np.array([0.42 * sx, 0.82 * sy, 0.39], dtype=float)
+                d_obj /= np.linalg.norm(d_obj)
+                d_base = T_base_obj[:3, :3] @ d_obj
+                score = float(np.dot(d_base, current_dir))
+                if best is None or score > best[0]:
+                    best = (score, d_obj, d_base)
+        _score, d_obj, d_base = best
+        camera_target = centre + d_base * args.distance
+        print(f"角视方向(工件系) {np.round(d_obj,2)} → base {np.round(d_base,2)}"
+              f"（与当前视线夹角 {np.degrees(np.arccos(np.clip(_score,-1,1))):.0f}°）")
+    else:
+        azimuth = np.arctan2(centre[1] - T_base_cam[1, 3], centre[0] - T_base_cam[0, 3])
+        elevation = np.radians(args.elevation)
+        camera_target = centre - args.distance * np.array(
+            [np.cos(elevation) * np.cos(azimuth), np.cos(elevation) * np.sin(azimuth),
+             -np.sin(elevation)])
     desired_axis = (centre - camera_target) / np.linalg.norm(centre - camera_target)
 
     from scipy.spatial.transform import Rotation as R
