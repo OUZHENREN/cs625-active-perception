@@ -47,13 +47,76 @@ def current_joints(node) -> dict:
     return {name: float(msg.position[names.index(name)]) for name in ARM}
 
 
-def move_to(xyz) -> bool:
+def plan_and_move(tcp_now, target_xyz, max_wrist_deg: float) -> bool:
+    """平移 + 小幅转腕瞄准工件中心；规划器会拒绝腕部超限/碰撞的方案。
+
+    所有者 2026-11-12：纯平移不够灵活，允许后三轴"适当转动"，但绝不允许大幅转动。
+    所以这里把腕部变化上限收到 max_wrist_deg（默认 25°），并依赖 plan_pose_once 的
+    腕部限位 + /check_state_validity 抽样复核这两道闸。
+    """
+    import numpy as _np
+    from scipy.spatial.transform import Rotation as _R
+    handeye = json.loads((REPO / "config/handeye/tcp_to_camera.json").read_text())
+    T_tcp_cam = _np.array(handeye["T_tcp_cam"])
+    camera_now = tcp_now @ T_tcp_cam
+    # 目标相机位置 = 目标 TCP 平移同样的世界位移（姿态先沿用当前）
+    delta = _np.asarray(target_xyz, float) - tcp_now[:3, 3]
+    camera_target = camera_now[:3, 3] + delta
+    centre = _part_centre()
+    axis = centre - camera_target
+    axis /= max(_np.linalg.norm(axis), 1e-9)
+    current_axis = camera_now[:3, :3][:, 2]
+    cross = _np.cross(current_axis, axis)
+    sine = float(_np.linalg.norm(cross))
+    cosine = float(_np.dot(current_axis, axis))
+    swing = (_np.eye(3) if sine < 1e-9
+             else _R.from_rotvec(cross / sine * _np.arctan2(sine, cosine)).as_matrix())
+    rotation = swing @ tcp_now[:3, :3]
+    tcp_target = target_xyz - rotation @ T_tcp_cam[:3, 3] + (camera_target - camera_target)
+    # 注意：TCP = 相机位置 − R·t_tcp_cam
+    tcp_target = camera_target - rotation @ T_tcp_cam[:3, 3]
+    quat = _R.from_matrix(rotation).as_quat()
+    command = [sys.executable, str(REPO / "scripts" / "plan_pose_once.py"),
+               *[f"{v:.4f}" for v in tcp_target], *[f"{v:.5f}" for v in quat],
+               "--max-wrist-delta", f"{max_wrist_deg:.1f}",
+               "--output", "/tmp/nbv_lateral_plan.json"]
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=300)
+    lines = (completed.stdout or "").strip().splitlines()
+    last = lines[-1] if lines else ""
+    print("   规划:", last)
+    if "code 1 " not in (completed.stdout or ""):
+        return False
+    moved = subprocess.run(
+        [sys.executable, str(REPO / "scripts" / "execute_assembly_chunks.py"),
+         "/tmp/nbv_lateral_plan.json", "--time-scale", "2.0", "--dwell", "0.5",
+         "--goal-tolerance", "0.005"], capture_output=True, text=True, timeout=900)
+    lines = (moved.stdout or "").strip().splitlines()
+    print("   执行:", lines[-1] if lines else "")
+    return moved.returncode == 0
+
+
+def move_to(xyz, retries: int = 2) -> bool:
+    """直线平移到目标位置；遇到 'resend succeeded' 时重试（外部控制被顶掉后已自动恢复）。"""
     command = [sys.executable, str(REPO / "scripts" / "move_tcp_linear.py"),
                f"{xyz[0]:.4f}", f"{xyz[1]:.4f}", f"{xyz[2]:.4f}", "70", "0.05", "2.0"]
-    completed = subprocess.run(command, capture_output=True, text=True, timeout=600)
-    lines = (completed.stdout or "").strip().splitlines()
-    print("   移动:", lines[-1] if lines else "(no output)")
-    return completed.returncode == 0
+    for attempt in range(retries + 1):
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=600)
+        lines = (completed.stdout or "").strip().splitlines()
+        last = lines[-1] if lines else "(no output)"
+        print(f"   移动({attempt + 1}/{retries + 1}):", last)
+        if completed.returncode == 0:
+            return True
+        if "resend succeeded" not in last:
+            return False
+    return False
+
+
+def _part_centre():
+    payload = pathlib.Path(REPO / "runtime/measurements/workpiece_coarse.json")
+    if payload.exists():
+        data = json.loads(payload.read_text())
+        return np.array(data["pose_base_centre_mm"]) / 1000.0
+    return nbv.read_tcp()[:3, 3] + np.array([0.0, 0.25, -0.4])
 
 
 def probe():
@@ -75,6 +138,8 @@ def probe():
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--offsets-mm", default="-280,-200,-120,120,200,280")
+    parser.add_argument("--max-wrist-deg", type=float, default=25.0,
+                        help="后三轴允许的最大变化（度）；超过由规划器直接拒绝")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
 
@@ -104,6 +169,17 @@ def main() -> int:
     left = np.array([-view[1], view[0], 0.0])
     print("视线(水平) =", np.round(view, 3), " 左方向 =", np.round(left, 3))
 
+    # 出发前先确认"当前视角里真的有工件"：否则横移只是在盲走。
+    # 2026-11-12 的教训：机械臂停在插槽一侧时直接跑 NBV，探针覆盖只有 0.31，
+    # 继续横移还撞出了 PROTECTIVE_STOP。
+    if args.execute:
+        ok_now, handle_now, coverage_now = probe()
+        print("出发前探针：扶手 %.2f 覆盖 %.3f" % (handle_now, coverage_now))
+        if coverage_now < 0.60:
+            print("当前视角看不到工件（覆盖率 %.3f），拒绝移动；"
+                  "请先把机械臂移到工件观测位" % coverage_now)
+            return 5
+
     tried = False
     for offset_mm in [int(v) for v in args.offsets_mm.split(",") if v.strip()]:
         target = start + left * (offset_mm / 1000.0)
@@ -112,7 +188,11 @@ def main() -> int:
         if not args.execute:
             continue
         tried = True
-        if not move_to(target):
+        moved = plan_and_move(tcp_now, target, args.max_wrist_deg)
+        if not moved:
+            print("   平移+微调被拒/失败，退回纯平移")
+            moved = move_to(target)
+        if not moved:
             print("   移动失败，试下一个")
             continue
         good, handle, coverage = probe()
