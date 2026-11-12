@@ -45,6 +45,9 @@ def main() -> int:
     parser.add_argument("--preset", choices=["workpiece", "slot"], default="workpiece",
                         help="workpiece=弹仓（用扶手判据）；slot=插槽夹具（用整体覆盖率判据）")
     parser.add_argument("--template", default=None)
+    parser.add_argument("--stage", choices=["coarse", "fine"], default="fine",
+                        help="coarse=只要能给出一个'够用来算精观测位'的粗略位姿（5–20 mm 可接受）；"
+                             "fine=严格质量门（给最终位姿）")
     parser.add_argument("--groups", type=int, default=4, help="采集组数（每组 3 帧取中位）")
     parser.add_argument("--depth-window", type=float, nargs=2, default=None,
                         metavar=("MIN_M", "MAX_M"),
@@ -151,8 +154,14 @@ def main() -> int:
     # 只统计"可信组"：位姿有效 + 对称解未判不可用。
     # 退化组（例如只有两个可见面）的解本身是错的，若把它算进重复性，
     # 会把一次本来合格的测量判成不合格（实测：3 组正解 0.1°，1 组退化把重复性拉到 3.9°）。
+    coarse_stage = args.stage == "coarse"
+
     def credible(row) -> bool:
         check = row.get("symmetry_check") or {}
+        if coarse_stage:
+            # 粗观测只要求"位姿大致可信"：覆盖率够、没有离谱的退化即可，
+            # 扶手判据（需要扶手清晰可见）在这里不作硬性要求。
+            return float(row.get("pose_fitness", 0.0)) >= 0.70
         return bool(row.get("pose_valid", True)) and bool(check.get("valid", True))
 
     credible_rows = [row for row in good if credible(row)]
@@ -177,18 +186,21 @@ def main() -> int:
     if len(good) < args.groups:
         verdict = "REFUSE"
         reasons.append(f"只有 {len(good)}/{args.groups} 组出位姿")
-    if coverage < MIN_COVERAGE:
+    min_coverage = 0.70 if coarse_stage else MIN_COVERAGE
+    max_translation = 20.0 if coarse_stage else MAX_TRANSLATION_MM
+    max_rotation = 20.0 if coarse_stage else MAX_ROTATION_DEG
+    if coverage < min_coverage:
         verdict = "REFUSE"
-        reasons.append(f"覆盖率中位 {coverage:.3f} < {MIN_COVERAGE}")
+        reasons.append(f"覆盖率中位 {coverage:.3f} < {min_coverage}")
     if ambiguous:
         verdict = "REFUSE"
         reasons.append(f"{ambiguous} 组存在翻转歧义")
-    if translation_spread > MAX_TRANSLATION_MM:
+    if translation_spread > max_translation:
         verdict = "REFUSE"
-        reasons.append(f"中心重复性 {translation_spread:.1f} mm > {MAX_TRANSLATION_MM}")
-    if rotation_spread > MAX_ROTATION_DEG:
+        reasons.append(f"中心重复性 {translation_spread:.1f} mm > {max_translation}")
+    if rotation_spread > max_rotation:
         verdict = "REFUSE"
-        reasons.append(f"姿态重复性 {rotation_spread:.2f}° > {MAX_ROTATION_DEG}")
+        reasons.append(f"姿态重复性 {rotation_spread:.2f}° > {max_rotation}")
 
     summary = {
         "stamp": stamp,
@@ -200,6 +212,7 @@ def main() -> int:
         "coverage_median": round(coverage, 4),
         "flip_ambiguous_groups": ambiguous,
         "degenerate_groups_dropped": dropped,
+        "stage": args.stage,
         "verdict": verdict,
         "reasons": reasons,
         "per_group": [{k: row.get(k) for k in

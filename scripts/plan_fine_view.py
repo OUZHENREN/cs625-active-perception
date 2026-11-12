@@ -111,12 +111,23 @@ def main() -> int:
         if not args.measurements or not args.group:
             print("要么给 --centre，要么给 --measurements + --group", file=sys.stderr)
             return 2
-        rows = json.loads(pathlib.Path(args.measurements).read_text())
-        row = [item for item in rows if item["group"] == args.group][0]
-        T_cam_obj = np.eye(4)
-        T_cam_obj[:3, :3] = np.array(row["pose"]["rotation"])
-        T_cam_obj[:3, 3] = np.array(row["pose"]["translation"])
-        T_base_obj = T_base_cam @ T_cam_obj @ correction
+        payload = json.loads(pathlib.Path(args.measurements).read_text())
+        # 两种输入都支持：coarse_pose 的输出（list）与 measure_object 的输出（dict.per_group）
+        rows = payload.get("per_group") if isinstance(payload, dict) else payload
+        rows = rows or []
+        row = [item for item in rows if item.get("group") == args.group][0]
+        if "pose" in row:
+            T_cam_obj = np.eye(4)
+            T_cam_obj[:3, :3] = np.array(row["pose"]["rotation"])
+            T_cam_obj[:3, 3] = np.array(row["pose"]["translation"])
+            T_base_obj = T_base_cam @ T_cam_obj @ correction
+        else:
+            # measure_object 的输出只有 pose_base（base 系），直接用它，再叠 CAD 帧修正
+            from scipy.spatial.transform import Rotation as _R
+            base = np.eye(4)
+            base[:3, :3] = _R.from_quat(row["pose_base"]["quaternion"]).as_matrix()
+            base[:3, 3] = row["pose_base"]["translation"]
+            T_base_obj = base @ correction
         centre = T_base_obj[:3, :3] @ centre_obj + T_base_obj[:3, 3]
         print(f"工件中心(base, 由测量推出): {np.round(centre, 3)}")
 
