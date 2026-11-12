@@ -142,7 +142,7 @@ def main() -> int:
                              "默认先试正侧——所有者 2026-11-12：先向画面左侧移动才拍得到工件左侧面")
     parser.add_argument("--max-wrist-deg", type=float, default=25.0,
                         help="后三轴允许的最大变化（度）；超过由规划器直接拒绝")
-    parser.add_argument("--time-budget-sec", type=float, default=240.0,
+    parser.add_argument("--time-budget-sec", type=float, default=120.0,
                         help="整个 NBV 的时间预算（秒）；超时立即停止并报告，不再无意义等待")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
@@ -173,6 +173,28 @@ def main() -> int:
     # 所有者 2026-11-12：这里的"左"是【当前相机画面里工件的左侧】。
     # 相机朝 view 看时，画面左方 = view × 世界 z（右手系），不是 z × view。
     left = np.cross(view, np.array([0.0, 0.0, 1.0]))
+    # 所有者 2026-11-12：按工件的偏转角决定优先方向——
+    # 转角为负（例如 −30°）优先往画面左侧找；转角为正优先往画面右侧找。
+    from scipy.spatial.transform import Rotation as _R
+    import yaml as _yaml
+    yaw_deg = None
+    try:
+        cfg = _yaml.safe_load((REPO / "config/tasks/common.yaml").read_text())
+        ref_q = np.array(cfg["workpiece_reference"]["quat"], dtype=float)
+        meas_q = np.array(json.loads((REPO / "runtime/measurements/workpiece_coarse.json")
+                                     .read_text())["per_group"][0]["pose_base"]["quaternion"])
+        delta = _R.from_quat(meas_q) * _R.from_quat(ref_q).inv()
+        yaw_deg = float(np.degrees(delta.as_euler("zyx")[0]))
+    except Exception:  # noqa: BLE001 - 读不到就按当前顺序
+        yaw_deg = None
+    if yaw_deg is not None:
+        prefer_left = yaw_deg >= 0
+        order = args.offsets_mm.split(",")
+        pos = [v for v in order if not v.strip().startswith("-")]
+        neg = [v for v in order if v.strip().startswith("-")]
+        args.offsets_mm = ",".join(pos + neg if prefer_left else neg + pos)
+        print("工件偏转 %.1f° → 优先试%s侧（正=画面左，负=画面右）"
+              % (yaw_deg, "左" if prefer_left else "右"))
     print("视线(水平) =", np.round(view, 3), " 左方向 =", np.round(left, 3))
     print("提示：正偏移 = 沿画面左侧；负偏移 = 沿画面右侧。默认先试正侧。")
 
