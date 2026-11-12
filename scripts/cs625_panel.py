@@ -1118,17 +1118,16 @@ class VisionPipelineView(QtWidgets.QWidget):
 
     stage_received = QtCore.pyqtSignal(dict)
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, probe: bool = True, parent=None) -> None:
         super().__init__(parent)
         self._stop = False
+        self._probe = probe
         self.stage_received.connect(self.on_stage)
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        title = QtWidgets.QLabel("视觉流程（实时）")
-        title.setObjectName("Cap")
-        layout.addWidget(title)
         self.table = QtWidgets.QTableWidget(len(self.STAGES), 5)
         self.table.setHorizontalHeaderLabels(["步骤", "状态", "输入", "输出", "耗时"])
+        self.table.setWordWrap(True)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.table.setShowGrid(False)
@@ -1141,12 +1140,22 @@ class VisionPipelineView(QtWidgets.QWidget):
             self.table.setItem(row, 2, QtWidgets.QTableWidgetItem("—"))
             self.table.setItem(row, 3, QtWidgets.QTableWidgetItem("—"))
             self.table.setItem(row, 4, QtWidgets.QTableWidgetItem("—"))
-            self.table.setRowHeight(row, 52)
-        self.table.resizeColumnsToContents()
-        self.table.setColumnWidth(3, 320)
+            self.table.setRowHeight(row, 64)
+        self.table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.table.setColumnWidth(0, 90)
+        self.table.setColumnWidth(1, 60)
+        self.table.setColumnWidth(2, 140)
+        self.table.setColumnWidth(3, 360)
+        self.table.horizontalHeader().setStretchLastSection(False)
+        self.table.setColumnWidth(4, 80)
+        self.table.horizontalHeader().setStretchLastSection(True)
         layout.addWidget(self.table, 1)
-        self._thread = threading.Thread(target=self._ros_loop, daemon=True)
-        self._thread.start()
+        # 只有真正带 ROS 的实例才起订阅线程：--no-probe / 截图模式不连 ROS，
+        # 否则退出时会因为没有 rclpy 上下文而崩溃。
+        if self._probe:
+            self._thread = threading.Thread(target=self._ros_loop, daemon=True)
+            self._thread.start()
 
     def _ros_loop(self) -> None:
         """订阅 /vision_stage：measure_object 每完成一步就发一条 JSON。"""
@@ -1231,18 +1240,26 @@ class VisionDataBox(QtWidgets.QGroupBox):
     )
     ROWS = ("判定", "覆盖率", "组数(可信/退化)", "平移重复性", "旋转重复性", "中心 (mm)", "更新时间")
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, compact: bool = False, parent=None) -> None:
         super().__init__("视觉实验数据", parent)
+        self._compact = compact
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(6, 4, 6, 4)
         self.table = QtWidgets.QTableWidget(len(self.ROWS), 3)
         self.table.setHorizontalHeaderLabels(["指标", "工件", "插槽"])
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.table.setShowGrid(False)
+        # 不出现横向/纵向滚动条：宽度固定、列宽按 4K 面板分配
+        self.table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.table.horizontalHeader().setStretchLastSection(True)
         for row, name in enumerate(self.ROWS):
             self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(name))
-        self.table.resizeColumnsToContents()
+            self.table.setRowHeight(row, 26)
+        self.table.setColumnWidth(0, 190)
+        self.table.setColumnWidth(1, 250)
+        self.table.setColumnWidth(2, 250)
         layout.addWidget(self.table)
         self._last = 0.0
         self.refresh()
@@ -1392,23 +1409,29 @@ class EfficiencyTab(QtWidgets.QWidget):
         right_layout.setSpacing(4)
 
         # 相机：效率模式下同样需要看实时画面（1:1，不缩放）
-        # 相机 + 视觉流程并排：把相机右侧那块空白用"算法每一步"占住
+        # 相机 + 视觉流程 + 视觉实验数据 同一排：相机右侧的空白正好放这两块，
+        # 三者都不需要拖动就能看全（4K 下 1280 + 720 + 780 ≈ 2780 px）。
         camera_row = QtWidgets.QWidget()
         camera_row_layout = QtWidgets.QHBoxLayout(camera_row)
         camera_row_layout.setContentsMargins(0, 0, 0, 0)
         camera_row_layout.setSpacing(4)
-        self.camera = CameraView(probe=self._probe)
-        camera_row_layout.addWidget(make_group("相机（1:1 原始像素）", self.camera), 3)
-        self.pipeline = VisionPipelineView()
-        self.pipeline.setFixedWidth(430)
-        camera_row_layout.addWidget(make_group("视觉流程（每一步的输入/输出）",
-                                               self.pipeline), 0)
-        right_layout.addWidget(camera_row, 3)
 
-        # 视觉实验数据：测量判定/覆盖率/重复性/中心
-        self.vision_data = VisionDataBox()
-        self.vision_data.setFixedHeight(190)
-        right_layout.addWidget(self.vision_data, 0)
+        self.camera = CameraView(probe=self._probe)
+        camera_group = make_group("相机（1:1 原始像素）", self.camera)
+        camera_group.setFixedWidth(1300)          # 略宽于 1280 的原始像素，不拉伸不浪费
+        camera_row_layout.addWidget(camera_group, 0)
+
+        self.pipeline = VisionPipelineView(probe=self._probe)
+        pipeline_group = make_group("视觉流程（每一步的输入/输出）", self.pipeline)
+        pipeline_group.setMinimumWidth(720)
+        camera_row_layout.addWidget(pipeline_group, 1)
+
+        self.vision_data = VisionDataBox(compact=True)
+        data_group = make_group("视觉实验数据", self.vision_data)
+        data_group.setMinimumWidth(760)
+        camera_row_layout.addWidget(data_group, 1)
+
+        right_layout.addWidget(camera_row, 3)
 
         self.effort_chart = EffortChart()
         right_layout.addWidget(make_group("插入力矩曲线（debug_runs/*/effort.csv）",

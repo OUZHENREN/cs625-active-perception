@@ -65,9 +65,9 @@ def main() -> int:
     parser.add_argument("--budget", type=float, default=15.0, help="planning seconds")
     parser.add_argument("--output", default="/tmp/jm.json")
     parser.add_argument("--frame", default=FRAME)
-    parser.add_argument("--max-joint-delta", type=float, default=1.2,
-                        help="允许的单关节最大变化（rad）；超过就拒绝该规划（默认 1.2 rad ≈ 69°）")
-    parser.add_argument("--max-duration", type=float, default=60.0,
+    parser.add_argument("--max-joint-delta", type=float, default=2.0,
+                        help="允许的单关节最大变化（rad）；超过就拒绝该规划（默认 2.0 rad ≈ 115°）")
+    parser.add_argument("--max-duration", type=float, default=90.0,
                         help="允许的轨迹最长时长（s）；超过就拒绝")
     arguments = parser.parse_args()
 
