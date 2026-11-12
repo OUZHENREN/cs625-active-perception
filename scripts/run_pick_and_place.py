@@ -34,6 +34,14 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
+REPO = Path(__file__).resolve().parents[1]
+
+
+def run(command, timeout: float = 180.0):
+    """跑一个子进程，返回 (退出码, 合并后的输出)。阶段里调用外部脚本统一走这里。"""
+    completed = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+    return completed.returncode, (completed.stdout or "") + (completed.stderr or "")
+
 import numpy as np
 import rclpy
 import tf2_ros
@@ -165,6 +173,8 @@ class Config:
     action: str = "/arm_controller/follow_joint_trajectory"
     observe: dict = field(default_factory=dict)
     observe_settle_sec: float = 10.0
+    nbv_distance_m: float = 0.65
+    nbv_elevation_deg: float = 25.0
     camera_fast_during_assembly: bool = True
     # 观测位检查命令的按模式覆盖：{waypoint: "shell 命令"}。
     # 位姿仍由 common.yaml 的 observe 提供，这里只换"用什么算子检查/测量"，
@@ -228,6 +238,8 @@ def load_config(path: str) -> Config:
         action=str(raw.get("action", "/arm_controller/follow_joint_trajectory")),
         observe=dict(raw.get("observe", {}) or {}),
         observe_settle_sec=float(raw.get("observe_settle_sec", 10.0)),
+        nbv_distance_m=float(raw.get("nbv_distance_m", 0.65)),
+        nbv_elevation_deg=float(raw.get("nbv_elevation_deg", 25.0)),
         camera_fast_during_assembly=bool(raw.get("camera_fast_during_assembly", True)),
         observe_checks=dict(raw.get("observe_checks", {}) or {}),
         process_images=bool(raw.get("process_images", True)),
@@ -2184,6 +2196,10 @@ def resolve_phase_list(cfg) -> list[tuple[str, str]]:
         entry = str(entry).strip()
         if not entry:
             continue
+        if entry.startswith("nbv:") or entry.startswith("nbv_"):
+            name = entry.split(":", 1)[1] if ":" in entry else entry[len("nbv_"):]
+            resolved.append((f"nbv:{name}", "nbv"))
+            continue
         if entry.startswith("observe:") or entry.startswith("observe_"):
             name = entry.split(":", 1)[1] if ":" in entry else entry[len("observe_"):]
             resolved.append((f"observe:{name}", "observe"))
@@ -2724,6 +2740,24 @@ def main() -> int:
                         # A) 抓取基线：必须在 attached 之后取（见上面
                         # capture_grasp_baseline 的说明）。真机走不到这里。
                         capture_grasp_baseline()
+            elif kind == "nbv":
+                # NBV：由粗观测位姿推算精观测位，然后有界移动过去。
+                # 粗位姿只要"够用来定视角"（5–20 mm），精确位姿由随后的精观测给出。
+                target = name.split(":", 1)[1]
+                coarse = REPO / "runtime" / "measurements" / f"{target}_coarse.json"
+                if not coarse.exists():
+                    step(name, False, f"NBV_NO_COARSE_POSE ({coarse.name})")
+                    continue
+                command = [sys.executable, "-u", str(REPO / "scripts" / "plan_fine_view.py"),
+                           "--measurements", str(coarse), "--group", "g00_m",
+                           "--distance", str(getattr(cfg, "nbv_distance_m", 0.65)),
+                           "--elevation", str(getattr(cfg, "nbv_elevation_deg", 25.0))]
+                if not plan_only:
+                    command.append("--execute")
+                code, text = run(command, timeout=900.0)
+                tail = (text or "").strip().splitlines()
+                step(name, code == 0,
+                     f"NBV {target}: {tail[-1] if tail else 'no output'}")
             elif kind == "observe":
                 waypoint = name.split(":", 1)[1]
                 pose = (cfg.observe or {}).get(waypoint)

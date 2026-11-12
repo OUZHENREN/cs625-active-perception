@@ -39,6 +39,20 @@ MAX_TRANSLATION_MM = 5.0
 MAX_ROTATION_DEG = 2.0
 
 
+def publish_stage(node, stage: str, payload: dict) -> None:
+    """把视觉流程的每一步发到 /vision_stage（面板订阅它，把"黑盒"摊开）。"""
+    try:
+        from std_msgs.msg import String
+        if getattr(node, "vision_pub", None) is None:
+            node.vision_pub = node.create_publisher(String, "/vision_stage", 10)
+        payload = dict(payload)
+        payload["stage"] = stage
+        payload["stamp"] = time.time()
+        node.vision_pub.publish(String(data=json.dumps(payload, ensure_ascii=False)))
+    except Exception:  # noqa: BLE001 - 进度推送不能影响测量
+        pass
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -141,11 +155,27 @@ def main() -> int:
         prior_pose_base = T_base_slot.copy()      # 夹具位置已知 → 走先验引导配准
         print(f"夹具先验：中心 {np.round(centre, 3)}，球裁半径 {radius:.2f} m")
     print(f"深度窗：{depth_window[0]:.2f}–{depth_window[1]:.2f} m")
+    # 视觉流程进度：有 rclpy 就发 /vision_stage，没有就只打印
+    stage_node = None
+    try:
+        import rclpy
+        from rclpy.node import Node
+        if not rclpy.ok():
+            rclpy.init()
+        stage_node = rclpy.create_node("measure_object_stages")
+    except Exception:  # noqa: BLE001
+        stage_node = None
+
+    def progress(stage: str, payload: dict) -> None:
+        if stage_node is not None:
+            publish_stage(stage_node, stage, payload)
+
     results = []
     for directory in sorted(dataset.glob("g*")):
         results.append(cp.analyse_group(directory, bbox, cad, depth_window, base_cam,
                                         focus=focus, use_feature=use_feature,
-                                        prior_pose_base=prior_pose_base))
+                                        prior_pose_base=prior_pose_base,
+                                        progress=progress))
     good = [row for row in results if "pose_base" in row]
     if not good:
         print("所有组都没出位姿", file=sys.stderr)
@@ -169,6 +199,11 @@ def main() -> int:
     if len(credible_rows) < 3:
         summary_reason = f"可信组只有 {len(credible_rows)} 组（需要 ≥3），其余 {dropped} 组退化"
         print(summary_reason, file=sys.stderr)
+        if stage_node is not None:
+            publish_stage(stage_node, "gate", {
+                "verdict": "REFUSE", "coverage": 0.0, "translation_mm": 0.0,
+                "rotation_deg": 0.0, "credible": len(credible_rows),
+                "group_total": len(results), "reasons": [summary_reason]})
         return 2
 
     centres = np.array([row["pose_base"]["centre_mm"] for row in credible_rows])
@@ -224,6 +259,13 @@ def main() -> int:
                        "flip_ambiguous_groups", "degenerate_groups_dropped",
                        "verdict", "reasons")},
                      ensure_ascii=False, indent=2))
+    if stage_node is not None:
+        publish_stage(stage_node, "gate", {
+            "verdict": verdict, "coverage": round(coverage, 3),
+            "translation_mm": round(translation_spread, 2),
+            "rotation_deg": round(rotation_spread, 2),
+            "credible": len(credible_rows), "group_total": len(results),
+            "reasons": reasons})
     if args.out:
         pathlib.Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         pathlib.Path(args.out).write_text(json.dumps(summary, ensure_ascii=False, indent=2))

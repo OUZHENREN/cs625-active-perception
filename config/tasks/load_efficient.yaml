@@ -3,6 +3,7 @@ mode: efficient
 flow: pick_place
 phases:
 - observe:workpiece_coarse
+- nbv:workpiece
 - observe:workpiece_fine
 - observe:tables
 - observe:slot_coarse
@@ -71,12 +72,14 @@ phase_speeds:
     time_scale: 1.0
     chunks: 1
 observe_checks:
-  workpiece_fine: python3 scripts/measure_object.py --preset workpiece --observe-pose
-    workpiece_fine --groups 5 --out runtime/measurements/workpiece_latest.json
+  workpiece_fine: python3 scripts/measure_object.py --preset workpiece --stage fine
+    --groups 4 --out runtime/measurements/workpiece_latest.json
   slot_coarse: python3 scripts/measure_object.py --preset slot --observe-pose slot_coarse
     --groups 5 --out runtime/measurements/slot_latest.json
   tables: none
   slot_fine: none
+  workpiece_coarse: python3 scripts/measure_object.py --preset workpiece --stage coarse
+    --groups 3 --out runtime/measurements/workpiece_coarse.json
 environment_gate: measurement
 measurement_targets:
 - workpiece_fine

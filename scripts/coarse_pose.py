@@ -617,7 +617,8 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                   cad_points_for_guide: np.ndarray | None = None,
                   use_feature: bool = True,
                   feature_region=None,
-                  prior_pose_base: np.ndarray | None = None) -> dict:
+                  prior_pose_base: np.ndarray | None = None,
+                  progress=None) -> dict:
     o3d.utility.random.seed(7)          # RANSAC 可复现：不加这句同一组数据两次跑出不同结果
     depth, k = load_group(directory)
     expected = None
@@ -637,6 +638,11 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         points = focus_crop(points, T_base_cam, focus[0], focus[1])
     if len(points) < MIN_POINTS:
         return {"group": directory.name, "error": f"工件区域太小（{len(points)} 点）"}
+    if progress:
+        progress("segment", {"group": directory.name,
+                             "points": int(len(points)),
+                             "extent_mm": [int(v) for v in
+                                           (points.max(axis=0) - points.min(axis=0)) * 1000]})
     if prior_pose_base is not None and T_base_cam is not None and cad_points is not None:
         # 先验引导路径：目标位置已知、但场景里有更大的干扰物（插槽夹具）
         solved = prior_register(points, cad_points,
@@ -670,6 +676,10 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
     result = {"group": directory.name, "planes": len(planes),
               "planes_raw": len(planes_all), **info}
     triple = choose_triple(planes) if len(planes) >= 3 else None
+    if progress:
+        progress("planes", {"group": directory.name, "planes": len(planes),
+                            "inliers": [int(p["inliers"]) for p in planes][:4],
+                            "orthogonal_triple": bool(triple)})
     if triple is None:
         # 退化情况（只有两个可见面，或第三个面不正交）：交给形状配准
         if cad_points is None:
@@ -776,6 +786,12 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                                            feature_region=feature_region,
                                            use_feature=use_feature)
             matrix = solved["matrix"]
+            if progress:
+                progress("register", {"group": directory.name,
+                                      "chosen": solved["chosen"],
+                                      "handle_score": solved["handle_score"],
+                                      "overall": solved["overall"],
+                                      "valid": bool(solved["valid"])})
             matrix, yaw_fix = refine_rotation_with_planes(
                 solved["matrix"], chosen, template[0], template[1])
             result["plane_rotation_fix_deg"] = round(yaw_fix, 2)

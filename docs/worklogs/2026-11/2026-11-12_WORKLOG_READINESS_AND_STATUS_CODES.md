@@ -158,3 +158,47 @@ plan_pose_once.py 新增 --max-joint-delta（默认 1.2 rad ≈ 69°）与 --max
 把这条闭环写进效率流程：observe 阶段先跑 coarse（宽松门）→ 由粗位姿算精观测位 →
 有界移动 → 在该位观测 fine。这样任何朝向都能自适应，不再依赖"固定观测位刚好合适"。
 ```
+
+## 8. 15:0x 视觉流程可视化 + NBV 接入效率流程
+
+### 8.1 视觉不再是黑盒：/vision_stage + 面板"视觉流程"视图
+
+```text
+measure_object 每完成一步就发一条 JSON 到 /vision_stage：
+  segment  → 点数、外形尺寸
+  planes   → 平面数、内点数、是否正交三面
+  register → 选中解、扶手分、整体覆盖率、是否可信
+  gate     → 判定、覆盖率、重复性、可信组数（拒绝时也发）
+面板（效率模式标签页）相机右侧新增"视觉流程"表：步骤 / 状态 / 输入 / 输出 / 耗时，
+相机图像与它并排，占住原来空白的右侧区域。
+```
+
+### 8.2 NBV 接入效率流程（阶段改名 + 新增阶段）
+
+```text
+load/full 效率流程的观测前缀改为：
+  observe:workpiece_coarse   （粗观测，宽松门：覆盖率 ≥0.70、重复性 ≤20 mm/20°）
+  nbv:workpiece              （由粗位姿推算精观测位 → 有界移动）
+  observe:workpiece_fine     （精观测，严格门）
+
+observe_checks：
+  workpiece_coarse → measure_object --stage coarse --groups 3 → workpiece_coarse.json
+  workpiece_fine   → measure_object --stage fine  --groups 4 → workpiece_latest.json
+runner 新增 nbv 阶段类型（kind="nbv"），plan-only 时只推算+规划不移动。
+面板阶段名：工件粗观测 / NBV 换精观测位 / 工件精观测 / 桌面观测 / 插槽粗观测 …
+```
+
+### 8.3 顺手修掉的两个隐藏 bug
+
+```text
+· run_pick_and_place.py 里引用了未定义的 REPO 与 run()（发布碰撞体、切相机档位时才会触发）；
+  已补 REPO = Path(__file__).resolve().parents[1] 与 run() 子进程包装。
+```
+
+### 8.4 验证
+
+```text
+296 项测试通过；
+plan-only：observe:workpiece_coarse → nbv:workpiece（规划 9 点/0.71 s）→ observe:workpiece_fine
+           → tables → slot_coarse → slot_fine → pre_grasp → grasp → grip → … → 收尾观测
+```

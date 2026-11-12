@@ -30,6 +30,7 @@ import re
 import signal
 import subprocess
 import sys
+import threading
 import time
 from typing import Sequence
 
@@ -94,6 +95,8 @@ PHASE_LABELS = {
     "observe:tables": "桌面观测",
     "observe:slot_coarse": "插槽粗观测",
     "observe:slot_fine": "插槽精观测",
+    "nbv:workpiece": "NBV 换精观测位",
+    "nbv:slot": "NBV 换槽精观测位",
     "baseline": "基准位",
     "pre_grasp": "预抓取",
     "gripper_init": "夹爪初始化",
@@ -1096,6 +1099,122 @@ class SafeTab(QtWidgets.QWidget):
         self.resume_label.setText(f"上次 {last} → {start}  {stamp}" if last else "")
 
 
+class VisionPipelineView(QtWidgets.QWidget):
+    """视觉流程"摊开"视图：把每个算法步骤的输入/输出/状态/耗时列出来。
+
+    数据来自 /vision_stage（measure_object 每个阶段发一条 JSON）。
+    目的：让视觉不再是黑盒——能直接看到"现在走到哪一步、这一步吃进去什么、吐出来什么"。
+    """
+
+    STAGES = [
+        ("capture", "① 采集", "组数×帧数", "帧数/分辨率"),
+        ("segment", "② 分割", "原始点云", "剔桌面/高度过滤/球裁后点数"),
+        ("planes", "③ 平面", "工件点云", "平面数/内点数/是否正交"),
+        ("register", "④ 配准", "平面 + CAD", "选解/扶手分/覆盖率"),
+        ("gate", "⑤ 质量门", "各组位姿", "判定/重复性/中心"),
+    ]
+
+    stage_received = QtCore.pyqtSignal(dict)
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._stop = False
+        self.stage_received.connect(self.on_stage)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        title = QtWidgets.QLabel("视觉流程（实时）")
+        title.setObjectName("Cap")
+        layout.addWidget(title)
+        self.table = QtWidgets.QTableWidget(len(self.STAGES), 5)
+        self.table.setHorizontalHeaderLabels(["步骤", "状态", "输入", "输出", "耗时"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.table.setShowGrid(False)
+        self.table.verticalHeader().setDefaultSectionSize(22)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        self._started: dict[str, float] = {}
+        for row, (key, label, _in, _out) in enumerate(self.STAGES):
+            self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(label))
+            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem("待"))
+            self.table.setItem(row, 2, QtWidgets.QTableWidgetItem("—"))
+            self.table.setItem(row, 3, QtWidgets.QTableWidgetItem("—"))
+            self.table.setItem(row, 4, QtWidgets.QTableWidgetItem("—"))
+            self.table.setRowHeight(row, 52)
+        self.table.resizeColumnsToContents()
+        self.table.setColumnWidth(3, 320)
+        layout.addWidget(self.table, 1)
+        self._thread = threading.Thread(target=self._ros_loop, daemon=True)
+        self._thread.start()
+
+    def _ros_loop(self) -> None:
+        """订阅 /vision_stage：measure_object 每完成一步就发一条 JSON。"""
+        try:
+            import rclpy
+            from rclpy.node import Node
+            from std_msgs.msg import String
+            from panel_status import SPIN_LOCK
+            if not rclpy.ok():
+                rclpy.init(args=None)
+            node = rclpy.create_node("vision_pipeline_view")
+            node.create_subscription(
+                String, "/vision_stage",
+                lambda msg: self.stage_received.emit(json.loads(msg.data or "{}")), 10)
+            while not self._stop and rclpy.ok():
+                with SPIN_LOCK:
+                    rclpy.spin_once(node, timeout_sec=0.1)
+        except Exception:  # noqa: BLE001 - 没有 ROS 时保持空白即可
+            return
+
+    def reset(self) -> None:
+        for row in range(self.table.rowCount()):
+            self.table.item(row, 1).setText("待")
+            self.table.item(row, 2).setText("—")
+            self.table.item(row, 3).setText("—")
+            self.table.item(row, 4).setText("—")
+        self._started.clear()
+
+    def on_stage(self, payload: dict) -> None:
+        stage = str(payload.get("stage") or "")
+        index = next((i for i, (key, *_rest) in enumerate(self.STAGES) if key == stage), None)
+        if index is None:
+            return
+        now = time.time()
+        started = self._started.setdefault(stage, now)
+        elapsed = now - started
+        _key, _label, input_hint, output_hint = self.STAGES[index]
+        detail_in = []
+        detail_out = []
+        if stage == "segment":
+            detail_in.append(f"{payload.get('points', '?')} 点")
+            detail_out.append(f"外形 {payload.get('extent_mm')}")
+            status = "OK"
+        elif stage == "planes":
+            detail_in.append(f"{payload.get('planes', '?')} 个面")
+            detail_out.append(f"内点 {payload.get('inliers')}")
+            detail_out.append("正交三面" if payload.get("orthogonal_triple") else "退化")
+            status = "OK" if payload.get("orthogonal_triple") else "退化"
+        elif stage == "register":
+            detail_in.append("多起点 + CAD")
+            detail_out.append(f"{payload.get('chosen')} 扶手 {payload.get('handle_score')}")
+            detail_out.append(f"整体 {payload.get('overall')}")
+            status = "OK" if payload.get("valid") else "可疑"
+        elif stage == "gate":
+            detail_in.append(f"{payload.get('credible')}/{payload.get('group_total')} 组")
+            detail_out.append(f"{payload.get('verdict')} 覆盖 {payload.get('coverage')}")
+            detail_out.append(f"{payload.get('translation_mm')} mm / "
+                              f"{payload.get('rotation_deg')}°")
+            status = "通过" if payload.get("verdict") == "OK" else "拒绝"
+        else:
+            status = "OK"
+        colour = {"OK": C_OK, "通过": C_OK, "退化": C_WARN, "可疑": C_WARN,
+                  "拒绝": C_BAD}.get(status, C_TEXT)
+        self.table.item(index, 1).setText(status)
+        self.table.item(index, 1).setForeground(QtGui.QColor(colour))
+        self.table.item(index, 2).setText(" / ".join(detail_in) or input_hint)
+        self.table.item(index, 3).setText(" / ".join(detail_out) or output_hint)
+        self.table.item(index, 4).setText(f"{elapsed:.1f} s")
+
+
 class VisionDataBox(QtWidgets.QGroupBox):
     """右上角的"视觉实验数据"：读 runtime/measurements/*.json，展示两类目标的测量结果。
 
@@ -1271,10 +1390,20 @@ class EfficiencyTab(QtWidgets.QWidget):
         right_layout.setSpacing(4)
 
         # 相机：效率模式下同样需要看实时画面（1:1，不缩放）
+        # 相机 + 视觉流程并排：把相机右侧那块空白用"算法每一步"占住
+        camera_row = QtWidgets.QWidget()
+        camera_row_layout = QtWidgets.QHBoxLayout(camera_row)
+        camera_row_layout.setContentsMargins(0, 0, 0, 0)
+        camera_row_layout.setSpacing(4)
         self.camera = CameraView(probe=self._probe)
-        right_layout.addWidget(make_group("相机（1:1 原始像素）", self.camera), 2)
+        camera_row_layout.addWidget(make_group("相机（1:1 原始像素）", self.camera), 3)
+        self.pipeline = VisionPipelineView()
+        self.pipeline.setFixedWidth(430)
+        camera_row_layout.addWidget(make_group("视觉流程（每一步的输入/输出）",
+                                               self.pipeline), 0)
+        right_layout.addWidget(camera_row, 3)
 
-        # 效率模式右上角原来是大片空白：补一块"视觉实验数据"（测量判定/覆盖率/重复性/中心）
+        # 视觉实验数据：测量判定/覆盖率/重复性/中心
         self.vision_data = VisionDataBox()
         self.vision_data.setFixedHeight(190)
         right_layout.addWidget(self.vision_data, 0)

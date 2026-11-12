@@ -124,6 +124,7 @@ phase_speeds:
     chunks: 1
 phases:
 - observe:workpiece_coarse
+- nbv:workpiece
 - observe:workpiece_fine
 - observe:tables
 - observe:slot_coarse
@@ -188,12 +189,14 @@ phases_unload:
 - d9c_baseline
 - observe:workpiece_coarse
 observe_checks:
-  workpiece_fine: python3 scripts/measure_object.py --preset workpiece --observe-pose
-    workpiece_fine --groups 5 --out runtime/measurements/workpiece_latest.json
+  workpiece_fine: python3 scripts/measure_object.py --preset workpiece --stage fine
+    --groups 4 --out runtime/measurements/workpiece_latest.json
   slot_coarse: python3 scripts/measure_object.py --preset slot --observe-pose slot_coarse
     --groups 5 --out runtime/measurements/slot_latest.json
   tables: none
   slot_fine: none
+  workpiece_coarse: python3 scripts/measure_object.py --preset workpiece --stage coarse
+    --groups 3 --out runtime/measurements/workpiece_coarse.json
 environment_gate: measurement
 measurement_targets:
 - workpiece_fine
