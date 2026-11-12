@@ -180,13 +180,19 @@ def main() -> int:
     yaw_deg = None
     try:
         cfg = _yaml.safe_load((REPO / "config/tasks/common.yaml").read_text())
-        ref_q = np.array(cfg["workpiece_reference"]["quat"], dtype=float)
+        # 0° 基准 = 工件摆正时实测的那一帧（所有者 2026-11-12 指定）；没有则退回示教参考
+        ref_q = np.array(cfg.get("workpiece_zero_quat")
+                         or cfg["workpiece_reference"]["quat"], dtype=float)
         meas_q = np.array(json.loads((REPO / "runtime/measurements/workpiece_coarse.json")
                                      .read_text())["per_group"][0]["pose_base"]["quaternion"])
         delta = _R.from_quat(meas_q) * _R.from_quat(ref_q).inv()
         yaw_deg = float(np.degrees(delta.as_euler("zyx")[0]))
     except Exception:  # noqa: BLE001 - 读不到就按当前顺序
         yaw_deg = None
+    if yaw_deg is not None and 0.0 < yaw_deg <= 45.0:
+        print("工件偏转 %+.1f°（正角度且在 45° 内）→ 当前粗观测位通常三面齐全，跳过 NBV"
+              % yaw_deg)
+        return 0
     if yaw_deg is not None:
         prefer_left = yaw_deg >= 0
         order = args.offsets_mm.split(",")
