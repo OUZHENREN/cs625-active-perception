@@ -65,6 +65,10 @@ def main() -> int:
     parser.add_argument("--budget", type=float, default=15.0, help="planning seconds")
     parser.add_argument("--output", default="/tmp/jm.json")
     parser.add_argument("--frame", default=FRAME)
+    parser.add_argument("--max-joint-delta", type=float, default=1.2,
+                        help="允许的单关节最大变化（rad）；超过就拒绝该规划（默认 1.2 rad ≈ 69°）")
+    parser.add_argument("--max-duration", type=float, default=60.0,
+                        help="允许的轨迹最长时长（s）；超过就拒绝")
     arguments = parser.parse_args()
 
     xyz = arguments.pose[:3]
@@ -130,6 +134,20 @@ def main() -> int:
         return 6
 
     duration = points[-1].time_from_start.sec + points[-1].time_from_start.nanosec * 1e-9
+
+    # 动程限制（2026-11-12 所有者反馈"又在无限制地移动"）：
+    # 关节空间规划对远处目标可能给出上百秒、上千点的大幅摆动，看起来像"乱动"。
+    # 这里在写轨迹之前就量一下"每个关节的最大变化"和"总时长"，超限直接拒绝，
+    # 要求调用方改成分段的笛卡尔移动或更近的中继点。
+    import numpy as _np
+    max_delta = max(float(_np.max(_np.abs(_np.asarray(p.positions) - _np.asarray(points[0].positions))))
+                    for p in points)
+    if max_delta > arguments.max_joint_delta or duration > arguments.max_duration:
+        print(f"code 2 points {len(points)} duration {duration:.2f}s "
+              f"max_joint_delta {max_delta:.2f} rad -- REFUSED by motion bounds "
+              f"(limit {arguments.max_joint_delta:.2f} rad / {arguments.max_duration:.1f} s); "
+              f"split into shorter segments")
+        return 2
     pathlib.Path(arguments.output).write_text(json.dumps({
         "joint_names": list(trajectory.joint_names),
         "points": [{"q": list(p.positions), "t": p.time_from_start.sec

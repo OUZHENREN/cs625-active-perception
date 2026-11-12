@@ -164,6 +164,8 @@ class Config:
     gripper_span_max_mm: float = 246.57
     action: str = "/arm_controller/follow_joint_trajectory"
     observe: dict = field(default_factory=dict)
+    observe_settle_sec: float = 10.0
+    camera_fast_during_assembly: bool = True
     # 观测位检查命令的按模式覆盖：{waypoint: "shell 命令"}。
     # 位姿仍由 common.yaml 的 observe 提供，这里只换"用什么算子检查/测量"，
     # 这样效率模式可以换成本仓库的测量管线，而示教/安全模式继续用原检查。
@@ -225,6 +227,8 @@ def load_config(path: str) -> Config:
         gripper_span_max_mm=float(raw.get("gripper_span_max_mm", 246.57)),
         action=str(raw.get("action", "/arm_controller/follow_joint_trajectory")),
         observe=dict(raw.get("observe", {}) or {}),
+        observe_settle_sec=float(raw.get("observe_settle_sec", 10.0)),
+        camera_fast_during_assembly=bool(raw.get("camera_fast_during_assembly", True)),
         observe_checks=dict(raw.get("observe_checks", {}) or {}),
         process_images=bool(raw.get("process_images", True)),
         verify=bool(verification.get("enabled", True)),
@@ -2014,6 +2018,29 @@ def run_cartesian_profile(node, name: str, xyz, quat, profile: SpeedProfile,
     return False
 
 
+_CAMERA_RESTORE_REGISTERED = [False]
+
+
+def switch_camera_mode(mode: str) -> bool:
+    """切换相机档位：fast=640×480 高帧率（装配段观察用），modeling=1280×960。
+
+    切到 fast 时注册 atexit 恢复 modeling——流程无论正常结束还是异常退出，
+    都不会把相机留在低分辨率档上。
+    """
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-u", str(REPO / "scripts" / "camera_mode.py"), mode],
+            capture_output=True, text=True, timeout=180)
+        ok = completed.returncode == 0
+    except Exception:  # noqa: BLE001
+        return False
+    if mode == "fast" and not _CAMERA_RESTORE_REGISTERED[0]:
+        import atexit
+        atexit.register(lambda: switch_camera_mode("modeling"))
+        _CAMERA_RESTORE_REGISTERED[0] = True
+    return ok
+
+
 def publish_task_log(node, text: str) -> None:
     """把阶段日志发到 /task_log（面板订阅它，就能看到"终端里跑的流程"的日志）。"""
     try:
@@ -2665,6 +2692,10 @@ def main() -> int:
                 if ok:
                     ok = verify(name, pre, grasp_quat)
             elif name == "grasp":
+                # 装配段不用相机测量，但所有者要盯着看 → 切到 640×480 高帧率
+                if getattr(cfg, "camera_fast_during_assembly", True) and not plan_only:
+                    ok_fast = switch_camera_mode("fast")
+                    node.get_logger().info(f"[camera] 切到 fast 档 {'成功' if ok_fast else '失败'}")
                 grasp_xyz, grasp_quat, _pre, _note = grip_targets()
                 profile = profile_for(cfg.speeds, name, cfg.assembly_velocity_scale,
                                       cfg.time_scale, 4)
@@ -2727,7 +2758,11 @@ def main() -> int:
                         node.get_logger().warn(
                             f"[{name}] no camera frame newer than the motion within "
                             "10 s; the check below may look at an old view")
-                time.sleep(0.2)
+                # 机械臂惯性大：到位后先等它稳定再拍，否则拍到的是运动中/刚停下的帧
+                settle = float(getattr(cfg, "observe_settle_sec", 10.0) or 0.0)
+                if settle > 0:
+                    node.get_logger().info(f"[{name}] 等待 {settle:.0f} s 稳定后拍摄")
+                    time.sleep(settle)
                 if cfg.process_images:
                     capture_process_image(f"observe:{waypoint}", "enter")
                 override = (cfg.observe_checks or {}).get(waypoint)

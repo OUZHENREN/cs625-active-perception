@@ -1096,6 +1096,71 @@ class SafeTab(QtWidgets.QWidget):
         self.resume_label.setText(f"上次 {last} → {start}  {stamp}" if last else "")
 
 
+class VisionDataBox(QtWidgets.QGroupBox):
+    """右上角的"视觉实验数据"：读 runtime/measurements/*.json，展示两类目标的测量结果。
+
+    放什么（按调试时的顺序）：
+      判定 / 覆盖率 / 组数(可信-退化) / 平移重复性 / 旋转重复性 / 中心坐标 / 更新时间
+    这些正是 measure_object 的质量门指标，看板上一眼就能判断"这次测得准不准"。
+    """
+
+    TARGETS = (
+        ("工件", REPO / "runtime" / "measurements" / "workpiece_latest.json"),
+        ("插槽", REPO / "runtime" / "measurements" / "slot_latest.json"),
+    )
+    ROWS = ("判定", "覆盖率", "组数(可信/退化)", "平移重复性", "旋转重复性", "中心 (mm)", "更新时间")
+
+    def __init__(self, parent=None) -> None:
+        super().__init__("视觉实验数据", parent)
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(6, 4, 6, 4)
+        self.table = QtWidgets.QTableWidget(len(self.ROWS), 3)
+        self.table.setHorizontalHeaderLabels(["指标", "工件", "插槽"])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.table.horizontalHeader().setStretchLastSection(True)
+        for row, name in enumerate(self.ROWS):
+            self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(name))
+        self.table.resizeColumnsToContents()
+        layout.addWidget(self.table)
+        self._last = 0.0
+        self.refresh()
+
+    def refresh(self) -> None:
+        for column, (_label, path) in enumerate(self.TARGETS, start=1):
+            data = {}
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                data = {}
+            verdict = str(data.get("verdict") or "—")
+            values = [
+                verdict,
+                f"{data.get('coverage_median', 0):.3f}" if data else "—",
+                (f"{data.get('groups', 0) - data.get('degenerate_groups_dropped', 0)}"
+                 f"/{data.get('degenerate_groups_dropped', 0)}") if data else "—",
+                f"{data.get('repeatability', {}).get('translation_mm', 0):.2f} mm"
+                if data else "—",
+                f"{data.get('repeatability', {}).get('rotation_deg', 0):.2f}°"
+                if data else "—",
+                ", ".join(f"{v:.1f}" for v in (data.get("pose_base_centre_mm") or []))
+                if data else "—",
+                time.strftime("%H:%M:%S", time.localtime(path.stat().st_mtime))
+                if path.exists() else "—",
+            ]
+            for row, text in enumerate(values):
+                item = self.table.item(row, column)
+                if item is None:
+                    item = QtWidgets.QTableWidgetItem()
+                    self.table.setItem(row, column, item)
+                item.setText(text)
+                if row == 0:
+                    level = "#3ec98a" if verdict == "OK" else (
+                        "#d6a52f" if verdict == "—" else "#e05252")
+                    item.setForeground(QtGui.QColor(level))
+        self.table.resizeColumnsToContents()
+
+
 class EfficiencyTab(QtWidgets.QWidget):
     """效率模式：左侧配置（阶段/速度/参数/执行），右侧看结果（状态/力矩/记录/日志）。"""
 
@@ -1107,6 +1172,8 @@ class EfficiencyTab(QtWidgets.QWidget):
         self._timer = QtCore.QTimer(self)
         self._timer.setInterval(2000)
         self._timer.timeout.connect(self._refresh_views)
+        self._timer.timeout.connect(
+            lambda: self.vision_data.refresh() if getattr(self, "vision_data", None) else None)
         self._timer.start()
         self._refresh_views()
 
@@ -1206,6 +1273,11 @@ class EfficiencyTab(QtWidgets.QWidget):
         # 相机：效率模式下同样需要看实时画面（1:1，不缩放）
         self.camera = CameraView(probe=self._probe)
         right_layout.addWidget(make_group("相机（1:1 原始像素）", self.camera), 2)
+
+        # 效率模式右上角原来是大片空白：补一块"视觉实验数据"（测量判定/覆盖率/重复性/中心）
+        self.vision_data = VisionDataBox()
+        self.vision_data.setFixedHeight(190)
+        right_layout.addWidget(self.vision_data, 0)
 
         self.effort_chart = EffortChart()
         right_layout.addWidget(make_group("插入力矩曲线（debug_runs/*/effort.csv）",

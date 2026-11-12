@@ -70,3 +70,49 @@ refine_rotation_with_planes()：用三平面法向做 Kabsch 修正，把观测�
 3. 或者换一个"第三个面更大"的观测位（视角决定可观测性，这是论文主线）；
 4. 之后再做 --until pre_grasp 真机验证（碰撞体 + 接近速度）。
 ```
+
+## 5. 14:0x 事故与修复：一次"无限制移动" + 控制器不执行
+
+### 5.1 现象与根因
+
+```text
+所有者在调试中看到机械臂"无限制地移动"，紧急停下。
+查规划记录：目标 NBV 位姿的关节空间规划给出
+  points 1242，duration 124 s，max_joint_delta = 7.45 rad（≈427°）
+即：同一 TCP 位姿存在多个 IK 解，规划器选了需要腕部翻转 400+ 度的那个，且没有任何动程限制。
+```
+
+### 5.2 修复一：动程护栏（执行前拦截）
+
+```text
+plan_pose_once.py 新增 --max-joint-delta（默认 1.2 rad ≈ 69°）与 --max-duration（默认 60 s）：
+  超限直接拒绝，打印 "REFUSED by motion bounds ... split into shorter segments"
+实测：同一 NBV 目标现在被拒（code 2，7.45 rad）；
+      退回观测位的正常目标仍可用（code 1，122 点 / 12 s）。
+```
+
+### 5.3 修复二：控制器"接受但不执行"
+
+```text
+所有者切换过"本地控制"→ 外部控制脚本被顶掉：
+  表现：safety_mode=1、robot_mode=7 一切正常，控制器接受目标，但机械臂 10 s 不动，
+        执行器报 NO_MOTION 并提示 recover_control.sh。
+处置：bash scripts/recover_control.sh（轻量恢复：重发 external script + 速度滑条），
+      之后单步 8 cm 笛卡尔移动立即生效。
+```
+
+### 5.4 结果
+
+```text
+机械臂已用【有界规划】退回工件观测位：TCP (0.6366, 0.3282, 0.4668)，与目标差 <4 mm。
+```
+
+## 6. 今日新增的其它改动（效率模式）
+
+```text
+① 观测位到位后等待 10 s 稳定再拍摄（observe_settle_sec，默认 10 s）——机械臂惯性大；
+② 进入装配段自动把相机切到 fast（640×480 高帧率），流程结束 atexit 自动恢复 modeling；
+③ 面板"效率模式"标签页右上角新增【视觉实验数据】：
+   判定 / 覆盖率 / 组数(可信/退化) / 平移重复性 / 旋转重复性 / 中心 / 更新时间，
+   数据来自 runtime/measurements/{workpiece,slot}_latest.json，每 2 s 刷新。
+```
