@@ -137,11 +137,13 @@ def probe():
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--offsets-mm", default="-120,-200,-280,120,200,280",
-                        help="横向偏移（mm）；负号=与 left 向量相反的一侧。"
-                             "默认先试负侧——所有者 2026-11-12：先向左侧移动才拍得到左侧面")
+    parser.add_argument("--offsets-mm", default="120,200,280,-120,-200,-280",
+                        help="横向偏移（mm）；正号=沿 left（画面左侧）移动。"
+                             "默认先试正侧——所有者 2026-11-12：先向画面左侧移动才拍得到工件左侧面")
     parser.add_argument("--max-wrist-deg", type=float, default=25.0,
                         help="后三轴允许的最大变化（度）；超过由规划器直接拒绝")
+    parser.add_argument("--time-budget-sec", type=float, default=240.0,
+                        help="整个 NBV 的时间预算（秒）；超时立即停止并报告，不再无意义等待")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
 
@@ -168,9 +170,11 @@ def main() -> int:
     view = centre - camera[:3, 3]
     view[2] = 0.0
     view /= max(np.linalg.norm(view), 1e-9)
-    left = np.array([-view[1], view[0], 0.0])
+    # 所有者 2026-11-12：这里的"左"是【当前相机画面里工件的左侧】。
+    # 相机朝 view 看时，画面左方 = view × 世界 z（右手系），不是 z × view。
+    left = np.cross(view, np.array([0.0, 0.0, 1.0]))
     print("视线(水平) =", np.round(view, 3), " 左方向 =", np.round(left, 3))
-    print("提示：正偏移 = 沿左方向；负偏移 = 沿右方向。先试负侧再试正侧。")
+    print("提示：正偏移 = 沿画面左侧；负偏移 = 沿画面右侧。默认先试正侧。")
 
     # 出发前先确认"当前视角里真的有工件"：否则横移只是在盲走。
     # 2026-11-12 的教训：机械臂停在插槽一侧时直接跑 NBV，探针覆盖只有 0.31，
@@ -183,6 +187,8 @@ def main() -> int:
                   "请先把机械臂移到工件观测位" % coverage_now)
             return 5
 
+    import time as _time
+    started = _time.time()
     tried = False
     for offset_mm in [int(v) for v in args.offsets_mm.split(",") if v.strip()]:
         target = start + left * (offset_mm / 1000.0)
@@ -190,6 +196,11 @@ def main() -> int:
         print("尝试横向 %+d mm -> TCP %s" % (offset_mm, np.round(target, 3)))
         if not args.execute:
             continue
+        spent = _time.time() - started
+        if spent > args.time_budget_sec:
+            print("已用 %.0f s，超过预算 %.0f s，停止（算法该改，不该继续等）"
+                  % (spent, args.time_budget_sec))
+            return 6
         tried = True
         moved = plan_and_move(tcp_now, target, args.max_wrist_deg)
         if not moved:
