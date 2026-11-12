@@ -114,13 +114,18 @@ def main() -> int:
     # "前三轴大位移"当作正常、"后三轴（尤其 J6）位移"当作应避免的。
     to_part = centre - T_base_cam[:3, 3]
     azimuth0 = math.degrees(math.atan2(-to_part[1], -to_part[0]))
+    # 关键修正（所有者 2026-11-12 指出）：NBV 必须真的"横向挪动"才能看到侧面。
+    # 之前的代价函数偏向"腕部变化最小"，结果选中的是 Δ方位 = 0° 的候选——
+    # 机械臂只是上下动了动，视角根本没变。现在要求 |Δ方位| ≥ 25°。
     candidates = []
     for offset in range(-180, 180, 20):
-        for elevation in (15.0, 30.0, 45.0):
+        if abs(offset) < 25:
+            continue
+        for elevation in (10.0, 20.0, 30.0):
             az, el = math.radians(azimuth0 + offset), math.radians(elevation)
             direction = np.array([math.cos(el) * math.cos(az),
                                   math.cos(el) * math.sin(az), math.sin(el)])
-            if not nbv.handle_face_visible(direction, base, bbox[0], bbox[1]):
+            if not nbv.handle_face_visible(direction, base, bbox[0], bbox[1], min_cosine=0.5):
                 continue
             candidates.append((nbv.score_direction(direction, base, faces, narrow_area),
                                offset, elevation, direction))
@@ -171,17 +176,20 @@ def main() -> int:
                 continue
             if best_cost is None or cost > best_cost[0]:
                 best_cost = (cost, offset, elevation, roll_deg, tcp, quat, score, delta)
-            continue
-            if best_cost is not None and best_cost[0] == cost:
-                # 记住当前这条轨迹，等所有候选评完再决定
+                # 立刻把这条轨迹另存：循环结束后用的就是它（之前多写了一个 continue，
+                # 导致保存语句永远执行不到，执行阶段报 NO_CHUNKS）。
                 pathlib.Path("/tmp/nbv_best_plan.json").write_text(
                     pathlib.Path("/tmp/nbv_move_plan.json").read_text())
     print(f"规划成功 {ik_ok} 个；|ΔJ6| 最小 = "
           f"{None if best_delta is None else round(abs(best_delta), 1)}°")
     if best_cost is not None:
         cost, offset, elevation, roll_deg, tcp, quat, score, delta = best_cost
+        camera_now = T_base_cam[:3, 3]
+        camera_new = centre + direction * args.distance
         print(f"选定：方位偏移 {offset:+d}° 俯角 {elevation:.0f}° 滚转 {roll_deg:+d}° "
-              f"得分 {score:.4f} ΔJ6 {delta:+.1f}° 代价 {cost:.4f} TCP {np.round(tcp, 3)}")
+              f"得分 {score:.4f} ΔJ6 {delta:+.1f}° 代价 {cost:.4f}")
+        print(f"      相机 {np.round(camera_now,3)} → {np.round(camera_new,3)}"
+              f"（横向位移 {np.linalg.norm((camera_new-camera_now)[:2])*1000:.0f} mm）")
         json.dump({"tcp": list(map(float, tcp)), "quat": list(map(float, quat))},
                   open("/tmp/nbv_move.json", "w"))
         if args.execute:

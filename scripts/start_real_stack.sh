@@ -96,47 +96,12 @@ sleep 45
 python3 scripts/control_health.py --activate
 python3 scripts/preflight_motion.py
 
-# 安全模式检查：机器人若停在急停（safety_mode=7），驱动即使"连上了"也不会动，
-# 而且力矩通道读数为 0（所有接触检测失效）。11-11 就踩过：松开急停按钮后驱动
-# 仍报 safety=7，必须重启驱动栈才会重新读取。这里明确提示，避免又白跑一次流程。
-python3 - <<'PYCHECK'
-import sys
-try:
-    import rclpy
-    from rclpy.node import Node
-    from rclpy.qos import (DurabilityPolicy, HistoryPolicy, QoSProfile,
-                           ReliabilityPolicy)
-    from eli_common_interface.msg import SafetyMode, RobotMode
-except Exception as error:  # noqa: BLE001
-    print(f"[开工] 安全模式检查跳过：{error}")
-    sys.exit(0)
-rclpy.init()
-node = rclpy.create_node("startup_safety")
-qos = QoSProfile(depth=1, history=HistoryPolicy.KEEP_LAST,
-                 reliability=ReliabilityPolicy.RELIABLE,
-                 durability=DurabilityPolicy.TRANSIENT_LOCAL)
-seen: dict = {}
-node.create_subscription(SafetyMode, "/io_and_status_controller/safety_mode",
-                         lambda m: seen.__setitem__("safety", m.mode), qos)
-node.create_subscription(RobotMode, "/io_and_status_controller/robot_mode",
-                         lambda m: seen.__setitem__("robot", m.mode), qos)
-import time
-deadline = time.time() + 3.0
-while time.time() < deadline and len(seen) < 2:
-    rclpy.spin_once(node, timeout_sec=0.1)
-safety, robot = seen.get("safety"), seen.get("robot")
-print(f"[开工] safety_mode={safety} robot_mode={robot}")
-if safety != 1:
-    print("[开工] 警告：机器人不在 NORMAL（safety_mode != 1）。"
-          "若是急停，请先在示教器复位；复位后仍报 7 就再跑一次本脚本重启驱动栈。")
-    sys.exit(3)
-if robot != 7:
-    print(f"[开工] 警告：robot_mode={robot} 不是 RUNNING(7)，控制器可能还没上使能。")
-PYCHECK
-SAFETY_CODE=$?
-if [ "$SAFETY_CODE" = "3" ]; then
-  echo "[开工] 安全模式不正常，已停止后续动作"
-  exit 3
+# 机器人就绪检查：safety 必须 NORMAL；若停在 IDLE/未使能则自动重挂（约 5 s，不再干等）
+python3 scripts/ensure_robot_ready.py
+READY_CODE=$?
+if [ "$READY_CODE" != "0" ]; then
+  echo "[开工] 机器人未就绪（code=$READY_CODE），已停止后续动作"
+  exit "$READY_CODE"
 fi
 
 # 夹爪不是 ROS 驱动（Windows COM9 + 可选常驻桥）；这里只确保"桥在或明确报告不在"，

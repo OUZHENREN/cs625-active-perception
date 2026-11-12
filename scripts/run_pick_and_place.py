@@ -2770,6 +2770,27 @@ def main() -> int:
                 if not coarse.exists():
                     step(name, False, f"NBV_NO_COARSE_POSE ({coarse.name})")
                     continue
+                # 先看"当前视角"是否已经够用：够用就不换位（省时间，也避免换到更差的视角）。
+                # 判据：1 组快速探针里，扶手覆盖率 ≥0.70 且覆盖率 ≥0.90。
+                probe_out = REPO / "runtime" / "measurements" / f"{target}_probe.json"
+                probe_cmd = [sys.executable, "-u", str(REPO / "scripts" / "measure_object.py"),
+                             "--preset", target, "--stage", "coarse", "--groups", "1",
+                             "--out", str(probe_out)]
+                if target != "workpiece":
+                    probe_cmd += ["--observe-pose", "slot_coarse"]
+                if not plan_only:
+                    run(probe_cmd, timeout=600.0)
+                    try:
+                        probe = json.loads(probe_out.read_text(encoding="utf-8"))
+                        handles = [(g.get("symmetry_check") or {}).get("handle_score") or 0.0
+                                   for g in probe.get("per_group", [])]
+                        coverage = float(probe.get("coverage_median") or 0.0)
+                        if handles and max(handles) >= 0.70 and coverage >= 0.90:
+                            step(name, True,
+                                 f"当前视角已可用（扶手 {max(handles):.2f}，覆盖 {coverage:.3f}），不换位")
+                            continue
+                    except (OSError, ValueError):
+                        node.get_logger().warn("[nbv] 探针结果读取失败，仍然尝试换视角")
                 command = [sys.executable, "-u", str(REPO / "scripts" / "plan_fine_view.py"),
                            "--measurements", str(coarse), "--group", "g00_m",
                            "--distance", str(getattr(cfg, "nbv_distance_m", 0.65)),

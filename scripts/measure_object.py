@@ -266,6 +266,18 @@ def main() -> int:
                 "verdict": "REFUSE", "coverage": 0.0, "translation_mm": 0.0,
                 "rotation_deg": 0.0, "credible": len(credible_rows),
                 "group_total": len(results), "reasons": [summary_reason]})
+        # 即使被判不合格也把结果写出来：面板要看每组的扶手分/覆盖率，
+        # 流程里的"快速探针"也要能读到这些中间量（否则只能靠退出码猜）。
+        if args.out:
+            pathlib.Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            pathlib.Path(args.out).write_text(json.dumps({
+                "stamp": stamp, "dataset": str(dataset), "stage": args.stage,
+                "groups": len(results), "verdict": "REFUSE",
+                "reasons": [summary_reason],
+                "coverage_median": round(float(np.median(
+                    [r.get("pose_fitness", 0.0) for r in good])), 4) if good else 0.0,
+                "per_group": results,
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
         return 2
 
     centres = np.array([row["pose_base"]["centre_mm"] for row in credible_rows])
