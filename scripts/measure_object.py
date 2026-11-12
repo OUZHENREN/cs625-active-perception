@@ -42,7 +42,8 @@ MAX_TRANSLATION_MM = 1.0
 MAX_ROTATION_DEG = 0.5
 
 
-def refine_pose_base(row: dict, directory, cad, bbox, base_cam) -> dict:
+def refine_pose_base(row: dict, directory, cad, bbox, base_cam,
+                     depth_window=(0.41, 1.10)) -> dict:
     """在 D2 位姿上做 D3 细配准，并把结果写回 pose_base。"""
     import fine_pose as fp
     from scipy.spatial.transform import Rotation as _R
@@ -52,7 +53,7 @@ def refine_pose_base(row: dict, directory, cad, bbox, base_cam) -> dict:
     pose[:3, :3] = _R.from_quat(row["pose_base"]["quaternion"]).as_matrix()
     pose[:3, 3] = row["pose_base"]["translation"]
     depth, k = cp.load_group(directory)
-    points, _ = cp.extract_workpiece(depth, k, 0.41, 1.10)
+    points, _ = cp.extract_workpiece(depth, k, *depth_window)
     pose_cam = np.linalg.inv(base_cam) @ pose
     points = cp.reject_with_pose(points, pose_cam, cad, threshold_m=0.02)
     refined_cam = fp.fine_icp(points, cad, pose_cam)
@@ -229,7 +230,8 @@ def main() -> int:
         # 精观测：在 D2 位姿上再做一次细配准（D3）。
         # 实测组间分散 3.44 mm → 0.08 mm（同一批数据），是达到 1.0 mm/0.5° 门的关键。
         if (not coarse_stage) and args.refine and "pose_base" in row:
-            row = refine_pose_base(row, directory, cad, bbox, base_cam)
+            row = refine_pose_base(row, directory, cad, bbox, base_cam,
+                                   depth_window=depth_window)
         height = cp.LAST_TABLE_HEIGHT[0]
         if height is not None:
             table_heights.append(float(height))

@@ -222,6 +222,14 @@ def print_model_summary(model: dict, model_path: pathlib.Path | None) -> None:
 
 # --------------------------------------------------------------------- runner
 def runner_command(effective: pathlib.Path, step: str, args) -> list[str]:
+    if (getattr(args, "world", "real") == "real"
+            and not getattr(args, "dry_run", False)
+            and not getattr(args, "plan_only", False)):
+        # 每次真机运行前重发一次外部控制脚本 + 恢复速度滑条：
+        # 示教器一旦接管过（本地控制），控制器会"接受但不执行"或报 PATH_TOLERANCE，
+        # 2026-11-12 一天之内踩了两次。
+        subprocess.run(["bash", str(REPO / "scripts" / "recover_control.sh")],
+                       capture_output=True, text=True, timeout=120)
     command = [sys.executable, "-u", str(RUNNER), "--config", str(effective),
                "--flow", flow_of(step),
                "--log", str(RUNTIME / f"phase_log_{step}.json")]
