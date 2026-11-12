@@ -109,10 +109,13 @@ def main() -> int:
     size = bbox[1] - bbox[0]
     narrow_area = float(max(min(size[1] * size[2], size[0] * size[1]), 1e-6))
 
+    # 所有者 2026-11-12：J6 只允许微调 ±45°，但 **前三轴可以大范围移动**（在既有工作空间内）。
+    # 所以候选不再限制在"当前视线 ±45°"，而是绕工件整圈；代价函数里把
+    # "前三轴大位移"当作正常、"后三轴（尤其 J6）位移"当作应避免的。
     to_part = centre - T_base_cam[:3, 3]
     azimuth0 = math.degrees(math.atan2(-to_part[1], -to_part[0]))
     candidates = []
-    for offset in (-45, -30, -15, 0, 15, 30, 45):
+    for offset in range(-180, 180, 20):
         for elevation in (15.0, 30.0, 45.0):
             az, el = math.radians(azimuth0 + offset), math.radians(elevation)
             direction = np.array([math.cos(el) * math.cos(az),
@@ -128,6 +131,7 @@ def main() -> int:
     # 改成"让 plan_pose_once 规划，再从轨迹末点读 J6"——这是真正会执行的解。
     ik_ok = 0
     best_delta = None
+    best_cost = None
     for score, offset, elevation, direction in candidates:
         camera = centre + direction * args.distance
         axis = (centre - camera) / np.linalg.norm(centre - camera)
@@ -156,23 +160,39 @@ def main() -> int:
             delta = math.degrees((j6_new - j6_now + math.pi) % (2 * math.pi) - math.pi)
             if best_delta is None or abs(delta) < abs(best_delta):
                 best_delta = delta
+            # 前三轴=主运动（允许大），后三轴=微调（越少越好）
+            wrist = sum(abs(last[i] - seed[i]) for i in (3, 4, 5))
+            proximal = sum(abs(last[i] - seed[i]) for i in (0, 1, 2))
+            cost = score - 0.02 * wrist
             print(f"  方位偏移 {offset:+d}° 俯角 {elevation:.0f}° 滚转 {roll_deg:+d}° "
-                  f"得分 {score:.4f} → 规划可达，ΔJ6 {delta:+.1f}°")
+                  f"得分 {score:.4f} ΔJ6 {delta:+.1f}° 腕 {wrist:.2f} rad "
+                  f"前三轴 {proximal:.2f} rad → 代价 {cost:.4f}")
             if abs(delta) > args.j6_limit:
                 continue
-            print(f"选定：方位偏移 {offset:+d}° 俯角 {elevation:.0f}° 滚转 {roll_deg:+d}°，"
-                  f"TCP {np.round(tcp, 3)}")
-            if not args.execute:
-                print("（未执行）")
-                return 0
+            if best_cost is None or cost > best_cost[0]:
+                best_cost = (cost, offset, elevation, roll_deg, tcp, quat, score, delta)
+            continue
+            if best_cost is not None and best_cost[0] == cost:
+                # 记住当前这条轨迹，等所有候选评完再决定
+                pathlib.Path("/tmp/nbv_best_plan.json").write_text(
+                    pathlib.Path("/tmp/nbv_move_plan.json").read_text())
+    print(f"规划成功 {ik_ok} 个；|ΔJ6| 最小 = "
+          f"{None if best_delta is None else round(abs(best_delta), 1)}°")
+    if best_cost is not None:
+        cost, offset, elevation, roll_deg, tcp, quat, score, delta = best_cost
+        print(f"选定：方位偏移 {offset:+d}° 俯角 {elevation:.0f}° 滚转 {roll_deg:+d}° "
+              f"得分 {score:.4f} ΔJ6 {delta:+.1f}° 代价 {cost:.4f} TCP {np.round(tcp, 3)}")
+        json.dump({"tcp": list(map(float, tcp)), "quat": list(map(float, quat))},
+                  open("/tmp/nbv_move.json", "w"))
+        if args.execute:
             moved = subprocess.run(
                 [sys.executable, str(REPO / "scripts" / "execute_assembly_chunks.py"),
-                 "/tmp/nbv_move_plan.json", "--time-scale", "2.0", "--dwell", "0.5",
+                 "/tmp/nbv_best_plan.json", "--time-scale", "2.0", "--dwell", "0.5",
                  "--goal-tolerance", "0.005"], capture_output=True, text=True, timeout=600)
             print("   执行:", (moved.stdout or "").strip().splitlines()[-1])
             return 0 if moved.returncode == 0 else 1
-    print(f"规划成功 {ik_ok} 个；|ΔJ6| 最小 = "
-          f"{None if best_delta is None else round(abs(best_delta), 1)}°")
+        print("（未执行）")
+        return 0
     print("没有满足约束（J6 ±45° + 可达）的候选")
     return 2
 

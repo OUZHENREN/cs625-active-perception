@@ -77,7 +77,13 @@ def analyse(directory: pathlib.Path, cad_points: np.ndarray, template: tuple) ->
     shift_mm = float(np.linalg.norm(refined[:3, 3] - pose[:3, 3]) * 1000.0)
     angle_deg = float(np.degrees((R.from_matrix(np.array(refined[:3, :3]))
                                   * R.from_matrix(np.array(pose[:3, :3])).inv()).magnitude()))
-    refine_rejected = shift_mm > 10.0 or angle_deg > 2.0
+    # 守卫（2026-11-12 修订）：原来的"位移 >10 mm 就拒绝"会误杀正确的精配准——
+    # 实测两组分别移动 8.7 / 11.2 mm，但覆盖率与 RMSE 都变好、组间分散从 3.44 mm 掉到 0.08 mm。
+    # 所以判据改成"位移上限放宽到 20 mm / 2°，并要求覆盖率确实提升"，以覆盖率为准。
+    fit_before, rmse_before = coverage(cloud, cad_points, pose)
+    fit_after, _rmse_after = coverage(cloud, cad_points, refined)
+    refine_rejected = (shift_mm > 20.0 or angle_deg > 2.0
+                       or fit_after + 1e-6 < fit_before)
     if refine_rejected:
         refined = pose
     flipped_init = refined @ FLIP

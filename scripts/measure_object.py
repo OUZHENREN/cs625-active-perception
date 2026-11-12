@@ -42,6 +42,44 @@ MAX_TRANSLATION_MM = 1.0
 MAX_ROTATION_DEG = 0.5
 
 
+def refine_pose_base(row: dict, directory, cad, bbox, base_cam) -> dict:
+    """在 D2 位姿上做 D3 细配准，并把结果写回 pose_base。"""
+    import fine_pose as fp
+    from scipy.spatial.transform import Rotation as _R
+    if base_cam is None:
+        return row
+    pose = np.eye(4)
+    pose[:3, :3] = _R.from_quat(row["pose_base"]["quaternion"]).as_matrix()
+    pose[:3, 3] = row["pose_base"]["translation"]
+    depth, k = cp.load_group(directory)
+    points, _ = cp.extract_workpiece(depth, k, 0.41, 1.10)
+    pose_cam = np.linalg.inv(base_cam) @ pose
+    points = cp.reject_with_pose(points, pose_cam, cad, threshold_m=0.02)
+    refined_cam = fp.fine_icp(points, cad, pose_cam)
+    refined = base_cam @ refined_cam
+    fit_before, _ = fp.coverage(points, cad, pose_cam)
+    fit_after, rmse_after = fp.coverage(points, cad, refined_cam)
+    shift = float(np.linalg.norm(refined_cam[:3, 3] - pose_cam[:3, 3]) * 1000.0)
+    if shift > 20.0 or fit_after + 1e-6 < fit_before:
+        row["refine"] = {"accepted": False, "shift_mm": round(shift, 2),
+                         "coverage_before": round(fit_before, 4),
+                         "coverage_after": round(fit_after, 4)}
+        return row
+    centre_obj = (bbox[0] + bbox[1]) / 2
+    row["pose_base"] = {
+        "translation": [round(float(v), 5) for v in refined[:3, 3]],
+        "quaternion": [round(float(v), 6) for v in
+                       _R.from_matrix(np.array(refined[:3, :3])).as_quat()],
+        "centre_mm": [round(float(v) * 1000, 1) for v in
+                      (refined[:3, :3] @ centre_obj + refined[:3, 3])],
+    }
+    row["refine"] = {"accepted": True, "shift_mm": round(shift, 2),
+                     "coverage_before": round(fit_before, 4),
+                     "coverage_after": round(fit_after, 4),
+                     "rmse_mm": round(rmse_after, 2)}
+    return row
+
+
 def publish_stage(node, stage: str, payload: dict) -> None:
     """把视觉流程的每一步发到 /vision_stage（面板订阅它，把"黑盒"摊开）。"""
     try:
@@ -62,6 +100,8 @@ def main() -> int:
     parser.add_argument("--preset", choices=["workpiece", "slot"], default="workpiece",
                         help="workpiece=弹仓（用扶手判据）；slot=插槽夹具（用整体覆盖率判据）")
     parser.add_argument("--template", default=None)
+    parser.add_argument("--no-refine", dest="refine", action="store_false",
+                        help="fine 阶段不做 D3 细配准（默认做）")
     parser.add_argument("--stage", choices=["coarse", "fine"], default="fine",
                         help="coarse=只要能给出一个'够用来算精观测位'的粗略位姿（5–20 mm 可接受）；"
                              "fine=严格质量门（给最终位姿）")
@@ -159,6 +199,7 @@ def main() -> int:
         print(f"夹具先验：中心 {np.round(centre, 3)}，球裁半径 {radius:.2f} m")
     print(f"深度窗：{depth_window[0]:.2f}–{depth_window[1]:.2f} m")
     # 视觉流程进度：有 rclpy 就发 /vision_stage，没有就只打印
+    coarse_stage = args.stage == "coarse"
     stage_node = None
     try:
         import rclpy
@@ -175,10 +216,18 @@ def main() -> int:
 
     results = []
     for directory in sorted(dataset.glob("g*")):
-        results.append(cp.analyse_group(directory, bbox, cad, depth_window, base_cam,
+        row = cp.analyse_group(directory, bbox, cad, depth_window, base_cam,
                                         focus=focus, use_feature=use_feature,
                                         prior_pose_base=prior_pose_base,
-                                        progress=progress))
+                                        progress=progress)
+        # 记录采集时的相机位：没有它，事后无法在离线数据上复算（机械臂一动就不可复现）
+        if base_cam is not None:
+            row["T_base_cam"] = [[round(float(v), 6) for v in line] for line in base_cam]
+        # 精观测：在 D2 位姿上再做一次细配准（D3）。
+        # 实测组间分散 3.44 mm → 0.08 mm（同一批数据），是达到 1.0 mm/0.5° 门的关键。
+        if (not coarse_stage) and args.refine and "pose_base" in row:
+            row = refine_pose_base(row, directory, cad, bbox, base_cam)
+        results.append(row)
     good = [row for row in results if "pose_base" in row]
     if not good:
         print("所有组都没出位姿", file=sys.stderr)
@@ -187,8 +236,6 @@ def main() -> int:
     # 只统计"可信组"：位姿有效 + 对称解未判不可用。
     # 退化组（例如只有两个可见面）的解本身是错的，若把它算进重复性，
     # 会把一次本来合格的测量判成不合格（实测：3 组正解 0.1°，1 组退化把重复性拉到 3.9°）。
-    coarse_stage = args.stage == "coarse"
-
     def credible(row) -> bool:
         check = row.get("symmetry_check") or {}
         if coarse_stage:
@@ -254,6 +301,8 @@ def main() -> int:
         "flip_ambiguous_groups": ambiguous,
         "degenerate_groups_dropped": dropped,
         "stage": args.stage,
+        "T_base_cam": ([[round(float(v), 6) for v in line] for line in base_cam]
+                       if base_cam is not None else None),
         "verdict": verdict,
         "reasons": reasons,
         "per_group": [{k: row.get(k) for k in
