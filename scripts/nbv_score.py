@@ -40,6 +40,58 @@ HANDEYE = REPO / "config" / "handeye" / "tcp_to_camera.json"
 TEMPLATE = pathlib.Path.home() / "cs625_rvs_archive" / "models_20261023" / "弹仓_装配导出.STL"
 
 
+def upright_tool_rotation(view_dir: np.ndarray) -> np.ndarray:
+    """让相机画面"正过来"的工具姿态。
+
+    手眼关系：相机 z = 工具 +z（光轴），相机 y(画面上) = 工具 +x，相机 x(画面右) = 工具 −y。
+    所以要让画面里的"上"是世界 +z，就必须让 **工具 +x 指向世界上方**；
+    之前的"从当前姿态做最短弧摆动"会把这个滚转原样带过去，
+    结果相机沿法兰 z 转了约 90°，画面是横的（所有者 2026-11-12 指出）。
+    """
+    z_axis = -np.asarray(view_dir, dtype=float)          # 光轴 = 从相机指向工件
+    z_axis /= np.linalg.norm(z_axis)
+    # ROS 相机光学系：x 向右、y 向下、z 向前。画面里的"上"是 −y_cam，
+    # 而 y_cam = 工具 +x，所以要让画面正过来，必须让【工具 +x 指向世界下方】。
+    # （之前取成"指向上方"，画面就整幅转了 180°——所有者 2026-11-12 指出。）
+    world_up = np.array([0.0, 0.0, 1.0])
+    x_axis = -(world_up - np.dot(world_up, z_axis) * z_axis)
+    if np.linalg.norm(x_axis) < 1e-6:                     # 几乎垂直向下看
+        x_axis = np.array([-1.0, 0.0, 0.0])
+    x_axis /= np.linalg.norm(x_axis)
+    y_axis = np.cross(z_axis, x_axis)
+    return np.column_stack([x_axis, y_axis, z_axis])
+
+
+def read_joint(name: str):
+    """读一个关节角的当前值（弧度）。"""
+    import subprocess
+    completed = subprocess.run(["ros2", "topic", "echo", "/joint_states", "--once"],
+                               capture_output=True, text=True, timeout=20)
+    text = completed.stdout or ""
+    inside = False
+    names = []
+    positions = []
+    section = None
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("name:"):
+            section = "n"
+            names.append(stripped.split(":", 1)[1].strip().strip("[]',\""))
+        elif stripped.startswith("position:"):
+            section = "p"
+            positions.append(stripped.split(":", 1)[1].strip().strip("[]"))
+        elif section == "n" and stripped.startswith("- ") or (
+                section == "n" and stripped.startswith("'")):
+            names.append(stripped.strip("- ").strip("',\""))
+        elif section == "p" and stripped and stripped[0].isdigit() or (
+                section == "p" and stripped.startswith("-")):
+            positions.append(stripped.strip("',\""))
+    try:
+        return float(positions[names.index(name)])
+    except (ValueError, IndexError):
+        return None
+
+
 def read_tcp():
     import subprocess
     completed = subprocess.run(
@@ -137,9 +189,26 @@ def main() -> int:
     print(f"工件尺寸 {np.round(size, 3)} m，窄面面积阈值 {narrow_area:.3f} m²，"
           f"中心 {np.round(centre, 3)}")
 
+    # 相机/电机线缆限制（所有者 2026-11-12）：J6 相对当前角度不允许超过 ±45°；
+    # 观测方向同理只允许在当前视线 ±45° 内微调（这个范围已足够看到两个侧面）。
+    handeye0 = json.loads(HANDEYE.read_text())
+    T_tcp_cam0 = np.array(handeye0["T_tcp_cam"])
+    tcp_now = read_tcp()
+    if tcp_now is None:
+        print("读不到 TCP", file=sys.stderr)
+        return 2
+    T_base_cam_initial = tcp_now @ T_tcp_cam0
+    j6_now = read_joint("wrist_3_joint")
+    print(f"当前 J6 = {None if j6_now is None else round(np.degrees(j6_now), 1)}°，"
+          f"候选限制在视线 ±45°")
+    horizon_cam = T_base_cam_initial[:3, 3]
+    centre_dir = centre - horizon_cam
+    # direction 是"工件→相机"，所以方位角要取相机相对工件的方向（即 centre_dir 的反向）
+    azimuth0 = float(np.degrees(np.arctan2(-centre_dir[1], -centre_dir[0])))
     candidates = []
-    for azimuth in np.arange(0, 360, 30):
-        for elevation in (15.0, 30.0, 45.0):
+    for offset in (-45, -30, -15, 0, 15, 30, 45):
+      for elevation in (15.0, 30.0, 45.0):
+        for azimuth in (azimuth0 + offset,):
             az, el = np.radians(azimuth), np.radians(elevation)
             direction = np.array([np.cos(el) * np.cos(az), np.cos(el) * np.sin(az),
                                   np.sin(el)])
@@ -168,13 +237,7 @@ def main() -> int:
             tried += 1
             camera = centre + direction * args.distance
             axis = (centre - camera) / np.linalg.norm(centre - camera)
-            current_axis = T_base_cam[:3, :3][:, 2]
-            cross = np.cross(current_axis, axis)
-            sine = float(np.linalg.norm(cross))
-            cosine = float(np.dot(current_axis, axis))
-            swing = (np.eye(3) if sine < 1e-9
-                     else R.from_rotvec(cross / sine * np.arctan2(sine, cosine)).as_matrix())
-            rotation = swing @ T_base_cam[:3, :3]
+            rotation = upright_tool_rotation(-axis)
             tcp = camera - rotation @ T_tcp_cam[:3, 3]
             quat = R.from_matrix(rotation).as_quat()
             command = [sys.executable, str(REPO / "scripts" / "plan_pose_once.py"),
