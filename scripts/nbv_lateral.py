@@ -137,7 +137,9 @@ def probe():
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--offsets-mm", default="-280,-200,-120,120,200,280")
+    parser.add_argument("--offsets-mm", default="-120,-200,-280,120,200,280",
+                        help="横向偏移（mm）；负号=与 left 向量相反的一侧。"
+                             "默认先试负侧——所有者 2026-11-12：先向左侧移动才拍得到左侧面")
     parser.add_argument("--max-wrist-deg", type=float, default=25.0,
                         help="后三轴允许的最大变化（度）；超过由规划器直接拒绝")
     parser.add_argument("--execute", action="store_true")
@@ -168,6 +170,7 @@ def main() -> int:
     view /= max(np.linalg.norm(view), 1e-9)
     left = np.array([-view[1], view[0], 0.0])
     print("视线(水平) =", np.round(view, 3), " 左方向 =", np.round(left, 3))
+    print("提示：正偏移 = 沿左方向；负偏移 = 沿右方向。先试负侧再试正侧。")
 
     # 出发前先确认"当前视角里真的有工件"：否则横移只是在盲走。
     # 2026-11-12 的教训：机械臂停在插槽一侧时直接跑 NBV，探针覆盖只有 0.31，

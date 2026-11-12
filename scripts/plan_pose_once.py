@@ -126,7 +126,6 @@ def main() -> int:
     future = client.call_async(request)
     rclpy.spin_until_future_complete(node, future, timeout_sec=arguments.budget + 25.0)
     response = future.result()
-    rclpy.shutdown()
     if response is None:
         print("plan timed out")
         return 5
@@ -155,7 +154,7 @@ def main() -> int:
         (abs(point.positions[index] - base_positions[index]) for point in points
          for index in wrist_indices),
         default=0.0)
-    wrist_limit = float(np.radians(arguments.max_wrist_delta))
+    wrist_limit = float(_np.radians(arguments.max_wrist_delta))
     if wrist_delta > wrist_limit:
         print(f"code 3 points {len(points)} duration {duration:.2f}s "
               f"wrist_delta {wrist_delta:.2f} rad -- REFUSED: 腕部转动超过 "
