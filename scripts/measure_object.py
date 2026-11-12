@@ -215,11 +215,14 @@ def main() -> int:
             publish_stage(stage_node, stage, payload)
 
     results = []
-    for directory in sorted(dataset.glob("g*")):
+    table_heights: list[float] = []
+    for index, directory in enumerate(sorted(dataset.glob("g*"))):
+        prior = None if not table_heights else float(np.median(table_heights))
         row = cp.analyse_group(directory, bbox, cad, depth_window, base_cam,
+                               table_prior=prior,
                                         focus=focus, use_feature=use_feature,
-                                        prior_pose_base=prior_pose_base,
-                                        progress=progress)
+                               prior_pose_base=prior_pose_base,
+                               progress=progress)
         # 记录采集时的相机位：没有它，事后无法在离线数据上复算（机械臂一动就不可复现）
         if base_cam is not None:
             row["T_base_cam"] = [[round(float(v), 6) for v in line] for line in base_cam]
@@ -227,6 +230,10 @@ def main() -> int:
         # 实测组间分散 3.44 mm → 0.08 mm（同一批数据），是达到 1.0 mm/0.5° 门的关键。
         if (not coarse_stage) and args.refine and "pose_base" in row:
             row = refine_pose_base(row, directory, cad, bbox, base_cam)
+        height = cp.LAST_TABLE_HEIGHT[0]
+        if height is not None:
+            table_heights.append(float(height))
+            row["table_height_m"] = round(float(height), 4)
         results.append(row)
     good = [row for row in results if "pose_base" in row]
     if not good:
@@ -261,7 +268,10 @@ def main() -> int:
 
     centres = np.array([row["pose_base"]["centre_mm"] for row in credible_rows])
     from scipy.spatial.transform import Rotation as R
-    rotations = [R.from_matrix(np.array(row["pose"]["rotation"])) for row in credible_rows]
+    # 姿态重复性必须用【最终位姿】pose_base——D3 只更新 pose_base，
+    # 用相机系的 pose（D2 结果）会把已修正的差异当成"重复性差"（实测报 1.31°，
+    # 而最终位姿之间只有 0.05–0.08°）。
+    rotations = [R.from_quat(row["pose_base"]["quaternion"]) for row in credible_rows]
     translation_spread = float(np.linalg.norm(centres.max(axis=0) - centres.min(axis=0)))
     rotation_spread = max(
         float(np.degrees((rotations[i].inv() * rotations[j]).magnitude()))

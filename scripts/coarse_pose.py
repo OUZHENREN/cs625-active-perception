@@ -349,7 +349,8 @@ def height_crop(points: np.ndarray, T_base_cam: np.ndarray, clearance_m: float =
 
 def remove_table(points: np.ndarray, T_base_cam: np.ndarray,
                  max_angle_deg: float = 15.0, thickness_m: float = 0.015,
-                 attempts: int = 6) -> np.ndarray:
+                 attempts: int = 6, height_prior: float | None = None,
+                 prior_band_m: float = 0.05) -> np.ndarray:
     """在 base 系里剔掉桌面：找法向接近竖直的大平面，删掉它附近的点。
 
     为什么必须在 base 系做：相机是斜着装的，"桌面"在相机系里没有简单的法向特征；
@@ -362,6 +363,12 @@ def remove_table(points: np.ndarray, T_base_cam: np.ndarray,
         return points
     base_points = (T_base_cam[:3, :3] @ points.T).T + T_base_cam[:3, 3]
     remaining = base_points.copy()
+    if height_prior is not None:
+        # 已知桌面高度（来自同批其他组的共识）时，只在 ±prior_band 的高度带里拟合平面。
+        # 这一步专门治"个别组把夹具顶面/其他水平面当成桌面"（实测把 −0.109 拟成 −0.052）。
+        band = np.abs(base_points[:, 2] - height_prior) <= prior_band_m
+        if int(band.sum()) >= MIN_POINTS:
+            remaining = base_points[band]
     for attempt in range(attempts):
         if len(remaining) < MIN_POINTS:
             break
@@ -377,7 +384,9 @@ def remove_table(points: np.ndarray, T_base_cam: np.ndarray,
             height = float(np.mean(plane_points[:, 2]))
             distance = np.abs(base_points[:, 2] - height)
             keep = distance > thickness_m
-            print(f"   [table] 桌面在 base z={height:.3f} m，剔除 {int((~keep).sum())} 点"
+            print(f"   [table] 桌面在 base z={height:.3f} m"
+                  f"{'（先验带内）' if height_prior is not None else ''}，"
+                  f"剔除 {int((~keep).sum())} 点"
                   f"（剩 {int(keep.sum())}）", flush=True)
             LAST_TABLE_HEIGHT[0] = height
             return points[keep]
@@ -618,7 +627,7 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
                   use_feature: bool = True,
                   feature_region=None,
                   prior_pose_base: np.ndarray | None = None,
-                  progress=None) -> dict:
+                  progress=None, table_prior: float | None = None) -> dict:
     o3d.utility.random.seed(7)          # RANSAC 可复现：不加这句同一组数据两次跑出不同结果
     depth, k = load_group(directory)
     expected = None
@@ -632,7 +641,7 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         info.update(guided)
     if T_base_cam is not None:
         LAST_TABLE_HEIGHT[0] = None
-        points = remove_table(points, T_base_cam)      # 先剔桌面（在整块云上找平面最稳）
+        points = remove_table(points, T_base_cam, height_prior=table_prior)
         points = height_crop(points, T_base_cam)       # 再把"躺在桌面上的薄件"裁掉
     if T_base_cam is not None and focus is not None:
         points = focus_crop(points, T_base_cam, focus[0], focus[1])
