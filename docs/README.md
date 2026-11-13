@@ -24,6 +24,7 @@
 |---|---|
 | [`worklogs/2026-11/2026-11-13_HANDOFF_VISION_MILESTONE.md`](worklogs/2026-11/2026-11-13_HANDOFF_VISION_MILESTONE.md) | **最新交接**：视觉里程碑现状、可用能力表、安全红线、未完成项 |
 | [`plans/2026-11.md`](plans/2026-11.md) | **本月做什么**：三件交付、每周产物、验收线、明确不做 |
+| [`plans/2026-11-13_PLAN_NBV_CHAPTER.md`](plans/2026-11-13_PLAN_NBV_CHAPTER.md) | **NBV 这一章怎么写**：章纲、三个贡献点、E1–E5 实验协议、限制与预期图表 |
 | [`worklogs/2026-11/2026-11-13_WORKLOG_P7_ARCHIVE_AND_PLAN_A.md`](worklogs/2026-11/2026-11-13_WORKLOG_P7_ARCHIVE_AND_PLAN_A.md) | 11-13 全天：P7 归档、方案 A 选站、文档纠错 |
 
 ## 先看这几份（按顺序）
