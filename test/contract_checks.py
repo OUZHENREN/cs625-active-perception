@@ -214,9 +214,11 @@ def check_environment_contract() -> None:
         )
 
 
-# sim_control reads the P7 attachment switch from the environment, so passing it
-# as an include argument would be a no-op that IncludeLaunchDescription also turns
-# into a global launch configuration -- the leak documented in sim_base.launch.py.
+# sim_control used to read the P7 attachment switch from the environment, so
+# passing it as an include argument would be a no-op that IncludeLaunchDescription
+# also turns into a global launch configuration -- the leak documented in
+# sim_base.launch.py.  The switch itself was removed from the xacro on 2026-11-13
+# with the P7 archive; this check stays so nobody silently reintroduces the arg.
 TASK_SCENE_FORBIDDEN_ARGS = ("p7_attachment_enabled",)
 
 # Documented commands must be copy-pasteable.  No test/*.sh carries an executable
@@ -443,7 +445,8 @@ def check_cs625_task_scene() -> None:
         print(
             f"  SKIP {P7_1_OBSERVATION_DIAGNOSTIC.name}: solved against an older "
             "cs625_active_perception.urdf.xacro (P7.1 archived 2026-10-24; "
-            "re-solve with test/p7_solve_static_observation_pose.py if revived)"
+            "re-solve with docs/archive/2026-11-13-p7-nbv-legacy-code/test/"
+            "p7_solve_static_observation_pose.py if revived)"
         )
     candidate = diagnostic["candidate"]
     projection = candidate["projection"]
@@ -455,9 +458,13 @@ def check_cs625_task_scene() -> None:
         fail("the recorded P7.1 observation pose was not solved with --lock-proximal")
     if candidate["occlusion_audit_by_repository"]["occludes_target"]:
         fail("the real gripper occludes the target from the recorded P7.1 pose")
-    # The solver seeds from the safe state and must not wander far from it.
+    # The solver seeds from the safe state and must not wander far from it.  The
+    # initial-position file moved to the 2026-11-13 P7 archive together with the
+    # rest of the P7.1 pipeline; the check keeps reading it from there so this
+    # historical consistency test stays verifiable.
     initial = yaml.safe_load(
-        (ROOT / "src/cs625_bringup/config/p7_1_observation_initial_positions.yaml")
+        (ROOT / "docs/archive/2026-11-13-p7-nbv-legacy-code/src_cs625_bringup/config"
+         / "p7_1_observation_initial_positions.yaml")
         .read_text(encoding="utf-8")
     )
     for joint, value in candidate["joint_positions_rad"].items():

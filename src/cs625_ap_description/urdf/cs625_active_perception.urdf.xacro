@@ -54,7 +54,6 @@
   <xacro:arg name="camera_noise_stddev" default="0.003"/>
   <xacro:arg name="camera_enabled" default="true"/>
   <xacro:arg name="simulation_controllers" default=""/>
-  <xacro:arg name="p7_attachment_enabled" default="true"/>
   <xacro:arg name="headless_mode" default="false"/>
 
   <xacro:arg name="robot_ip" default="0.0.0.0"/>
@@ -81,10 +80,11 @@
        rather than editing by hand.
 
        What changed and why.  The previous default was (0.03, 0, 0.15) tilted 45
-       degrees, tuned against the placeholder gripper so that P7.1's marker stayed
-       out of the palm's shadow.  The real camera looks straight down the tool axis
-       from about 97 mm out.  P7.1's sensor gate was therefore re-run against this
-       pose; its earlier evidence belonged to the placeholder and is not current.
+       degrees, tuned against the placeholder gripper so that the marker stayed
+       out of the palm's shadow.  The real camera looks straight down the tool
+       axis from about 97 mm out; the sensor gate was re-run against this pose
+       (its earlier evidence belonged to the placeholder and is not current;
+       the archived 2026-11-13 P7 records keep that history).
 
        camera_link anchors on the DEPTH eye so that the Gazebo rgbd_camera, which
        looks along camera_link +X, coincides exactly with
@@ -171,37 +171,23 @@
         <parameters>$(arg simulation_controllers)</parameters>
         <!-- gz_ros2_control maps the position interface to a velocity
              setpoint.  Its default 0.1 gain leaves the heavy CS625 fixture
-             materially behind a retimed P7 trajectory; 0.5 is within the
+             materially behind a retimed trajectory; 0.5 is within the
              Jazzy documented non-oscillatory range (<= 1) and is simulation
              only. -->
         <position_proportional_gain>0.5</position_proportional_gain>
         <controller_manager_name>$(arg prefix)controller_manager</controller_manager_name>
       </plugin>
-      <!-- P7 attachment-assisted grasp mechanism.  Gazebo's official
-           DetachableJoint starts attached, so a P7 episode must explicitly
-           publish /p7/attachment/detach during reset and may only publish
-           /p7/attachment/attach after its geometric pre-grasp gate passes.
-           This is an attachment state, not evidence of frictional contact. -->
-      <xacro:if value="$(arg p7_attachment_enabled)">
-        <plugin filename="gz-sim-detachable-joint-system"
-                name="gz::sim::systems::DetachableJoint">
-        <!-- Gazebo collapses the fixed tool / gripper chain when converting
-             the URDF; wrist_3_link is the terminal non-lumped actuated link
-             that remains addressable in the running CS625 model. -->
-        <parent_link>$(arg prefix)wrist_3_link</parent_link>
-        <child_model>target_object</child_model>
-        <child_link>target_link</child_link>
-        <detach_topic>/p7/attachment/detach</detach_topic>
-        <attach_topic>/p7/attachment/attach</attach_topic>
-          <output_topic>/p7/attachment/state</output_topic>
-        </plugin>
-      </xacro:if>
+      <!-- The carry/attach DetachableJoint is NOT declared here.  It is injected
+           by scripts/sim_robot_description.py (parent wrist_3_link, child
+           shielding_module, topics /cs625/carry/*) when the current task world
+           is built.  The archived P7-era attach block (child target_object,
+           /p7/attachment/*) was removed on 2026-11-13 with the P7 archive. -->
     </gazebo>
-    <!-- P7 validates task geometry and controller/TF consistency, not
+    <!-- The simulation validates task geometry and controller/TF consistency, not
          force-accurate robot dynamics.  Make the robot's own articulated
          links gravity-free so a position command is not torque-saturated by
-         the synthetic arm mass.  The YCB target remains dynamic in the world
-         and the attachment mechanism is still explicitly labelled kinematic.
+         the synthetic arm mass.  The workpiece remains dynamic in the world
+         and the carry/attach mechanism is still explicitly labelled kinematic.
          This never applies to a real-robot profile. -->
     <gazebo reference="$(arg prefix)base_link"><gravity>false</gravity></gazebo>
     <gazebo reference="$(arg prefix)shoulder_link"><gravity>false</gravity></gazebo>
@@ -321,22 +307,11 @@
        gripper_right_finger_joint" on every cycle, i.e. collision checking and
        planning ran on an incomplete robot state.
        The simulation profiles still instantiate it (the Gazebo controllers need
-       the joints), together with the p7 grasp-centre frame that hangs off it. -->
+       the joints).  The P7-era grasp-centre frame that used to hang off the
+       gripper base was removed on 2026-11-13 with the P7 archive. -->
   <xacro:if value="${('$(arg sim_gazebo)' == 'true') or ('$(arg sim_ignition)' == 'true')}">
     <xacro:cs625_parallel_gripper parent="$(arg prefix)tool0" prefix="$(arg prefix)"
         sim_gazebo="$(arg sim_gazebo)" sim_ignition="$(arg sim_ignition)"/>
-
-    <!-- Grasp centre between the two support arms.  Massless and collision-free.
-         The arms are 146 mm tall centred on Z = 77 mm, so this frame sits at the
-         middle of the contact area on the tool axis. -->
-    <link name="$(arg prefix)p7_grasp_center_link"/>
-    <joint name="$(arg prefix)gripper_base_to_p7_grasp_center" type="fixed">
-      <parent link="$(arg prefix)gripper_base_link"/>
-      <child link="$(arg prefix)p7_grasp_center_link"/>
-      <!-- Between the two support arms, on the tool axis.  The old 0.080 m along X
-           was the placeholder jaw's pad centre and pointed along the wrong axis. -->
-      <origin xyz="0 0 0.077" rpy="0 0 0"/>
-    </joint>
   </xacro:if>
 
   <xacro:cs625_eye_in_hand_camera

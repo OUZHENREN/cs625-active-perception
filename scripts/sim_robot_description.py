@@ -138,7 +138,7 @@ def inject_plugin_gain(xml: str, gain: float) -> str:
     declared / invalid name / wrong type" 这些字符串）。2026-10-26 00:30 的实测：
     只写进 <hardware><param> 时 pre_grasp 末端跟踪误差仍有 0.042~0.062 rad（> 0.01
     容差 → 动作 ABORT）。所以两处都写，值一致，避免"到底读了哪一处"这种暗坑。
-    插件块不存在时原样返回（包装层走 P7 路径时可能已经有）。
+    插件块不存在时原样返回（其它包装层可能已经注入过）。
     """
 
     element = f"<position_proportional_gain>{gain:g}</position_proportional_gain>"
@@ -332,8 +332,9 @@ def inject_gripper(xml: str) -> str:
 def inject_detachable_joint(xml: str) -> str:
     """把 Gazebo 的 DetachableJoint 插件追加到 </robot> 之前（仿真附着机制）。
 
-    幂等：描述里已经有 gz-sim-detachable-joint-system 就不重复注入（例如仓库
-    包装层的 P7 附件机制已经带了一个）。parent_link 从展开后的 URDF 里取真实名字，
+    幂等：描述里已经有 gz-sim-detachable-joint-system 就不重复注入（历史
+    P7 附着块已于 2026-11-13 归档并从 xacro 移除，此检查仍保留以防御其它
+    注入源）。parent_link 从展开后的 URDF 里取真实名字，
     取不到就原样返回并在 stderr 说一句，绝不猜名字（猜错的表现是插件 Configure
     直接失败、连话题都不会建）。
     """

@@ -2,7 +2,7 @@ import math
 
 import pytest
 
-from cs625_task_orchestrator.p7_gazebo_pose import parse_gz_model_pose
+from cs625_task_orchestrator.gazebo_pose import parse_gz_model_pose
 
 
 SAMPLE = """Requesting state for world [p7_ycb_tomato_light]...\n\nModel: [8]\n\n- Name: target_object\n\n- Pose [ XYZ (m) ] [ RPY (rad) ]:\n\n[0.719173 | 0.001108 | 0.120095]\n\n[-0.001445 | -0.000335 | -0.006715]\n"""

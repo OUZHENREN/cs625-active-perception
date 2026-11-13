@@ -12,7 +12,7 @@ module at ANY module pose is one composition:
 
 Nothing here re-derives a pose per waypoint; the waypoints are the same transform
 evaluated at the module poses the task visits.  That is also why a pose observed by
-P7.2 can be grasped without touching this module.
+the archived P7.2 estimators can be grasped without touching this module.
 """
 
 from __future__ import annotations

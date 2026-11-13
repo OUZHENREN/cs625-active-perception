@@ -42,7 +42,7 @@ TASK_SCENE = ROOT / "src/cs625_bringup/config/cs625_task_scene.yaml"
 GRASP_TEMPLATE = ROOT / "src/cs625_bringup/config/cs625_grasp_template.yaml"
 SEQUENCE = ROOT / "src/cs625_bringup/config/cs625_insertion_sequence.yaml"
 URDF_XACRO = ROOT / "src/cs625_ap_description/urdf/cs625_active_perception.urdf.xacro"
-SAFE_INITIAL = ROOT / "src/cs625_bringup/config/p7_safe_initial_positions.yaml"
+SAFE_INITIAL = ROOT / "src/cs625_bringup/config/cs625_safe_initial_positions.yaml"
 
 TIP_LINK = "my_end_effector_link"
 JOINT_NAMES = (

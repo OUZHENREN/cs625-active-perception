@@ -228,8 +228,8 @@ def generate_launch_description() -> LaunchDescription:
             #  这些……绝对不是几个方块的，而是具体的 CAD 模型"。
             # 厂商 cs625.urdf.xacro 的 my_end_effector_link 挂 tool0_vision.STL，
             # 一个 CAD 网格里同时含夹爪 + 两条支撑臂 + 相机安装座 + 相机。
-            # 仓库包装层（cs625_ap_description）只保留给 P7 时代的其它仿真 launch，
-            # 不再是六模式仿真的默认；要显式切回仍可传参数，不删任何文件。
+            # 仓库包装层（cs625_ap_description）仍保留给需要仓库包装层的仿真
+            # launch，不再是六模式仿真的默认；要显式切回仍可传参数，不删任何文件。
             DeclareLaunchArgument(
                 "description_package",
                 default_value="eli_cs_robot_description",

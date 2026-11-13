@@ -7,7 +7,6 @@ the transient-local robot_description topic, and controllers are spawned only
 after entity creation succeeds.
 """
 
-import os
 import pathlib
 
 import yaml
@@ -82,9 +81,6 @@ def _compose(context):
             LaunchConfiguration("controllers_file"),
         ]
     )
-    attachment_enabled = os.getenv("CS625_P7_ATTACHMENT_ENABLED", "true").lower()
-    if attachment_enabled not in ("true", "false"):
-        raise ValueError("CS625_P7_ATTACHMENT_ENABLED must be true or false")
     gazebo_model_path = LaunchConfiguration("gazebo_model_file")
     # gz_ros2_control is configured by the robot model to read
     # ``robot_description`` from this node.  Publish the exact renderer-safe
@@ -207,8 +203,6 @@ def _compose(context):
         controllers_path,
         "initial_positions_file:=",
         LaunchConfiguration("initial_positions_file"),
-        "p7_attachment_enabled:=",
-        attachment_enabled,
     ] + camera_arguments()
     prepare_gazebo_model = ExecuteProcess(
         cmd=prepare_gazebo_model_cmd,
@@ -415,7 +409,7 @@ def generate_launch_description():
             ),
             DeclareLaunchArgument(
                 "initial_detach_topic",
-                default_value="/p7/attachment/detach",
+                default_value="/cs625/carry/detach",
                 description="Absolute Gazebo transport topic used by initial_detach.",
             ),
             DeclareLaunchArgument("world_file", default_value="empty.sdf"),

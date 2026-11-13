@@ -402,7 +402,7 @@ def generate_launch_description():
                         "IK branch than the real one and the 2.6 rad branch guard then "
                         "refuses the first observation."),
         DeclareLaunchArgument("initial_detach", default_value="false", description="Publish a one-shot Gazebo DetachableJoint detach command after robot spawn."),
-        DeclareLaunchArgument("initial_detach_topic", default_value="/p7/attachment/detach", description="Absolute Gazebo transport detach topic used when initial_detach is true."),
+        DeclareLaunchArgument("initial_detach_topic", default_value="/cs625/carry/detach", description="Absolute Gazebo transport detach topic used when initial_detach is true."),
         DeclareLaunchArgument("prefix", default_value="", description="Optional TF and joint-name prefix; must match the underlay controller configuration."),
         # These settings are consumed by sim_moveit.launch.py but were only
         # available because the included control launch declared them and

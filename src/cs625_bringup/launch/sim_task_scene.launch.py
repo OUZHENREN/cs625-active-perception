@@ -95,11 +95,10 @@ def generate_launch_description() -> LaunchDescription:
             actions.append(
                 LogInfo(
                     msg=(
-                        "note: sim_control reads the P7 attachment switch from the "
-                        "environment, not from a launch argument.  This world has no "
-                        "target_object/target_link, so DetachableJoint logs a warning "
-                        "and stays inert; silence it with "
-                        "CS625_P7_ATTACHMENT_ENABLED=false before launching.\n"
+                        "note: the workpiece carry/attach uses the DetachableJoint "
+                        "injected by scripts/sim_robot_description.py on "
+                        "/cs625/carry/* (the archived P7 attach block was removed "
+                        "on 2026-11-13).\n"
                         "task scene mirror scheduled in "
                         f"{FIXTURE_SCENE_DELAY_SEC:.0f} s: {' '.join(str(part) for part in command)}"
                     )

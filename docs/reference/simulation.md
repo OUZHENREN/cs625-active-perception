@@ -344,7 +344,7 @@ cs625_camera_extension.xacro
 
 **为什么手指不是"看起来合理"的 1.2 kg**：整块 55×58×146 mm 实心铝在密度 2.677 g/cm³ 下是 **1.246 kg/臂**，但 `my_end_effector_link` 上的 **4.580 kg 实测质量已经包含这两条臂**；按物理估算填进去会变成"7.4 kg 的末端"（实测 4.580 kg 的 1.6 倍），对重力补偿/加减速的伤害比 1 g 占位更大。所以选择"小值记账"，**代价是重复记账 0.140 kg（实测的 3.1%）**，并在注释里写明正确做法是等 CAD 分件质量属性把 4.580 kg 拆到各 link。相机同理：真机相机是**工具网格的一部分**，0.060 kg 与 `camera_kg_placeholder: 0.06` 一致，但真实 PS800-E1 应更重 → **这份 0.06 kg 是下限，不是实测**。
 
-**MoveIt 侧**：规划组是 `chain base_link → my_end_effector_link`，`tool0 → gripper_base_link → *_finger_link` 都是它的子链，所以手指关节**不属于** `cs625_arm`（这正是要的）。SRDF 里没有 `<end_effector>`，夹爪相关只有六条 `disable_collisions`；`touch_links` 由运行时补：P7 抓取用 `[p7_grasp_center_link, gripper_left_finger_link, gripper_right_finger_link]`（两指都覆盖），六模式用 `scripts/update_grasped_box.py` 把 9 个机器人 link 的 ACM 置为允许（等价效果）。结论：**抓取后 attach 的"允许接触"覆盖手指，但它是脚本里的运行时行为，不是 SRDF 声明** → 换入口（纯 MoveIt 手写 `AttachedCollisionObject`）就会漏；建议在 SRDF 补 `<end_effector>`。
+**MoveIt 侧**：规划组是 `chain base_link → my_end_effector_link`，`tool0 → gripper_base_link → *_finger_link` 都是它的子链，所以手指关节**不属于** `cs625_arm`（这正是要的）。SRDF 里没有 `<end_effector>`，夹爪相关只有六条 `disable_collisions`；`touch_links` 由运行时补：六模式用 `scripts/update_grasped_box.py` 把 9 个机器人 link 的 ACM 置为允许；历史上的 P7 抓取路径用的是 `p7_grasp_center_link` 等 frame，该 frame 已于 2026-11-13 随 P7 代码归档从 URDF 移除（见 `docs/archive/2026-11-13-p7-nbv-legacy-code/`）。结论：**抓取后 attach 的"允许接触"覆盖手指，但它是脚本里的运行时行为，不是 SRDF 声明** → 换入口（纯 MoveIt 手写 `AttachedCollisionObject`）就会漏；建议在 SRDF 补 `<end_effector>`。
 
 **TCP / 工具坐标系口径（已查明）**：
 

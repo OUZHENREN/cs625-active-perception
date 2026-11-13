@@ -25,6 +25,15 @@
 | `p7_simulation_temporary_acceptance_2026-08-31.md` | 仿真临时验收记录 | 历史证据 |
 | `diagnostics/` | 早期诊断脚本与截图（2.1 MB） | 一次性诊断，已被新工具取代 |
 
+## 2026-11-13-p7-nbv-legacy-code/
+
+2026-11-13 按所有者指令归档 P7 五道门仿真流水线的**代码**（NBV 打分/筛选、番茄遮挡
+世界、门禁脚本与配置、arm_motion_adapter、抓取几何等）。归档理由、保留件清单（仍被
+插入序验证链使用的 P7 执行回执工具）与改名件（`gazebo_pose`、`cs625_safe_initial_positions`）
+见该目录内 `README.md`。同批还从共享 URDF/launch 中移除了死 P7 附着块与
+`p7_grasp_center_link`；`docs/evidence/p7_*` 历史证据与
+`2026-10-24-pre-six-modes/` 里的 P7 文档**未动**。
+
 ## 规则
 
 - 归档**必须经所有者书面批准**，且要给出：源路径、目标路径、原因、被谁取代、

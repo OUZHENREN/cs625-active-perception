@@ -1,4 +1,10 @@
-"""Parse the documented ``gz model --pose`` output for P7 evidence."""
+"""Parse the documented ``gz model --pose`` output.
+
+Used by ``scripts/run_pick_and_place.py`` in the simulation profile to read the
+workpiece ground-truth pose (the module used to live under the archived P7 name
+``p7_gazebo_pose``; it was renamed on 2026-11-13 when the P7 pipeline was
+archived because this parser is still load-bearing for the six-mode sim flows).
+"""
 
 from __future__ import annotations
 

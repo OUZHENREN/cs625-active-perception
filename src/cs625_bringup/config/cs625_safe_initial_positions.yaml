@@ -1,4 +1,5 @@
-# P7 simulation-only start pose.
+# Simulation-only start pose (renamed from p7_safe_initial_positions.yaml on
+# 2026-11-13 when the P7 pipeline was archived; the values are unchanged).
 #
 # The vendor zero pose extends the 1.37 m arm nearly horizontally from a base
 # mounted at floor height.  The distal collision geometry then contacts the
@@ -7,7 +8,7 @@
 # exact zero wrist-1 posture still lets the application collision model report
 # forearm_link <-> wrist_2_link contact at startup.  The smallest tested
 # positive wrist-1 probe (+0.05 rad) both tracks with <= 0.0005 rad terminal
-# error and admits a collision-checked P7 pregrasp path.  Other axes retain the
+# error and admits a collision-checked pregrasp path.  Other axes retain the
 # senior/official zero values; this is an application fixture profile, not a
 # replacement robot model.
 shoulder_pan_joint: 0.0

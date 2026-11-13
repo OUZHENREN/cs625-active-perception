@@ -15,7 +15,7 @@ setup(
     zip_safe=True,
     maintainer="CS625 Active Perception",
     maintainer_email="cs625@example.invalid",
-    description="P7 task-level grasp evidence contract and recorder.",
+    description="Insertion episode receipt contract, recorder and adapters (the P7-era modules were archived 2026-11-13; the surviving receipt tools keep their names).",
     license="Apache-2.0",
     entry_points={"console_scripts": [
         "p7_episode_recorder = cs625_task_orchestrator.p7_episode_recorder:main",

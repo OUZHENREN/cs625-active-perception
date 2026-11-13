@@ -402,7 +402,7 @@ def validate(cfg: Config) -> None:
 #
 # 数据来源全部是仓库已有产物，不硬编码任何坐标：
 #   工件真值位姿  gz model -m <model> --pose（模型名由 config/tasks/world_sim.yaml 下发，
-#                 解析用 package 里的权威解析器 cs625_task_orchestrator.p7_gazebo_pose）
+#                 解析用 package 里的权威解析器 cs625_task_orchestrator.gazebo_pose）
 #   工具位姿      TF world -> my_end_effector_link（仿真里由 robot_state_publisher 提供）
 #   插槽体积      config/cs625_real_cell_scene.yaml（生成物，权威）
 #                 fixture.pose_world + fixture.bbox_min_m/bbox_max_m → 世界 AABB → 外扩容差
@@ -1090,7 +1090,7 @@ class Runner(Node):
         # 要求唯一一条 Pose、模型名不符就 raise）。延迟导入：--dry-run / 真机路径
         # 从不走到这里，缺包也只降级成"无法测量"，不会让真机流程失败。
         try:
-            from cs625_task_orchestrator.p7_gazebo_pose import parse_gz_model_pose
+            from cs625_task_orchestrator.gazebo_pose import parse_gz_model_pose
         except ImportError as exc:
             self.sim_error = f"pose parser unavailable: {exc}"
             return None
@@ -2774,28 +2774,44 @@ def main() -> int:
                                        "detail": check_detail}
                 Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
             elif kind == "nbv":
-                # NBV = "把机械臂移到能拍到工件大部分的位置"，用已验证视角的相对关系推导：
-                #   0° 标定过一个"能测准"的相机位姿 → 换成相对工件的位姿 →
-                #   按当前工件转角重新落到世界系（scripts/nbv_from_reference.py）。
-                # 这样既不需要搜索，也不会像转腕那样把相机甩出去。
+                # NBV = 方案 A（2026-11-13 所有者定调）：预教站位 + 按偏转角自动选站。
+                #   粗观测给出工件偏转角 → 查 workpiece_views 选最近已验证站位
+                #   → 与"0° 相对视角推导"交叉核对（relative_zero 族相差 >40 mm 判
+                #   工件已移动，拒绝）→ 由 plan_pose_ik 带全套安全闸执行到站位
+                #   绝对位姿。查不到站位 / 核对不过 / 需大幅改构型 → 一律跳过自动
+                #   换位，继续原地精测（精测失败再人工摆位）。
+                # 注意：这里没有任何视角搜索或转腕动作（agent_memory 137）。
                 target = name.split(":", 1)[1]
+                reference_measurement = (REPO / "runtime" / "measurements"
+                                         / "workpiece_zero.json")
+                current_measurement = (REPO / "runtime" / "measurements"
+                                       / "workpiece_coarse.json")
+                station_cmd = [sys.executable, "-u",
+                               str(REPO / "scripts" / "nbv_from_reference.py"),
+                               "--auto-station",
+                               "--reference-measurement", str(reference_measurement),
+                               "--current-measurement", str(current_measurement)]
                 if plan_only:
-                    step(name, True, f"NBV {target}（plan-only 跳过换位）")
+                    # 离线/plan-only：跑一遍纯数学选站（不执行），把决定打出来；
+                    # 没有测量文件时如实跳过。
+                    if (reference_measurement.exists()
+                            and current_measurement.exists()):
+                        code, text = run(station_cmd, timeout=120.0)
+                        tail = (text or "").strip().splitlines()
+                        detail = tail[-1] if tail else "no output"
+                        step(name, True, f"NBV {target}: 选站 dry-run｜{detail}")
+                    else:
+                        step(name, True,
+                             f"NBV {target}（plan-only，无测量文件，跳过换位）")
                     continue
-                reference_cmd = [sys.executable, "-u",
-                                 str(REPO / "scripts" / "nbv_from_reference.py"),
-                                 "--reference-measurement",
-                                 str(REPO / "runtime" / "measurements" / "workpiece_zero.json"),
-                                 "--current-measurement",
-                                 str(REPO / "runtime" / "measurements" / "workpiece_coarse.json"),
-                                 "--view-key", "0", "--execute"]
-                code, text = run(reference_cmd, timeout=900.0)
+                station_cmd.append("--execute")
+                code, text = run(station_cmd, timeout=900.0)
                 tail = (text or "").strip().splitlines()
                 detail = tail[-1] if tail else "no output"
                 if code == 6:
-                    # 需要大幅改构型 → 不做自动换位（安全第一），继续在原地精测；
-                    # 若原地测不了，精测阶段会失败，届时人工摆位。
-                    step(name, True, f"NBV {target}: 跳过自动换位（需人工摆位）｜{detail}")
+                    # 无站位覆盖 / 工件已移动 / 需大幅改构型 → 不做自动换位（安全第一），
+                    # 继续在原地精测；若原地测不了，精测阶段会失败，届时人工摆位。
+                    step(name, True, f"NBV {target}: 跳过自动换位（原地精测）｜{detail}")
                     continue
                 step(name, code == 0, f"NBV {target}: {detail}")
             elif kind == "observe":

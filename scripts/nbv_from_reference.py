@@ -31,6 +31,7 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 import nbv_score as nbv  # noqa: E402
 import coarse_pose as cp  # noqa: E402
+import nbv_views  # noqa: E402
 
 HAND_EYE = REPO / "config" / "handeye" / "tcp_to_camera.json"
 COMMON = REPO / "config" / "tasks" / "common.yaml"
@@ -38,12 +39,35 @@ COMMON = REPO / "config" / "tasks" / "common.yaml"
 
 def pose_from_measurement(path: pathlib.Path, group: str = "g00_m") -> np.ndarray:
     payload = json.loads(path.read_text(encoding="utf-8"))
-    rows = payload.get("per_group") if isinstance(payload, dict) else payload
-    row = [item for item in rows if item.get("group") == group][0]
-    pose = np.eye(4)
-    pose[:3, :3] = R.from_quat(row["pose_base"]["quaternion"]).as_matrix()
-    pose[:3, 3] = row["pose_base"]["translation"]
-    return pose
+    return nbv_views.pose_from_payload(payload, group)
+
+
+def auto_station(target_pose: dict, execute: bool) -> int:
+    """方案 A：查表选中的站位（已验证绝对位姿）→ plan_pose_ik 执行（带全套安全闸）。
+
+    2026-11-13 所有者定调：预教站位 + 按偏转角自动选站，NBV 只做"选站"，
+    不做大幅换构型。目标位姿来自已验证的 workpiece_views 表，不再推导/搜索。
+    """
+    tcp = np.asarray(target_pose["tcp"], dtype=float)
+    quat = np.asarray(target_pose["quat"], dtype=float)
+    cmd = [sys.executable, str(REPO / "scripts" / "plan_pose_ik.py"),
+           *(f"{v:.5f}" for v in tcp), *(f"{v:.6f}" for v in quat)]
+    if not execute:
+        print("（未执行）")
+        return 0
+    move = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
+    tail = (move.stdout or "").strip().splitlines()
+    print("   换位执行:", tail[-1] if tail else f"(exit {move.returncode})")
+    if move.returncode == 6:
+        # plan_pose_ik 拒绝"大幅改构型"：不做自动换位，原地精测（安全第一）
+        return 6
+    if move.returncode != 0:
+        return 4
+    verify = subprocess.run([sys.executable, str(REPO / "scripts" / "check_state_ok.py")],
+                            capture_output=True, text=True, timeout=120)
+    vtail = (verify.stdout or "").strip().splitlines()
+    print("   到位复核:", vtail[-1] if vtail else "(no output)")
+    return 0 if verify.returncode == 0 else 5
 
 
 def main() -> int:
@@ -56,7 +80,51 @@ def main() -> int:
     parser.add_argument("--max-wrist-delta", type=float, default=90.0,
                         help="透传给 plan_pose_ik；终点构型仍在绝对安全区间内即可")
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--auto-station", action="store_true",
+                        help="方案 A：按当前工件偏转角查表选预教站位，"
+                             "与 0° 相对视角推导交叉核对后执行（不搜索视角）")
+    parser.add_argument("--family-gate-mm", type=float, default=40.0,
+                        help="relative_zero 族站位：推导目标与存储位姿的位置差超过"
+                             "该值（mm）→ 判工件已移动，拒绝自动换位")
     args = parser.parse_args()
+
+    if args.auto_station:
+        config = yaml.safe_load(COMMON.read_text())
+        views = config.get("workpiece_views") or {}
+        handeye = json.loads(HAND_EYE.read_text())
+        T_tcp_cam = np.array(handeye["T_tcp_cam"])
+        try:
+            ref_pose = pose_from_measurement(pathlib.Path(args.reference_measurement))
+            cur_pose = pose_from_measurement(pathlib.Path(args.current_measurement))
+        except (OSError, json.JSONDecodeError, KeyError, IndexError) as exc:
+            print(f"读测量文件失败：{exc}", file=sys.stderr)
+            return 2
+        try:
+            plan = nbv_views.station_plan(views, ref_pose, cur_pose, T_tcp_cam,
+                                          family_gate_mm=args.family_gate_mm)
+        except ValueError as exc:
+            print(f"选站失败：{exc}", file=sys.stderr)
+            return 2
+
+        print(f"工件偏转角 {plan['yaw_deg']:+.1f}°（相对 0° 基准）")
+        if plan["verdict"] == "no_station":
+            print(f"→ 无预教站位覆盖该偏转角（容差 "
+                  f"{float(views.get('tolerance_deg', 12.0)):.0f}°），"
+                  "拒绝自动换位，原地精测/人工摆位")
+            return 6
+        error, key, entry = plan["station"]
+        family = entry.get("family", "relative_zero")
+        print(f"选中站位 {key}°（差 {error:.1f}°，family={family}）："
+              f"TCP {np.round(plan['stored_tcp'], 4)}")
+        print(f"0° 相对视角推导目标 TCP {np.round(plan['derived_tcp'], 4)}，"
+              f"与站位差 {plan['delta_mm']:.1f} mm / {plan['delta_deg']:.1f}°")
+        if plan["verdict"] == "station_moved":
+            print("→ 工件位置与示教站位不符（推导 vs 存储 > "
+                  f"{args.family_gate_mm:.0f} mm），拒绝自动换位，原地精测/人工摆位")
+            return 6
+        print("→ 使用该已验证站位（不搜索）")
+        return auto_station({"tcp": plan["stored_tcp"], "quat": plan["stored_quat"]},
+                            args.execute)
 
     bbox = cp.load_template_bbox(pathlib.Path.home()
                                  / "cs625_rvs_archive" / "models_20261023"
