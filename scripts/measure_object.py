@@ -107,6 +107,11 @@ def main() -> int:
                         help="coarse=只要能给出一个'够用来算精观测位'的粗略位姿（5–20 mm 可接受）；"
                              "fine=严格质量门（给最终位姿）")
     parser.add_argument("--groups", type=int, default=4, help="采集组数（每组 3 帧取中位）")
+    parser.add_argument("--prior", default="",
+                        help="粗观测结果 JSON：用它作为先验，剔除偏离过大的组"
+                             "（防止多起点落到错误分支）")
+    parser.add_argument("--prior-tol-mm", type=float, default=40.0)
+    parser.add_argument("--prior-tol-deg", type=float, default=15.0)
     parser.add_argument("--depth-window", type=float, nargs=2, default=None,
                         metavar=("MIN_M", "MAX_M"),
                         help="默认用 preset 的建议深度窗（工件 0.41–1.10 / 插槽 0.48–1.35）")
@@ -201,6 +206,19 @@ def main() -> int:
     print(f"深度窗：{depth_window[0]:.2f}–{depth_window[1]:.2f} m")
     # 视觉流程进度：有 rclpy 就发 /vision_stage，没有就只打印
     coarse_stage = args.stage == "coarse"
+    prior_pose = None
+    if args.prior:
+        try:
+            prior_payload = json.loads(pathlib.Path(args.prior).read_text(encoding="utf-8"))
+            prior_row = (prior_payload.get("per_group") or [None])[0]
+            if prior_row:
+                import scipy.spatial.transform as _sst
+                prior_pose = (np.array(prior_row["pose_base"]["translation"], dtype=float),
+                              _sst.Rotation.from_quat(prior_row["pose_base"]["quaternion"]))
+                print(f"先验位姿：{np.round(prior_pose[0], 4)}（偏离 >{args.prior_tol_mm:.0f} mm 或 "
+                      f">{args.prior_tol_deg:.0f}° 的组会被剔除）")
+        except Exception as _error:  # noqa: BLE001
+            print(f"先验读取失败：{_error}")
     stage_node = None
     try:
         import rclpy
@@ -232,6 +250,19 @@ def main() -> int:
         if (not coarse_stage) and args.refine and "pose_base" in row:
             row = refine_pose_base(row, directory, cad, bbox, base_cam,
                                    depth_window=depth_window)
+        if prior_pose is not None and "pose_base" in row:
+            import scipy.spatial.transform as _sst
+            delta_mm = float(np.linalg.norm(np.array(row["pose_base"]["translation"], dtype=float)
+                                            - prior_pose[0]) * 1000.0)
+            delta_deg = float(np.degrees(
+                (_sst.Rotation.from_quat(row["pose_base"]["quaternion"]) * prior_pose[1].inv())
+                .magnitude()))
+            row["prior_delta"] = {"mm": round(delta_mm, 1), "deg": round(delta_deg, 1)}
+            if delta_mm > args.prior_tol_mm or delta_deg > args.prior_tol_deg:
+                row["symmetry_check"] = dict(row.get("symmetry_check") or {},
+                                             valid=False, prior_rejected=True)
+                print(f"   [prior] {row['group']} 偏离先验 {delta_mm:.0f} mm / {delta_deg:.1f}° "
+                      f"→ 判为错误分支并剔除")
         height = cp.LAST_TABLE_HEIGHT[0]
         if height is not None:
             table_heights.append(float(height))
@@ -255,8 +286,10 @@ def main() -> int:
 
     credible_rows = [row for row in good if credible(row)]
     dropped = len(good) - len(credible_rows)
-    # 粗观测只用来"定视角"，两组可信就够；精观测必须要三组，否则重复性没意义。
-    min_credible = 2 if coarse_stage else 3
+    # 粗观测两组即可；精观测优先三组，但【两组若能高度一致（≤1 mm / ≤0.5°）】也接受——
+    # 2026-11-13 实测：某些视角下会出现一组异常解，剩下两组差 0.1 mm / 0.039°，
+    # 这时因为"三组"这条数量要求把整批拒掉是不合理的（所有者指出）。
+    min_credible = 2
     if len(credible_rows) < min_credible:
         summary_reason = (f"可信组只有 {len(credible_rows)} 组（需要 ≥{min_credible}），"
                           f"其余 {dropped} 组退化")
@@ -357,6 +390,8 @@ def main() -> int:
         "coverage_median": round(coverage, 4),
         "flip_ambiguous_groups": ambiguous,
         "degenerate_groups_dropped": dropped,
+        "credible_groups": len(credible_rows),
+        "few_groups_warning": len(credible_rows) < 3,
         "outlier_groups": outliers,
         "stage": args.stage,
         "workpiece_yaw_deg": None if yaw_deg is None else round(yaw_deg, 1),
