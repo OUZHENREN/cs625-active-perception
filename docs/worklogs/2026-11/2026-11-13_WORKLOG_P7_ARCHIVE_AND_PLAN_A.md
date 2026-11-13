@@ -56,6 +56,34 @@ Gazebo 运行时（carry attach 行为）只做了静态展开验证，未实际
 验证：pytest 275 全绿；contract_checks PASS；对 docs/evidence/p7 的活动引用 0 命中。
 ```
 
+## 0.3 主页 README 刷新（23:2x，所有者指出状态表停在 11-08）
+
+```text
+问题：远程主页 README 的"现在真实的状态"整表停在 2026-11-08，与今晚实际状态脱节
+（还写着 293 passed、插入未完成、六维力未采集、VS Code 6 个任务等）。
+处理：重写 README 的状态部分（保留原有结构与硬规则/许可章节）：
+① 日期 11-08 → 11-13；状态表拆成"视觉与观测 / 运动与装配 / 平台与工具"三组，
+   新增本轮成果：测量链 0.14–0.5 mm、插槽 0.64 mm、方案 A（代码完成+离线验证、
+   真机未跑）、自动 NBV 已放弃、P7 流水线已归档；并如实写入两个阻塞：
+   六模式抓取/插入仅 plan-only、规划场景里桌子/夹具对 MoveIt 不可见。
+② 三分钟上手：pytest 293 → 275 passed；补 contract_checks.py、六模式 dry-run、
+   方案 A 选站命令；"两种模式"改为"六类任务模式（run_task.py 唯一入口）"，
+   示教链路单列为"前期主线，仍在用"。
+③ VS Code 任务 6 个 → 8 个（补 ⑦ 相机、⑧ 收工），命令与 .vscode/tasks.json 一致。
+④ 顺手修正两处沿用下来的过期数字（以代码为准）：
+   · "工件附近必须先竖直抬升 20 mm" → 实为 SAFE_HEIGHT_Z = 0.53 m
+     （scripts/teaching/teaching_sequence.py:133）
+   · 持件巡航 0.013 m/s 标注为"示教链路 CARRY_SPEED_CAP"，避免与六模式 0.12 m/s 混淆
+⑤ 十一月计划 → "当前重心（2026-11-13 起）"：修规划场景 → 方案 A 真机验收 →
+   六模式抓取/插入真机验证 → 六维力到位后的模型/TCP 更新。
+
+发现但未改（留给所有者决定）：agent_memory 第 80 条写"持件 ≤ 0.020 m/s"，
+而代码 CARRY_SPEED_CAP = 0.013、architecture_current.md 也写 0.013 ——
+三处口径不一致，属历史规则冲突，不在本轮 README 任务范围内。
+验证：check_docs.py ALL PASSED；README 引用路径 0 缺失；pytest 275 passed；
+contract_checks PASS；六模式 dry-run OK。
+```
+
 ## 0. 本轮解决的两个问题
 
 ```text
