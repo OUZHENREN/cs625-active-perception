@@ -45,7 +45,7 @@ source scripts/source_dev_env.sh --full
 python3 scripts/apply_real_cell_scene.py --dry-run     # exit 0，打印夹具 + 桌高交叉校验
 python3 scripts/apply_real_cell_scene.py               # 无 move_group → exit 1 + 明确报错
 python3 -m pytest test/test_real_cell_scene_applier.py -q   # 4 passed
-python3 -m pytest test/ -q                             # 279 passed（275 + 4 新增）
+python3 -m pytest test/ -q                             # 283 passed（275 + 4 场景 + 4 注入器）
 python3 scripts/check_docs.py                          # ALL DOC CHECKS PASSED
 python3 test/contract_checks.py                        # PASS
 ```
@@ -120,6 +120,10 @@ showed stderr output`（命令是 `scripts/sim_robot_description.py`）。根因
 来找，顺序 `my_end_effector_link` → `tool0`。实测：代理现在注入到 `tool0`、**stderr 为空**、
 DetachableJoint 仍是 1 个、`/cs625/carry/*` 话题齐全。
 
+补了 4 条离线回归测试（`test/test_sim_robot_description.py`）——这个脚本此前**没有任何测试**，
+正是它能把"代理从未注入"藏这么久的原因：覆盖代理替换单个 collision 且不动 visual、
+TCP 框架无几何时退回 tool0、无候选时原样返回、DetachableJoint 注入幂等。
+
 ## 5. 附带发现（本轮不修，需所有者决定）
 
 `--dry-run` 的桌高交叉校验暴露：**生成的世界与场景配置落后于最新实测模型**。
@@ -149,7 +153,7 @@ runtime/environment/20261105_134756/model.json（最新实测）
 
 ```text
 Capability layer: vision/planning 输入链 —— "点云/环境 → MoveIt 规划场景" 这一环
-  环境与依赖      PASS（离线：279 测试 + 合同 + 文档检查）
+  环境与依赖      PASS（离线：283 测试 + 合同 + 文档检查）
   规划场景写入    PASS（仿真端到端：写入/移除/重写 + 独立回查均通过）；真机 **NOT RUN**
   真机            NOT RUN（无真机运动、未启动 Gazebo/相机）
 Intentionally not done:
