@@ -172,7 +172,7 @@ ls install/cs625_simulation/share/cs625_simulation/assets/cs625_real_cell/slot_f
 source scripts/source_dev_env.sh --full
 python3 scripts/fit_fixture_to_cloud.py --json /tmp/fixture_fit.json   # 夹具配准
 python3 scripts/build_sim_world.py --out-world src/cs625_simulation/worlds/cs625_real_cell.sdf --out-config config/cs625_real_cell_scene.yaml   # 桌面
-python3 scripts/apply_real_cell_scene.py                               # 规划场景（默认只发夹具）
+python3 scripts/apply_real_cell_scene.py                               # 规划场景（默认只发夹具；走 /apply_planning_scene 服务并回查核对）
 ```
 
 夹具基线：中位 4.95 mm、p90 17.16 mm、<5 mm 50.3%、<10 mm 73.6%、<20 mm 93.3% → PASS。ICP 会沿长轴滑移 104 mm（近对称楔形），脚本显式提示"对称滑移、忽略"，不作为修正。

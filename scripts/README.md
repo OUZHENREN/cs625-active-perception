@@ -45,7 +45,7 @@
 | `build_sim_world.py` | **从真机实测生成** Gazebo 世界与场景配置（桌子/夹具/工件） | 主力 |
 | `analyze_fixture_geometry.py` | 判定哪份夹具几何与真机一致（bbox、槽口宽度、是否贯通插入路径） | 工具 |
 | `build_fixture_collision_mesh.py` | 把真机 RVS 夹具网格转成米制碰撞网格（抽稀到 60k 面） | 工具 |
-| `apply_real_cell_scene.py` | 把真机场景的碰撞体发布进 MoveIt（默认只发夹具；桌子/工件按需） | 主力 |
+| `apply_real_cell_scene.py` | 把真机场景的碰撞体**经 `/apply_planning_scene` 服务**写进 MoveIt，并回查场景核对 id 真的在（默认只发夹具；桌子/工件按需）。服务不在或对象没进去 → 退出码 1 | 主力 |
 | `camera_mode.py` | 相机在"精细 1280×960"与"高帧率"之间切换并实测 fps | 主力 |
 | `sync_task_world.py` | 旧场景配置 ↔ SDF 世界的位姿同步（旧世界专用） | 旧 |
 | `build_environment_collision.py` | PCD → MoveIt 碰撞体（被 `model_environment` 覆盖） | 旧 |

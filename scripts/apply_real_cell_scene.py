@@ -17,10 +17,24 @@ Frames: the planning frame is ``world`` (the SRDF pins base_link to world with a
 fixed virtual joint and sim_moveit.launch.py sets octomap_frame: world), so every
 pose in the scene config is already in the frame MoveIt expects.
 
+How it reaches MoveIt (2026-11-14 fix): the objects are applied through the
+``/apply_planning_scene`` service, not published fire-and-forget on the
+``/planning_scene`` topic.  The service answers ``success`` and the script then reads
+the scene back through ``/get_planning_scene`` and checks that every expected id is
+actually there.  Before this, the script only printed "published N collision objects"
+while nothing had confirmed that move_group received anything -- which is exactly how
+"published 1 collision objects" and "the planning scene has 0 objects" coexisted on
+2026-11-13.  The working simulation applier (``src/cs625_bringup/scripts/
+apply_task_scene.py``) already used the service; this brings the real-cell path to the
+same mechanism.
+
+Requires move_group to be running; if the service is missing the script fails loudly
+instead of pretending to succeed.
+
 Usage:
-    python3 scripts/apply_real_cell_scene.py --dry-run      # print, publish nothing
-    python3 scripts/apply_real_cell_scene.py                # publish
-    python3 scripts/apply_real_cell_scene.py --remove       # remove the bodies
+    python3 scripts/apply_real_cell_scene.py --dry-run      # print, apply nothing
+    python3 scripts/apply_real_cell_scene.py                # apply + verify
+    python3 scripts/apply_real_cell_scene.py --remove       # remove + verify
 """
 
 from __future__ import annotations
@@ -152,18 +166,16 @@ def mesh_from_stl(path: pathlib.Path):
     return module.mesh_from_stl(path)
 
 
-def publish(specs: list[dict], remove: bool = False) -> int:
-    import rclpy
-    from geometry_msgs.msg import Pose
-    from moveit_msgs.msg import CollisionObject, PlanningScene
-    from shape_msgs.msg import SolidPrimitive
-    from rclpy.node import Node
-    from rclpy.qos import DurabilityPolicy, QoSProfile
+APPLY_SERVICE = "/apply_planning_scene"
+QUERY_SERVICE = "/get_planning_scene"
 
-    rclpy.init()
-    node = Node("apply_real_cell_scene")
-    latched = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
-    publisher = node.create_publisher(PlanningScene, "/planning_scene", latched)
+
+def build_scene(specs: list[dict], remove: bool = False):
+    """Build the PlanningScene diff (pure: no ROS objects needed except messages)."""
+    from moveit_msgs.msg import CollisionObject, PlanningScene
+    from geometry_msgs.msg import Pose
+    from shape_msgs.msg import SolidPrimitive
+
     scene = PlanningScene()
     scene.is_diff = True
     for spec in specs:
@@ -188,16 +200,90 @@ def publish(specs: list[dict], remove: bool = False) -> int:
                 obj.meshes.append(mesh_from_stl(pathlib.Path(spec["mesh"])))
                 obj.mesh_poses.append(pose)
         scene.world.collision_objects.append(obj)
-    # the publisher needs a moment to match a latched subscriber
-    for _ in range(20):
-        publisher.publish(scene)
-        rclpy.spin_once(node, timeout_sec=0.05)
-    node.get_logger().info(
-        f"{'removed' if remove else 'published'} {len(specs)} collision objects to "
-        f"{WORLD_FRAME}")
-    node.destroy_node()
-    rclpy.shutdown()
-    return 0
+    return scene
+
+
+def scene_object_ids(node, timeout_sec: float = 10.0) -> set[str] | None:
+    """Read the world collision-object ids back from move_group."""
+    from moveit_msgs.srv import GetPlanningScene
+    from moveit_msgs.msg import PlanningSceneComponents
+
+    client = node.create_client(GetPlanningScene, QUERY_SERVICE)
+    if not client.wait_for_service(timeout_sec=timeout_sec):
+        node.get_logger().error(f"{QUERY_SERVICE} is not available")
+        return None
+    request = GetPlanningScene.Request()
+    request.components.components = (
+        PlanningSceneComponents.WORLD_OBJECT_NAMES
+        | PlanningSceneComponents.WORLD_OBJECT_GEOMETRY
+    )
+    future = client.call_async(request)
+    import rclpy
+    rclpy.spin_until_future_complete(node, future, timeout_sec=timeout_sec)
+    result = future.result()
+    if result is None:
+        node.get_logger().error("get_planning_scene did not answer")
+        return None
+    return {obj.id for obj in result.scene.world.collision_objects}
+
+
+def publish(specs: list[dict], remove: bool = False) -> int:
+    """Apply the diff through /apply_planning_scene and verify it landed."""
+    import rclpy
+    from moveit_msgs.srv import ApplyPlanningScene
+    from rclpy.node import Node
+
+    rclpy.init()
+    node = Node("apply_real_cell_scene")
+    try:
+        client = node.create_client(ApplyPlanningScene, APPLY_SERVICE)
+        if not client.wait_for_service(timeout_sec=10.0):
+            node.get_logger().error(
+                f"{APPLY_SERVICE} is not available -- is move_group running? "
+                "Nothing was applied (the old topic publish would have printed "
+                "'published' anyway, which is what made this look successful).")
+            return 1
+        request = ApplyPlanningScene.Request()
+        request.scene = build_scene(specs, remove=remove)
+        future = client.call_async(request)
+        rclpy.spin_until_future_complete(node, future, timeout_sec=20.0)
+        result = future.result()
+        if result is None:
+            node.get_logger().error("apply_planning_scene did not answer")
+            return 1
+        if not result.success:
+            node.get_logger().error(
+                "move_group rejected the planning-scene diff (success=false)")
+            return 1
+
+        expected = {spec["id"] for spec in specs}
+        present = scene_object_ids(node)
+        if present is None:
+            return 1
+        if remove:
+            still_there = expected & present
+            if still_there:
+                node.get_logger().error(
+                    f"remove reported success but these ids are still present: "
+                    f"{sorted(still_there)}")
+                return 1
+            node.get_logger().info(
+                f"removed {len(expected)} collision objects; scene now has "
+                f"{len(present)} world objects")
+            return 0
+        missing = expected - present
+        if missing:
+            node.get_logger().error(
+                f"apply reported success but these ids are missing from the scene: "
+                f"{sorted(missing)} (present: {sorted(present)})")
+            return 1
+        node.get_logger().info(
+            f"applied {len(expected)} collision objects to frame {WORLD_FRAME}; "
+            f"verified in the scene (world objects now: {sorted(present)})")
+        return 0
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 
 def main() -> int:
