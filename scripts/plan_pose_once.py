@@ -42,12 +42,45 @@ def contacts_are_real(contacts) -> bool:
         if pair not in IGNORED_CONTACT_PAIRS:
             return True
     return False
+def require_current_state_valid(node, names, positions, label: str = "current") -> bool:
+    """移动前的硬性自检：**当前状态本身就是碰着的，就绝对不许再动**。
+
+    2026-11-13 事故（agent_memory 135）：当时当前状态已报 forearm_link↔tool0 接触，
+    却继续规划并执行，造成夹爪撞机械臂、J4 信号中断。
+    返回 True 表示可以继续；False 表示必须停手并报告。
+    """
+    from moveit_msgs.msg import RobotState as _RS
+    from moveit_msgs.srv import GetStateValidity as _GSV
+    checker = node.create_client(_GSV, "/check_state_validity")
+    if not checker.wait_for_service(timeout_sec=5.0):
+        print(f"[guard] /check_state_validity 不可用，拒绝移动（{label}）")
+        return False
+    request = _GSV.Request()
+    state = _RS()
+    state.joint_state.name = list(names)
+    state.joint_state.position = [float(v) for v in positions]
+    request.robot_state = state
+    request.group_name = "cs625_arm"
+    future = checker.call_async(request)
+    import rclpy as _rclpy
+    _rclpy.spin_until_future_complete(node, future, timeout_sec=10.0)
+    result = future.result()
+    if result is None:
+        print(f"[guard] 无法判定当前状态，拒绝移动（{label}）")
+        return False
+    if not result.valid and contacts_are_real(result.contacts):
+        pairs = [(c.contact_body_1, c.contact_body_2) for c in result.contacts[:3]]
+        print(f"[guard] 当前状态已存在接触 {pairs} —— 停止，请人工摆位后再动")
+        return False
+    return True
+
 
 
 import argparse
 import json
 import pathlib
 import sys
+import time
 
 import rclpy
 from geometry_msgs.msg import Pose
@@ -55,6 +88,7 @@ from moveit_msgs.msg import (BoundingVolume, Constraints,
                              OrientationConstraint, PositionConstraint)
 from moveit_msgs.srv import GetMotionPlan as GetMotionPlanSrv
 from rclpy.node import Node
+from sensor_msgs.msg import JointState
 from shape_msgs.msg import SolidPrimitive
 
 sys.stdout.reconfigure(line_buffering=True)
@@ -101,6 +135,21 @@ def main() -> int:
     if not client.wait_for_service(timeout_sec=10.0):
         print("plan service unavailable")
         return 4
+
+    # 移动前硬性自检：当前状态已接触则一律不动（agent_memory 135）
+    guard_state: dict = {}
+    node.create_subscription(JointState, "/joint_states",
+                             lambda msg: guard_state.setdefault("j", msg), 10)
+    deadline = time.time() + 5.0
+    while time.time() < deadline and "j" not in guard_state:
+        rclpy.spin_once(node, timeout_sec=0.2)
+    if "j" in guard_state:
+        if not require_current_state_valid(node, guard_state["j"].name,
+                                           guard_state["j"].position):
+            return 6
+    else:
+        print("[guard] 读不到当前关节状态，拒绝规划")
+        return 6
 
     constraints = Constraints()
     position = PositionConstraint()
