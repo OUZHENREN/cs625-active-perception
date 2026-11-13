@@ -123,6 +123,7 @@ phase_speeds:
     time_scale: 1.0
     chunks: 1
 phases:
+- observe:workpiece_coarse_efficient
 - measure:workpiece_coarse
 - nbv:workpiece
 - measure:workpiece_fine
@@ -198,6 +199,9 @@ observe_checks:
   workpiece_coarse: python3 scripts/measure_object.py --preset workpiece --stage coarse
     --groups 3 --out runtime/measurements/workpiece_coarse.json --prior auto --auto-release
     --prior-max-age-min 30
+  workpiece_coarse_efficient: python3 scripts/measure_object.py --preset workpiece
+    --stage coarse --groups 3 --out runtime/measurements/workpiece_coarse.json --prior
+    auto --auto-release --prior-max-age-min 30
 environment_gate: measurement
 measurement_targets:
 - workpiece_fine

@@ -189,6 +189,17 @@ observe:
     - 0.12511
     - 0.56007
     check: python3 scripts/model_environment.py --out runtime/environment --verify-only
+  workpiece_coarse_efficient:
+    xyz:
+    - 0.6238
+    - 0.37375
+    - 0.50762
+    quat:
+    - -0.383818
+    - 0.748045
+    - 0.213452
+    - 0.497544
+    check: ''
 gripper_max_opening_mm: 50.0
 gripper_span_min_mm: 204.0
 gripper_span_max_mm: 246.57
@@ -559,3 +570,14 @@ workspace_bounds:
   - 0.05
   - 0.95
   note: TCP 必须落在这个框内；框外一律拒绝（2026-11-13 机械臂曾被移到 y=-0.17 的危险位置）
+efficient_start_pose:
+  xyz:
+  - 0.6238
+  - 0.37375
+  - 0.50762
+  quat:
+  - -0.383818
+  - 0.748045
+  - 0.213452
+  - 0.497544
+  note: 2026-11-13 所有者确认：效率模式的起点 = 工件粗观测基准点位（仅限效率模式，不影响示教）
