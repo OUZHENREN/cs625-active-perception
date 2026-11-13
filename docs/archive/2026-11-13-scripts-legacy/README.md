@@ -56,7 +56,7 @@ git mv docs/archive/2026-11-13-scripts-legacy/<group>/<file> <原路径>
 ## 仍然保留、但属于"疑似过时"的脚本（未归档，等所有者决定）
 
 盘点中另有 25 个脚本属于"0 代码引用但可能是手动工具/未完成计划"，**没有**归档，
-清单见 `docs/worklogs/2026-11/2026-11-14_WORKLOG_WORKSPACE_AUDIT.md`。
+清单见 `docs/worklogs/2026-11/2026-11-13_WORKLOG_WORKSPACE_AUDIT.md`。
 其中两个**明确不能动**：
 
 - `scripts/sync_task_world.py`：README 标"旧"，但 `src/cs625_bringup/scripts/apply_task_scene.py`
