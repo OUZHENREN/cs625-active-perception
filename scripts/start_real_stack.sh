@@ -18,9 +18,13 @@ source scripts/source_dev_env.sh --full || exit 1
 if [ -f "$HOME/.cs625_local.env" ]; then . "$HOME/.cs625_local.env"; fi
 
 ROBOT_IP="${CS625_ROBOT_IP:-}"
-LOCAL_IP="${CS625_HOST_IP:-192.168.1.100}"
+LOCAL_IP="${CS625_HOST_IP:-}"
 if [ -z "$ROBOT_IP" ]; then
   echo "[开工] CS625_ROBOT_IP 未设置，请写进 ~/.cs625_local.env"
+  exit 1
+fi
+if [ -z "$LOCAL_IP" ]; then
+  echo "[开工] CS625_HOST_IP 未设置，请写进 ~/.cs625_local.env"
   exit 1
 fi
 CHECK_ONLY=0

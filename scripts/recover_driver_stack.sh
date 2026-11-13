@@ -16,9 +16,10 @@
 # Usage:
 #   scripts/recover_driver_stack.sh [--timeout 120] [--quiet]
 #
-# Environment overrides:
-#   CS625_ROBOT_IP   default 192.168.1.200
-#   CS625_HOST_IP    default 192.168.1.100   (the address advertised to the robot)
+# Environment overrides (both required, machine-local values live in
+# ~/.cs625_local.env -- no hardcoded IPs in this repository):
+#   CS625_ROBOT_IP   robot controller address
+#   CS625_HOST_IP    the address advertised to the robot
 set -u
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -32,8 +33,16 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-ROBOT_IP="${CS625_ROBOT_IP:-192.168.1.200}"
-HOST_IP="${CS625_HOST_IP:-192.168.1.100}"
+ROBOT_IP="${CS625_ROBOT_IP:-}"
+HOST_IP="${CS625_HOST_IP:-}"
+if [ -z "$ROBOT_IP" ]; then
+  echo "[恢复] CS625_ROBOT_IP 未设置，请写进 ~/.cs625_local.env" >&2
+  exit 1
+fi
+if [ -z "$HOST_IP" ]; then
+  echo "[恢复] CS625_HOST_IP 未设置，请写进 ~/.cs625_local.env" >&2
+  exit 1
+fi
 LOG=/tmp/cs625_driver.log
 say() { [ "$QUIET" -eq 1 ] || echo "$@"; }
 

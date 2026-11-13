@@ -69,8 +69,12 @@ def source_scan_directories(current_root: str, directories: list[str]) -> list[s
         # Work logs and the archive are records of what was actually run: they quote
         # the absolute paths and addresses of the machine they ran on.  Auditing them
         # for machine-specific literals would mean rewriting history, so they are
-        # outside this scan by design (they are not executable source).
-        if str(relative).startswith(("docs/worklogs", "docs/archive")):
+        # outside this scan by design (they are not executable source).  The same
+        # holds for docs/reference (e.g. real_cell.md records the measured site
+        # network) and docs/manuals (on-site experience reports): they document the
+        # cell as measured, while the no-hardcoded-IP rule applies to code.
+        if str(relative).startswith(("docs/worklogs", "docs/archive",
+                                     "docs/reference", "docs/manuals")):
             continue
         retained.append(directory)
     return retained
@@ -677,12 +681,13 @@ def main() -> int:
         ROOT / "README.md",
         ROOT / ".repos" / "common.repos",
         ROOT / ".repos" / "sim.repos",
-        ROOT / "docs" / "architecture.md",
-        ROOT / "docs" / "dependencies.md",
-        ROOT / "docs" / "interfaces.md",
-        ROOT / "docs" / "frames_and_topics.md",
-        ROOT / "docs" / "simulation.md",
-        ROOT / "docs" / "migration_from_legacy.md",
+        ROOT / "docs" / "reference" / "architecture_current.md",
+        ROOT / "docs" / "reference" / "dependencies.md",
+        ROOT / "docs" / "reference" / "interfaces.md",
+        ROOT / "docs" / "reference" / "frames_and_topics.md",
+        ROOT / "docs" / "reference" / "simulation.md",
+        # archived 2026-11-07 with the doc reorg; kept readable, still required
+        ROOT / "docs" / "archive" / "2026-11-07-pre-reorg" / "migration_from_legacy.md",
         src / "cs625_bringup" / "launch" / "sensor_adapter.launch.py",
         src / "cs625_bringup" / "launch" / "sim_sensor_bridge.launch.py",
         src / "cs625_bringup" / "launch" / "sim_moveit.launch.py",
@@ -772,7 +777,7 @@ def main() -> int:
         ROOT / "docs" / "archive" / "2026-10-24-pre-six-modes" / "p5_experiment_protocol.md",
         ROOT / "docs" / "archive" / "2026-10-24-pre-six-modes" / "minimum_showcase_experiment.md",
         ROOT / "scripts" / "run_minimum_showcase_matrix.sh",
-        ROOT / "docs" / "real_hardware_readiness.md",
+        ROOT / "docs" / "archive" / "2026-11-07-pre-reorg" / "real_hardware_readiness.md",
         ROOT / "docs" / "archive" / "2026-10-24-pre-six-modes" / "p6_on_site_runbook.md",
         ROOT / "test" / "data" / "p5_candidate_snapshot.json",
         ROOT / "test" / "data" / "p5_paired_experiment.json",
