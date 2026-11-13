@@ -14,7 +14,9 @@
 * 候选：绕工件方位 ±180°、俯角 {10,20,30,40}°、距离 {0.65,0.8}；
 * 每个候选先用 view_scan.predict() 算带遮挡的逐面像素数；
 * 得分 = 侧面像素占比（±x 取较大者），并要求大面（±y）像素 ≥ 8% 以免看不到手柄；
-* 输出排名；--execute 交给 nbv_lateral 执行（本脚本不移动机械臂）。
+* 输出排名；本脚本**不移动机械臂**。真机换位由
+  `scripts/nbv_from_reference.py --auto-station [--execute]` 负责（旧的 nbv_lateral 已于
+  2026-11-13 归档到 docs/archive/2026-11-13-scripts-legacy/six-mode/）。
 """
 
 from __future__ import annotations
@@ -152,16 +154,22 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
     yaw = yaw_degrees_between(ref_pose, cur_pose)
     tolerance = float(views.get("tolerance_deg", 12.0))
     best = None
+    nearest = None          # 无论是否在容差内，记下最近的站位（用于失败诊断）
+    skipped_unvalidated = []  # 在容差内但未过精度门的站位
     for key, entry in views.items():
         if not isinstance(entry, dict) or "tcp" not in entry:
             continue
-        if entry.get("validated", True) is False:
-            continue   # 未通过精度门的站位不参与自动选站（-45° 即此类）
         try:
             angle = float(key)
         except ValueError:
             continue
         error = abs(angle - yaw)
+        if nearest is None or error < nearest[0]:
+            nearest = (error, key)
+        if entry.get("validated", True) is False:
+            if error <= tolerance:
+                skipped_unvalidated.append((key, error))
+            continue   # 未通过精度门的站位不参与自动选站（-45° 即此类）
         if error <= tolerance and (best is None or error < best[0]):
             best = (error, key, entry)
 
@@ -177,11 +185,18 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
     derived_tcp = derived[:3, 3]
     derived_quat = R.from_matrix(derived[:3, :3]).as_quat()
 
+    diagnostics = {
+        "nearest_key": nearest[1] if nearest else None,
+        "nearest_error_deg": round(nearest[0], 2) if nearest else None,
+        "skipped_unvalidated": [(key, round(error, 2))
+                                for key, error in skipped_unvalidated],
+    }
     if best is None:
         return {"yaw_deg": yaw, "station": None,
                 "derived_tcp": derived_tcp, "derived_quat": derived_quat,
                 "stored_tcp": None, "stored_quat": None,
-                "delta_mm": None, "delta_deg": None, "verdict": "no_station"}
+                "delta_mm": None, "delta_deg": None, "verdict": "no_station",
+                **diagnostics}
 
     error, key, entry = best
     stored_tcp = np.asarray(entry["tcp"], dtype=float)
@@ -196,7 +211,8 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
     return {"yaw_deg": yaw, "station": (error, key, entry),
             "derived_tcp": derived_tcp, "derived_quat": derived_quat,
             "stored_tcp": stored_tcp, "stored_quat": stored_quat,
-            "delta_mm": delta_mm, "delta_deg": delta_deg, "verdict": verdict}
+            "delta_mm": delta_mm, "delta_deg": delta_deg, "verdict": verdict,
+            **diagnostics}
 
 
 def main() -> int:

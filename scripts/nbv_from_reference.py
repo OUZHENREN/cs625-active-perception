@@ -22,6 +22,7 @@ import json
 import pathlib
 import subprocess
 import sys
+from datetime import datetime
 
 import numpy as np
 import yaml
@@ -40,6 +41,66 @@ COMMON = REPO / "config" / "tasks" / "common.yaml"
 def pose_from_measurement(path: pathlib.Path, group: str = "g00_m") -> np.ndarray:
     payload = json.loads(path.read_text(encoding="utf-8"))
     return nbv_views.pose_from_payload(payload, group)
+
+
+GAP_DIR = REPO / "runtime" / "measurements"
+
+
+def record_station_gap(plan: dict, reason: str, views: dict,
+                       current_measurement: pathlib.Path) -> pathlib.Path:
+    """把"这次没选到可用站位"落盘，供所有者决定是否新增/复核站位。
+
+    为什么记录（2026-11-13 定）：查表未命中时只打印"拒绝"没有"然后"，
+    事后无法判断该补哪个角度。记录推导出的目标位姿，下次人工摆到该角度时
+    可以直接实测并把结果并入 workpiece_views。
+    """
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")   # 微秒：同秒内多次调用不互相覆盖
+    payload = {
+        "stamp": stamp,
+        "reason": reason,                 # no_station / station_moved
+        "yaw_deg": round(float(plan["yaw_deg"]), 2),
+        "current_measurement": str(current_measurement),
+        "tolerance_deg": float(views.get("tolerance_deg", 12.0)),
+        "derived_tcp": [round(float(v), 5) for v in plan["derived_tcp"]],
+        "derived_quat": [round(float(v), 6) for v in plan["derived_quat"]],
+        "nearest_known_station_deg": plan.get("nearest_key"),
+        "nearest_error_deg": plan.get("nearest_error_deg"),
+        "skipped_unvalidated": plan.get("skipped_unvalidated") or [],
+        "next_steps": [
+            "1) 先原地精测（不换位）；测稳就继续，不需要新站位",
+            "2) 原地测不稳 → 人工摆位到能测的角度",
+            "3) 该角度实测通过后，把位姿并入 config/tasks/common.yaml 的 workpiece_views",
+        ],
+    }
+    GAP_DIR.mkdir(parents=True, exist_ok=True)
+    path = GAP_DIR / f"station_gap_{stamp}.json"
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def print_gap_guidance(plan: dict, reason: str, views: dict,
+                       current_measurement: pathlib.Path) -> None:
+    """失败时的"然后呢"：说清为什么、下一步做什么、记录落在哪。"""
+    nearest = plan.get("nearest_key")
+    nearest_err = plan.get("nearest_error_deg")
+    skipped = plan.get("skipped_unvalidated") or []
+    if reason == "no_station":
+        tol = float(views.get("tolerance_deg", 12.0))
+        print(f"→ 无可用预教站位覆盖该偏转角（容差 {tol:.0f}°）")
+        if nearest is not None:
+            where = "超出容差" if (nearest_err or 0) > tol else "在容差内但未通过精度门"
+            print(f"   最近站位 {nearest}°，差 {nearest_err:.1f}°（{where}）")
+        others = [(k, e) for k, e in skipped if str(k) != str(nearest)]
+        if others:
+            names = "、".join(f"{k}°(差 {e:.1f}°)" for k, e in others)
+            print(f"   另有站位在容差内但**未通过精度门**，已跳过：{names}")
+    else:
+        print("→ 工件位置与示教站位不符（推导 vs 存储差 "
+              f"{plan.get('delta_mm', float('nan')):.1f} mm），拒绝自动换位")
+    print("   下一步：① 原地精测（默认）；② 测不稳则人工摆位；"
+          "③ 新角度实测通过后并入 workpiece_views")
+    path = record_station_gap(plan, reason, views, current_measurement)
+    print(f"   已记录缺口：{path.relative_to(REPO)}（含推导目标位姿，便于下次补站位）")
 
 
 def auto_station(target_pose: dict, execute: bool) -> int:
@@ -108,9 +169,8 @@ def main() -> int:
 
         print(f"工件偏转角 {plan['yaw_deg']:+.1f}°（相对 0° 基准）")
         if plan["verdict"] == "no_station":
-            print(f"→ 无预教站位覆盖该偏转角（容差 "
-                  f"{float(views.get('tolerance_deg', 12.0)):.0f}°），"
-                  "拒绝自动换位，原地精测/人工摆位")
+            print_gap_guidance(plan, "no_station", views,
+                               pathlib.Path(args.current_measurement))
             return 6
         error, key, entry = plan["station"]
         family = entry.get("family", "relative_zero")
@@ -119,8 +179,8 @@ def main() -> int:
         print(f"0° 相对视角推导目标 TCP {np.round(plan['derived_tcp'], 4)}，"
               f"与站位差 {plan['delta_mm']:.1f} mm / {plan['delta_deg']:.1f}°")
         if plan["verdict"] == "station_moved":
-            print("→ 工件位置与示教站位不符（推导 vs 存储 > "
-                  f"{args.family_gate_mm:.0f} mm），拒绝自动换位，原地精测/人工摆位")
+            print_gap_guidance(plan, "station_moved", views,
+                               pathlib.Path(args.current_measurement))
             return 6
         print("→ 使用该已验证站位（不搜索）")
         return auto_station({"tcp": plan["stored_tcp"], "quat": plan["stored_quat"]},

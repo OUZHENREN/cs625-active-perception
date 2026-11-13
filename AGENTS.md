@@ -279,6 +279,37 @@ calibration in `config/handeye/`, simulation/real profile values in
 
 ## View-planning order
 
+### Real-machine mainline (方案 A: discrete station selection, 2026-11-13)
+
+On the real cell, changing the view is a **lookup in a verified station table plus a
+cross-check**, not a search:
+
+```text
+粗观测 workpiece pose in base_link + yaw angle
+→ 查已验证站位表 config/tasks/common.yaml:workpiece_views
+     (nearest station by yaw, tolerance 12°; `validated: false` entries are excluded)
+→ 与 0° 相对视角推导交叉核对（position delta > 40 mm ⇒ 工件已移动，拒绝）
+→ plan_pose_ik 安全闸（工作空间、当前状态接触、轨迹无碰撞、安全构型区间）
+→ 换位 change view → 带先验精观测 fine observation with the prior
+```
+
+`scripts/nbv_from_reference.py --auto-station` prints the decision; add `--execute` to
+move, and the motion always goes through `scripts/plan_pose_ik.py`. The 0° relative-view
+derivation is only the cross-check — execution targets the stored, verified station
+pose. Stations marked `family: taught` (hand-placed by the owner) skip the 40 mm
+cross-check; for them the derivation is diagnostic information only.
+
+Do **not** change view automatically — stay in place for a fine measurement, or have the
+owner place the arm manually — when:
+
+- no verified station covers the measured yaw (outside the 12° tolerance, or not
+  `validated`);
+- the derivation and the stored station disagree by more than 40 mm (workpiece moved);
+- the move needs a large reconfiguration (flip IK solution, J2 too low, J6 beyond
+  ±180°).
+
+### Search-based flow (simulation / research only — not used on the real cell)
+
 ```text
 observe → estimate target → check termination → generate candidates
 → transform camera poses → filter hard reachability constraints
@@ -286,8 +317,15 @@ observe → estimate target → check termination → generate candidates
 → wait for a new settled sensor frame → repeat
 ```
 
+This loop is kept for simulation and research. It is **not used on the real cell**: the
+camera sits about 0.3 m behind the TCP, so rotating the wrist swings the camera on a
+large arc, the wrist is limited to ±45° by its cabling, and table/fixture interference
+makes "generate → score → pick the best" candidates mostly unreachable in hardware.
+
 Fixed, random, predefined and NBV strategies must use one common interface and one
-candidate set.
+common candidate set. That is a research-layer constraint; the real-machine mainline
+above implements the **predefined/fixed baseline** (a verified station table), not an
+NBV search.
 
 ## Task workflow and verification
 
@@ -421,3 +459,14 @@ blockers at their actual layer instead of attributing downstream symptoms to alg
 - Do not modify several architecture layers in one task without explicit scope.
 - Do not hand-edit files that a generator owns (`cs625_real_cell.sdf`,
   `cs625_real_cell_scene.yaml`); change the generator and regenerate.
+- Do not make a plan pass by ignoring contact pairs or suppressing collision warnings;
+  contact is contact.
+- Do not move while the current state already reports contact — stop and hand over to
+  the owner first.
+- Do not accept a flipped configuration (J2 too low; `|wrist_3|` — the same joint as J6
+  — beyond 170°); before any large reconfiguration, print all 6 joint angles and get the
+  owner's explicit consent.
+
+(originally agent_memory §133–§135; after the 2026-11-13 split they are the
+"安全红线" section of `docs/agent_memory.md`, with the full history in
+`docs/agent_memory_history.md`.  Never relax them.)

@@ -1,5 +1,15 @@
 #!/usr/bin/env python3
-"""NBV 视角评分：用"能看到的面和面积"给候选观测方向打分，再从中挑可达的那个。
+"""NBV 视角评分（仅作库保留）：用"能看到的面和面积"给候选观测方向打分。
+
+状态（2026-11-13 起）
+--------------------
+本文件**仅作为库**被 `scripts/nbv_from_reference.py` 使用（`read_tcp()` 等）；
+已归档的 `docs/archive/2026-11-13-scripts-legacy/six-mode/nbv_lateral.py` 也 import
+它，但归档代码不再运行。**命令行评分入口已退役**：它按 CAD 盒的投影面积打分，
+实测区分不了"能测准"和"测不准"的视角（2026-11-13 真机对比），现行做法改看
+`scripts/nbv_views.py`（已验证站位查表 + 相对视角推导）。
+保留原因：`nbv_from_reference.py` 依赖本文件的库函数；11-12 的实测结论与判据仍是
+方案 A 的溯源证据。退役日期：2026-11-13。
 
 为什么需要它（2026-11-12 真机结论）
 -------------------------------------
@@ -14,11 +24,13 @@
 一个面能被看到 ⟺ 该面法向朝向相机。可见面积 = 面积 × |cos(法向, 视线)|。
 窄面（厚度方向的两个侧面）权重要高：它们正是约束偏航的关键。
 
-用法
-----
+用法（已退役，仅存档）
+--------------------
     python3 scripts/nbv_score.py --measurements runtime/measurements/workpiece_coarse.json \
         --group g00_m --distance 0.70 --top 5
     python3 scripts/nbv_score.py --measurements ... --plan        # 顺带规划前 5 个
+
+（以上命令行入口已退役，仅存档；现行观测位选择见 `scripts/nbv_views.py`。）
 """
 
 from __future__ import annotations

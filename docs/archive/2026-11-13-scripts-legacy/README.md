@@ -24,6 +24,7 @@
 |---|---|---|---|
 | `plan_fine_view.py` | `scripts/plan_fine_view.py` | 11-12 的精观测位规划执行器；11-13 方案 A 落地后 `nbv:workpiece` 阶段改调 `nbv_from_reference.py` | `scripts/nbv_from_reference.py` |
 | `nbv_move.py` | `scripts/nbv_move.py` | 11-12 闭环换位实验，当天日志明写"尚未接进流程"；最终从未进入任何配置/代码路径 | `scripts/nbv_from_reference.py` |
+| `nbv_lateral.py` | `scripts/nbv_lateral.py` | 11-12 平移式换视角实验，方案 A 落地后无调用者 | `scripts/nbv_from_reference.py --auto-station` |
 | `preinsert_plan_only.py` | `scripts/preinsert_plan_only.py` | 把轨迹写到 `/tmp/preinsert_plan.json`，全仓库无读取者 | `scripts/teaching/pose_math.py` + `plan_joint_locked.py` |
 | `update_grasped_workpiece.py` | `scripts/update_grasped_workpiece.py` | 默认输入 `runs/20261022_workpiece_model/workpiece_voxels.json` 已不存在；10-22 交接即标"备选方案" | `scripts/update_grasped_box.py` + `attach_workpiece.py` |
 | `auto_label_frames.py` | `scripts/auto_label_frames.py` | 单类几何标注，README 已标"被 four_class 取代" | `scripts/auto_label_four_class.py` |

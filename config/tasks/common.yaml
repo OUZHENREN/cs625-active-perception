@@ -489,6 +489,8 @@ workpiece_views:
     - -0.410926
     note: 2026-11-13 复测通过：0.22 mm / 0.074°，覆盖率 0.976，3 组 3 平面、扶手 0.85–0.89（前次 11-12
       为 0.37 mm / 0.065°）
+    validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
+      --groups 3 --prior runtime/measurements/workpiece_coarse.json
   tolerance_deg: 12.0
   '-23':
     tcp:
@@ -501,6 +503,8 @@ workpiece_views:
     - -0.19014
     - -0.45045
     note: 2026-11-13 由 0° 相对视角推导并实测通过（0.30 mm / 0.059°，3 组 3 平面，扶手 0.91–0.93）
+    validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
+      --groups 3 --prior runtime/measurements/workpiece_coarse.json
   '-30':
     tcp:
     - 0.5107
@@ -512,6 +516,8 @@ workpiece_views:
     - -0.166741
     - -0.45998
     note: 2026-11-13 由 0° 相对视角推导并实测通过（0.28 mm / 0.052°，3 组 3 平面，扶手 0.91–0.92）
+    validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
+      --groups 3 --prior runtime/measurements/workpiece_coarse.json
   '-45':
     # 2026-11-13 实测：3 平面/扶手 0.90–0.92，但平移重复性 1.3 mm（未过 1.0 mm 门）
     # → 自动选站不使用；需要大角度时由所有者判断后手动摆位
@@ -526,6 +532,9 @@ workpiece_views:
     - -0.11223
     - -0.4737
     note: 2026-11-13 相对视角推导 + 实测：3 平面/扶手 0.90–0.92，但平移重复性 1.3 mm（未过 1.0 mm 门），待优化
+    validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
+      --groups 4 --prior runtime/measurements/workpiece_coarse.json
+     
   '-16':
     tcp:
     - 0.5389
@@ -538,6 +547,8 @@ workpiece_views:
     - -0.4374
     note: 2026-11-13 相对视角推导（工件 yaw −16.0°）实测通过：0.46 mm / 0.102°，覆盖率 0.967，3 组 3 平面，扶手
       0.90
+    validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
+      --groups 3 --prior runtime/measurements/workpiece_coarse.json
   '+11':
     family: taught
     tcp:
@@ -553,6 +564,8 @@ workpiece_views:
       0.80）。注意：该视角单靠多起点会频繁落到错误分支，必须先有粗位姿先验。
       family=taught 表示这是所有者手摆的独立站位（不是 0° 相对视角族），选站时不与
       0° 推导做一致性门。
+    validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
+      --groups 3 --prior runtime/measurements/workpiece_coarse.json
   +11_left8:
     family: taught
     tcp:
@@ -567,6 +580,8 @@ workpiece_views:
     note: 2026-11-13 在 +11° 基础上向画面左侧平移 8 cm：0.33 mm / 0.168°，覆盖率 0.967，扶手 0.831–0.836（比原位
       0.80 更好）
       family=taught 同上：独立示教站位，不与 0° 推导做一致性门。
+    validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
+      --groups 3 --prior runtime/measurements/workpiece_coarse.json
 workspace_bounds:
   x:
   - 0.3

@@ -71,6 +71,16 @@
         "panel": "shared",
         "clear": true
       }
+    },
+    {
+      "label": "⑨ 提交前检查 · 三连",
+      "detail": "不碰机器人：pytest 离线单元测试 + 文档一致性 + 仓库治理合同，任一步失败立即停止并说明是哪一步；脚本自己加载开发环境，可在任意目录运行。只改文档时用 bash scripts/pre_commit_check.sh --fast 跳过 pytest。",
+      "type": "shell",
+      "command": "bash scripts/pre_commit_check.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": []
     }
   ]
 }

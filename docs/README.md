@@ -30,7 +30,7 @@
 
 | 顺序 | 文档 | 什么时候看 |
 |---|---|---|
-| 1 | [`agent_memory.md`](agent_memory.md) | **每次开工先扫一遍**：硬规则、常量、禁止事项 |
+| 1 | [`agent_memory.md`](agent_memory.md) | **每次开工先扫一遍**：硬规则、当前权威值、安全红线（≤300 行；历史条目见 [`agent_memory_history.md`](agent_memory_history.md)，不必每轮读） |
 | 2 | [`reference/architecture_current.md`](reference/architecture_current.md) | 想知道代码怎么分层、示教链路 0–18 步是什么 |
 | 3 | [`manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md`](manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md) | **上真机前**：29 条实机经验（含装配工艺、断联排障、安全） |
 | 4 | [`reference/experiment_metrics.md`](reference/experiment_metrics.md) | 要做实验、要出数据之前 |
@@ -46,7 +46,8 @@
 ```text
 docs/
 ├── README.md               ← 本页
-├── agent_memory.md         ← 长期规则（活文件，只追加）
+├── agent_memory.md         ← 当前权威值 + 硬规则（精简版，开工必读）
+├── agent_memory_history.md ← 历史条目存档（只读溯源，不必每轮读）
 ├── reference/              ← 现在有效的技术参考（13 份，常用 8 份列在这里）
 │   ├── architecture_current.md      架构 + 链路 0–18 步 + 两模式
 │   ├── experiment_metrics.md        六类 18 项指标体系
@@ -137,7 +138,8 @@ scripts/sync_worklog.sh docs/worklogs/2026-11/<file>.md
 
 ## 文档规则
 
-1. **只追加、不覆盖**：`agent_memory.md` 与手册只增条目，不改历史条目。
+1. **只追加、不覆盖**：`agent_memory.md`（当前规则）与手册只增条目、不改历史结论；
+   历史条目已移入 `agent_memory_history.md`，新增条目仍写在 `agent_memory.md`。
 2. **归档要批准**：把文档移进 `archive/` 属于所有者决策，需明确同意；本次重整已获批准。
 3. **计划逐月一份**：`plans/` 下文件名就是月份（`YYYY-MM.md`），当月方案只写当月文件；
    旧月份文件不重写、不覆盖（2026-11-08 所有者决定，见 `docs/plans/2026-10.md` 头部）。
