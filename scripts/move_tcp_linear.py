@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import pathlib
 import sys
 import time
 
@@ -33,6 +34,28 @@ def main() -> int:
     velocity = float(sys.argv[5]) if len(sys.argv) > 5 else 0.02
     time_scale = float(sys.argv[6]) if len(sys.argv) > 6 else 2.0
     rotate_deg = float(sys.argv[7]) if len(sys.argv) > 7 else 0.0
+
+    # 目标必须落在安全作业空间内（2026-11-13：一次"纯平移"把 TCP 移到 y=-0.17 的危险位置）
+    try:
+        import yaml as _yaml
+        _config = _yaml.safe_load((pathlib.Path(__file__).resolve().parents[1]
+                                   / "config" / "tasks" / "common.yaml").read_text())
+        _bounds = _config.get("workspace_bounds") or {}
+        for _axis, _index in (("x", 0), ("y", 1), ("z", 2)):
+            _limits = _bounds.get(_axis)
+            if not _limits:
+                continue
+            _low, _high = float(_limits[0]), float(_limits[1])
+            if not (_low <= xyz[_index] <= _high):
+                print(f"REFUSED: TCP {_axis}={xyz[_index]:.3f} 超出安全作业空间 "
+                      f"[{_low}, {_high}]")
+                return 7
+    except Exception as _error:  # noqa: BLE001
+        print(f"REFUSED: 无法读取安全作业空间（{_error}）")
+        return 7
+
+    # 速度上限：真机上限制在 0.03 以内（今天出现过"速度极快"的移动）
+    velocity = min(velocity, 0.03)
 
     rclpy.init()
     node = Node("move_tcp_linear")

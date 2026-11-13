@@ -53,6 +53,8 @@ def main() -> int:
     parser.add_argument("--current-measurement", default=str(
         REPO / "runtime" / "measurements" / "workpiece_now.json"))
     parser.add_argument("--view-key", default="0")
+    parser.add_argument("--max-wrist-delta", type=float, default=90.0,
+                        help="透传给 plan_pose_ik；终点构型仍在绝对安全区间内即可")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
 
@@ -109,31 +111,58 @@ def main() -> int:
     cosine = float(np.dot(current_axis, axis))
     swing = (np.eye(3) if sine < 1e-9
              else R.from_rotvec(cross / sine * np.arctan2(sine, cosine)).as_matrix())
-    for roll_deg in (0, -45, 45, -90, 90, 180):
-        roll = R.from_rotvec(np.array([0.0, 0.0, 1.0])
-                             * np.radians(roll_deg)).as_matrix()
-        rotation = swing @ current_camera[:3, :3] @ roll
-        # TCP = 相机位置 − R_cam · t_tcp_cam（t_tcp_cam 是相机在 TCP 系里的平移）
-        t_tcp_cam = np.linalg.inv(T_tcp_cam)[:3, 3]
-        tcp_target = camera_pos - rotation @ t_tcp_cam
-        quat_target = R.from_matrix(rotation).as_quat()
-        plan = subprocess.run([sys.executable, str(REPO / "scripts" / "plan_pose_once.py"),
-                               *[f"{v:.4f}" for v in tcp_target],
-                               *[f"{v:.5f}" for v in quat_target],
-                               "--max-wrist-delta", "45",
-                               "--output", "/tmp/nbv_ref_plan.json"],
-                              capture_output=True, text=True, timeout=300)
-        text = ((plan.stdout or "") + (plan.stderr or "")).strip().splitlines()
-        print(f"滚转 {roll_deg:+4d}° 规划:", text[-1] if text else "(none)")
-        if "code 1 " in (plan.stdout or ""):
-            moved = subprocess.run(
-                [sys.executable, str(REPO / "scripts" / "execute_assembly_chunks.py"),
-                 "/tmp/nbv_ref_plan.json", "--time-scale", "2.0", "--dwell", "0.5",
-                 "--goal-tolerance", "0.005"], capture_output=True, text=True, timeout=900)
-            lines = (moved.stdout or "").strip().splitlines()
-            print("执行:", lines[-1] if lines else "")
-            return 0 if moved.returncode == 0 else 4
-    print("所有滚转都不可达")
+    # 【安全限幅】自动 NBV 只做"小幅微调"：如果为了到目标视角需要大幅改构型
+    # （任一关节 > 25° 或整臂合计 > 1.0 rad），一律不动，交人工摆位。
+    # 2026-11-13 两次自碰撞/急停都是在"自动大幅改构型"时发生的。
+    current_positions = None
+    try:
+        import rclpy as _rclpy
+        from rclpy.node import Node as _Node
+        from sensor_msgs.msg import JointState as _JS
+        _rclpy.init()
+        _node = _Node("nbv_limit_check")
+        _state = {}
+        _node.create_subscription(_JS, "/joint_states",
+                                  lambda msg: _state.setdefault("j", msg), 10)
+        import time as _time
+        _deadline = _time.time() + 5
+        while _time.time() < _deadline and "j" not in _state:
+            _rclpy.spin_once(_node, timeout_sec=0.2)
+        if "j" in _state:
+            current_positions = dict(zip(_state["j"].name, _state["j"].position))
+        _node.destroy_node()
+        _rclpy.shutdown()
+    except Exception as _error:  # noqa: BLE001
+        print(f"读当前关节失败：{_error}")
+
+    tried = []
+    # ===== 换视角必须先"平移"、不许"转腕"（agent_memory 137）=====
+    # 相机在 TCP 后方约 0.3 m：转腕等于把相机甩出大圆弧，既危险又对视野没帮助。
+    # 正确做法：保持当前工具姿态，用【前三轴】把相机整体平移过去。
+    handeye_now = json.loads(HAND_EYE.read_text())
+    T_tcp_cam_now = np.array(handeye_now["T_tcp_cam"])
+    current_tcp = nbv.read_tcp()
+    current_camera = current_tcp @ T_tcp_cam_now
+    t_tcp_cam = np.linalg.inv(T_tcp_cam_now)[:3, 3]
+    tcp_target_translate = camera_pos - current_camera[:3, :3] @ t_tcp_cam
+    print("平移目标 TCP", np.round(tcp_target_translate, 4),
+          "（姿态保持当前，前三轴负责移动）")
+    if not args.execute:
+        return 0
+    move = subprocess.run(
+        [sys.executable, str(REPO / "scripts" / "move_tcp_linear.py"),
+         f"{tcp_target_translate[0]:.4f}", f"{tcp_target_translate[1]:.4f}",
+         f"{tcp_target_translate[2]:.4f}", "50", "0.02", "4.0"],
+        capture_output=True, text=True, timeout=900)
+    lines_out = (move.stdout or "").strip().splitlines()
+    print("   平移执行:", lines_out[-1] if lines_out else "")
+    if move.returncode != 0:
+        return 4
+    verify = subprocess.run([sys.executable, str(REPO / "scripts" / "check_state_ok.py")],
+                            capture_output=True, text=True, timeout=120)
+    tail = (verify.stdout or "").strip().splitlines()
+    print("   到位复核:", tail[-1] if tail else "(no output)")
+    return 0 if verify.returncode == 0 else 5
     return 3
 
 

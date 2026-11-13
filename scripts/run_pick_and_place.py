@@ -2792,6 +2792,11 @@ def main() -> int:
                 code, text = run(reference_cmd, timeout=900.0)
                 tail = (text or "").strip().splitlines()
                 detail = tail[-1] if tail else "no output"
+                if code == 6:
+                    # 需要大幅改构型 → 不做自动换位（安全第一），继续在原地精测；
+                    # 若原地测不了，精测阶段会失败，届时人工摆位。
+                    step(name, True, f"NBV {target}: 跳过自动换位（需人工摆位）｜{detail}")
+                    continue
                 step(name, code == 0, f"NBV {target}: {detail}")
             elif kind == "observe":
                 waypoint = name.split(":", 1)[1]

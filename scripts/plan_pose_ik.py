@@ -61,6 +61,31 @@ def require_current_state_valid(node, names, positions, label: str = "current") 
         return False
     return True
 
+def target_inside_workspace(tcp_xyz, bounds=None) -> tuple[bool, str]:
+    """目标 TCP 必须落在安全作业空间内（config/tasks/common.yaml → workspace_bounds）。
+
+    2026-11-13 事故：一次"纯平移"把 TCP 移到了 y=-0.17（越过了机器人本体一侧），
+    关节限位全都在范围内，但这个位置本身是危险/无意义的。
+    所以除了关节区间，还必须检查【空间位置】。
+    """
+    import yaml as _yaml
+    if bounds is None:
+        try:
+            config = _yaml.safe_load((REPO / "config" / "tasks" / "common.yaml").read_text())
+            bounds = config.get("workspace_bounds") or {}
+        except Exception:  # noqa: BLE001
+            bounds = {}
+    for axis, index in (("x", 0), ("y", 1), ("z", 2)):
+        limits = bounds.get(axis)
+        if not limits:
+            continue
+        low, high = float(limits[0]), float(limits[1])
+        value = float(tcp_xyz[index])
+        if not (low <= value <= high):
+            return False, f"TCP {axis}={value:.3f} 超出安全作业空间 [{low}, {high}]"
+    return True, ""
+
+
 
 
 import argparse
@@ -68,6 +93,8 @@ import json
 import math
 import pathlib
 import sys
+
+REPO = pathlib.Path(__file__).resolve().parents[1]
 
 import numpy as np
 import rclpy
@@ -145,6 +172,12 @@ def main() -> int:
         rclpy.spin_once(node, timeout_sec=0.2)
     names = list(state["j"].name)
     start = list(state["j"].position)
+
+    # 目标点必须落在安全作业空间内（只查关节区间不够：今天曾把 TCP 移到 y=-0.17）
+    inside, reason = target_inside_workspace(args.pose[:3])
+    if not inside:
+        print(f"code 7 {reason}（拒绝）")
+        return 7
 
     # 移动前硬性自检：当前状态已接触则一律不动（agent_memory 135）
     if not require_current_state_valid(node, names, start):
