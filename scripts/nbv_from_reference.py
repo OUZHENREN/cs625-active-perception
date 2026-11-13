@@ -89,9 +89,6 @@ def main() -> int:
     print("工件相对标定时转动 %.1f°" % np.degrees(delta.magnitude()))
     print("目标 TCP", np.round(tcp, 4), "四元数", np.round(quat, 5))
 
-    if not args.execute:
-        print("（未执行）")
-        return 0
 
     # 位置保持不变（相对视角的关键），姿态只要求"光轴指向工件中心"，滚转自由：
     # 沿用手眼基准滚转会逼出不可达的腕部构型（实测规划直接 code 99999）。
@@ -148,6 +145,7 @@ def main() -> int:
     print("平移目标 TCP", np.round(tcp_target_translate, 4),
           "（姿态保持当前，前三轴负责移动）")
     if not args.execute:
+        print("（未执行）")
         return 0
     move = subprocess.run(
         [sys.executable, str(REPO / "scripts" / "move_tcp_linear.py"),
