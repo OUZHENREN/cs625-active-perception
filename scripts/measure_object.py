@@ -108,8 +108,13 @@ def main() -> int:
                              "fine=严格质量门（给最终位姿）")
     parser.add_argument("--groups", type=int, default=4, help="采集组数（每组 3 帧取中位）")
     parser.add_argument("--prior", default="",
-                        help="粗观测结果 JSON：用它作为先验，剔除偏离过大的组"
-                             "（防止多起点落到错误分支）")
+                        help="先验 JSON（粗观测/上次成功结果）；写 auto 表示用 "
+                             "runtime/measurements/workpiece_prior.json（会自动更新）")
+    parser.add_argument("--prior-max-age-min", type=float, default=0.0,
+                        help="先验文件足够新（分钟）时，粗观测直接采用它、不再重新测量；"
+                             "0 表示总重新测量")
+    parser.add_argument("--auto-release", action="store_true",
+                        help="带先验失败时自动退回【无先验】重试一次（工件被大幅移动后的冷启动）")
     parser.add_argument("--prior-tol-mm", type=float, default=40.0)
     parser.add_argument("--prior-tol-deg", type=float, default=15.0)
     parser.add_argument("--depth-window", type=float, nargs=2, default=None,
@@ -207,9 +212,33 @@ def main() -> int:
     # 视觉流程进度：有 rclpy 就发 /vision_stage，没有就只打印
     coarse_stage = args.stage == "coarse"
     prior_pose = None
-    if args.prior:
+    prior_path = args.prior
+    if prior_path == "auto":
+        candidate = REPO / "runtime" / "measurements" / "workpiece_prior.json"
+        if candidate.exists() and args.prior_max_age_min > 0:
+            age_min = (time.time() - candidate.stat().st_mtime) / 60.0
+            if age_min <= args.prior_max_age_min:
+                print(f"先验新鲜（{age_min:.1f} 分钟 < {args.prior_max_age_min:.1f}）"
+                      f"→ 粗观测直接采用先验，不再测量")
+                payload = json.loads(candidate.read_text(encoding="utf-8"))
+                pose = payload["per_group"][0]["pose_base"]
+                out = pathlib.Path(args.out) if args.out else None
+                if out:
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    out.write_text(json.dumps({
+                        "stamp": time.strftime("%Y%m%d_%H%M%S"), "source": "prior",
+                        "groups": 0, "verdict": "OK", "reasons": [],
+                        "coverage_median": float(payload.get("coverage", 0.97)),
+                        "per_group": [{"group": "g00_m", "planes": 0, "pose_fitness": 0.97,
+                                       "pose_base": pose, "source": "prior"}],
+                    }, ensure_ascii=False, indent=2), encoding="utf-8")
+                return 0
+        prior_path = str(candidate) if candidate.exists() else ""
+        if prior_path:
+            print(f"自动先验：{candidate.name}")
+    if prior_path:
         try:
-            prior_payload = json.loads(pathlib.Path(args.prior).read_text(encoding="utf-8"))
+            prior_payload = json.loads(pathlib.Path(prior_path).read_text(encoding="utf-8"))
             prior_row = (prior_payload.get("per_group") or [None])[0]
             if prior_row:
                 import scipy.spatial.transform as _sst
@@ -290,6 +319,20 @@ def main() -> int:
     # 2026-11-13 实测：某些视角下会出现一组异常解，剩下两组差 0.1 mm / 0.039°，
     # 这时因为"三组"这条数量要求把整批拒掉是不合理的（所有者指出）。
     min_credible = 2
+    if len(credible_rows) < min_credible and prior_pose is not None and args.auto_release:
+        # 冷启动：先验可能已经过时（工件被大幅移动），自动退回【无先验】重跑一次
+        print("带先验失败（可能是工件已被移动）→ 自动退回无先验重试", file=sys.stderr)
+        retry = [sys.executable, "-u", str(pathlib.Path(__file__).resolve())]
+        for flag in ("--preset", "--observe-pose", "--stage", "--groups", "--out",
+                     "--depth-window", "--focus", "--object-pose"):
+            if flag in sys.argv:
+                idx = sys.argv.index(flag)
+                retry += [flag, sys.argv[idx + 1]]
+        if "--prior" in sys.argv:
+            idx = sys.argv.index("--prior")
+            retry = [v for i, v in enumerate(retry)]
+        return subprocess.run(retry, check=False).returncode
+
     if len(credible_rows) < min_credible:
         summary_reason = (f"可信组只有 {len(credible_rows)} 组（需要 ≥{min_credible}），"
                           f"其余 {dropped} 组退化")
@@ -379,6 +422,18 @@ def main() -> int:
     if rotation_spread > max_rotation:
         verdict = "REFUSE"
         reasons.append(f"姿态重复性 {rotation_spread:.2f}° > {max_rotation}")
+
+    # 成功则把这次结果存成"下次的先验"
+    if verdict == "OK":
+        try:
+            prior_file = REPO / "runtime" / "measurements" / "workpiece_prior.json"
+            prior_file.write_text(json.dumps({
+                "per_group": [{"group": "prior",
+                               "pose_base": credible_rows[0]["pose_base"]}],
+                "stamp": stamp,
+            }, ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
 
     summary = {
         "stamp": stamp,

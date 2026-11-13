@@ -2178,6 +2178,12 @@ def run_observation_check(command: str, pose: dict) -> tuple[bool, str]:
     completed = subprocess.run(command + extra, shell=True, capture_output=True,
                                timeout=600, text=True)
     output = ((completed.stdout or "") + (completed.stderr or "")).strip().splitlines()
+    # 失败时"最后一行"往往只是"写入 xxx.json"，把真正的原因（verdict/reasons）找出来
+    if completed.returncode != 0:
+        reason_lines = [line.strip() for line in output
+                        if "verdict" in line or "reasons" in line or "< " in line]
+        if reason_lines:
+            return False, " | ".join(reason_lines[:2])
     tail = output[-1] if output else "no output"
     return completed.returncode == 0, tail
 
@@ -2556,6 +2562,9 @@ def main() -> int:
                                   "plan_only": plan_only})
         node.get_logger().info(f"[{name}] ok={ok} {record[-1]['detail']}")
         Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
+        # --until：跑到指定阶段就停（这个 helper 之前漏了，导致 --until 不生效）
+        if args.until and name == args.until:
+            raise SystemExit(f"stopped after requested phase {name}")
 
     def detail(goal, points) -> str:
         """Say why a phase failed instead of a bare ok=False."""
@@ -2758,49 +2767,32 @@ def main() -> int:
                     step(name, True, f"measure {target} (planned only)")
                     continue
                 ok_check, check_detail = run_observation_check(check, {})
+                # 先 step()（它会 append 记录），再补 check 明细；
+                # 之前先写 record[-1] 在"第一个阶段就是 measure"时会 IndexError。
+                step(name, ok_check, f"measure {target}: {check_detail}")
                 record[-1]["check"] = {"name": check, "ok": ok_check,
                                        "detail": check_detail}
                 Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
-                step(name, ok_check, f"measure {target}: {check_detail}")
             elif kind == "nbv":
-                # NBV：由粗观测位姿推算精观测位，然后有界移动过去。
-                # 粗位姿只要"够用来定视角"（5–20 mm），精确位姿由随后的精观测给出。
+                # NBV = "把机械臂移到能拍到工件大部分的位置"，用已验证视角的相对关系推导：
+                #   0° 标定过一个"能测准"的相机位姿 → 换成相对工件的位姿 →
+                #   按当前工件转角重新落到世界系（scripts/nbv_from_reference.py）。
+                # 这样既不需要搜索，也不会像转腕那样把相机甩出去。
                 target = name.split(":", 1)[1]
-                coarse = REPO / "runtime" / "measurements" / f"{target}_coarse.json"
-                if not coarse.exists():
-                    step(name, False, f"NBV_NO_COARSE_POSE ({coarse.name})")
+                if plan_only:
+                    step(name, True, f"NBV {target}（plan-only 跳过换位）")
                     continue
-                # 先看"当前视角"是否已经够用：够用就不换位（省时间，也避免换到更差的视角）。
-                # 判据：1 组快速探针里，扶手覆盖率 ≥0.70 且覆盖率 ≥0.90。
-                probe_out = REPO / "runtime" / "measurements" / f"{target}_probe.json"
-                probe_cmd = [sys.executable, "-u", str(REPO / "scripts" / "measure_object.py"),
-                             "--preset", target, "--stage", "coarse", "--groups", "1",
-                             "--out", str(probe_out)]
-                if target != "workpiece":
-                    probe_cmd += ["--observe-pose", "slot_coarse"]
-                if not plan_only:
-                    run(probe_cmd, timeout=600.0)
-                    try:
-                        probe = json.loads(probe_out.read_text(encoding="utf-8"))
-                        handles = [(g.get("symmetry_check") or {}).get("handle_score") or 0.0
-                                   for g in probe.get("per_group", [])]
-                        coverage = float(probe.get("coverage_median") or 0.0)
-                        if handles and max(handles) >= 0.70 and coverage >= 0.90:
-                            step(name, True,
-                                 f"当前视角已可用（扶手 {max(handles):.2f}，覆盖 {coverage:.3f}），不换位")
-                            continue
-                    except (OSError, ValueError):
-                        node.get_logger().warn("[nbv] 探针结果读取失败，仍然尝试换视角")
-                command = [sys.executable, "-u", str(REPO / "scripts" / "plan_fine_view.py"),
-                           "--measurements", str(coarse), "--group", "g00_m",
-                           "--distance", str(getattr(cfg, "nbv_distance_m", 0.65)),
-                           "--elevation", str(getattr(cfg, "nbv_elevation_deg", 25.0))]
-                if not plan_only:
-                    command.append("--execute")
-                code, text = run(command, timeout=900.0)
+                reference_cmd = [sys.executable, "-u",
+                                 str(REPO / "scripts" / "nbv_from_reference.py"),
+                                 "--reference-measurement",
+                                 str(REPO / "runtime" / "measurements" / "workpiece_zero.json"),
+                                 "--current-measurement",
+                                 str(REPO / "runtime" / "measurements" / "workpiece_coarse.json"),
+                                 "--view-key", "0", "--execute"]
+                code, text = run(reference_cmd, timeout=900.0)
                 tail = (text or "").strip().splitlines()
-                step(name, code == 0,
-                     f"NBV {target}: {tail[-1] if tail else 'no output'}")
+                detail = tail[-1] if tail else "no output"
+                step(name, code == 0, f"NBV {target}: {detail}")
             elif kind == "observe":
                 waypoint = name.split(":", 1)[1]
                 pose = (cfg.observe or {}).get(waypoint)

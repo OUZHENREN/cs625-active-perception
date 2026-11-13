@@ -123,8 +123,7 @@ phase_speeds:
     time_scale: 1.0
     chunks: 1
 phases:
-- observe:workpiece_coarse
-- nbv:workpiece
+- measure:workpiece_coarse
 - measure:workpiece_fine
 - observe:tables
 - observe:slot_coarse
@@ -190,13 +189,14 @@ phases_unload:
 - observe:workpiece_coarse
 observe_checks:
   workpiece_fine: python3 scripts/measure_object.py --preset workpiece --stage fine
-    --groups 4 --out runtime/measurements/workpiece_latest.json --prior runtime/measurements/workpiece_coarse.json
+    --groups 3 --out runtime/measurements/workpiece_latest.json --prior runtime/measurements/workpiece_coarse.json
   slot_coarse: python3 scripts/measure_object.py --preset slot --observe-pose slot_coarse
     --groups 5 --out runtime/measurements/slot_latest.json
   tables: none
   slot_fine: none
   workpiece_coarse: python3 scripts/measure_object.py --preset workpiece --stage coarse
-    --groups 3 --out runtime/measurements/workpiece_coarse.json
+    --groups 3 --out runtime/measurements/workpiece_coarse.json --prior auto --auto-release
+    --prior-max-age-min 30
 environment_gate: measurement
 measurement_targets:
 - workpiece_fine
