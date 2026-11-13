@@ -431,6 +431,13 @@ def _coverage(points: np.ndarray, cad_points: np.ndarray, transformation: np.nda
     observed = _prepared_cloud(points, 0.003)
     template = o3d.geometry.PointCloud()
     template.points = o3d.utility.Vector3dVector(cad_points)
+    # 覆盖率 = "观测点里有多少落在模型附近"，但【先剔掉远离模型的点】。
+    # 直接用全部裁剪点会把背景/桌面残留算成覆盖率（实测同一位姿：全部 0.306、近模型 0.961）；
+    # 反过来用"模型点被覆到多少"又永远到不了 1（背面本来就看不到，实测只有 0.90）。
+    # 所以取两者的折中：先按 20 mm 剔背景，再算观测→模型的命中率。
+    keep = np.asarray(observed.compute_point_cloud_distance(template)) <= max(0.02, threshold_m * 2)
+    if keep.sum() >= 1000:
+        observed = observed.select_by_index(np.flatnonzero(keep))
     evaluation = o3d.pipelines.registration.evaluate_registration(
         observed, template, threshold_m, np.linalg.inv(transformation))
     return float(evaluation.fitness)
