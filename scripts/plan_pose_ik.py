@@ -34,6 +34,30 @@ TIP = "my_end_effector_link"
 FRAME = "world"
 
 
+def _wrap_deg(angle: float) -> float:
+    """把角度差折算到 (−180, 180]。"""
+    import math as _m
+    return (angle + _m.pi) % (2 * _m.pi) - _m.pi
+
+
+def acceptable(candidate: list[float]) -> bool:
+    """拒绝危险构型（2026-11-13 所有者警告：J2 过低会撞桌面；J6 超 ±180° 会缠线）。
+
+    判据（按 JOINT_ORDER 的索引：0 肩转、1 肩抬、2 肘、3/4/5 腕）：
+      · wrist_3 绝对值 > 170°          → 拒绝
+      · 肩抬 < 5° 且 肘伸展 > 100°（手臂横伸到桌面高度）→ 拒绝
+      · 肩转与当前相差 > 90°（换到了另一种翻转构型）→ 拒绝
+    """
+    import math as _m
+    pan, lift, elbow = candidate[0], candidate[1], candidate[2]
+    wrist_3 = candidate[5]
+    if abs(_m.degrees(wrist_3)) > 170.0:
+        return False
+    if _m.degrees(lift) < 5.0 and abs(_m.degrees(elbow)) > 100.0:
+        return False
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("pose", type=float, nargs=7, help="x y z qx qy qz qw")
@@ -94,14 +118,21 @@ def main() -> int:
         solution = dict(zip(response.solution.joint_state.name,
                             response.solution.joint_state.position))
         candidate = [solution.get(name, start[i]) for i, name in enumerate(names)]
-        delta = max(abs(candidate[i] - start[i]) for i in wrist_idx)
-        if best is None or delta < best[0]:
-            best = (delta, candidate)
+        if not acceptable(candidate):
+            continue
+        # 换构型（肩转相对当前 >90°）一律不要：实测那正是"横伸到桌面"的那一支
+        if abs(_wrap_deg(candidate[0] - start[0])) > 90.0:
+            continue
+        # 选解标准：整条手臂的关节变化量（前三轴也算），避免换到另一种"翻转构型"
+        arm_delta = sum(abs(candidate[i] - start[i]) for i in range(len(names)))
+        wrist_delta = max(abs(candidate[i] - start[i]) for i in wrist_idx)
+        if best is None or (arm_delta, wrist_delta) < (best[0], best[1]):
+            best = (arm_delta, wrist_delta, candidate)
     if best is None:
         print("IK_FAILED 所有种子都无解")
         return 5
-    target = best[1]
-    print(f"IK 解：腕部最小变化 {math.degrees(best[0]):.1f}°")
+    target = best[2]
+    print(f"IK 解：整臂变化 {best[0]:.2f} rad，腕部最大变化 {math.degrees(best[1]):.1f}°")
     wrist_delta = max(abs(target[i] - start[i]) for i in wrist_idx)
     max_delta = max(abs(target[i] - start[i]) for i in range(len(names)))
     if wrist_delta > math.radians(args.max_wrist_delta):
