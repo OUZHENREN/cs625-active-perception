@@ -85,7 +85,7 @@ must be sourced *after* the entry point when a command needs `percipio_camera`.
 ## Current package boundary
 
 The repository has 12 ROS 2 packages. The list is maintained in
-[`docs/project_layout.md`](docs/project_layout.md) and must match `colcon list`:
+[`docs/reference/project_layout.md`](docs/reference/project_layout.md) and must match `colcon list`:
 
 - `cs625_ap_interfaces`: ROS messages, services and actions only;
 - `cs625_ap_description`: camera/tool extensions to the official CS625 description;
@@ -109,14 +109,26 @@ owning runtime state:
 
 | Layer | Where | Responsibility |
 |---|---|---|
-| Task entry | `scripts/run_task.py` | `--scope {load,unload,full} --mode {safe,efficient} --world {real,sim}`; merges config, loads the environment model, runs the phase runner. **No motion logic.** |
+| Six-mode entry (frozen, ADR-005) | `scripts/run_task.py` | `--scope {load,unload,full} --mode {safe,efficient} --world {real,sim}`; merges config, loads the environment model, runs the phase runner. **No motion logic.** |
 | Phase runner | `scripts/run_pick_and_place.py` | The 13 load phases and the unload D1–D9 sequence, phase speeds, verification, plan-only chaining. |
 | Environment model | `scripts/model_environment.py` | Offline measurement of tables/slot/workpiece → `model.json` + gate. |
 | Experiment data | `scripts/experiment_recorder.py` + `archive_experiment.py` | 20 Hz timeseries, phase markers, camera frames, trimming, archive to `~/cs625_experiment_archive`. |
 
 A new capability belongs in one of these scripts, or in a package, **not in both**.
 
-## Six task modes (the application contract)
+## Six task modes (frozen design record — NOT the daily entry)
+
+> **Status (ADR-005, 2026-11-07; reconfirmed by the owner 2026-11-13):** the six-mode
+> matrix was **classified/frozen**, not deleted. It is **not** the application entry.
+> The current mainline is two modes running one chain:
+> `efficiency = scripts/teaching/teaching_debug.py` (under development) and
+> `teaching/safe = scripts/resume_teaching.sh` (frozen). The six-mode sources
+> (`scripts/run_task.py`, `scripts/run_pick_and_place.py`, `scripts/cs625_ui.py`) are
+> kept runnable but are no longer the entry; the panel's Run button and parts of the
+> efficiency flow reuse `run_task.py --scope load --mode efficient`, which does not
+> promote the matrix back to an entry. Do not describe the six modes as "the current
+> application contract". The description below is the frozen design record, and its hard
+> rules still apply whenever that code path is executed.
 
 ```text
 scope  load    = 抓取工件 → 装入插槽
@@ -180,7 +192,7 @@ gz_ros2_control and camera drivers are upstream dependencies.
 - Prefer `.repos` files and an underlay workspace.
 - If an upstream modification is unavoidable, use a dedicated fork and pin the commit.
 - Record URL, branch/tag/commit, purpose, vendor status and modification policy in
-  [`docs/dependencies.md`](docs/dependencies.md).
+  [`docs/reference/dependencies.md`](docs/reference/dependencies.md).
 
 The senior's automation stack is frozen at `~/cs625_legacy_underlay_jazzy/` (read-only)
 with provenance in [`docs/decisions/ADR-004-legacy-senior-underlay.md`](docs/decisions/ADR-004-legacy-senior-underlay.md).
@@ -328,7 +340,7 @@ readable:
 docs/archive/2026-10-24-pre-six-modes/  old docs (protocols, phase reviews)
 ```
 
-[`docs/source_authority.md`](docs/source_authority.md) defines which numbers are
+[`docs/archive/2026-11-07-pre-reorg/source_authority.md`](docs/archive/2026-11-07-pre-reorg/source_authority.md) defines which numbers are
 authoritative (A: 2026-10-22..24 real measurements, B: senior interfaces, C: old simulation
 parameters, kept for reference only).
 

@@ -84,6 +84,43 @@ Gazebo 运行时（carry attach 行为）只做了静态展开验证，未实际
 contract_checks PASS；六模式 dry-run OK。
 ```
 
+## 0.4 更正：我把"六模式"错写成当前主线（23:3x，所有者当场指出）
+
+```text
+错误：0.3 那轮重写 README 时，我把"六类任务模式（load/unload/full × safe/efficient）"
+写成"当前唯一应用入口"，并把 run_task.py 当成主线执行路径。
+事实（ADR-005，2026-11-07 已采纳；所有者 2026-11-13 再次确认）：
+  · 六模式矩阵已被取代、归类冻结：源码（run_task.py / run_pick_and_place.py /
+    cs625_ui.py）冻结保留，**不再作为日常入口**；
+  · 当前主线是两种模式、同一条链路（teaching_sequence.py）：
+      效率模式 = scripts/teaching/teaching_debug.py（正在开发）
+      示教模式 = scripts/resume_teaching.sh（安全模式，已冻结）
+  · 面板「运行」与部分效率流程调用 run_task.py --scope load --mode efficient
+    （复用 load+efficient 配置与观测前缀），这不等于六模式矩阵恢复为入口。
+根因：我读 AGENTS.md 的"Six task modes (the application contract)"章节就当真，
+没有回到 ADR-005 / architecture_current.md / 代码 docstring 交叉核对，也没有
+用所有者实际使用的入口（VS Code 任务、teaching_debug.py）验证。
+
+已修正：
+① README：状态表改为"两种运行模式（效率/示教）"+"六模式已归类（ADR-005）"；
+   新增"两种运行模式（当前主线）"章节（含两条命令）；抓取/插入与当前重心两条
+   改为"效率模式"；dry-run 标注为"六模式源码离线自检"。
+② AGENTS.md：六模式章节加状态前言（归类冻结、主线是两种模式、不得称其为
+   application contract）；"Task entry"行改为"Six-mode entry (frozen, ADR-005)"。
+③ 顺手修 AGENTS.md 三处失效文档链接（11-07 文档重组后未更新）：
+   docs/project_layout.md → docs/reference/project_layout.md
+   docs/dependencies.md  → docs/reference/dependencies.md
+   docs/source_authority.md → docs/archive/2026-11-07-pre-reorg/source_authority.md
+④ README 里 camera_mode.py 子命令补全 probe（实际有 6 个）。
+
+同轮审计（所有者追问"没搞出其他错误吧"）：逐条回到源头核对了 README 的其余
+断言——pytest 275、contract_checks PASS、check_docs PASS、12 个包（colcon list）、
+VS Code 8 个任务、teaching_debug.py 的 --stage/--from/--to/--repeat 均存在、
+SAFE_HEIGHT_Z=0.53、CARRY_SPEED_CAP=0.013、六维力"未采集"、插入 371–372 mm、
+规划场景 0 个碰撞对象、方案 A 数字与 P7 归档路径——均与代码/文档一致，未发现
+新的错误。仍存疑但未改：agent_memory 第 80 条"持件 ≤0.020 m/s"与代码 0.013 冲突。
+```
+
 ## 0. 本轮解决的两个问题
 
 ```text

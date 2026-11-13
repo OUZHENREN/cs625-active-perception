@@ -28,7 +28,7 @@
 | 能力 | 状态 | 证据 |
 |---|---|---|
 | 示教链路：观测 → 抓取 → 抬升 → 转运 → 分级 → 旋转 → 预插入 | ✅ 真机整链跑通（人工示教后回放） | `docs/manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md` |
-| 六模式自动流程的抓取 / 插入 | 🚧 **仅 plan-only**，真机未验证 | `scripts/run_pick_and_place.py` |
+| 效率模式的抓取 / 插入 | 🚧 **仅 plan-only**，真机未验证 | `scripts/run_pick_and_place.py` |
 | 插入到底 | 🚧 371–372 mm 被机器人自身力矩保护挡住（重复性 1.1 mm），不是物理底部 | 同上 第 21 节 |
 | 槽内转 10° 转平 | 🚧 未在真机跑通（源码依据已确认） | `scripts/teaching/straighten_in_slot.py` |
 | 规划场景里的桌子 / 夹具 | ⛔ MoveIt 查询返回 0 个碰撞对象 → **自动运动前必须先修** | 交接文档 §6 |
@@ -38,10 +38,11 @@
 
 | 能力 | 状态 | 证据 |
 |---|---|---|
-| 六类任务模式（load/unload/full × safe/efficient） | ✅ 唯一应用入口，两模式已收敛 | `scripts/run_task.py` |
+| 两种运行模式（效率 / 示教） | ✅ 已收敛为两条入口：效率模式在开发，示教模式冻结 | `scripts/teaching/teaching_debug.py`、`scripts/resume_teaching.sh` |
 | 操作面板（PyQt5） | ✅ 阶段/遥测/采集/相机 1:1/夹爪/RViz 状态卡 | `scripts/cs625_panel.py` |
 | RViz 3D（机械臂/点云/规划场景） | ✅ 复用 MoveIt 参数启动 | `scripts/open_rviz.sh` |
 | 实验指标与归档 | ✅ 六类 18 项字段，`runtime/debug_runs/` | `scripts/teaching/teaching_debug.py` |
+| 六模式（scope × mode）矩阵 | 🗄 已归类（ADR-005）：源码冻结保留，不作为日常入口 | `docs/decisions/ADR-005-two-modes-and-insert-authority.md` |
 | P7 五道门仿真流水线 | 🗄 2026-11-13 归档（代码 + 证据），只读溯源 | `docs/archive/2026-11-13-p7-nbv-legacy-code/` |
 
 **一句话**：观测（测量）这条链已经可以依赖；接下来是插入段、规划场景可见性，以及方案 A 的真机验收。
@@ -61,7 +62,7 @@ python3 -m pytest test/ -q            # 275 passed
 python3 test/contract_checks.py       # 仓库治理合同
 python3 scripts/check_docs.py         # 文档一致性
 
-# ③ 六类任务模式：先 dry-run 看相位表与门检，再动臂
+# ③ 六模式源码的离线 dry-run（已归类，仅作配置合并 + 相位表 + 门检自检，不动臂）
 python3 scripts/run_task.py --scope load --mode efficient --world sim --dry-run
 
 # ④ 动臂前的四项门
@@ -74,26 +75,29 @@ python3 scripts/nbv_from_reference.py --auto-station \
     --current-measurement runtime/measurements/workpiece_coarse.json
 ```
 
-### 六类任务模式（当前唯一应用入口）
+### 两种运行模式（当前主线）
 
 ```text
-scope  load / unload / full      ×      mode  safe / efficient
-紧间隙阶段（插入/转正/取出）固定 0.005 m/s；巡航 ≤0.12 m/s；释放必须 --allow-release
-每次运行前必须有新鲜环境模型（runtime/environment/<ts>/model.json），过期或超差 → 拒绝执行
+效率模式  scripts/teaching/teaching_debug.py     ← 正在开发（视觉算法 / 力控实验）
+示教模式  scripts/resume_teaching.sh（安全模式）   ← 已冻结，只维护不再开发
+两者跑的是同一条示教链路（scripts/teaching/teaching_sequence.py），效率模式只是它的调试外壳。
 ```
 
 ```bash
-python3 scripts/run_task.py --scope load --mode efficient --world real --confirm \
-        --until measure:workpiece_fine        # 只跑观测前缀（真机，需所有者在场）
+# 效率模式：可分阶段、可改速度、可跳静置/门检，每次运行自动归档
+python3 scripts/teaching/teaching_debug.py --stage 5            # 只跑预抓取
+python3 scripts/teaching/teaching_debug.py --from 12 --to 13    # 旋转 + 下降
+python3 scripts/teaching/teaching_debug.py --stage 14 --repeat 3
+
+# 示教模式（冻结）：门检全开、静置、位姿库、失败自动重启并续跑
+bash scripts/resume_teaching.sh
 ```
 
-### 示教链路（前期主线，仍在用）
-
-```bash
-bash scripts/resume_teaching.sh                                  # 安全模式
-python3 scripts/teaching/teaching_debug.py --stage 5             # 效率模式：只跑预抓取
-python3 scripts/teaching/teaching_debug.py --from 12 --to 13     # 旋转 + 下降
-```
+> **六模式（load/unload/full × safe/efficient）已按 ADR-005 归类**：源码
+> （`run_task.py` / `run_pick_and_place.py` / `cs625_ui.py`）冻结保留、不再作为日常入口。
+> 面板「运行」按钮与部分效率流程会调用 `run_task.py --scope load --mode efficient`
+> （复用其中 load+efficient 的配置与观测前缀），这不代表六模式矩阵恢复为入口。
+> 该路径运行前必须有新鲜环境模型（`runtime/environment/<ts>/model.json`），过期或超差 → 拒绝执行。
 
 ### 周边工具
 
@@ -101,7 +105,7 @@ python3 scripts/teaching/teaching_debug.py --from 12 --to 13     # 旋转 + 下�
 python3 scripts/cs625_panel.py                 # 操作面板（两标签页 + 相机 + 夹爪）
 scripts/open_rviz.sh                           # RViz：机械臂 / TF / 点云 / 规划场景
 python3 scripts/show_targets_in_scene.py       # 已知位姿的工件与插槽显示进 RViz
-python3 scripts/camera_mode.py {status,fast,modeling,high,stop}
+python3 scripts/camera_mode.py {status,fast,modeling,probe,high,stop}
 ```
 
 ### VS Code 任务（8 个）
@@ -169,7 +173,7 @@ runtime/        运行产物（环境模型、采集、位姿库、debug_runs）
 ```text
 1. 修规划场景：让桌子/夹具对 MoveIt 可见（自动运动的前置条件）
 2. 方案 A 真机验收：选站 → 换位 → 带先验精测，整链跑通
-3. 六模式自动流程的抓取 / 插入真机验证
+3. 效率模式的抓取 / 插入真机验证
 4. 六维力 12 月到位后：三维模型 / URDF / TCP 更新 + 力控实验数据
 ```
 
