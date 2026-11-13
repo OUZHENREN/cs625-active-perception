@@ -17,7 +17,7 @@ Frames: the planning frame is ``world`` (the SRDF pins base_link to world with a
 fixed virtual joint and sim_moveit.launch.py sets octomap_frame: world), so every
 pose in the scene config is already in the frame MoveIt expects.
 
-How it reaches MoveIt (2026-11-14 fix): the objects are applied through the
+How it reaches MoveIt (2026-11-13 fix): the objects are applied through the
 ``/apply_planning_scene`` service, not published fire-and-forget on the
 ``/planning_scene`` topic.  The service answers ``success`` and the script then reads
 the scene back through ``/get_planning_scene`` and checks that every expected id is
