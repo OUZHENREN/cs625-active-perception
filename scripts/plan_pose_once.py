@@ -219,11 +219,29 @@ def main() -> int:
         (abs(point.positions[index] - base_positions[index]) for point in points
          for index in wrist_indices),
         default=0.0)
-    wrist_limit = float(_np.radians(arguments.max_wrist_delta))
-    if wrist_delta > wrist_limit:
-        print(f"code 3 points {len(points)} duration {duration:.2f}s "
-              f"wrist_delta {wrist_delta:.2f} rad -- REFUSED: 腕部转动超过 "
-              f"{arguments.max_wrist_delta:.0f}°（会自碰撞）")
+    # 判据改为【终点构型的绝对安全区间】（见 agent_memory 136）：不再用"相对当前 ±45°"，
+    # 那只是电缆缠绕的代理指标，会误杀"终点仍在安全区内"的移动（所有者 2026-11-13 追问）。
+    ABS_LIMITS = {
+        "shoulder_pan_joint": (-100.0, 100.0),
+        "shoulder_lift_joint": (-110.0, 10.0),
+        "elbow_joint": (-150.0, -100.0),
+        "wrist_1_joint": (-150.0, 150.0),
+        "wrist_2_joint": (-150.0, 150.0),
+        "wrist_3_joint": (-150.0, 150.0),
+    }
+    final = dict(zip(trajectory.joint_names, points[-1].positions))
+    for joint, (low, high) in ABS_LIMITS.items():
+        if joint in final:
+            value = float(_np.degrees(final[joint]))
+            if not (low <= value <= high):
+                print(f"code 3 points {len(points)} duration {duration:.2f}s "
+                      f"{joint}={value:.1f}° 超出安全区间 [{low:.0f}, {high:.0f}] -- REFUSED")
+                return 3
+    lift = float(_np.degrees(final.get("shoulder_lift_joint", 0.0)))
+    elbow = float(_np.degrees(final.get("elbow_joint", -90.0)))
+    if lift > -20.0 and abs(elbow) > 100.0:
+        print(f"code 3 points {len(points)} -- REFUSED: 肩抬 {lift:.0f}° + 肘 {elbow:.0f}° "
+              f"（手臂横在桌面高度）")
         return 3
 
     if max_delta > arguments.max_joint_delta or duration > arguments.max_duration:

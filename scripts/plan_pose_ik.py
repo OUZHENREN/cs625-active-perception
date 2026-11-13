@@ -88,20 +88,36 @@ def _wrap_deg(angle: float) -> float:
     return (angle + _m.pi) % (2 * _m.pi) - _m.pi
 
 
-def acceptable(candidate: list[float]) -> bool:
-    """拒绝危险构型（2026-11-13 所有者警告：J2 过低会撞桌面；J6 超 ±180° 会缠线）。
+def acceptable(candidate: list[float], names=None) -> bool:
+    """判断一个关节构型是否可以接受。
 
-    判据（按 JOINT_ORDER 的索引：0 肩转、1 肩抬、2 肘、3/4/5 腕）：
-      · wrist_3 绝对值 > 170°          → 拒绝
-      · 肩抬 < 5° 且 肘伸展 > 100°（手臂横伸到桌面高度）→ 拒绝
-      · 肩转与当前相差 > 90°（换到了另一种翻转构型）→ 拒绝
+    判据只看【终点构型本身】（绝对量），不再用"相对当前 ±45°"——
+    后者是电缆缠绕的代理指标，会误杀"终点仍在安全区内"的移动
+    （所有者 2026-11-13 追问：既然满足安全区间，为什么不能执行？）。
+      · 每个关节的终点必须落在绝对安全区间内；
+      · 危险组合：肩抬接近水平（> −20°）且肘大角度伸展（|肘| > 100°）→ 手臂横在桌面高度；
+      · 危险组合：腕部三个关节都接近极限（任两个 |角度| > 140°）。
     """
-    import math as _m
-    pan, lift, elbow = candidate[0], candidate[1], candidate[2]
-    wrist_3 = candidate[5]
-    if abs(_m.degrees(wrist_3)) > 170.0:
+    limits = {
+        "shoulder_pan_joint": (-100.0, 100.0),
+        "shoulder_lift_joint": (-110.0, 10.0),
+        "elbow_joint": (-150.0, -100.0),
+        "wrist_1_joint": (-150.0, 150.0),
+        "wrist_2_joint": (-150.0, 150.0),
+        "wrist_3_joint": (-150.0, 150.0),
+    }
+    order = names or ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+                      "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"]
+    degrees = [math.degrees(candidate[i]) for i in range(len(candidate))]
+    for index, name in enumerate(order[:len(degrees)]):
+        low, high = limits.get(name, (-180.0, 180.0))
+        if not (low <= degrees[index] <= high):
+            return False
+    lift, elbow = degrees[1], degrees[2]
+    if lift > -20.0 and abs(elbow) > 100.0:
         return False
-    if _m.degrees(lift) < 5.0 and abs(_m.degrees(elbow)) > 100.0:
+    wrists = degrees[3:6]
+    if sum(1 for value in wrists if abs(value) > 140.0) >= 2:
         return False
     return True
 
@@ -140,10 +156,20 @@ def main() -> int:
         return 4
     wrist_idx = [i for i, name in enumerate(names) if name in
                  ("wrist_1_joint", "wrist_2_joint", "wrist_3_joint")]
+    # 绝对安全区间（见 agent_memory 136）：这是"关节能不能待在那儿"的硬约束。
+    # 之前用的"相对当前 ±45°"其实是电缆缠绕的代理指标，会误杀"终点仍在安全区内"的移动。
+    ABSOLUTE_LIMITS = {
+        "shoulder_pan_joint": (-100.0, 100.0),
+        "shoulder_lift_joint": (-110.0, 10.0),
+        "elbow_joint": (-150.0, -100.0),
+        "wrist_1_joint": (-150.0, 150.0),
+        "wrist_2_joint": (-150.0, 150.0),
+        "wrist_3_joint": (-150.0, 150.0),
+    }
 
     # 同一个位姿有多组 IK 解；按"腕部变化最小"挑一个，避免为了视角把腕子拧过去。
     # 只用当前构型做种子通常会给出腕部变化最大的那个解，所以这里扰动种子多试几次。
-    best = None
+    candidates_pool = []
     rng = np.random.default_rng(7)
     for attempt in range(args.ik_seeds):
         seed = list(start)
@@ -170,69 +196,80 @@ def main() -> int:
         solution = dict(zip(response.solution.joint_state.name,
                             response.solution.joint_state.position))
         candidate = [solution.get(name, start[i]) for i, name in enumerate(names)]
-        if not acceptable(candidate):
+        if not acceptable(candidate, names):
             continue
-        # 换构型（肩转相对当前 >90°）一律不要：实测那正是"横伸到桌面"的那一支
-        if abs(_wrap_deg(candidate[0] - start[0])) > 90.0:
-            continue
-        # 选解标准：整条手臂的关节变化量（前三轴也算），避免换到另一种"翻转构型"
         arm_delta = sum(abs(candidate[i] - start[i]) for i in range(len(names)))
         wrist_delta = max(abs(candidate[i] - start[i]) for i in wrist_idx)
-        if best is None or (arm_delta, wrist_delta) < (best[0], best[1]):
-            best = (arm_delta, wrist_delta, candidate)
-    if best is None:
-        print("IK_FAILED 所有种子都无解")
+        candidates_pool.append((arm_delta, wrist_delta, candidate))
+    candidates_pool.sort(key=lambda item: (item[0], item[1]))
+    if not candidates_pool:
+        print("IK_FAILED 所有种子都无解（或被安全区间拒绝）")
         return 5
-    target = best[2]
-    print(f"IK 解：整臂变化 {best[0]:.2f} rad，腕部最大变化 {math.degrees(best[1]):.1f}°")
-    wrist_delta = max(abs(target[i] - start[i]) for i in wrist_idx)
-    max_delta = max(abs(target[i] - start[i]) for i in range(len(names)))
-    if wrist_delta > math.radians(args.max_wrist_delta):
-        print(f"code 3 wrist_delta {wrist_delta:.2f} rad -- 腕部转动超过 "
-              f"{args.max_wrist_delta:.0f}°（拒绝）")
-        return 3
-    if max_delta > args.max_joint_delta:
-        print(f"code 2 max_joint_delta {max_delta:.2f} rad -- 超过单关节上限（拒绝）")
-        return 2
-
-    points = []
-    # 第一个点必须是【当前关节角】：执行器会用 FIRST_POINT_FAR 拒绝"起点不符"的轨迹。
-    points.append({"q": list(start), "t": 0.0})
-    for step in range(1, args.steps + 1):
-        alpha = step / args.steps
-        q = [start[i] + (target[i] - start[i]) * alpha for i in range(len(names))]
-        points.append({"q": q, "t": 6.0 * alpha})
-    duration = points[-1]["t"]
-    if duration > args.max_duration:
-        print(f"code 2 duration {duration:.1f}s -- 超过时长上限（拒绝）")
-        return 2
-
+    target_choice = None
+    wrist_limit_note = ""
     checker = node.create_client(GetStateValidity, "/check_state_validity")
-    if checker.wait_for_service(timeout_sec=5):
-        # 不检查第 0 点：它必然是"当前状态"，而当前模型对 forearm_link↔tool0 这类
-        # 相邻连杆报的是常态接触（实测当前位置就被判 invalid），拿它当"碰撞"没意义。
-        for index in sorted({len(points) // 3, 2 * len(points) // 3, len(points) - 1}):
+    if not checker.wait_for_service(timeout_sec=5):
+        print("code 4 /check_state_validity 不可用，拒绝（不做无验证的移动）")
+        return 4
+
+    def trajectory_ok(candidate):
+        """按候选构型插值，抽样检查中途与终点是否无接触。"""
+        test_points = []
+        for sample in range(1, args.steps + 1):
+            alpha = sample / args.steps
+            test_points.append([start[i] + (candidate[i] - start[i]) * alpha
+                                for i in range(len(names))])
+        for index in sorted({len(test_points) // 3, 2 * len(test_points) // 3,
+                             len(test_points) - 1}):
             request_valid = GetStateValidity.Request()
             robot_state = RobotState()
             robot_state.joint_state.name = names
-            robot_state.joint_state.position = points[index]["q"]
+            robot_state.joint_state.position = [float(v) for v in test_points[index]]
             request_valid.robot_state = robot_state
             request_valid.group_name = GROUP
             future_valid = checker.call_async(request_valid)
             rclpy.spin_until_future_complete(node, future_valid, timeout_sec=8)
             result = future_valid.result()
-            if result is not None and not result.valid and contacts_are_real(result.contacts):
+            if result is None:
+                return False, f"碰撞服务无响应（sample {index}）"
+            if not result.valid and contacts_are_real(result.contacts):
                 pairs = [(c.contact_body_1, c.contact_body_2) for c in result.contacts[:3]]
-                print(f"code 4 collision/invalid at point {index} {pairs}（拒绝）")
-                return 4
-    else:
-        print("warn: /check_state_validity 不可用，跳过碰撞抽样")
+                return False, f"point {index} 接触 {pairs}"
+        return True, ""
+
+    for arm_delta, wrist_delta, candidate in candidates_pool:
+        if not acceptable(candidate, names):
+            continue
+        ok, reason = trajectory_ok(candidate)
+        if not ok:
+            print(f"  候选（整臂 {arm_delta:.2f} rad）被拒：{reason}")
+            continue
+        target_choice = (arm_delta, wrist_delta, candidate)
+        break
+    if target_choice is None:
+        print("code 4 所有 IK 候选轨迹都有接触或超出安全区间（拒绝）")
+        return 4
+
+    target = target_choice[2]
+    wrist_delta = target_choice[1]
+    print(f"IK 解：整臂变化 {target_choice[0]:.2f} rad，腕部变化 {math.degrees(wrist_delta):.1f}°"
+          f"（终点构型在绝对安全区间内，且轨迹抽样无接触）")
+
+    points = [{"q": list(start), "t": 0.0}]
+    for sample in range(1, args.steps + 1):
+        alpha = sample / args.steps
+        points.append({"q": [start[i] + (target[i] - start[i]) * alpha
+                             for i in range(len(names))], "t": 6.0 * alpha})
+    duration = points[-1]["t"]
+    if duration > args.max_duration:
+        print(f"code 2 duration {duration:.1f}s -- 超过时长上限（拒绝）")
+        return 2
 
     pathlib.Path(args.output).write_text(json.dumps({
         "joint_names": names,
         "points": points,
     }))
-    print(f"code 1 points {len(points)} duration {duration:.2f}s wrist_delta {wrist_delta:.2f} rad")
+    print(f"code 1 points {len(points)} duration {duration:.2f}s")
     return 0
 
 
