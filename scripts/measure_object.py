@@ -280,6 +280,23 @@ def main() -> int:
             }, ensure_ascii=False, indent=2), encoding="utf-8")
         return 2
 
+    # 组间聚类：同一批里偶尔有一组落偏（实测 −45° 时 3 组里 1 组偏 4.3 mm，
+    # 另外两组只差 0.3 mm）。取"最大的紧密簇"作为本批结果，偏出的组记为离群，
+    # 这比"最大两两差"稳健，也不会因为一组坏数据把整批判死。
+    centres_all = np.array([row["pose_base"]["centre_mm"] for row in credible_rows])
+    cluster_ids = []
+    for index in range(len(centres_all)):
+        close = np.linalg.norm(centres_all - centres_all[index], axis=1) <= 2.0
+        cluster_ids.append(int(close.sum()))
+    best_cluster = int(np.argmax(cluster_ids))
+    keep = np.linalg.norm(centres_all - centres_all[best_cluster], axis=1) <= 2.0
+    outliers = [row["group"] for row, kept in zip(credible_rows, keep) if not kept]
+    if outliers:
+        print(f"离群组（>2 mm，已剔除）：{outliers}")
+    credible_rows = [row for row, kept in zip(credible_rows, keep) if kept]
+    if len(credible_rows) < 2:
+        print("紧密簇不足 2 组，无法给出一致位姿", file=sys.stderr)
+        return 2
     centres = np.array([row["pose_base"]["centre_mm"] for row in credible_rows])
     from scipy.spatial.transform import Rotation as R
     # 姿态重复性必须用【最终位姿】pose_base——D3 只更新 pose_base，
@@ -324,6 +341,7 @@ def main() -> int:
         "coverage_median": round(coverage, 4),
         "flip_ambiguous_groups": ambiguous,
         "degenerate_groups_dropped": dropped,
+        "outlier_groups": outliers,
         "stage": args.stage,
         "T_base_cam": ([[round(float(v), 6) for v in line] for line in base_cam]
                        if base_cam is not None else None),
