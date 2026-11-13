@@ -63,12 +63,62 @@ exit=1
 盒子对象 id/帧/尺寸、REMOVE 操作不带几何、真实配置里夹具存在且帧为 world、
 默认 CLI 只发夹具（桌子/工件按需）。
 
+## 3.1 端到端验证（仿真，2026-11-14 00:4x–00:5x）
+
+在 headless Gazebo + MoveIt 上真跑了一遍（`ROS_DOMAIN_ID=79`，无真机、无相机）：
+
+```bash
+ros2 launch cs625_bringup sim_base.launch.py headless:=true \
+        launch_sensor_adapter:=false launch_rviz:=false    # 另需 CS625_SIM_GRIPPER=1，见 §5
+python3 scripts/apply_real_cell_scene.py          # ADD
+python3 scripts/apply_real_cell_scene.py --remove # REMOVE
+python3 scripts/apply_real_cell_scene.py          # 再 ADD
+```
+
+实测输出：
+
+```text
+[INFO] applied 1 collision objects to frame world; verified in the scene
+       (world objects now: ['real_cell_slot_fixture'])
+[INFO] removed 1 collision objects; scene now has 0 world objects
+[INFO] applied 1 collision objects ... verified ...
+```
+
+**独立复核**（另一个进程直接调 `/get_planning_scene`，不采信脚本自己的输出）：
+
+```text
+独立查询：世界碰撞对象数 = 1
+  - real_cell_slot_fixture  frame=world  mesh x1 (29886 verts)
+```
+
+`--remove` 后独立查询 = 0，重新写入后又 = 1。三条路径（写入 / 移除 / 重写）都通过。
+
 ## 4. 未验证（如实）
 
-- **没有在 move_group 运行时端到端跑过**：真机不可用，仿真需要 Gazebo（本轮未启动）。
-  服务调用与回查路径的"真跑到"属于仿真/真机验收范围，测试里没有伪装。
+- **真机未验证**：本轮只在 headless 仿真里跑通（§3.1）；真机 MoveIt 上还没跑过。
+- 仿真里验证的是"夹具"这一项；桌子盒（`--include-tables`）未启用，因为其数值落后于实测（§5）。
 - 默认仍**只发夹具**（桌子需要 `--include-tables`）：桌子盒与实测桌高有偏差（见 §5），
   在修正之前默认发表面盒会让规划出现假的碰撞。
+- **默认启动仿真仍然会中止**（未修，见 §5 第 2 条）：`gripper_controller` 的 spawner
+  在 `CS625_SIM_GRIPPER` 未开时必然失败，而 launch 没有对它做条件门控。
+
+## 4.1 过程中发现并修复的第二个 bug：工具碰撞代理挂错了 link
+
+启动仿真时 `sim_base` **起不来**，报 `Caught exception in launch ... executed command
+showed stderr output`（命令是 `scripts/sim_robot_description.py`）。根因有两层：
+
+```text
+① 注入脚本找的是 my_end_effector_link，但工具碰撞体其实挂在 tool0 上
+   （my_end_effector_link 是自闭合的 <link .../>，只有 TCP 框架、没有几何）；
+   ⇒ 工具碰撞代理**从来没有被注入**——仿真里一直是张开态 240 mm 碰撞，
+     正是文档里"预抓取把 6.8 kg 工件推走 0.4 m"的老原因；
+② 找不到就 sys.stderr.write(...)，而 launch 的 Command 默认 on_stderr='fail'
+   ⇒ 每次启动 MoveIt 都直接中止。
+```
+
+修复（`scripts/sim_robot_description.py`）：按"哪个 link 真的带 `<collision>` 就改哪个"
+来找，顺序 `my_end_effector_link` → `tool0`。实测：代理现在注入到 `tool0`、**stderr 为空**、
+DetachableJoint 仍是 1 个、`/cs625/carry/*` 话题齐全。
 
 ## 5. 附带发现（本轮不修，需所有者决定）
 
@@ -89,15 +139,22 @@ runtime/environment/20261105_134756/model.json（最新实测）
 最新 `model.json` 重新生成，而不是手改。这属于"仿真必须与真机 1:1"的范畴，
 改它会同时改变仿真场景，需要所有者确认后再做（本轮按"一轮一个问题"未动）。
 
+**第 2 条（启动脆弱点，未修）**：`sim_control.launch.py` 无条件 spawn `gripper_controller`，
+而两个手指关节只在 `CS625_SIM_GRIPPER=1` 时才注入 → 默认参数下 spawner 必然失败并
+中止整个仿真启动。本轮是带 `CS625_SIM_GRIPPER=1` 才跑通的。建议二选一：
+① 给 spawner 加条件（与注入变量同一个开关）；② 让 spawner 失败不致命（`on_exit` 忽略）。
+两者都改行为，留给所有者定。
+
 ## 6. 能力层与状态
 
 ```text
 Capability layer: vision/planning 输入链 —— "点云/环境 → MoveIt 规划场景" 这一环
   环境与依赖      PASS（离线：279 测试 + 合同 + 文档检查）
-  规划场景写入    PASS（机制修复 + 离线验证）；运行时端到端 **NOT ACCEPTED**（未启动 MoveIt）
+  规划场景写入    PASS（仿真端到端：写入/移除/重写 + 独立回查均通过）；真机 **NOT RUN**
   真机            NOT RUN（无真机运动、未启动 Gazebo/相机）
 Intentionally not done:
-  · 未在 move_group 运行时验证写入（需要仿真或真机）；
+  · 真机上的写入验证（仿真已通过）；
+  · 默认启动仿真的 gripper spawner 门控（§5 第 2 条，需所有者定方案）；
   · 未重新生成世界/场景配置（§5，需所有者确认）；
   · 未把桌子纳入默认发布（等 §5 修正）。
 ```

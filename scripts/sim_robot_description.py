@@ -172,12 +172,28 @@ def inject_tool_collision_proxy(xml: str, size: str, origin: str) -> str:
     原样返回并在 stderr 说一句（不猜、不静默改别的 link）。
     """
 
-    m = re.search(r'<link\s+name="([^"]*my_end_effector_link)"\s*>(.*?)</link>',
-                  xml, re.S)
-    if not m:
+    # 2026-11-13：工具碰撞体其实挂在 tool0 上（my_end_effector_link 是无几何的 TCP
+    # 框架，只有 <link .../>）。旧代码只找 my_end_effector_link，于是：
+    #   ① 代理从来没被注入 → 仿真里一直是张开态（240 mm）碰撞，正是"预抓取把工件
+    #      推走 0.4 m"的老原因；
+    #   ② 每次启动都往 stderr 告警 → launch 的 Command(on_stderr='fail') 直接中止
+    #      sim MoveIt 启动（实测：sim_base 起不来）。
+    # 现在按"哪个 link 真的带 <collision> 就改哪个"来找，顺序：TCP 框架 → tool0。
+    candidates = ("my_end_effector_link", "tool0")
+    m = None
+    for suffix in candidates:
+        for match in re.finditer(
+                rf'<link\s+name="([^"]*{re.escape(suffix)})"\s*>(.*?)</link>',
+                xml, re.S):
+            if "<collision" in match.group(2):
+                m = match
+                break
+        if m is not None:
+            break
+    if m is None:
         sys.stderr.write(
-            "[sim_robot_description] 找不到 my_end_effector_link，跳过工具碰撞代理"
-            "（仿真里会保留张开态碰撞，进槽可能顶工件）\n")
+            "[sim_robot_description] 找不到带碰撞体的工具 link（my_end_effector_link / "
+            "tool0），跳过工具碰撞代理（仿真里会保留张开态碰撞，进槽可能顶工件）\n")
         return xml
     body = m.group(2)
     box = TOOL_COLLISION_PROXY.format(origin=origin, size=size)
