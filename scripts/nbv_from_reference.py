@@ -229,7 +229,6 @@ def main() -> int:
     tail = (verify.stdout or "").strip().splitlines()
     print("   到位复核:", tail[-1] if tail else "(no output)")
     return 0 if verify.returncode == 0 else 5
-    return 3
 
 
 if __name__ == "__main__":

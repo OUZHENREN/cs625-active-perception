@@ -116,6 +116,8 @@ def select_known_view(yaw_deg: float, tolerance: float | None = None):
     for key, entry in table.items():
         if not isinstance(entry, dict) or "tcp" not in entry:
             continue
+        if entry.get("validated", True) is False:
+            continue   # 未通过精度门的站位不参与自动选站（-45° 即此类）
         try:
             angle = float(key)
         except ValueError:
@@ -153,6 +155,8 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
     for key, entry in views.items():
         if not isinstance(entry, dict) or "tcp" not in entry:
             continue
+        if entry.get("validated", True) is False:
+            continue   # 未通过精度门的站位不参与自动选站（-45° 即此类）
         try:
             angle = float(key)
         except ValueError:

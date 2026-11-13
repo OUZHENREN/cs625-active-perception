@@ -101,6 +101,7 @@ def read_tcp():
     if "position:" not in text:
         return None
     pose = np.eye(4)
+    pose_quat = np.zeros(4)   # 局部变量（原来是模块级全局，多线程调用会互相污染）
     section = None
     for line in text.splitlines():
         stripped = line.strip()
@@ -260,7 +261,6 @@ def main() -> int:
     return 0
 
 
-pose_quat = np.zeros(4)
 
 if __name__ == "__main__":
     raise SystemExit(main())
