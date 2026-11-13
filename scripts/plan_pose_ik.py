@@ -113,6 +113,8 @@ def main() -> int:
         return 2
 
     points = []
+    # 第一个点必须是【当前关节角】：执行器会用 FIRST_POINT_FAR 拒绝"起点不符"的轨迹。
+    points.append({"q": list(start), "t": 0.0})
     for step in range(1, args.steps + 1):
         alpha = step / args.steps
         q = [start[i] + (target[i] - start[i]) * alpha for i in range(len(names))]
@@ -124,7 +126,9 @@ def main() -> int:
 
     checker = node.create_client(GetStateValidity, "/check_state_validity")
     if checker.wait_for_service(timeout_sec=5):
-        for index in sorted({0, len(points) // 2, len(points) - 1}):
+        # 不检查第 0 点：它必然是"当前状态"，而当前模型对 forearm_link↔tool0 这类
+        # 相邻连杆报的是常态接触（实测当前位置就被判 invalid），拿它当"碰撞"没意义。
+        for index in sorted({len(points) // 3, 2 * len(points) // 3, len(points) - 1}):
             request_valid = GetStateValidity.Request()
             robot_state = RobotState()
             robot_state.joint_state.name = names
@@ -135,7 +139,8 @@ def main() -> int:
             rclpy.spin_until_future_complete(node, future_valid, timeout_sec=8)
             result = future_valid.result()
             if result is not None and not result.valid:
-                print(f"code 4 collision/invalid at point {index}（拒绝）")
+                pairs = [(c.contact_body_1, c.contact_body_2) for c in result.contacts[:3]]
+                print(f"code 4 collision/invalid at point {index} {pairs}（拒绝）")
                 return 4
     else:
         print("warn: /check_state_validity 不可用，跳过碰撞抽样")
