@@ -7,7 +7,7 @@
 
 | 模式 | 入口 | 契约 |
 |---|---|---|
-| 安全模式 | `scripts/resume_teaching.sh` | 门检全开（5b/6b/13b，1.5/1.0 mm，0.4°）、静置 15 s、fitness 门控（T1/T3 ≥0.9、T2 ≥0.8）、位姿库拦截、失败自动重启驱动栈并 `--resume` |
+| 安全模式 | `scripts/resume_teaching.sh` | 门检全开（5b/6b = 1.5 mm / 0.40°；13b = 1.0 mm / 0.10°）、静置 15 s、fitness 门控（T1/T3 ≥0.9、T2 ≥0.8）、位姿库拦截、失败自动重启驱动栈并 `--resume` |
 | 效率模式 | `scripts/teaching/teaching_debug.py` | `--stage/--from/--to/--no-gates/--no-settle/--speed-override/--repeat`；每次运行归档到 `runtime/debug_runs/` |
 
 **两种模式都不跳过**：保护停止规则、工件附近先抬升守卫、释放许可。

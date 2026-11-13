@@ -1,6 +1,6 @@
 # CS625 视触融合精密装配 — 文档导航
 
-> 更新：2026-11-07。本页是**唯一入口**，其余文档按"现在有效 / 历史归档"分区。
+> 更新：**2026-11-13**。本页是**唯一入口**，其余文档按"现在有效 / 历史归档"分区。
 > 旧文档一律保留在 `archive/`，只读，不再维护。
 
 ---
@@ -8,10 +8,12 @@
 ## 一句话状态
 
 ```text
-硬件：Elite CS625 真机 + 图漾 PS800-E1 相机（RVS 离线采集位姿）
-已完成：观测 → 抓取 → 抬升 → 转运 → 分级 → 旋转 → 预插入（整链真机跑通）
-未完成：插入到底（三面接触，372 mm 不是物理底部）、槽内转 10°、六维力（十二月）
-十一月重心：自研视觉算法（替代 RVS 做位姿采集）+ 仿真平台搭建
+硬件：Elite CS625 真机 + 图漾 PS800-E1 相机（RVS 仅用于示教链路每次的 T1/T2/T3 观测；插入定位已不依赖它）
+主线：效率模式（`teaching_debug.py`，开发中）+ 示教模式（`resume_teaching.sh`，已冻结）
+已完成：观测 → 抓取 → 抬升 → 转运 → 分级 → 旋转 → 预插入（示教链路真机跑通）；
+        视觉测量链真机 0.14–0.5 mm（粗观测带先验 → 精观测带先验）
+未完成：插入到底（三面接触，371–372 mm 不是物理底部，重复性 1.1 mm）、槽内转 10°、六维力（十二月）、
+        规划场景里没有桌子/夹具（自动运动的前置阻塞）、方案 A 真机验收
 ```
 
 ---
@@ -20,16 +22,16 @@
 
 | 文档 | 用途 |
 |---|---|
-| [`worklogs/2026-11/2026-11-09_HANDOFF_NEXT_SESSION_VISION_ALGORITHM.md`](worklogs/2026-11/2026-11-09_HANDOFF_NEXT_SESSION_VISION_ALGORITHM.md) | **视觉算法研究交接**：现状、起点、第一步、陷阱清单 |
+| [`worklogs/2026-11/2026-11-13_HANDOFF_VISION_MILESTONE.md`](worklogs/2026-11/2026-11-13_HANDOFF_VISION_MILESTONE.md) | **最新交接**：视觉里程碑现状、可用能力表、安全红线、未完成项 |
 | [`plans/2026-11.md`](plans/2026-11.md) | **本月做什么**：三件交付、每周产物、验收线、明确不做 |
-| [`worklogs/2026-11/2026-11-07_WORKLOG_MODES_PANEL_DOCS_REORG.md`](worklogs/2026-11/2026-11-07_WORKLOG_MODES_PANEL_DOCS_REORG.md) | 11-07 全天（含 11-08 凌晨的面板/RViz/相机，第 9 节） |
+| [`worklogs/2026-11/2026-11-13_WORKLOG_P7_ARCHIVE_AND_PLAN_A.md`](worklogs/2026-11/2026-11-13_WORKLOG_P7_ARCHIVE_AND_PLAN_A.md) | 11-13 全天：P7 归档、方案 A 选站、文档纠错 |
 
 ## 先看这几份（按顺序）
 
 | 顺序 | 文档 | 什么时候看 |
 |---|---|---|
 | 1 | [`agent_memory.md`](agent_memory.md) | **每次开工先扫一遍**：硬规则、常量、禁止事项 |
-| 2 | [`reference/architecture_current.md`](reference/architecture_current.md) | 想知道代码怎么分层、示教链路 0–16 步是什么 |
+| 2 | [`reference/architecture_current.md`](reference/architecture_current.md) | 想知道代码怎么分层、示教链路 0–18 步是什么 |
 | 3 | [`manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md`](manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md) | **上真机前**：29 条实机经验（含装配工艺、断联排障、安全） |
 | 4 | [`reference/experiment_metrics.md`](reference/experiment_metrics.md) | 要做实验、要出数据之前 |
 | 5 | [`reference/real_cell.md`](reference/real_cell.md) | 换场地、网络异常、开工就绪检查 |
@@ -45,19 +47,27 @@
 docs/
 ├── README.md               ← 本页
 ├── agent_memory.md         ← 长期规则（活文件，只追加）
-├── reference/              ← 现在有效的技术参考
-│   ├── architecture_current.md      架构 + 链路 0–16 步 + 两模式
+├── reference/              ← 现在有效的技术参考（13 份，常用 8 份列在这里）
+│   ├── architecture_current.md      架构 + 链路 0–18 步 + 两模式
 │   ├── experiment_metrics.md        六类 18 项指标体系
 │   ├── real_cell.md                 真机工位 + 就绪检查 + 网络排障
-│   └── simulation.md                仿真环境（总述/场景生成/保真度）
+│   ├── simulation.md                仿真环境（总述/场景生成/保真度）
+│   ├── pose_conventions.md          相机系/对象系/内参/模板单位（§4.1 手眼已验明）
+│   ├── robot_status_codes.md        safety_mode / robot_mode 取值与处置
+│   ├── frames_and_topics.md         TF 链与话题契约
+│   ├── task_pose_derivation.md      任务位姿推导（插槽/插入链）
+│   └── 其余：interfaces / dependencies / project_layout / file_viewer
 ├── manuals/                ← 实机经验手册（29 条）+ debug/ 调试命令分册
 ├── plans/                  ← 月度计划（YYYY-MM.md，一个月一份；旧月份不重写）
 ├── decisions/              ← ADR（含 ADR-005 两模式与插入权威）
 ├── worklogs/               ← 工作日志，按月份分目录
 │   ├── 2026-09/  2026-10/  2026-11/
-├── evidence/               ← 实验证据（133 项，不整理）
+├── evidence/               ← 实验证据（P7 的 129 项已于 11-13 随 P7 归档；
+│                              现留 P4 矩阵 + 视频出处图，不整理）
 └── archive/                ← 历史归档（只读）
-    └── 2026-11-07-pre-reorg/   本次重整前的原件 + MANIFEST
+    ├── 2026-11-07-pre-reorg/   11-07 文档重整前的原件 + MANIFEST
+    ├── 2026-10-24-pre-six-modes/  六模式之前的阶段性文档
+    └── 2026-11-13-p7-nbv-legacy-code/  P7 旧仿真流水线（代码 + 运行证据 + YCB 资产）
 ```
 
 ---
@@ -90,7 +100,7 @@ python3 scripts/teaching/teaching_debug.py --stage 14 --repeat 3 --no-settle
 
 ---
 
-## VS Code 任务（7 个）
+## VS Code 任务（8 个）
 
 | # | 任务 | 说明 |
 |---|---|---|
@@ -101,6 +111,7 @@ python3 scripts/teaching/teaching_debug.py --stage 14 --repeat 3 --no-settle
 | ⑤ | 自检 · 离线 | pytest + 文档一致性 + 环境 |
 | ⑥ | DSH · 启动/打开界面 | 复用已在跑的 dsh web 实例 |
 | ⑦ | 相机 · 查看/换档 | `camera_view.py`（只碰相机，不碰机械臂/夹爪） |
+| ⑧ | 收工 · 关闭所有驱动 | `stop_all_drivers.sh` |
 
 ---
 

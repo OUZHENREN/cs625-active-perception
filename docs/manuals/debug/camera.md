@@ -52,6 +52,9 @@ python3 scripts/camera_probe.py --duration 120
 
 ## 4. 偏振 A/B（装膜前后）
 
+> **2026-11-09 已结案**：本工位偏振无效（0°/90° 无差别），`docs/plans/2026-11.md` §D0.5 已关闭该项。
+> 以下流程仅留档复现，**不再作为待做项**。
+
 ```bash
 python3 scripts/polarizer_ab.py capture --state before --frames 10
 # 装片、转到最暗

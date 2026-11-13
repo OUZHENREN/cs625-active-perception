@@ -22,7 +22,7 @@ Windows 浏览器打开：**http://localhost:8090/**
 - `.md/.log/.yaml/.json/.csv/.py/.sh`：页面内直接显示（不会被当成下载）；
 - 目录：可逐级点进去，面包屑能跳回。
 
-VS Code 里也有对应任务：`50 · 文件查看器（浏览器看视频/图片/日志）`。
+直接运行 `python3 scripts/file_viewer.py`（VS Code 任务里没有对应项，原有"任务 50"已不存在）。
 
 ## 演示视频在哪
 ```text

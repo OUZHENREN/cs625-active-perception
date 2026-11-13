@@ -29,11 +29,12 @@
   recover_control.sh             轻量恢复（resend + 速度滑条）
 
 示教链路（scripts/teaching/）
-  teaching_sequence.py           0–16 步主链
+  teaching_sequence.py           0–18 步主链
   teaching_debug.py              效率模式（分阶段/改参/归档）
   plan_joint_locked.py           IK + 分支锁 + 速度契约的规划器
-  execute_assembly_chunks.py     分段执行 + 力矩看门狗
-  compliant_insert.py            插入段 effort 监督
+  （注：分段执行与插入脚本在 scripts/ 根目录，不在 teaching/ 下）
+scripts/execute_assembly_chunks.py   分段执行 + 力矩看门狗
+scripts/compliant_insert.py          插入段 effort 监督
   assembly_search.py             绕 TCP Y 的装配搜索
   straighten_in_slot.py          槽内分步转平 + 自由转动空间测量
   rvs_pose_client.py / rvs_fitness.py / pose_library.py / pose_math.py

@@ -53,7 +53,7 @@ python3 scripts/build_sim_world.py --out-world src/cs625_simulation/worlds/cs625
 | S2 工件观测位 | 0.615353, 0.354540, 0.574506 | 采样基准 |
 | S3 工件抓取位 | 0.652989, 0.703460, 0.355241 | 采样基准 |
 
-每次任务重新测的只有**工件初位姿**（每抓一次都不一样），其余是恒定量。**坐标口径（10-20 日志的第一条经验）**：法兰 → 工具 TCP 为 (-46, 0, 353) mm（师兄工具实测）；工件模型原点 → 几何中心偏移 (10.5, -215, -105.2) mm（box.ply 尺寸 131 x 430 x 222 mm；T_b_tcp 平移 (-4, -215, -411) mm → T_center_tcp ≈ (-14.5, 0, -305.8) mm）。这两条分别造成过 **353 mm** 和 **约 16 cm** 的系统偏差，且两次都被先误判成"视觉算错/手眼标定错"。URDF 现状（2026-10-24 起）：工具换成 夹持机构0920.STL（法兰系导出，X ±147.285、Z -7.0..+207.0 mm，flange→my_end_effector_link 零偏移），但 `config/handeye/tcp_to_camera.json` 仍保存 T_flange_tcp = (-0.046, 0, 0.353)，而 URDF 里 camera_color_optical 距 eef 只有 (0.0970, 0.0422, 0.0975) m（约 0.14 m），与 T_tcp_cam 平移 0.296 m 相差约 0.16 m。两链数值对比（基准位姿 1.044,-0.011,0.726、四元数 [-0.059, 0.938, 0.060, 0.336]、槽心 1.241629,0.181709,0.443245）：`T_base_tcp @ T_tcp_cam` → 相机 0.769, -0.018, 0.834，到槽心 0.645 m、光轴夹角 14.9°；`T_base_tcp @ T_flange_cam` → 1.024, 0.039, 0.592，到槽心 0.300 m、25.7°。这条口径必须在真机一次性验明（见 §4.2）。
+每次任务重新测的只有**工件初位姿**（每抓一次都不一样），其余是恒定量。**坐标口径（10-20 日志的第一条经验）**：法兰 → 工具 TCP 为 (-46, 0, 353) mm（师兄工具实测）；工件模型原点 → 几何中心偏移 (10.5, -215, -105.2) mm（box.ply 尺寸 131 x 430 x 222 mm；T_b_tcp 平移 (-4, -215, -411) mm → T_center_tcp ≈ (-14.5, 0, -305.8) mm）。这两条分别造成过 **353 mm** 和 **约 16 cm** 的系统偏差，且两次都被先误判成"视觉算错/手眼标定错"。URDF 现状（2026-10-24 起）：工具换成 夹持机构0920.STL（法兰系导出，X ±147.285、Z -7.0..+207.0 mm，flange→my_end_effector_link 零偏移），但 `config/handeye/tcp_to_camera.json` 仍保存 T_flange_tcp = (-0.046, 0, 0.353)，而 URDF 里 camera_color_optical 距 eef 只有 (0.0970, 0.0422, 0.0975) m（约 0.14 m），与 T_tcp_cam 平移 0.296 m 相差约 0.16 m。两链数值对比（基准位姿 1.044,-0.011,0.726、四元数 [-0.059, 0.938, 0.060, 0.336]、槽心 1.241629,0.181709,0.443245）：`T_base_tcp @ T_tcp_cam` → 相机 0.769, -0.018, 0.834，到槽心 0.645 m、光轴夹角 14.9°；`T_base_tcp @ T_flange_cam` → 1.024, 0.039, 0.592，到槽心 0.300 m、25.7°。这条口径已于 **2026-11-10 验明**：正确链路是 `T_base_tcp @ T_tcp_cam`，两姿态一致性 0.19 mm / 0.71 mm（误差上界 ≈2.7 mm）；"0.16 m" 是法兰系安装位与 TCP 系 `T_tcp_cam` 的记账差，不是标定错（见 `pose_conventions.md` §4.1、`agent_memory.md` §131）。
 
 ### 2.3 中转点与插槽位姿链（装入/取出共用）
 
@@ -350,7 +350,7 @@ cs625_camera_extension.xacro
 
 ```text
 工具网格 gripper_0920.stl  bbox z ∈ [-0.007, +0.207] m，宽轴 x = 294.6 mm，窄轴 y = 85 mm
-URDF: flange --(xyz=0)--> my_end_effector_link --(xyz=0)--> tool0 --> 夹爪
+URDF: flange --(xyz=0)--> tool0 --> 夹爪；flange --(−0.046,0,0.353)--> my_end_effector_link（TCP，兄弟节点）
 SRDF tip = my_end_effector_link；/tcp_pose_broadcaster/pose 发布的就是它的位姿
 → 所有任务位姿（pre_grasp / insert / baseline …）都是【法兰位姿】，不存在 207 mm 换算错误
 pre_insert 工具网格与夹具顶梁的接触点 (1.2494, 0.0022, 0.3653)
@@ -401,7 +401,7 @@ vendor 描述的 camera_link 占位盒（3×5×2 cm）在 insert 路径上会撞
 | 13 | `prepare_gazebo_model.py` 起不来；`joint_trajectory_controller` 未激活 | 未修 / 未查 | 实体用的是上次生成的 `/tmp/cs625_active_perception_gazebo_model.urdf` → **实体落后于源码**；控制器 `Failed to activate` 原因未查（可能与本机并发 3~4 个 Gazebo 有关） |
 | 14 | 环境扫描没有机器人自点过滤 | 未验收 | RVS E1 7 视角合并 29,484 点，覆盖率未验收 |
 | 15 | 取出流程的真机关节轨迹 | 未录到 | 只推进到 d5 抽出 ~130 mm，放回工件桌是所有者手动完成；取出段只能按固定位姿链重新规划 |
-| 16 | 手眼链口径（`T_tcp_cam` vs `T_flange_cam`） | 未验证 | 两条链到槽心 0.645 m / 14.9° vs 0.300 m / 25.7°，相机位置差约 0.16 m；需真机一次性验明（拿 S0 图把槽心投影，落在槽口中心的链才对） |
+| 16 | 手眼链口径（`T_tcp_cam` vs `T_flange_cam`） | **已验明（2026-11-10）** | 正确链路 = `T_base_tcp @ T_tcp_cam`（见 `pose_conventions.md` §4.1、`agent_memory.md` §131）；两条链到槽心 0.645 m / 14.9° vs 0.300 m / 25.7° 的差异即那 0.16 m 记账差 |
 
 > 来源：归档原件 sim_fidelity.md（第 14/15/16 条来自 sim_scene_from_real_runs.md）
 

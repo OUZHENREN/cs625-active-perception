@@ -22,6 +22,23 @@
    并解释这个变换的物理含义。
 9. **每轮结束只给四样**：本轮解决了什么；所有者必须理解的 3 个知识点；所有者应该亲手
    运行的验证命令；下一步唯一推荐任务。
+10. **适当并行、自动分派（所有者 2026-11-13 定）**：遇到大范围盘点、只读审计、独立调研、
+   或互不重叠的多文件改动时，**主动**调用子智能体/队友并行处理，不要串行硬扛。
+   分派必须写清：范围、只读还是可写、验收标准与输出格式。可写任务要给**互不重叠**的
+   写作用域（共享同一个工作目录，改动立刻互相可见）；子智能体的结论必须由主负责人
+   汇总、抽样交叉验证后才算数，不能直接转述。**不拆分**的情况：规模小、强顺序依赖、
+   或需要同一份上下文连续推理的任务。
+11. **收尾必须换角度复盘（所有者 2026-11-13 定，起因是我把"六模式"错当成当前主线）**：
+   每轮工作完成后，**自动**做一次与主视角不同的复核，专门找逻辑错误与幻觉——不是把
+   自己的结论重读一遍，而是换证据链重验：
+   - **溯源**：每条"当前状态"结论都回到权威源（ADR / 代码常量 / 运行日志 / git 历史）
+     核对；不采信二手摘要（文档标题、旧 README、交接文档的转述）。
+   - **反证**：对最关键的 1–2 条结论主动找反例——是否存在相反写法、是否还有别的入口
+     在用、是否已被更新的决策取代。
+   - **口径**：同一事实在不同文件里的数字/名称是否一致（速度上限、日期、测试数、
+     入口脚本名、包名）。
+   - **可执行**：给出的每条命令是否真能跑（`--help`、`--dry-run`），路径是否存在。
+   复盘发现错误要**先改正再交付**；结论与未解决问题写进交付说明，不能只声明"应该没问题"。
 
 不要为了"工程完整性"一次性推进很多未来功能。
 
@@ -98,13 +115,14 @@ The repository has 12 ROS 2 packages. The list is maintained in
 - `cs625_experiment_tools`: episode summaries and experiment metrics;
 - `cs625_simulation`: Gazebo-only worlds, sensors and ground truth;
 - `cs625_bringup`: launch composition and profiles only;
-- `cs625_rviz_panel`: RViz2 dockable panel with the six task-mode buttons (2026-10-24).
+- `cs625_rviz_panel`: RViz2 dockable panel; its six task-mode buttons are frozen with the
+  six-mode matrix (ADR-005, 2026-10-24 / 2026-11-13).
 
 Do not create a mega-node that owns perception, planning, execution and logging.
 
 ## Application layers that are NOT packages
 
-Two layers deliberately stay outside `src/`, because they compose packages instead of
+Four layers deliberately stay outside `src/`, because they compose packages instead of
 owning runtime state:
 
 | Layer | Where | Responsibility |
@@ -254,8 +272,10 @@ A driver that is half dead keeps publishing *stale* status topics: a plausible-l
 
 Do not hardcode IP addresses, absolute user paths, topic names, frame names, workspace
 bounds, camera intrinsics, hand-eye transforms, score weights, controller names or
-velocity limits. Shared values live in `config/common` / `config/tasks`, profile values in
-`config/sim` or `config/real`, machine-local secrets in `~/.cs625_local.env`.
+velocity limits. Shared values live in `config/tasks/` (task constants), the hand-eye
+calibration in `config/handeye/`, simulation/real profile values in
+`src/cs625_bringup/config/` and `config/real/`, machine-local secrets in
+`~/.cs625_local.env`.
 
 ## View-planning order
 
@@ -279,7 +299,9 @@ The verification ladder, cheapest first — use the highest rung that answers th
 
 ```bash
 python3 -m pytest test/ -q                                     # offline
-python3 scripts/run_task.py ... --dry-run                      # config + gate + phase table
+python3 scripts/check_docs.py                                  # docs consistency
+python3 scripts/teaching/teaching_debug.py --dry-run           # mainline: print, do not move
+python3 scripts/run_task.py ... --dry-run                      # frozen six-mode: config + gate
 python3 scripts/run_task.py ... --plan-only                     # reachability, no motion
 python3 scripts/run_task.py ... --world sim --confirm           # Gazebo, no real arm
 python3 scripts/run_task.py ... --world real --confirm           # real arm, owner present

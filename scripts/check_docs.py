@@ -106,7 +106,7 @@ def resolve_reference(ref: str) -> pathlib.Path | None:
     reference is resolved against:
       1. its literal path;
       2. docs/worklogs/<YYYY-MM>/<basename>   (work logs moved into month folders);
-      3. docs/archive/<any stamp>/<basename>  (outdated docs kept read-only);
+      3. docs/archive/**/<basename>          (outdated docs kept read-only);
       4. docs/reference/<basename>            (updated technical reference).
     """
     ref = re.sub(r":\d+(-\d+)?$", "", ref)      # strip a trailing :line or :line-line
@@ -121,7 +121,9 @@ def resolve_reference(ref: str) -> pathlib.Path | None:
     candidates: list[pathlib.Path] = []
     if "worklogs" in ref:
         candidates += sorted(REPO.glob(f"docs/worklogs/*/{name}"))
-    candidates += sorted(REPO.glob(f"docs/archive/*/{name}"))
+    # archives may nest by group (e.g. docs/archive/<stamp>/six-mode/<file>),
+    # so resolve a basename anywhere inside the archive tree
+    candidates += sorted(REPO.glob(f"docs/archive/**/{name}"))
     candidates += [REPO / "docs" / "reference" / name,
                    REPO / "docs" / "manuals" / name]
     if parent:

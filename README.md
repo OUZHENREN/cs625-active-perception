@@ -19,7 +19,7 @@
 | 工件粗观测（带先验） | ✅ 真机，覆盖率 0.98，yaw 可检出 | `scripts/measure_object.py --stage coarse --prior auto` |
 | 工件精观测（带先验） | ✅ **真机 0.14–0.5 mm / ≤0.2°** | 同上 `--stage fine --prior <coarse.json>` |
 | 插槽精观测 | ✅ 真机 0.64 mm / 0.063° | `measure_object.py --preset slot --stage fine` |
-| 观测前缀接入效率流程 | ✅ 约 1 分钟跑通 | `run_task.py ... --until measure:workpiece_fine` |
+| 观测前缀接入面板效率页 | ✅ 约 1 分钟跑通（该页走 `run_task.py --mode efficient`，不是 ADR-005 的 `teaching_debug` 效率模式） | `run_task.py ... --until measure:workpiece_fine` |
 | 预教站位自动选站（方案 A） | 🆕 代码完成 + 离线验证；**真机未跑** | `scripts/nbv_from_reference.py --auto-station` |
 | 自动 NBV（几何打分搜索换位） | ⛔ 已放弃：需大幅改构型或越界，收窄为方案 A | `docs/archive/2026-11-13-p7-nbv-legacy-code/` |
 
@@ -157,7 +157,7 @@ runtime/        运行产物（环境模型、采集、位姿库、debug_runs）
 ## 4. 几条硬规则（摘自 `docs/agent_memory.md`）
 
 ```text
-· 插入权威 = runtime/slot_reference_verified.json（当天 R1 实测差 33 mm，不能用）
+· 插入权威 = runtime/slot_reference_verified.json（当天 R1 与它差 33 mm，R1 只作对比、不能用来算目标）
 · 保护停止后不自动重试；连续两次 NO_MOTION 才允许一次驱动栈自动重启
 · 工件附近禁止横向移动，必须先竖直抬到 SAFE_HEIGHT_Z = 0.53 m 或沿工具轴后撤
 · 持件巡航硬上限 0.013 m/s（示教链路 CARRY_SPEED_CAP）；释放必须显式 --allow-release

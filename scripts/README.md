@@ -4,14 +4,23 @@
 > 每个脚本只负责一件事；不在这里加新的抽象层。
 
 状态说明：**主力**＝日常会用到、有验收证据；**工具**＝特定场景用；**旧**＝保留可读，
-但新流程不再依赖（勿删）。
+但新流程不再依赖（勿删）；**冻结**＝按 ADR-005 保留可运行，但不再是日常入口。
+
+> **当前主线（2026-11-13 起）**：两种模式跑同一条链路（`scripts/teaching/teaching_sequence.py`）——
+> 效率模式 `scripts/teaching/teaching_debug.py`（开发中）、示教/安全模式 `scripts/resume_teaching.sh`（已冻结）。
+> 六模式（`run_task.py` + `run_pick_and_place.py` + `cs625_ui.py`）按 ADR-005 **归类冻结**：
+> 源码保留、可运行，但不再作为入口（面板「运行」按钮与部分效率流程仍复用
+> `run_task.py --scope load --mode efficient`）。
+> 2026-11-13 已归档 12 个 0 引用脚本到 `docs/archive/2026-11-13-scripts-legacy/`。
 
 ## 1. 任务入口（先看这四个）
 
 | 脚本 | 作用 | 状态 |
 |---|---|---|
-| `run_task.py` | **六类模式唯一入口**：`--scope {load,unload,full} --mode {safe,efficient} --world {real,sim}`，合并配置 → 过环境门禁 → 调阶段执行器 → 真机运行时自动录像并归档 | 主力 |
-| `run_pick_and_place.py` | 阶段执行器：load 的 19 段（含观测前缀）、unload 的 D1–D9；逐阶段速度、实测验收、`--plan-only` 串联规划 | 主力 |
+| `scripts/teaching/teaching_debug.py` | **效率模式入口（当前主线）**：可只跑某一步、跳静置/门检、改速度、重复 N 次，自动归档 `runtime/debug_runs/` | 主力 |
+| `resume_teaching.sh` | **示教/安全模式入口（已冻结）**：门检全开、静置、位姿库、失败自动重启并续跑 | 冻结 |
+| `run_task.py` | 六模式入口（**冻结**，ADR-005）：`--scope {load,unload,full} --mode {safe,efficient} --world {real,sim}`，合并配置 → 过环境门禁 → 调阶段执行器 → 自动录像归档 | 冻结 |
+| `run_pick_and_place.py` | 阶段执行器（**冻结**）：load 的 13 段运动阶段 + 观测前缀（共 21 个阶段项）、unload 的 D1–D9；逐阶段速度、实测验收、`--plan-only` 串联规划 | 冻结 |
 | `execute_assembly_chunks.py` | 把一段关节轨迹按 chunk 下发到控制器；首点保护、`NO_MOTION`、诚实超时、`--action` 可切真机/仿真控制器 | 主力 |
 | `model_environment.py` | 离线环境建模：点云 → 桌面/夹具/工件位姿 + 碰撞体 → `runtime/environment/<ts>/model.json`，并提供四种拒绝的门禁 | 主力 |
 
@@ -24,10 +33,9 @@
 | `check_pose_stability.py` | 多帧共识门禁（位置 ≤2 mm、转角 ≤0.5°）；精观测位的验收工具 | 主力 |
 | `capture_process_images.py` | 阶段边界抓一帧彩色+深度+meta（训练"阶段识别"用） | 主力 |
 | `auto_label_four_class.py` | 几何自动标注（工件 CAD 投影 / 插槽点云投影） | 工具 |
-| `auto_label_frames.py` | 单类工件几何标注（被 four_class 取代） | 旧 |
 | `build_scene_model.py` | 多帧拼基座系点云 + 平面拟合 | 主力 |
 | `depth_pose_once.py` | 单帧深度 → 掩膜点云 → 6D 位姿（ICP 之外的老路径） | 旧 |
-| `coarse_to_fine_pose.py` | 粗→精的早期流水线（已被 `run_task` 的观测阶段取代） | 旧 |
+| `coarse_to_fine_pose.py` | 粗→精的早期流水线（已被观测阶段取代） | 旧 |
 | `ros_rgb_observer.py` | 早期实时 RGB 观察器 | 旧 |
 
 ## 3. 仿真与场景
@@ -80,7 +88,6 @@
 | `build.sh` / `test.sh` | 构建 / colcon 测试包装 |
 | `run_minimum_showcase_matrix.sh` | 仿真矩阵（历史） |
 | `sync_worklog.sh` | 工作日志镜像到 Obsidian |
-| `bootstrap_humble.sh` / `doctor_humble.sh` | Humble 时代的环境脚本，**已过时**，仅保留 |
 
 ## 8. 约定
 

@@ -1,6 +1,7 @@
 # ADR-001: ROS distribution and VM baseline
 
-- Status: Accepted
+- Status: **Superseded by ADR-004** (2026-10-20) for the current environment; retained as the
+  historical Phase-0 baseline (Humble/VM notes are archive-only now).
 - Date: 2026-08-02
 
 ## Decision

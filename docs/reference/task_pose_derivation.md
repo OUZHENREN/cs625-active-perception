@@ -87,7 +87,8 @@ legacy = derive_task_poses(part_xyz, part_quat, slot_xyz, slot_quat)
 ```text
 · 师兄原始链复现配置常量：grasp 0.06 mm / pre_grasp 0.13 mm / insert 0.04 mm / pre_insert 0.04 mm
 · 示教链的四个值见上表；lock 的姿态与 teaching_insert_end.flat_quat 差 0.02°（对实测座施加）
-· 需要 base 系下的 part/slot 位姿：自研视觉目前只在相机系，手眼未验明 →
-  暂时只能用 RVS 原始位姿（工件侧）或校验过的插槽位姿；
-  手眼验明后，`teaching_task_poses` 才能直接吃相机算出来的工件位姿。
+· 需要 base 系下的 part/slot 位姿：手眼链已于 **2026-11-10 验明**（`T_base_cam = T_base_tcp @ T_tcp_cam`，
+  ≤3 mm，见 `pose_conventions.md` §4.1）；`scripts/measure_object.py` 自 2026-11-12 起直接输出
+  base 系位姿（`pose_base` / `pose_base_centre_mm`），`scripts/grasp_from_measurement.py` 已接；
+  插入段仍按 ADR-005 用已验证插槽位姿，不用实时测量做插入权威。
 ```

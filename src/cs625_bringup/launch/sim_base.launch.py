@@ -266,7 +266,7 @@ def _record_gz_partition(partition: str):
 
 def generate_launch_description():
     gz_control_lib_dir = Path(get_package_prefix("gz_ros2_control")) / "lib"
-    ycb_resource_dir = Path(get_package_prefix("cs625_simulation")) / "share" / "cs625_simulation" / "assets"
+    assets_resource_dir = Path(get_package_prefix("cs625_simulation")) / "share" / "cs625_simulation" / "assets"
 
     # 真机（师兄）那份描述用 `package://eli_cs_robot_description/meshes/...` 引用网格，
     # URDF→SDF 会把它写成 `model://eli_cs_robot_description/meshes/...`。Gazebo 解析
@@ -322,7 +322,7 @@ def generate_launch_description():
             [
                 # 厂商描述网格优先（见上方 vendor_resource_dirs 的说明）。
                 *[f"{d}{os.pathsep}" for d in vendor_resource_dirs],
-                str(ycb_resource_dir),
+                str(assets_resource_dir),
                 os.pathsep,
                 EnvironmentVariable("GZ_SIM_RESOURCE_PATH", default_value=""),
             ],

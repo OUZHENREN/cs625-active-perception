@@ -12,7 +12,7 @@
 | 插槽桌顶面 z | −0.0407 m（点云拟合） | 同上 |
 | `base_link` 坐标轴 | **两份原件未记录**；仓库其他文档记为 **+Z 竖直向上、右手系（ROS REP-103）** | `docs/manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md` 第 15 条、观测基线工作日志 |
 | 角度正方向 | **两份原件未记录**；仓库其他文档记为绕 `base_link` **+Z 右手定则、俯视逆时针为正**（+X→+Y） | 同上 |
-| 相机与手眼外参 | **两份原件未记录** | 手眼链未验明，见 `simulation.md` §4.2 |
+| 相机与手眼外参 | **两份原件未记录**；本仓库已于 **2026-11-10 验明** | 正确链路 `T_base_cam = T_base_tcp @ T_tcp_cam`；两姿态一致性 0.19 mm / 0.013° 与 0.71 mm / 0.038°（换算误差上界 ≈2.7 mm）。见 `pose_conventions.md` §4.1、`agent_memory.md` §131，复现 `python3 scripts/verify_handeye.py --draw` |
 | 工具 TCP / 法兰关系 | **两份原件未记录** | 见 `simulation.md` §3.7 |
 | 工作空间边界、关节限位 | **两份原件未记录** | 限位：肘 ±180、其余 ±360；手拖后经验上先拨回 ±180° 内再作业 |
 
@@ -149,7 +149,7 @@ New-NetFirewallRule -DisplayName "CS625 reverse control" -Direction Inbound -Pro
 | # | 项目 | 状态 | 说明 |
 |---|---|---|---|
 | 1 | 取出流程的真机关节轨迹 | 未录到 | 10-22/10-23 只推进到 `d1 → d2c → d3(抓取 50mm) → d4(转倾斜) → d5 抽出 ~130 mm`，"放回工件桌"是所有者手动完成；取出段只能按 `config/unload_real.yaml` 的固定位姿链重新规划，不能原样回放 |
-| 2 | 手眼链口径（`T_tcp_cam` vs `T_flange_cam`） | 未验证 | 两条链的相机位置差约 0.16 m，需真机一次性验明（拿真实 S0 图把槽心投影，落在槽口中心的链才对），见 `simulation.md` §4.2 |
+| 2 | 手眼链口径（`T_tcp_cam` vs `T_flange_cam`） | **已验明（2026-11-10）** | 正确链路 = `T_base_tcp @ T_tcp_cam`（投影落在工件表面；当成 `T_flange_cam` 用会投到画面外）。原"差 0.16 m"是法兰系安装位 vs TCP 系 `T_tcp_cam` 的记账差，不是标定错。见 `pose_conventions.md` §4.1、`agent_memory.md` §131 |
 | 3 | 夹爪 `position_mm` ↔ 物理跨距 | 未标定 | 没有 0/10/20/30/40/50 mm 六点卡尺表，所以"position_mm 合理"只能定性判断 |
 | 4 | 夹持力与闭合/张开速度 | 未测 | 0.1 A 限流只知电流、不知 N；速度未测（仿真侧 `effort=80`、`velocity=0.02` 是假定） |
 | 5 | 两指是否机械强制同步 | 未单独验证 | 真机为单驱动、机械同步，但未单独取证 |

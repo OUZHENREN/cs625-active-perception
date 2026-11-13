@@ -8,7 +8,8 @@
 world → base_link                                  世界与机械臂基座
 base_link → shoulder_link → upperarm_link → forearm_link
           → wrist_1_link → wrist_2_link → wrist_3_link
-          → flange → tool0 → my_end_effector_link  工具链（末端 = TCP）
+          → flange ├→ tool0（identity，夹爪/相机挂在这里）
+                   └→ my_end_effector_link（TCP，xyz=(−0.046, 0, 0.353)）
 base_link → camera_link → camera_depth_optical_frame
 ```
 

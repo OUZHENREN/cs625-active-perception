@@ -91,14 +91,10 @@ LEGACY_ENV_LITERALS = (
     "cs625_p56_install",
 )
 
-# Historical Humble-era helper scripts that are allowed to keep mentioning them.
-LEGACY_ENV_ALLOWED_FILES = frozenset(
-    {
-        "wsl_local_build.sh",
-        "bootstrap_humble.sh",
-        "doctor_humble.sh",
-    }
-)
+# Historical Humble-era helper scripts were archived on 2026-11-13
+# (docs/archive/2026-11-13-scripts-legacy/humble/), so nothing in the active tree
+# is allowed to mention a legacy environment any more.
+LEGACY_ENV_ALLOWED_FILES: frozenset = frozenset()
 
 ENVIRONMENT_ENTRY_SCRIPT = pathlib.Path("scripts") / "source_dev_env.sh"
 
@@ -731,10 +727,10 @@ def main() -> int:
         src / "cs625_bringup" / "config" / "sim_controllers.yaml",
         src / "cs625_ap_description" / "urdf" / "cs625_parallel_gripper.xacro",
         src / "cs625_ap_description" / "meshes" / "tool" / "gripper_0920.stl",
-        ROOT / "scripts" / "bootstrap_humble.sh",
+        # the Humble-era bootstrap/doctor scripts were archived 2026-11-13;
+        # their replacements are the single Jazzy entry scripts/source_dev_env.sh
         ROOT / "scripts" / "build.sh",
         ROOT / "scripts" / "test.sh",
-        ROOT / "scripts" / "doctor_humble.sh",
         src / "cs625_sensor_adapter" / "tests" / "test_import.py",
         src / "cs625_target_perception" / "tests" / "test_import.py",
         src / "cs625_bringup" / "launch" / "sim_ground_truth.launch.py",
