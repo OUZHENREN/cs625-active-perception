@@ -3,6 +3,42 @@
 > 交接来源：`docs/worklogs/2026-11/2026-11-13_HANDOFF_VISION_MILESTONE.md`（下一段对话先读它）。
 > 本轮环境：真机已关机（所有者下班），全部验证**离线**完成；**没有发生任何真机运动**。
 
+## 0.1 复盘补记（22:2x，应所有者要求复查）
+
+复查结论：**本轮自己的改动全部真实通过；复查过程中发现并修复了一串"本轮之前就存在"
+的合同检查失败**（与归档无关），并如实记录：
+
+```text
+已复核并再次通过（fresh 重跑）：
+· pytest test/               275 collected / 275 passed / 0 错误 0 跳过
+· 包级测试（orchestrator/bringup/motion_adapter tests）  29 passed
+· test/contract_checks.py 独立运行  PASS（带与不带 ROS 环境各一次）
+· xacro 展开 exit 0，注入后恰好 1 个 /cs625/carry DetachableJoint
+· --auto-station 决策（真机测量文件）与初测一致
+· git：HEAD=main=origin/main=429097f（复查后追加 2 提交），工作树干净，
+  推送内容无 runtime/、无敏感文件
+· 全仓库悬空引用终扫：0 命中
+
+本轮之前就坏、复查时发现并修复（提交 f57e6a2）：
+① contract_checks 的 required_files 还指着 2026-11-07 文档重组前的 7 个旧路径
+   （docs/*.md → docs/reference/ 或 docs/archive/2026-11-07-pre-reorg/）——
+   该检查自 11-07 起就一直是红的，与今晚归档无关。
+② start_real_stack.sh / recover_driver_stack.sh 里有 192.168.* 兜底字面量
+   （违反 AGENTS.md"禁止硬编码 IP"）。两脚本本就读 ~/.cs625_local.env，
+   改为：值放本地 env（已补 CS625_HOST_IP=192.168.1.100），脚本缺失即报错。
+③ 字面量扫描范围修正：docs/reference（真机实测记录）/ docs/manuals（现场报告）
+   按 worklog/archive 同理由豁免；代码里的禁令不变。
+
+数量口径说明：交接文档记"296 passed"。当前 275 = 296 − 归档掉的 P7 用例
+（24 个 test 函数 + 2 个参数化展开）＋ 新增 9 个，差 4 个用例无法在 worktree
+里精确复现（ROS 环境解析到主仓库 install，历史口径不可完全重建）；
+该差异只影响历史数字，不影响当前套件全绿、零错误的事实。
+
+仍未验证（如实）：方案 A 的执行路径（plan_pose_ik 换位 + 精测闭环）需要真机；
+Gazebo 运行时（carry attach 行为）只做了静态展开验证，未实际启动；colcon build
+未在归档后重跑（包结构只动了 setup.py 入口清单，语法已验证）。
+```
+
 ## 0. 本轮解决的两个问题
 
 ```text
