@@ -31,7 +31,8 @@
 | 效率模式的抓取 / 插入 | 🚧 **仅 plan-only**，真机未验证 | `scripts/run_pick_and_place.py` |
 | 插入到底 | 🚧 371–372 mm 被机器人自身力矩保护挡住（重复性 1.1 mm），不是物理底部 | 同上 第 21 节 |
 | 槽内转 10° 转平 | 🚧 未在真机跑通（源码依据已确认） | `scripts/teaching/straighten_in_slot.py` |
-| 规划场景里的桌子 / 夹具 | ⛔ MoveIt 查询返回 0 个碰撞对象 → **自动运动前必须先修** | 交接文档 §6 |
+| 规划场景里的夹具 | ✅ 已修（2026-11-13）：改走 `/apply_planning_scene` 服务并回查，仿真端到端验证通过 | `scripts/apply_real_cell_scene.py` |
+| 规划场景里的桌子 | 🚧 默认不发布（需 `--include-tables`）；生成的世界/配置落后于 11-05 实测（桌顶差 12.1/65.5 mm），待新 URDF 到位后统一重生成 | `docs/worklogs/2026-11/2026-11-13_WORKLOG_PLANNING_SCENE_FIX.md` |
 | 六维力传感与力控 | ⛔ 传感器 12 月到位，指标全部记"未采集" | `docs/reference/experiment_metrics.md` |
 
 ### 平台与工具
@@ -58,7 +59,7 @@ cd ~/projects/cs625-active-perception
 source scripts/source_dev_env.sh --full
 
 # ② 离线自检（不碰机器人）
-python3 -m pytest test/ -q            # 275 passed
+python3 -m pytest test/ -q            # 283 passed（需先 source 环境；离线 shell 缺 rclpy 会少收集 1 个模块）
 python3 test/contract_checks.py       # 仓库治理合同
 python3 scripts/check_docs.py         # 文档一致性
 
