@@ -144,9 +144,12 @@ def main() -> int:
     parser.add_argument("--auto-station", action="store_true",
                         help="方案 A：按当前工件偏转角查表选预教站位，"
                              "与 0° 相对视角推导交叉核对后执行（不搜索视角）")
-    parser.add_argument("--family-gate-mm", type=float, default=40.0,
+    parser.add_argument("--family-gate-mm", type=float, default=200.0,
                         help="relative_zero 族站位：推导目标与存储位姿的位置差超过"
-                             "该值（mm）→ 判工件已移动，拒绝自动换位")
+                             "该值（mm）→ 判工件已移动，拒绝自动换位。"
+                             "2026-11-14 所有者从 40 放宽到 200：相机绕工件转 12-15° "
+                             "本身就有 90-120 mm 几何位移，40 mm 会误判；"
+                             "工件真被搬走 200 mm 以上仍会被拦住")
     args = parser.parse_args()
 
     if args.auto_station:
@@ -178,6 +181,10 @@ def main() -> int:
               f"TCP {np.round(plan['stored_tcp'], 4)}")
         print(f"0° 相对视角推导目标 TCP {np.round(plan['derived_tcp'], 4)}，"
               f"与站位差 {plan['delta_mm']:.1f} mm / {plan['delta_deg']:.1f}°")
+        if plan["verdict"] == "station_far":
+            print(f"→ 远站位告警：站位与偏转角相差 {error:.1f}°（近站位门 "
+                  f"{plan.get('near_tolerance_deg', 12.0):.0f}°），"
+                  "相对视角核对不适用；精度可能下降，以精观测质量门为准")
         if plan["verdict"] == "station_moved":
             print_gap_guidance(plan, "station_moved", views,
                                pathlib.Path(args.current_measurement))

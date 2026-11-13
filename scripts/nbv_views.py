@@ -107,7 +107,9 @@ def select_known_view(yaw_deg: float, tolerance: float | None = None):
     几乎没有分辨力（实测三个视角的好/差，得分 0.2704 / 0.2704 / 0.2715）。
     已经验证通过的位姿比任何几何打分都可靠，而且不用搜索、不会撞。
 
-    tolerance 缺省时取查表里的 tolerance_deg（默认 12.0°）。
+    tolerance 缺省时取查表里的 tolerance_deg（2026-11-14 起 15.0°）；
+    一致性门默认 200 mm（2026-11-14 所有者从 40 放宽）；超出 near_tolerance_deg 判 station_far（告警）
+    （放行 + 告警，由精观测质量门兜底）。
     """
     import yaml
     config = yaml.safe_load((REPO / "config/tasks/common.yaml").read_text())
@@ -125,13 +127,13 @@ def select_known_view(yaw_deg: float, tolerance: float | None = None):
         except ValueError:
             continue
         error = abs(angle - yaw_deg)
-        if error <= tolerance and (best is None or error < best[0]):
+        if error <= tolerance + 1e-6 and (best is None or error < best[0]):
             best = (error, key, entry)
     return best
 
 
 def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
-                 T_tcp_cam: np.ndarray, family_gate_mm: float = 40.0) -> dict:
+                 T_tcp_cam: np.ndarray, family_gate_mm: float = 200.0) -> dict:
     """方案 A 选站：按偏转角选最近的预教站位，并与"0° 相对视角推导"交叉核对。
 
     纯数学、不碰 ROS。数据流：
@@ -170,7 +172,7 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
             if error <= tolerance:
                 skipped_unvalidated.append((key, error))
             continue   # 未通过精度门的站位不参与自动选站（-45° 即此类）
-        if error <= tolerance and (best is None or error < best[0]):
+        if error <= tolerance + 1e-6 and (best is None or error < best[0]):
             best = (error, key, entry)
 
     # 0° 相对视角推导（与 nbv_from_reference.py 同一套数学），只用于交叉核对。
@@ -205,13 +207,21 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
     delta_deg = float(np.degrees(
         (R.from_quat(stored_quat) * R.from_quat(derived_quat).inv()).magnitude()))
     family = entry.get("family", "relative_zero")
+    near_tolerance = float(views.get("near_tolerance_deg", tolerance))
     verdict = "station"
+    if error > near_tolerance:
+        # 远站位（偏差 > near_tolerance）：只作告警。门本身仍然适用——
+        # 2026-11-14 所有者把门从 40 mm 放宽到 200 mm，因为相机绕工件转 12-15°
+        # 本来就会产生 90-120 mm 的几何位移；真被搬走 200 mm 以上仍会被拦住。
+        verdict = "station_far"
     if family == "relative_zero" and delta_mm > family_gate_mm:
-        verdict = "station_moved"
+        verdict = "station_moved"      # 覆盖 far：远站位也要过门
     return {"yaw_deg": yaw, "station": (error, key, entry),
             "derived_tcp": derived_tcp, "derived_quat": derived_quat,
             "stored_tcp": stored_tcp, "stored_quat": stored_quat,
             "delta_mm": delta_mm, "delta_deg": delta_deg, "verdict": verdict,
+            "near_tolerance_deg": near_tolerance,
+            "far_by_deg": round(max(0.0, error - near_tolerance), 2),
             **diagnostics}
 
 

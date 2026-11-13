@@ -101,12 +101,48 @@ def test_station_plan_refuses_when_no_station_covers_yaw(world):
     assert plan["station"] is None
 
 
-def test_station_plan_refuses_when_workpiece_moved(world):
+def test_station_plan_refuses_when_workpiece_moved_far(world):
+    """工件被搬走很远（>200 mm）仍要拦住——门放宽不等于不设防。"""
     ref_pose, T_tcp_cam, views = world
-    moved = pose(translation=(0.76, 0.4, 0.12), yaw_deg=-30.0)
+    moved = pose(translation=(1.0, 0.4, 0.12), yaw_deg=-30.0)   # 300 mm
     plan = nbv_views.station_plan(views, ref_pose, moved, T_tcp_cam)
     assert plan["verdict"] == "station_moved"
-    assert plan["delta_mm"] > 40.0
+    assert plan["delta_mm"] > 200.0
+
+
+def test_small_workpiece_shift_is_accepted(world):
+    """2026-11-14 所有者决定：门从 40 mm 放宽到 200 mm，60 mm 的小范围移动应放行。"""
+    ref_pose, T_tcp_cam, views = world
+    moved = pose(translation=(0.76, 0.4, 0.12), yaw_deg=-30.0)   # 60 mm
+    plan = nbv_views.station_plan(views, ref_pose, moved, T_tcp_cam)
+    assert plan["verdict"] == "station"
+    assert plan["delta_mm"] < 200.0
+
+
+def test_far_station_is_selected_with_a_warning(world):
+    """偏差超过 near_tolerance 但仍在 tolerance 内 → station_far（可用 + 告警）。
+
+    2026-11-14 所有者把覆盖从 -42..+23 扩到 -45..+25，靠的就是这条路径：
+    站位比偏转角远 12-15 度时仍然可用（几何位移 90-120 mm，远小于 200 mm 门）。
+    """
+    ref_pose, T_tcp_cam, _ = world
+    # 只放两个站位，保证 -44° 的最近站位是 -30°（偏差 14°，介于 near 12 与 tol 15 之间）
+    views = {"tolerance_deg": 15.0, "near_tolerance_deg": 12.0}
+    cam0 = ref_pose.copy()
+    cam0[:3, 3] = ref_pose[:3, 3] + np.array([0.1, -0.3, 0.3])
+    for key in (0, -30):
+        cur = ref_pose.copy()
+        cur[:3, :3] = R.from_euler("z", key, degrees=True).as_matrix() @ ref_pose[:3, :3]
+        derived = cur @ np.linalg.inv(ref_pose) @ (cam0 @ T_tcp_cam) @ np.linalg.inv(T_tcp_cam)
+        views[str(key)] = {
+            "family": "relative_zero",
+            "tcp": np.round(derived[:3, 3], 6).tolist(),
+            "quat": np.round(R.from_matrix(derived[:3, :3]).as_quat(), 9).tolist(),
+        }
+    plan = nbv_views.station_plan(views, ref_pose, pose(yaw_deg=-44.0), T_tcp_cam)
+    assert plan["verdict"] == "station_far"
+    assert plan["station"][1] == "-30"
+    assert plan["far_by_deg"] == pytest.approx(2.0, abs=0.2)
 
 
 def test_station_plan_taught_family_skips_consistency_gate(world):

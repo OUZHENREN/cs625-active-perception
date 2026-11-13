@@ -287,8 +287,9 @@ cross-check**, not a search:
 ```text
 粗观测 workpiece pose in base_link + yaw angle
 → 查已验证站位表 config/tasks/common.yaml:workpiece_views
-     (nearest station by yaw, tolerance 12°; `validated: false` entries are excluded)
-→ 与 0° 相对视角推导交叉核对（position delta > 40 mm ⇒ 工件已移动，拒绝）
+     (nearest station by yaw, tolerance 15°, strict cross-check within 12°;
+      `validated: false` entries are excluded)
+→ 与 0° 相对视角推导交叉核对（position delta > 200 mm ⇒ 工件已移动，拒绝）
 → plan_pose_ik 安全闸（工作空间、当前状态接触、轨迹无碰撞、安全构型区间）
 → 换位 change view → 带先验精观测 fine observation with the prior
 ```
@@ -296,15 +297,18 @@ cross-check**, not a search:
 `scripts/nbv_from_reference.py --auto-station` prints the decision; add `--execute` to
 move, and the motion always goes through `scripts/plan_pose_ik.py`. The 0° relative-view
 derivation is only the cross-check — execution targets the stored, verified station
-pose. Stations marked `family: taught` (hand-placed by the owner) skip the 40 mm
-cross-check; for them the derivation is diagnostic information only.
+pose. Stations marked `family: taught` (hand-placed by the owner) skip the cross-check;
+for them the derivation is diagnostic information only.  The gate is **200 mm**, not 40 mm
+(owner 2026-11-14): a station 12-15 deg away from the measured yaw legitimately shifts the
+target by 90-120 mm, so a 40 mm gate would reject valid far stations.  A workpiece moved
+beyond 200 mm is still refused.
 
 Do **not** change view automatically — stay in place for a fine measurement, or have the
 owner place the arm manually — when:
 
-- no verified station covers the measured yaw (outside the 12° tolerance, or not
+- no verified station covers the measured yaw (outside the 15° tolerance, or not
   `validated`);
-- the derivation and the stored station disagree by more than 40 mm (workpiece moved);
+- the derivation and the stored station disagree by more than 200 mm (workpiece moved);
 - the move needs a large reconfiguration (flip IK solution, J2 too low, J6 beyond
   ±180°).
 

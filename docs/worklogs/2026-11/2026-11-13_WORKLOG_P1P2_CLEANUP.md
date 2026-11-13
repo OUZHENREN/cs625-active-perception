@@ -112,3 +112,34 @@ source scripts/source_dev_env.sh --full
 bash scripts/pre_commit_check.sh
 git log --oneline -1 --stat
 ```
+
+## 7. 收尾（2026-11-14 01:4x）：覆盖范围扩大到 −45..+25，移动门 40 → 200 mm
+
+所有者当天最后两个决定：
+
+```text
+① 覆盖范围从 −42..+23 扩到 −45..+25：
+   config/tasks/common.yaml  tolerance_deg 12 → 15（覆盖 [−45, +26]），
+   并新增 near_tolerance_deg: 12 —— 12° 以内仍做严格核对，12..15° 判 station_far
+   （可用 + 告警，最终由精观测质量门兜底）。
+② "工件被移动"的判定门从 40 mm 放宽到 200 mm：
+   相机绕工件转 12–15° 本身就有 90–120 mm 的几何位移，40 mm 会误判远站位；
+   --family-gate-mm 默认 40 → 200，nbv_views.station_plan 默认同步。
+   工件真被搬走 200 mm 以上仍判 station_moved 并拒绝自动换位。
+```
+
+实现细节（`scripts/nbv_views.py`）：
+- 门对**所有** relative_zero 站位统一适用（远站位不再跳过），`station_far` 只作告警标签；
+- 容差比较加 `1e-6` 余量（修 −45.0° 因浮点被判越界）；
+- 返回值新增 `near_tolerance_deg / far_by_deg`，`station_moved` 仍优先于 `station_far`。
+
+测试（`test/test_nbv_station_selection.py`，11 passed）：
+- 工件搬走 300 mm → 仍判 station_moved；
+- 工件移动 60 mm → 放行（对应所有者新门）；
+- 远站位（偏差 14°，介于 near 12 与 tol 15）→ station_far 且选中该站位。
+
+文档同步：AGENTS.md（tolerance 15 / 严格核对 12 / 门 200 mm）、论文计划（2.4 节口径）。
+
+**所有者明天（11-14 白天）计划**：上真机逐项测"工件边界 + 粗观测/精观测在该边界是否稳定"，
+据此再定 tolerance / 门的最终值。本轮没有真机运动。
+

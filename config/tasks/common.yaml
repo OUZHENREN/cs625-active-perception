@@ -491,7 +491,13 @@ workpiece_views:
       为 0.37 mm / 0.065°）
     validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
       --groups 3 --prior runtime/measurements/workpiece_coarse.json
-  tolerance_deg: 12.0
+  # 2026-11-14 所有者：覆盖范围由 -42..+23 扩到 -45..+25（tolerance 12 -> 15）。
+  # 站位离工件越远，相对视角推导与存储位姿的差越大（12-15 度约 90-120 mm），
+  # 所以一致性门（默认 200 mm，见 nbv_from_reference --family-gate-mm）
+  # 必须明显大于这个几何位移；超出 near_tolerance_deg 只作告警。
+  # 真被搬走 200 mm 以上仍会被判 station_moved 并拒绝自动换位。
+  tolerance_deg: 15.0
+  near_tolerance_deg: 12.0
   '-23':
     tcp:
     - 0.5328
