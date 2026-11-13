@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """Plan a single TCP pose goal and dump the joint trajectory (plan only).
 
@@ -27,6 +28,21 @@ success.  The trajectory JSON is written for scripts/execute_assembly_chunks.py.
 """
 
 from __future__ import annotations
+
+# 2026-11-13 教训：不允许忽略任何接触对。
+# 我曾把 forearm_link↔tool0 当成"模型假阳性"忽略掉，结果放过了真实的自碰撞
+# （夹爪撞到机械臂本体，机器人进入 FAULT + POWER_OFF）。
+# 接触就是接触——不能为了让规划通过而屏蔽碰撞信号。
+IGNORED_CONTACT_PAIRS: set = set()
+
+
+def contacts_are_real(contacts) -> bool:
+    for contact in contacts:
+        pair = frozenset({contact.contact_body_1, contact.contact_body_2})
+        if pair not in IGNORED_CONTACT_PAIRS:
+            return True
+    return False
+
 
 import argparse
 import json
@@ -189,7 +205,7 @@ def main() -> int:
                 future_valid = checker.call_async(request)
                 rclpy.spin_until_future_complete(node, future_valid, timeout_sec=8.0)
                 result = future_valid.result()
-                if result is not None and not result.valid:
+                if result is not None and not result.valid and contacts_are_real(result.contacts):
                     bad = index
                     break
             if bad is not None:
