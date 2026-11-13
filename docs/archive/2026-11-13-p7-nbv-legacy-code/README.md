@@ -69,5 +69,13 @@ P7.3 几何 NBV → P7.4 MoveIt NBV → P7.5 附着抓取）。它的 NBV 打分
 ## 可逆性
 
 全部文件经 `git mv` 移动，历史完整；恢复 = `git mv` 回原路径并撤销共享文件
-改动（见同一提交）。历史证据目录 `docs/evidence/p7_*` 与
-`docs/archive/2026-10-24-pre-six-modes/`（P7 文档）保持原样、未动。
+改动（见同一提交）。历史文档 `docs/archive/2026-10-24-pre-six-modes/`（P7 文档）
+保持原样、未动。
+
+## 附：P7 运行时证据（同日一并归档）
+
+所有者 2026-11-13 指示：`docs/evidence/` 里大段的 P7 仿真证据（129 个
+`p7_*` 目录，五道门各轮 capture/诊断/门总结，约 1100 个文件）同样归档，
+移入本目录的 `evidence/` 子目录，只读保留、仅供溯源，不再作为当前验收证据
+引用。`docs/evidence/README.md` 的 P7 运行索引已改为指向本处；
+`minimum_showcase_matrix_20260906_r1` 等非 P7 证据留在原位。

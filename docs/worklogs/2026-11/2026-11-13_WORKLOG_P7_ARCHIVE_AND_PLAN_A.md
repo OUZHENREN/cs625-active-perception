@@ -4,7 +4,6 @@
 > 本轮环境：真机已关机（所有者下班），全部验证**离线**完成；**没有发生任何真机运动**。
 
 ## 0.1 复盘补记（22:2x，应所有者要求复查）
-
 复查结论：**本轮自己的改动全部真实通过；复查过程中发现并修复了一串"本轮之前就存在"
 的合同检查失败**（与归档无关），并如实记录：
 
@@ -37,6 +36,24 @@
 仍未验证（如实）：方案 A 的执行路径（plan_pose_ik 换位 + 精测闭环）需要真机；
 Gazebo 运行时（carry attach 行为）只做了静态展开验证，未实际启动；colcon build
 未在归档后重跑（包结构只动了 setup.py 入口清单，语法已验证）。
+```
+
+## 0.2 收尾补记（23:1x，P7 证据归档 + 分支冻结 + 主页更新）
+
+```text
+① 所有者指示（先"删除"后更正为"归档"）：docs/evidence/ 里 129 个 p7_* 证据目录
+   （五道门各轮 capture/诊断/门总结，约 1100 个文件，旧番茄世界的仿真证据）
+   → git mv 入 docs/archive/2026-11-13-p7-nbv-legacy-code/evidence/，只读溯源。
+   docs/evidence/README.md 重写：P7 运行索引改为归档指引；
+   非 P7 证据（minimum_showcase_matrix_20260906_r1、视频出处图）留在原位。
+② 分支策略（所有者定调）：teaching-rvs-mode 冻结——它只服务 2026-10 前后
+   "示教模式 + RVS 视角"更新阶段；此后所有提交直接进 main。
+   已写入：AGENTS.md 新章节 "Branch policy (frozen 2026-11-13, owner decision)"、
+   根 README.md "分支与提交（2026-11-13 起）"（同时更新了首页的两条文档指针）。
+   本地 teaching-rvs-mode 重置到 154cbeb（冻结点）；远程分支保持原样不动。
+③ 远程主页说明：GitHub 仓库 About 描述原本为空 → 已通过 API 补上项目一句话
+   描述（含"活跃分支仅 main；teaching-rvs-mode 已冻结"）；README 随 push 同步到主页。
+验证：pytest 275 全绿；contract_checks PASS；对 docs/evidence/p7 的活动引用 0 命中。
 ```
 
 ## 0. 本轮解决的两个问题

@@ -309,6 +309,14 @@ owner decision. The rule covers repository documents and the Obsidian vault alik
 - Generated artifacts (build output, screenshots, `.bak`) are the only exception, and they
   still get a log line.
 
+## Branch policy (frozen 2026-11-13, owner decision)
+
+- `main` is the only active branch. **Every commit goes directly to `main`** and is
+  pushed to `origin/main`.
+- `teaching-rvs-mode` is **frozen**: it only served the 2026-10 teaching-mode / RVS
+  viewpoint update phase. Do not commit to it and do not push it; the remote branch
+  stays exactly as the owner left it.
+
 ## Source preservation and authority
 
 Nothing is deleted to "clean up". Old code, old docs and old simulation assets are kept

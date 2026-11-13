@@ -98,9 +98,15 @@ runtime/        运行产物（环境模型、采集、位姿库、debug_runs）
 指标体系 18 项  docs/reference/experiment_metrics.md
 真机参考/排障   docs/reference/real_cell.md
 仿真保真度      docs/reference/simulation.md
-视觉研究交接    docs/worklogs/2026-11/2026-11-09_HANDOFF_NEXT_SESSION_VISION_ALGORITHM.md
-最近工作日志    docs/worklogs/2026-11/2026-11-07_WORKLOG_MODES_PANEL_DOCS_REORG.md
+视觉研究交接    docs/worklogs/2026-11/2026-11-13_HANDOFF_VISION_MILESTONE.md
+最近工作日志    docs/worklogs/2026-11/2026-11-13_WORKLOG_P7_ARCHIVE_AND_PLAN_A.md
 ```
+
+### 分支与提交（2026-11-13 起）
+
+- **`main`**：唯一活跃分支，此后所有提交直接进 `main`。
+- **`teaching-rvs-mode`**：已冻结。它只服务于 2026-10 前后"示教模式 + RVS 视角"
+  更新阶段；远程该分支保持原样，不再向其提交或推送。
 
 ---
 
