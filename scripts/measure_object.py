@@ -315,7 +315,23 @@ def main() -> int:
     if len(good) < args.groups:
         verdict = "REFUSE"
         reasons.append(f"只有 {len(good)}/{args.groups} 组出位姿")
-    min_coverage = 0.70 if coarse_stage else MIN_COVERAGE
+    # 大视角（工件偏转 |yaw| ≥ 40°）时可见面本就有限，覆盖率门放宽到 0.90
+    # （所有者 2026-11-13 同意；精度在 −45° 时反而最好：0.28 mm / 0.045°）。
+    yaw_deg = None
+    try:
+        import yaml as _yaml
+        from scipy.spatial.transform import Rotation as _R
+        config = _yaml.safe_load((REPO / "config/tasks/common.yaml").read_text())
+        zero = config.get("workpiece_zero_quat")
+        if zero:
+            reference = _R.from_quat(np.array(zero, dtype=float))
+            measured = _R.from_quat(np.array(
+                credible_rows[0]["pose_base"]["quaternion"], dtype=float))
+            yaw_deg = float((measured * reference.inv()).as_euler("zyx", degrees=True)[0])
+    except Exception:  # noqa: BLE001 - 读不到就按常规门
+        yaw_deg = None
+    large_view = yaw_deg is not None and abs(yaw_deg) >= 40.0
+    min_coverage = 0.70 if coarse_stage else (0.90 if large_view else MIN_COVERAGE)
     max_translation = 20.0 if coarse_stage else MAX_TRANSLATION_MM
     max_rotation = 20.0 if coarse_stage else MAX_ROTATION_DEG
     if coverage < min_coverage:
@@ -343,6 +359,8 @@ def main() -> int:
         "degenerate_groups_dropped": dropped,
         "outlier_groups": outliers,
         "stage": args.stage,
+        "workpiece_yaw_deg": None if yaw_deg is None else round(yaw_deg, 1),
+        "min_coverage_used": min_coverage,
         "T_base_cam": ([[round(float(v), 6) for v in line] for line in base_cam]
                        if base_cam is not None else None),
         "verdict": verdict,
