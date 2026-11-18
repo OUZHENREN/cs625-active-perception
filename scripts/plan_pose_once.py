@@ -256,7 +256,7 @@ def main() -> int:
     ABS_LIMITS = {
         "shoulder_pan_joint": (-100.0, 100.0),
         "shoulder_lift_joint": (-110.0, 10.0),
-        "elbow_joint": (-150.0, -100.0),
+        "elbow_joint": (-160.0, -100.0),   # 2026-11-18 所有者放宽（原 -150；硬件 ±180）
         "wrist_1_joint": (-150.0, 150.0),
         "wrist_2_joint": (-150.0, 150.0),
         "wrist_3_joint": (-150.0, 150.0),

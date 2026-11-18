@@ -103,26 +103,50 @@ def print_gap_guidance(plan: dict, reason: str, views: dict,
     print(f"   已记录缺口：{path.relative_to(REPO)}（含推导目标位姿，便于下次补站位）")
 
 
+STATION_PLAN = pathlib.Path("/tmp/ik_station_plan.json")
+CHUNK_EXECUTOR = REPO / "scripts" / "execute_assembly_chunks.py"
+
+
 def auto_station(target_pose: dict, execute: bool) -> int:
-    """方案 A：查表选中的站位（已验证绝对位姿）→ plan_pose_ik 执行（带全套安全闸）。
+    """方案 A：查表选中的站位（已验证绝对位姿）→ 规划 → 执行（带全套安全闸）。
 
     2026-11-13 所有者定调：预教站位 + 按偏转角自动选站，NBV 只做"选站"，
     不做大幅换构型。目标位姿来自已验证的 workpiece_views 表，不再推导/搜索。
+
+    2026-11-18 修正两处实现缺陷（真机首次跑观测时暴露）：
+      ① 以前只调 `plan_pose_ik`（它只写计划文件、不执行）→ 即使规划成功臂也不会动；
+         现在规划成功后交给 `execute_assembly_chunks.py` 真正下发，并检查
+         `ALL_ASSEMBLY_CHUNKS_OK`。
+      ② 以前把 plan_pose_ik 的任何拒绝都当成"流程失败"→ 整条观测链中断；
+         按设计语义改为返回 6（无法安全换位 → 原地精测），流程可以继续。
     """
     tcp = np.asarray(target_pose["tcp"], dtype=float)
     quat = np.asarray(target_pose["quat"], dtype=float)
-    cmd = [sys.executable, str(REPO / "scripts" / "plan_pose_ik.py"),
-           *(f"{v:.5f}" for v in tcp), *(f"{v:.6f}" for v in quat)]
     if not execute:
         print("（未执行）")
         return 0
-    move = subprocess.run(cmd, capture_output=True, text=True, timeout=900)
-    tail = (move.stdout or "").strip().splitlines()
-    print("   换位执行:", tail[-1] if tail else f"(exit {move.returncode})")
-    if move.returncode == 6:
-        # plan_pose_ik 拒绝"大幅改构型"：不做自动换位，原地精测（安全第一）
+
+    plan = subprocess.run(
+        [sys.executable, str(REPO / "scripts" / "plan_pose_ik.py"),
+         *(f"{v:.5f}" for v in tcp), *(f"{v:.6f}" for v in quat),
+         "--output", str(STATION_PLAN)],
+        capture_output=True, text=True, timeout=900)
+    tail = (plan.stdout or "").strip().splitlines()
+    print("   换位规划:", tail[-1] if tail else f"(exit {plan.returncode})")
+    if plan.returncode != 0:
+        # 越界(7) / 当前状态已接触(6) / IK 无解(5) / 轨迹接触或越界(4) / 超时长(2)
+        # 一律视为"无法安全换位"，不做自动换位，继续原地精测（安全第一）。
+        print("   → 无法安全换位，跳过换位，继续原地精测")
         return 6
-    if move.returncode != 0:
+
+    run = subprocess.run(
+        [sys.executable, str(CHUNK_EXECUTOR), str(STATION_PLAN),
+         "--time-scale", "3.0", "--goal-tolerance", "0.001",
+         "--verify-final", "0.004", "--fault-poll", "0.1"],
+        capture_output=True, text=True, timeout=600)
+    if "ALL_ASSEMBLY_CHUNKS_OK" not in (run.stdout or ""):
+        rtail = (run.stdout or "").strip().splitlines()
+        print("   换位执行失败:", rtail[-1] if rtail else f"(exit {run.returncode})")
         return 4
     verify = subprocess.run([sys.executable, str(REPO / "scripts" / "check_state_ok.py")],
                             capture_output=True, text=True, timeout=120)
