@@ -143,3 +143,57 @@ Intentionally not done:
   · 未做接触类实验（抓取/插入/力控），按所有者决定全部停在观测阶段；
   · 未重测环境模型（效率模式走 measurement 门，不需要）。
 ```
+
+## 10. 根因分析（当晚补，真机已关闭）
+
+### 10.1 为什么报 `EFFORT_DEAD`（力矩峰值 0.000），而力矩其实是活的
+
+```text
+同一时刻单独读 /joint_states：Σ|effort| = 8.44（elbow −5.225、wrist_1 1.816…）→ 明显是活的。
+执行器的力矩门：先固定等 0.8 s，再要求 ≥10 帧样本，否则直接返回 (False, 0.0)。
+问题：节点多时（驱动 + 多个 move_group + 录制 + 相机 + 面板）DDS 发现可能超过 0.8 s，
+      "没收到数据"被当成"力矩为 0"——两种完全不同的情况用了同一个结论。
+修复：改为三态 —— dead（有样本但峰值 <1.0，真故障）/ unknown（完全没有样本，DDS 或话题掉线）
+      / alive；并先等第一条样本（最多 5 s）再要求窗口。unknown 时拒绝执行但不诬告硬件。
+```
+
+### 10.2 为什么"目标被接受却完全不动"
+
+```text
+证据：控制器报的位置误差正好等于指令增量（J1 0.501 rad = 28.7°）→ 机械臂一点没走。
+根因：一次轨迹中止（PATH_TOLERANCE_VIOLATED）之后，机器人侧的外部控制程序已经停止，
+      但 robot_mode 仍报 7(RUNNING)、驱动三个反控端口也仍 ESTAB。
+      此时动作目标会被"接受"，指令却进了真空（手册第 28 条描述过这个现象）。
+为什么没被拦住：ensure_robot_ready.py 只要看到 robot_mode==7 就打印"无需重挂"，
+      这个判断是错的——mode 7 不能证明外部控制脚本还在跑。
+修复：给 ensure_robot_ready.py 加 --force（即使 RUNNING 也调
+      /io_and_status_controller/resend_external_script + 恢复速度滑条）。
+新规矩：任何一次运动中止/保护停止之后，下一次动臂前必须 --force 重挂，
+      并用 2° 微动探针确认机器人真的跟指令走。
+```
+
+### 10.3 与今天两次中止的关系
+
+```text
+· 补偿位姿那次 PATH_TOLERANCE_VIOLATED：轨迹本身要求 47.6° 腕部 + 41° 肩转，
+  控制器跟不上 → 中止（这条已在 §7 记录为"大幅改构型不能用关节线性插值"）。
+· 中止之后机器人侧程序停了 → 后续所有"接受但不执行"都是 10.2 的后果，不是新故障。
+· 所以正确的恢复顺序是：中止 → ensure_robot_ready --force → 2° 探针 → 才谈大动作。
+```
+
+### 10.4 已提交的修复
+
+```text
+scripts/execute_assembly_chunks.py  力矩门三态（dead/unknown/alive），先等首样本再要窗口
+scripts/ensure_robot_ready.py       新增 --force（RUNNING 也重发外部控制脚本）
+docs/manuals/...                    新增第 31 条 + 开工清单第 9 条
+```
+
+### 10.5 仍待做（明天）
+
+```text
+1. 大幅改构型改用 MoveIt OMPL 规划（plan_pose_once），或强制拆 ≤15° 小段并逐段复核；
+2. 每次中止后自动提示/强制 ensure_robot_ready --force（现在只是文档规矩）；
+3. 选站补偿工件平移（今天精观测失败的直接原因），或先把工件摆回示教位置验证基础链路。
+```
+

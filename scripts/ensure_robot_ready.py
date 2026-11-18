@@ -8,6 +8,12 @@
 重发外部控制脚本（resend_external_script）+ 恢复速度滑条，然后最多等 5 s 复查，
 而不是固定等 45 s。
 
+2026-11-18 补充（真机事故后）：`robot_mode == 7` **不能证明机器人侧的外部控制程序
+还在跑**。一次轨迹中止（PATH_TOLERANCE_VIOLATED）之后，机器人可能仍报 RUNNING、
+驱动端口也仍 ESTAB，但外部控制脚本已经停止——此时动作目标会被"接受"却永不执行
+（手册第 28 条）。所以新增 `--force`：即使已经是 RUNNING，也重发外部控制脚本
++ 恢复速度滑条。**任何一次运动被中止/保护停止之后，下一次动臂前都应当用 --force。**
+
 退出码：0=已就绪；3=安全模式异常（需要人去示教器复位）；4=重挂失败。
 """
 
@@ -39,6 +45,14 @@ def read_modes(node: Node, timeout: float = 2.0) -> tuple[int | None, int | None
 
 
 def main() -> int:
+    import argparse
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--force", action="store_true",
+                        help="即使 robot_mode 已是 RUNNING，也重发外部控制脚本"
+                             "（运动被中止/保护停止之后必须这样做）")
+    args = parser.parse_args()
+
     rclpy.init()
     node = rclpy.create_node("ensure_robot_ready")
     safety, robot = read_modes(node)
@@ -46,8 +60,9 @@ def main() -> int:
     if safety != 1:
         print("[ready] 安全模式不是 NORMAL：请在示教器上复位（急停/保护停止）后重试")
         return 3
-    if robot == 7:
-        print("[ready] 已经是 RUNNING，无需重挂")
+    if robot == 7 and not args.force:
+        print("[ready] 已经是 RUNNING，无需重挂"
+              "（若上一次运动被中止或触发过保护停止，请加 --force）")
         return 0
 
     # 重挂：重发外部控制脚本 + 速度滑条

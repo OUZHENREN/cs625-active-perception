@@ -226,7 +226,7 @@ def main() -> int:
             node.destroy_subscription(sub)
         return captured or {"note": "no safety/mode samples within 3 s"}
 
-    def effort_alive() -> tuple[bool, float]:
+    def effort_alive() -> tuple[str, float]:
         """The torque interface must show a plausible load before any motion.
 
         On 2026-11-03 a controller switch left the effort interface reading ~0 N
@@ -234,18 +234,34 @@ def main() -> int:
         then silently see nothing, and the run collided with the fixture.  A dead
         stream reads < 1.0; a loaded arm reads >= 8 on joint 2 alone.
 
-        Spins to collect a real window first: the startup probe exits as soon as
-        POSITIONS arrive, which can leave the effort window empty at the first
-        chunk (measured: the gate fired with peak 0.000 although the stream was
-        alive at 15.9).
+        2026-11-18: the old version waited a fixed 0.8 s and reported
+        ``EFFORT_DEAD`` whenever fewer than 10 samples had arrived.  With many
+        participants (driver + several move_group + recorder + camera + panel) DDS
+        discovery can take longer than that, so the gate fired with
+        ``peak 0.000`` while the stream was actually alive (measured separately:
+        Σ|effort| = 8.44 at the same moment).  The two situations need different
+        actions, so they are now distinguished:
+
+            "dead"    — samples arrived, but the load stays below 1.0  → real fault
+            "unknown" — no samples at all (DDS discovery / no /joint_states) → retry
+            "alive"   — plausible load observed
+
+        It now waits for the first sample (up to 5 s) and only then requires a
+        real window, instead of assuming 0.8 s is always enough.
         """
-        probe = time.time() + 0.8
-        while time.time() < probe:
+        first_deadline = time.time() + 5.0
+        while not efforts and time.time() < first_deadline:
+            rclpy.spin_once(node, timeout_sec=0.05)
+        if not efforts:
+            return "unknown", 0.0
+        window_deadline = time.time() + 1.5
+        while len(efforts) < 10 and time.time() < window_deadline:
             rclpy.spin_once(node, timeout_sec=0.05)
         if len(efforts) < 10:
-            return False, 0.0
+            return "unknown", 0.0
         recent = efforts[-16:]
-        return max(recent) >= 1.0, float(max(recent))
+        peak = float(max(recent))
+        return ("alive" if peak >= 1.0 else "dead"), peak
 
     node.create_subscription(JointState, "/joint_states", _on_joints, 10)
     probe_deadline = time.time() + 3.0
@@ -370,11 +386,18 @@ def main() -> int:
                 "refusing to execute a stale trajectory"
             )
             return 7
-        alive, peak = effort_alive()
-        if not alive:
+        effort_state, peak = effort_alive()
+        if effort_state != "alive":
             # 记录失败瞬间的机器人状态：只报"力矩死流"无法区分是保护停止、
             # 模式切换还是话题掉线，而这三者的处置完全不同。
             status = robot_status_snapshot()
+            if effort_state == "unknown":
+                print(
+                    "EFFORT_UNKNOWN: no /joint_states samples arrived while probing "
+                    "(DDS discovery or a dead publisher), so the load cannot be "
+                    f"judged.  Nothing was executed.  robot_status={status}"
+                )
+                return 12
             print(
                 f"EFFORT_DEAD: the torque interface shows no plausible load "
                 f"(peak {peak:.3f}); every contact detector would be blind, so "
