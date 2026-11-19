@@ -235,3 +235,32 @@ def test_placement_gap_is_computed_from_the_reference_file(tmp_path):
 
 def test_placement_gap_absent_reference_returns_none():
     assert nbv_views.placement_gap({}, pose()) is None
+
+
+def test_empirical_coverage_outranks_a_closer_yaw(world):
+    """2026-11-19 真机结论：偏转角更近不等于测得更好。
+
+    −23 只差 1.2°，但实测覆盖率 0.88–0.93（拒）；−16 差 5.8°，实测 0.9725（过）。
+    所以选站的主判据是"该站位实测过的覆盖率"，偏转角只是过滤条件。
+    """
+    ref_pose, T_tcp_cam, views = world
+    tuned = dict(views)
+    # −16 实测 0.967；−23 没有实测数据
+    entry16 = dict(tuned["-16"])
+    entry16["empirical_coverage"] = 0.967
+    tuned["-16"] = entry16
+    plan = nbv_views.station_plan(tuned, ref_pose, pose(yaw_deg=-17.0), T_tcp_cam)
+    # −23 的偏转角更近（1°），但没有实测覆盖率 → 应让位给有数据的 −16
+    assert plan["station"][1] == "-16"
+    assert plan["ranked"][0]["coverage"] == pytest.approx(0.967)
+
+
+def test_a_station_without_coverage_loses_to_one_with_it(world):
+    ref_pose, T_tcp_cam, views = world
+    tuned = dict(views)
+    entry30 = dict(tuned["-30"])
+    entry30["empirical_coverage"] = 0.972
+    tuned["-30"] = entry30
+    plan = nbv_views.station_plan(tuned, ref_pose, pose(yaw_deg=-28.0), T_tcp_cam)
+    # −30 偏转角最近且有实测 → 选中
+    assert plan["station"][1] == "-30"

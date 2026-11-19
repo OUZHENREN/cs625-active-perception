@@ -278,27 +278,24 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
             "placement_ok": None if gap is None else (not gap_bad),
             "blocked": gap_bad,
             "family": entry.get("family", "relative_zero"),
+            "coverage": (float(entry["empirical_coverage"])
+                         if entry.get("empirical_coverage") is not None else None),
         })
-    # taught 族是所有者手摆的独立站位（+11 / +11_left8），delta 对它们**不是**质量指标：
-    # 它们本来就不是由 0° 推导出来的。所以分两族排序：
-    #   · taught：按偏转角误差（它是为那个偏转角手摆的）；
-    #   · relative_zero：按 delta_mm（与当前工件的匹配度）。
-    # 选谁：taught 的偏转角误差很小时优先用它（手摆的视角通常更贴合），否则用推导族。
-    taught = [c for c in candidates if c["family"] == "taught"]
-    derived_family = [c for c in candidates if c["family"] != "taught"]
-    taught.sort(key=lambda item: (item["blocked"], item["error_deg"]))
-    derived_family.sort(key=lambda item: (item["blocked"], item["delta_mm"],
-                                          item["error_deg"]))
-    chosen = None
-    if taught and taught[0]["error_deg"] <= TAUGHT_PREFERENCE_DEG:
-        chosen = taught[0]
-    elif derived_family:
-        chosen = derived_family[0]
-    elif taught:
-        chosen = taught[0]
-    candidates = derived_family[:4] + taught[:2]
+    # 选站判据（2026-11-19 所有者定，实测数据驱动）：
+    #   **主判据 = 该站位实测的 ICP 覆盖率（empirical_coverage）**，偏转角只是过滤条件。
+    #   为什么：11-19 真机实测，yaw 只差 1.2° 的 −23 覆盖率 0.88–0.93（拒），
+    #   而差 5.8° 的 −16 覆盖率 0.9725（通过）。"偏转角更近"不等于"测得更好"。
+    #   没有实测覆盖率的站位（如 −23）排在有数据的后面，按偏转角误差兜底。
+    def rank_key(item):
+        coverage = item["coverage"]
+        if coverage is None:
+            return (1, 0.0, item["error_deg"], item["delta_mm"])
+        return (0, -float(coverage), item["error_deg"], item["delta_mm"])
+
+    candidates.sort(key=rank_key)
     best = None
-    if chosen is not None:
+    if candidates:
+        chosen = candidates[0]
         best = (chosen["error_deg"], chosen["key"], chosen["entry"])
 
     diagnostics = {
@@ -306,7 +303,7 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
         "nearest_error_deg": round(nearest[0], 2) if nearest else None,
         "skipped_unvalidated": [(key, round(error, 2))
                                 for key, error in skipped_unvalidated],
-        "ranked": [{k: item[k] for k in ("key", "error_deg", "delta_mm",
+        "ranked": [{k: item[k] for k in ("key", "error_deg", "delta_mm", "coverage",
                                           "gap_mm", "gap_deg", "placement_ok")}
                    for item in candidates[:5]],
     }

@@ -478,6 +478,8 @@ workpiece_zero_quat:
 - 0.005061
 workpiece_views:
   '0':
+    # 该站位验证时实测的 ICP 覆盖率：选站的主判据（2026-11-19 所有者定）
+    empirical_coverage: 0.991
     # 该站位验证时的工件位姿：用于检查工件是否被摆到别处
     reference_measurement: runtime/measurements/workpiece_zero.json
     tcp:
@@ -514,6 +516,8 @@ workpiece_views:
     validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
       --groups 3 --prior runtime/measurements/workpiece_coarse.json
   '-30':
+    # 该站位验证时实测的 ICP 覆盖率：选站的主判据（2026-11-19 所有者定）
+    empirical_coverage: 0.972
     # 该站位验证时的工件位姿：用于检查工件是否被摆到别处
     reference_measurement: runtime/measurements/workpiece_minus30.json
     tcp:
@@ -546,6 +550,8 @@ workpiece_views:
       --groups 4 --prior runtime/measurements/workpiece_coarse.json
      
   '-16':
+    # 该站位验证时实测的 ICP 覆盖率：选站的主判据（2026-11-19 所有者定）
+    empirical_coverage: 0.967
     # 该站位验证时的工件位姿：用于检查工件是否被摆到别处
     reference_measurement: runtime/measurements/workpiece_minus15.json
     tcp:
@@ -562,6 +568,8 @@ workpiece_views:
     validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
       --groups 3 --prior runtime/measurements/workpiece_coarse.json
   '+11':
+    # 该站位验证时实测的 ICP 覆盖率：选站的主判据（2026-11-19 所有者定）
+    empirical_coverage: 0.967
     # 该站位验证时的工件位姿：用于检查工件是否被摆到别处
     reference_measurement: runtime/measurements/workpiece_left8.json
     family: taught
@@ -581,6 +589,8 @@ workpiece_views:
     validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
       --groups 3 --prior runtime/measurements/workpiece_coarse.json
   +11_left8:
+    # 该站位验证时实测的 ICP 覆盖率：选站的主判据（2026-11-19 所有者定）
+    empirical_coverage: 0.967
     # 该站位验证时的工件位姿：用于检查工件是否被摆到别处
     reference_measurement: runtime/measurements/workpiece_left8.json
     family: taught
