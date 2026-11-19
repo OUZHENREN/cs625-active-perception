@@ -34,7 +34,14 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 import coarse_pose as cp                                        # noqa: E402
 
+# 覆盖率判据（2026-11-19 所有者：0.95 略严，降到 0.90 作为硬底线）
+# 分两层，既放宽又不丢失"证据是否充分"这个信号：
+#   · ≥ MIN_COVERAGE（0.95）        → 合格
+#   · MIN_COVERAGE_FLOOR..0.95      → 合格但**标记低覆盖**（输出/日志里带 low_coverage），
+#                                     论文里可与高覆盖样本区分
+#   · < MIN_COVERAGE_FLOOR（0.90）  → REFUSE
 MIN_COVERAGE = 0.95
+MIN_COVERAGE_FLOOR = 0.90
 # 精观测门（2026-11-12 收紧）：扶手与工件之间的插入间隙每侧只有 2 mm，
 # 5 mm / 2° 的"重复性"根本保证不了能插进去。历史实测能做到 0.3–0.5 mm，
 # 所以精观测要求 ≤1.0 mm / ≤0.5°；达不到就应当换视角重测，而不是带着误差去抓。
@@ -428,12 +435,17 @@ def main() -> int:
     except Exception:  # noqa: BLE001 - 读不到就按常规门
         yaw_deg = None
     large_view = yaw_deg is not None and abs(yaw_deg) >= 40.0
-    min_coverage = 0.70 if coarse_stage else (0.90 if large_view else MIN_COVERAGE)
+    min_coverage = 0.70 if coarse_stage else (0.90 if large_view else MIN_COVERAGE_FLOOR)
     max_translation = 20.0 if coarse_stage else MAX_TRANSLATION_MM
     max_rotation = 20.0 if coarse_stage else MAX_ROTATION_DEG
+    low_coverage = False
     if coverage < min_coverage:
         verdict = "REFUSE"
         reasons.append(f"覆盖率中位 {coverage:.3f} < {min_coverage}")
+    elif not coarse_stage and not large_view and coverage < MIN_COVERAGE:
+        # 0.90–0.95：放行但标记"低覆盖"，提醒下游别把它当 1 mm 级证据链最强的那一档
+        low_coverage = True
+        reasons.append(f"低覆盖：{coverage:.3f} < {MIN_COVERAGE}（可接受但证据偏弱）")
     if ambiguous:
         verdict = "REFUSE"
         reasons.append(f"{ambiguous} 组存在翻转歧义")
@@ -472,6 +484,7 @@ def main() -> int:
         "stage": args.stage,
         "workpiece_yaw_deg": None if yaw_deg is None else round(yaw_deg, 1),
         "min_coverage_used": min_coverage,
+        "low_coverage": low_coverage,
         "T_base_cam": ([[round(float(v), 6) for v in line] for line in base_cam]
                        if base_cam is not None else None),
         "verdict": verdict,
@@ -482,8 +495,8 @@ def main() -> int:
     }
     print(json.dumps({k: summary[k] for k in
                       ("pose_base_centre_mm", "repeatability", "coverage_median",
-                       "flip_ambiguous_groups", "degenerate_groups_dropped",
-                       "verdict", "reasons")},
+                       "low_coverage", "flip_ambiguous_groups",
+                       "degenerate_groups_dropped", "verdict", "reasons")},
                      ensure_ascii=False, indent=2))
     if stage_node is not None:
         publish_stage(stage_node, "gate", {
@@ -491,7 +504,7 @@ def main() -> int:
             "translation_mm": round(translation_spread, 2),
             "rotation_deg": round(rotation_spread, 2),
             "credible": len(credible_rows), "group_total": len(results),
-            "reasons": reasons})
+            "low_coverage": low_coverage, "reasons": reasons})
     if args.out:
         pathlib.Path(args.out).parent.mkdir(parents=True, exist_ok=True)
         pathlib.Path(args.out).write_text(json.dumps(summary, ensure_ascii=False, indent=2))
