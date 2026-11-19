@@ -478,6 +478,8 @@ workpiece_zero_quat:
 - 0.005061
 workpiece_views:
   '0':
+    # 该站位验证时的工件位姿：用于检查工件是否被摆到别处
+    reference_measurement: runtime/measurements/workpiece_zero.json
     tcp:
     - 0.63546
     - 0.32805
@@ -512,6 +514,8 @@ workpiece_views:
     validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
       --groups 3 --prior runtime/measurements/workpiece_coarse.json
   '-30':
+    # 该站位验证时的工件位姿：用于检查工件是否被摆到别处
+    reference_measurement: runtime/measurements/workpiece_minus30.json
     tcp:
     - 0.5107
     - 0.4957
@@ -542,6 +546,8 @@ workpiece_views:
       --groups 4 --prior runtime/measurements/workpiece_coarse.json
      
   '-16':
+    # 该站位验证时的工件位姿：用于检查工件是否被摆到别处
+    reference_measurement: runtime/measurements/workpiece_minus15.json
     tcp:
     - 0.5389
     - 0.3808
@@ -556,6 +562,8 @@ workpiece_views:
     validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
       --groups 3 --prior runtime/measurements/workpiece_coarse.json
   '+11':
+    # 该站位验证时的工件位姿：用于检查工件是否被摆到别处
+    reference_measurement: runtime/measurements/workpiece_left8.json
     family: taught
     tcp:
     - 0.728
@@ -573,6 +581,8 @@ workpiece_views:
     validated_command: python3 scripts/measure_object.py --preset workpiece --stage fine
       --groups 3 --prior runtime/measurements/workpiece_coarse.json
   +11_left8:
+    # 该站位验证时的工件位姿：用于检查工件是否被摆到别处
+    reference_measurement: runtime/measurements/workpiece_left8.json
     family: taught
     tcp:
     - 0.7904

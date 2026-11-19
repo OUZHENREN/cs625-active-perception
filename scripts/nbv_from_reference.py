@@ -46,6 +46,34 @@ def pose_from_measurement(path: pathlib.Path, group: str = "g00_m") -> np.ndarra
 GAP_DIR = REPO / "runtime" / "measurements"
 
 
+# 摆放约束（2026-11-19，所有者定）：工件相对"该站位验证时的位置"允许的偏差。
+# 依据（capture 审计的投影模型）：yaw 差 3.3° 时，第三面要稳定出 3 个面
+# 需要平移 ≤30 mm；超出后第三面会掠射到只剩 2 个面，精观测必然失败。
+PLACEMENT_MAX_MM = 30.0
+PLACEMENT_MAX_DEG = 3.5
+
+
+def placement_gap(entry: dict, current_pose: np.ndarray):
+    """工件相对该站位参考测量位置的 (平移 mm, 偏航差 °, 参考文件名)。
+
+    没有参考测量（或读不到）时返回 None —— 如实跳过，不猜。
+    """
+    reference = entry.get("reference_measurement")
+    if not reference:
+        return None
+    path = pathlib.Path(reference)
+    if not path.is_absolute():
+        path = REPO / path
+    try:
+        reference_pose = pose_from_measurement(path)
+    except (OSError, json.JSONDecodeError, KeyError, IndexError):
+        return None
+    offset = current_pose[:3, 3] - reference_pose[:3, 3]
+    return (float(np.linalg.norm(offset)) * 1000.0,
+            abs(float(nbv_views.yaw_degrees_between(reference_pose, current_pose))),
+            path.name)
+
+
 def record_station_gap(plan: dict, reason: str, views: dict,
                        current_measurement: pathlib.Path) -> pathlib.Path:
     """把"这次没选到可用站位"落盘，供所有者决定是否新增/复核站位。
@@ -213,6 +241,26 @@ def main() -> int:
             print_gap_guidance(plan, "station_moved", views,
                                pathlib.Path(args.current_measurement))
             return 6
+        # --- 摆放检查：工件是否还在该站位验证时的位置附近 ---
+        gap = placement_gap(entry, cur_pose)
+        if gap is None:
+            print("摆放检查：该站位没有参考测量，跳过（只按偏转角选站）")
+        else:
+            gap_mm, gap_deg, reference_name = gap
+            print(f"摆放检查：工件相对该站位参考位置 平移 {gap_mm:.1f} mm / "
+                  f"yaw {gap_deg:.2f}°（限 {PLACEMENT_MAX_MM:.0f} mm / "
+                  f"{PLACEMENT_MAX_DEG:.1f}°；参考 {reference_name}）")
+            # 边界用 epsilon：浮点算出的 3.500000000000011 不该被判超限
+            if gap_mm > PLACEMENT_MAX_MM + 1e-6 or gap_deg > PLACEMENT_MAX_DEG + 1e-6:
+                print("   请把工件摆回该站位的参考位置附近，再重跑本阶段；"
+                      "或换一个覆盖当前偏转角的站位。")
+                # runner 只取最后一行作为阶段 detail，所以结论放最后并带上数字
+                print(f"→ REFUSED：工件偏离站位参考位置 {gap_mm:.1f} mm / {gap_deg:.2f}°"
+                      f"（限 {PLACEMENT_MAX_MM:.0f} mm / {PLACEMENT_MAX_DEG:.1f}°），"
+                      "精观测会只看到 2 个面")
+                return 7
+            print("→ 摆放位置在容差内")
+
         print("→ 使用该已验证站位（不搜索）")
         return auto_station({"tcp": plan["stored_tcp"], "quat": plan["stored_quat"]},
                             args.execute)
