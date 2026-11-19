@@ -1186,13 +1186,18 @@ class VisionPipelineView(QtWidgets.QWidget):
         self.table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         header = self.table.horizontalHeader()
         header.setStretchLastSection(False)
-        # 输出列是长文本 → Stretch；耗时列固定 90，不再把空白都留给它。
-        for column, width in ((0, 90), (1, 70), (2, 150)):
+        # 2026-11-19：状态列以前固定 70 px 且占位符只有"待"两个字，看起来像被裁掉。
+        # 现在按字体量出最长的状态词，占位符也写成完整词"待执行"。
+        fm = self.table.fontMetrics()
+        status_width = max(fm.horizontalAdvance(text) for text in
+                           ("待执行", "运行中", "通过", "拒绝", "退化", "可疑")) + 24
+        for column, width in ((0, 100), (1, status_width), (2, 170)):
             header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
             self.table.setColumnWidth(column, width)
         header.setSectionResizeMode(3, QtWidgets.QHeaderView.Stretch)
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.Fixed)
-        self.table.setColumnWidth(4, 90)
+        self.table.setColumnWidth(4, 80)
+        # 表头与单元格用同一套对齐，避免"表头居中、数值靠左"看起来错位。
         for column, align in ((0, QtCore.Qt.AlignLeft), (1, QtCore.Qt.AlignLeft),
                               (2, QtCore.Qt.AlignLeft), (3, QtCore.Qt.AlignLeft),
                               (4, QtCore.Qt.AlignRight)):
@@ -1200,12 +1205,14 @@ class VisionPipelineView(QtWidgets.QWidget):
             if item is not None:
                 item.setTextAlignment(align | QtCore.Qt.AlignVCenter)
         self._started: dict[str, float] = {}
+        self._cell_align = {0: QtCore.Qt.AlignLeft, 1: QtCore.Qt.AlignLeft,
+                            2: QtCore.Qt.AlignLeft, 3: QtCore.Qt.AlignLeft,
+                            4: QtCore.Qt.AlignRight}
         for row, (key, label, _in, _out) in enumerate(self.STAGES):
-            self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(label))
-            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem("待"))
-            self.table.setItem(row, 2, QtWidgets.QTableWidgetItem("—"))
-            self.table.setItem(row, 3, QtWidgets.QTableWidgetItem("—"))
-            self.table.setItem(row, 4, QtWidgets.QTableWidgetItem("—"))
+            for column, text in ((0, label), (1, "待执行"), (2, "—"), (3, "—"), (4, "—")):
+                item = QtWidgets.QTableWidgetItem(text)
+                item.setTextAlignment(self._cell_align[column] | QtCore.Qt.AlignVCenter)
+                self.table.setItem(row, column, item)
         self._viewport_width = 0
         self._autosize_rows()
         layout.addWidget(self.table, 1)
@@ -1272,7 +1279,7 @@ class VisionPipelineView(QtWidgets.QWidget):
 
     def reset(self) -> None:
         for row in range(self.table.rowCount()):
-            self.table.item(row, 1).setText("待")
+            self.table.item(row, 1).setText("待执行")
             self.table.item(row, 2).setText("—")
             self.table.item(row, 3).setText("—")
             self.table.item(row, 4).setText("—")
