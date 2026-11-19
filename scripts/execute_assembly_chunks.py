@@ -60,6 +60,54 @@ TRAJECTORY_ERROR_NAMES = {
 # overrides it through this flag, so the default stays the real-robot contract.
 DEFAULT_ACTION = "/arm_controller/follow_joint_trajectory"
 
+# --- 2026-11-19 硬性安全闸（所有者要求：速度与行程不允许任何逾越）-----------------
+# 执行器**不再信任计划文件里的时间戳**：它按这两个上限重新配时/拒绝执行。
+# 2026-11-18 事故：一份关节行程 47.6° 的计划被直接下发，机械臂最终停在"2 倍指令位移"
+# 的位置并越界（J1 128.7°、J6 156.8°），随后驱动失联。此后速度与行程由代码强制。
+MAX_JOINT_SPEED_RAD_S = 0.05     # 单关节速度硬上限 ≈ 2.9 °/s（远低于任何示教/装配需求）
+MAX_JOINT_DELTA_RAD = 0.44       # 单个计划文件里任一关节的行程硬上限 = 25°
+MIN_SEGMENT_SEC = 0.25           # 每段最短时间，避免时间戳过密导致控制器插值抖动
+
+
+def _arm_indices(names: list[str]) -> list[int]:
+    return [j for j, n in enumerate(names) if "finger" not in n]
+
+
+def govern_timestamps(data: dict, time_scale: float) -> tuple[list[float], dict]:
+    """按 MAX_JOINT_SPEED_RAD_S 重新配时：只会更慢，绝不会比计划更快。
+
+    返回 (times, info)。times 已经乘过 time_scale（>=1，只会更慢）。
+    """
+    names = data["joint_names"]
+    points = data["points"]
+    idx = _arm_indices(names)
+    times = [0.0]
+    for i in range(1, len(points)):
+        plan_dt = float(points[i]["t"]) - float(points[i - 1]["t"])
+        dq = max(abs(points[i]["q"][j] - points[i - 1]["q"][j]) for j in idx)
+        needed = dq / MAX_JOINT_SPEED_RAD_S
+        times.append(times[-1] + max(plan_dt, needed, MIN_SEGMENT_SEC))
+    scale = max(1.0, float(time_scale))
+    times = [value * scale for value in times]
+    info = {
+        "plan_duration": float(points[-1]["t"]),
+        "exec_duration": times[-1],
+        "max_speed": max(
+            (max(abs(points[i]["q"][j] - points[i - 1]["q"][j]) for j in idx)
+             / (times[i] - times[i - 1]))
+            for i in range(1, len(times))
+        ) if len(times) > 1 else 0.0,
+    }
+    return times, info
+
+
+def joint_deltas(data: dict) -> dict[str, float]:
+    """每个关节在整个计划里的总行程（弧度）。"""
+    names = data["joint_names"]
+    points = data["points"]
+    return {names[j]: abs(points[-1]["q"][j] - points[0]["q"][j])
+            for j in _arm_indices(names)}
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser without touching ROS.
@@ -103,6 +151,9 @@ def build_parser() -> argparse.ArgumentParser:
                              "and retry (2026-11-03: the reverse-control channel drops "
                              "silently and the arm then ignores accepted goals)")
     parser.add_argument("--no-auto-recover", dest="auto_recover", action="store_false")
+    parser.add_argument("--allow-large-move", action="store_true",
+                        help="允许单关节行程 >25° 的计划（默认拒绝）。加这个参数前必须"
+                             "已打印 6 个关节角并得到所有者明确同意（AGENTS 安全红线）")
     parser.add_argument("--action", default=DEFAULT_ACTION,
                         help="FollowJointTrajectory action name; the real-arm "
                              "controller by default, overridden for simulation "
@@ -330,16 +381,43 @@ def main() -> int:
 
     for index, path in enumerate(files, 1):
         data = json.load(open(path, encoding="utf-8"))
+
+        # --- 2026-11-19 硬闸 1：单关节行程 ---
+        deltas = joint_deltas(data)
+        worst_joint, worst_delta = max(deltas.items(), key=lambda kv: kv[1])
+        if worst_delta > MAX_JOINT_DELTA_RAD and not args.allow_large_move:
+            table = "  ".join(f"{n.replace('_joint','')}={math.degrees(v):.1f}°"
+                              for n, v in deltas.items())
+            print(
+                f"REFUSED_LARGE_MOVE: {path} asks {worst_joint} to travel "
+                f"{math.degrees(worst_delta):.1f}° (> {math.degrees(MAX_JOINT_DELTA_RAD):.0f}° "
+                f"hard limit).  Joint deltas: {table}.  Nothing was sent.  "
+                "Split the plan into smaller segments, or (only after printing the six "
+                "joint angles and getting the owner's explicit consent) pass "
+                "--allow-large-move."
+            )
+            return 13
+
+        # --- 2026-11-19 硬闸 2：速度（不信任计划时间戳，按上限重新配时）---
+        governed, gov = govern_timestamps(data, args.time_scale)
+        print(f"[{index}/{len(files)}] speed governor: plan {gov['plan_duration']:.2f}s -> "
+              f"exec {gov['exec_duration']:.2f}s, max joint speed "
+              f"{gov['max_speed']:.3f} rad/s ({math.degrees(gov['max_speed']):.1f}°/s, "
+              f"cap {MAX_JOINT_SPEED_RAD_S:.3f})")
+        if gov["max_speed"] > MAX_JOINT_SPEED_RAD_S + 1e-6:
+            print(f"REFUSED_SPEED: governed trajectory still exceeds the cap; nothing sent.")
+            return 14
+
         goal = FollowJointTrajectory.Goal()
         goal.trajectory.joint_names = data["joint_names"]
-        for point in data["points"]:
+        for point, stamp in zip(data["points"], governed):
             message = JointTrajectoryPoint()
             message.positions = point["q"]
-            scaled = point["t"] * args.time_scale
             message.time_from_start = Duration(
-                sec=int(scaled), nanosec=int((scaled - int(scaled)) * 1e9)
+                sec=int(stamp), nanosec=int((stamp - int(stamp)) * 1e9)
             )
             goal.trajectory.points.append(message)
+        scaled_total = governed[-1]
         # Slow the final approach instead of splitting the trajectory into
         # chunks: the tail keeps the same geometry (smooth) but has more time, so
         # contact and settling happen at low speed while the path stays single.
@@ -372,10 +450,7 @@ def main() -> int:
             path.position = max(0.15, args.goal_tolerance * 10.0)
             path.velocity = 1.0
             goal.path_tolerance.append(path)
-        scaled_total = (
-            goal.trajectory.points[-1].time_from_start.sec
-            + goal.trajectory.points[-1].time_from_start.nanosec * 1e-9
-        )
+
         # +5 s, not +25: the controller must say "I did not make it" quickly.
         goal.goal_time_tolerance = Duration(sec=int(scaled_total + 5))
 

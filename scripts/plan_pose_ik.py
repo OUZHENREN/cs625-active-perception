@@ -157,6 +157,9 @@ def main() -> int:
     parser.add_argument("--max-joint-delta", type=float, default=2.0)
     parser.add_argument("--max-duration", type=float, default=90.0)
     parser.add_argument("--steps", type=int, default=24)
+    parser.add_argument("--allow-large-move", action="store_true",
+                        help="允许单关节行程 >25°（默认拒绝）。加之前必须已打印 6 个关节角"
+                             "并得到所有者明确同意（2026-11-18 事故后新增强制闸）")
     parser.add_argument("--ik-seeds", type=int, default=12,
                         help="用多少个扰动种子求 IK，取腕部变化最小的解")
     args = parser.parse_args()
@@ -287,6 +290,22 @@ def main() -> int:
     wrist_delta = target_choice[1]
     print(f"IK 解：整臂变化 {target_choice[0]:.2f} rad，腕部变化 {math.degrees(wrist_delta):.1f}°"
           f"（终点构型在绝对安全区间内，且轨迹抽样无接触）")
+
+    # --- 2026-11-19 硬闸：单关节行程 ≤ 25°，否则拒绝写计划 ---
+    # 2026-11-18 事故：47.6° 腕部的计划被下发，机械臂最终停在"2 倍指令位移"的越界姿态。
+    MAX_JOINT_DELTA_RAD = 0.44   # 25°
+    deltas = {name: abs(target[i] - start[i]) for i, name in enumerate(names)}
+    worst_joint, worst_delta = max(deltas.items(), key=lambda kv: kv[1])
+    if worst_delta > MAX_JOINT_DELTA_RAD and not args.allow_large_move:
+        table = "  ".join(f"{n.replace('_joint','')}={math.degrees(v):.1f}°"
+                          for n, v in deltas.items())
+        print(f"REFUSED_LARGE_MOVE: {worst_joint} 需要走 "
+              f"{math.degrees(worst_delta):.1f}°（> 25° 硬上限）。关节行程：{table}")
+        print("  未写出计划。请拆成更小的目标，或在打印上述 6 个关节角并取得所有者"
+              "明确同意后加 --allow-large-move。")
+        return 8
+    print("关节行程：" + "  ".join(
+        f"{n.replace('_joint','')}={math.degrees(v):.1f}°" for n, v in deltas.items()))
 
     points = [{"q": list(start), "t": 0.0}]
     for sample in range(1, args.steps + 1):

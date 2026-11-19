@@ -449,6 +449,31 @@ gate. In particular, do not begin NBV/active-vision/RL/imitation/VLA work while 
 camera, point-cloud, TF and MoveIt input chain is not accepted. Record infrastructure
 blockers at their actual layer instead of attributing downstream symptoms to algorithms.
 
+## Execution safety contract (2026-11-19, owner directive — never bypass)
+
+The owner's standing instruction: **speed, joint travel and workspace limits are enforced by
+code, not by good intentions. No deviation is acceptable.** This exists because on 2026-11-18 a
+47.6 deg wrist reconfiguration was executed, the arm ended at twice the commanded travel
+(J1 128.7 deg, J6 156.8 deg, both outside the safe ranges), the driver then lost contact, and
+the same class of automated motion had already damaged the J4 brake on 2026-11-13.
+
+Hard rules, already implemented in `scripts/execute_assembly_chunks.py` and
+`scripts/plan_pose_ik.py`:
+
+- **The executor never trusts the plan's timestamps.** It re-times every trajectory so no
+  joint exceeds `MAX_JOINT_SPEED_RAD_S = 0.05 rad/s` (~2.9 deg/s), and only ever slows a plan
+  (`time_scale < 1` is refused; the governor applies `max(1.0, time_scale)`).
+- **Single-joint travel is capped at `MAX_JOINT_DELTA_RAD = 0.44 rad` (25 deg) per plan.**
+  A plan that exceeds it is refused (`REFUSED_LARGE_MOVE`) unless the six joint angles have
+  been printed and the owner has explicitly consented (`--allow-large-move`). Large
+  reconfigurations must be split into smaller segments or planned with MoveIt.
+- Before sending anything, print the governed duration, the resulting maximum joint speed and
+  the per-joint travel; a trajectory that still exceeds the cap is refused.
+- The arm's state must be re-verified after any abort before the next command
+  (`ensure_robot_ready.py --force` + a 2 degree probe).
+- Workspace bounds, absolute joint ranges, wrist limits and the "current state is already in
+  contact" check stay mandatory; they are never relaxed to make a plan pass.
+
 ## Prohibited patterns
 
 - Do not use `pkill ros2` or wildcard kills for lifecycle management; stop the launch
