@@ -361,3 +361,75 @@ plan["ranked"] 带上 coverage，面板/日志能看到"为什么选它"
 用这批数据重新填 empirical_coverage（届时每个站位都有实测值，选站判据才真正数据驱动）。
 ```
 
+## 13. 精拍开始：站位 tier、登记工具、0° 实测登记（所有者 2026-11-19 晚）
+
+### 13.1 站位优先级 tier（新拍优先，旧站位兜底）
+
+```text
+所有者定：新拍的那批示教位姿若站得住，就成为首选；现有站位降为第二选择。
+实现（config/tasks/common.yaml + scripts/nbv_views.py）：
+  · 条目可带 tier（1 = 新拍首选；缺省 2 = 现有兜底）与 yaw_deg（新站位与已有角度
+    撞名时用它指定设计偏角，例如 '0@20261119'）；
+  · 排序：tier 升序 → 有实测覆盖率优先 → 覆盖率高优先 → 偏角误差 → stored−derived delta；
+  · 决策日志同时打印 tier、实测覆盖率与候选排序，选站理由可见。
+```
+
+### 13.2 登记工具（不再手写 YAML）
+
+```text
+scripts/add_station_from_measurement.py：
+  读精拍测量 JSON → 校验（verdict=OK、覆盖率 ≥0.95、测得偏角与 --yaw 差 ≤1.5°）
+  → 生成条目（tcp/quat 取当前机器人位姿，reference_measurement 指向该 JSON，
+     写 empirical_coverage / tier / yaw_deg / workpiece_pose）
+  → 默认只打印；--write 写入并回读校验。
+用法（键以负号开头时必须用等号）：
+  python3 scripts/add_station_from_measurement.py \
+      --measurement runtime/measurements/workpiece_at_0_fine.json \
+      --key '0@20261119' --yaw 0.0 --write
+  # 负角：--key=-20@20261120
+```
+
+### 13.3 0° 精拍实录（今天只拍 0°）
+
+```text
+1) 所有者把工件绕**标记角点**转到 0° 并摆好；
+2) 反控端口曾掉线（ESTAB 0 条）→ ensure_robot_ready --force → 恢复 3 条；
+3) 移动到原 0° 站位 (0.63546, 0.32805, 0.46654)：
+   构型同分支 (1,-1,1)，自动分 2 段，ALL_ASSEMBLY_CHUNKS_OK，末态偏差 0.0006 rad；
+4) 粗观测三组位姿不一致（>2 mm，未采纳）→ 直接做无先验精观测：
+   verdict OK，coverage 0.954，3/3 组可信，3–4 个面，扶手 0.87–0.90，
+   重复性 0.30 mm / 0.022°，测得 yaw = 0.0°（与目标一致）；
+5) 登记为 tier-1 站位 '0@20261119'（reference_measurement 指向该次测量）。
+```
+
+### 13.4 选站验证
+
+```text
+当前工件位姿下：
+  选中站位 0@20261119（tier 1，差 0.0°，实测覆盖率 0.954）
+  候选排序：0@20261119(t1,cov 0.954,0.0°) > 0(t2,cov 0.991,0.0°) > +11(t2,cov 0.967,11.0°)
+→ tier 1 正确压过覆盖率更高的旧站位（所有者要的"新拍优先"）。
+→ 摆放检查：工件相对该站位参考位置 0.0 mm / 0.00°，在容差内。
+```
+
+### 13.5 今天没做 / 明天继续
+
+```text
+· 只有 0° 一个新站位；其余角度（+30…−45 每 5°）明天拍；
+· 0° 的 0.954 略低于旧站位历史 0.991，所有者计划"之后进行微调"——微调后重新拍、
+  重新登记（同 key 覆盖即可）；
+· 拍完每个角度后用同一个工具登记，选站判据将逐步完全由实测数据驱动。
+```
+
+### 13.6 验证命令
+
+```bash
+python3 -m pytest test/ -q            # 331 passed
+python3 scripts/add_station_from_measurement.py \
+  --measurement runtime/measurements/workpiece_at_0_fine.json --key '0@20261119' --yaw 0.0   # dry-run
+python3 scripts/nbv_from_reference.py --auto-station \
+  --reference-measurement runtime/measurements/workpiece_zero.json \
+  --current-measurement runtime/measurements/workpiece_at_0_fine.json
+# 预期：选中 0@20261119（tier 1）
+```
+
