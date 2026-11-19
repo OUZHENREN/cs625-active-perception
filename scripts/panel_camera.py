@@ -68,13 +68,17 @@ class CameraWorker(QtCore.QThread):
                              durability=DurabilityPolicy.VOLATILE)
             latest: dict[str, object] = {}
 
+            versions: dict[str, int] = {"color": 0, "depth": 0}
+
             def on_color(msg) -> None:
                 latest["color"] = msg
                 self._last["color"] = time.time()
+                versions["color"] += 1
 
             def on_depth(msg) -> None:
                 latest["depth"] = msg
                 self._last["depth"] = time.time()
+                versions["depth"] += 1
 
             # launch_sensor_adapter:=false 时 /sensors/camera/* 不存在（归一化话题没发布），
             # 所以同时订阅相机原始话题——否则面板永远是"等待图像"。
@@ -88,6 +92,7 @@ class CameraWorker(QtCore.QThread):
                         Image, topic,
                         on_color if kind == "color" else on_depth, qos)
             self.status = "等待图像"
+            last_version: dict[str, int] = {}
             reemit = 0.0
             while not self._stop and rclpy.ok():
                 with SPIN_LOCK:
@@ -104,6 +109,12 @@ class CameraWorker(QtCore.QThread):
                 message = latest.get(source)
                 if message is None:
                     continue
+                # 2026-11-19 修：以前每个 0.1 s 都重新转换**同一帧**，深度图纯 Python
+                # 转换一次要 1–3 s，于是线程永远在转旧帧，界面只能到 0.2–0.5 fps。
+                # 现在只有真的收到新帧才转换。
+                if versions.get(source, 0) == last_version.get(source, -1):
+                    continue
+                last_version[source] = versions[source]
                 image = self._to_qimage(message)
                 if image is not None:
                     self.status = f"{source} {image.width()}×{image.height()}"
@@ -125,20 +136,26 @@ class CameraWorker(QtCore.QThread):
             image = QtGui.QImage(data, width, height, stride, fmt)
             return image.copy()
         if encoding in ("mono16", "16UC1"):      # 深度：毫米，按 0.2–2 m 映射到灰度
+            # 2026-11-19 修：原来是纯 Python 逐像素 setPixel（1280x960 隔行仍要 61 万次
+            # Qt 调用，一次 1–3 s），比 ROS 端查看器慢两个数量级。改成 numpy 向量化，
+            # 与 scripts/camera_view.py 的做法一致。
+            import numpy as np
             stride = message.step or width * 2
-            image = QtGui.QImage(data, width, height, stride, QtGui.QImage.Format_Grayscale16)
-            image = image.copy()
+            raw = np.frombuffer(data, dtype=np.uint8)
+            if stride == width * 2:
+                millimetres = raw.view(np.uint16).reshape(height, width)
+            else:                                 # 行有 padding：按 stride 逐行取
+                millimetres = np.frombuffer(data, dtype=np.uint8).reshape(height, stride)
+                millimetres = millimetres[:, :width * 2].copy().view(np.uint16)
             low, high = 200, 2000
-            result = QtGui.QImage(width, height, QtGui.QImage.Format_RGB888)
-            for y in range(0, height, 2):        # 隔行处理，避免大图拖慢
-                line_in = image.constScanLine(y).asstring(width * 2)
-                values = memoryview(line_in).cast("H")
-                for x in range(width):
-                    depth = values[x]
-                    level = 0 if depth == 0 else max(0, min(255, int(
-                        (depth - low) * 255 / max(1, high - low))))
-                    result.setPixel(x, y, QtGui.qRgb(level, level, level))
-            return result
+            span = max(1, high - low)
+            scaled = ((millimetres.astype(np.int32) - low) * 255 // span)
+            scaled = np.clip(scaled, 0, 255).astype(np.uint8)
+            scaled[millimetres == 0] = 0          # 无效深度保持全黑
+            rgb = np.repeat(scaled[:, :, None], 3, axis=2)
+            result = QtGui.QImage(rgb.data, width, height, width * 3,
+                                  QtGui.QImage.Format_RGB888)
+            return result.copy()
         if encoding in ("mono8", "8UC1"):
             stride = message.step or width
             image = QtGui.QImage(data, width, height, stride, QtGui.QImage.Format_Grayscale8)
