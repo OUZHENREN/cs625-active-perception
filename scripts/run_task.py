@@ -437,6 +437,8 @@ def main() -> int:
         else:
             print("experiment recorder: script missing, run will not be recorded")
 
+    # finally 里要用到 recorder 的归档结果；提前初始化，避免"机器人未就绪就返回"时 KeyError
+    summary["recorder"] = {"started": recorder_started, "archived": None}
     try:
         for index, step in enumerate(steps):
             if index > 0 and args.handover == "confirm":
@@ -484,7 +486,6 @@ def main() -> int:
 
         elapsed = sum(item.get("seconds", 0) for item in summary["steps"])
         print(f"\nall steps finished in {elapsed:.1f} s")
-        summary["recorder"] = {"started": recorder_started, "archived": None}
         _write_summary(summary, args.summary)
         if RESUME_STATE.exists():
             RESUME_STATE.unlink()      # 跑完了，续跑点作废

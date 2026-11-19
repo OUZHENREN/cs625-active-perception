@@ -76,3 +76,36 @@ def test_a_small_move_stays_one_chunk():
     plan = make_plan([0, -60, -150, 0, 100, 80], [10, -60, -150, 0, 100, 80])
     chunks = executor.split_plan(plan, executor.MAX_JOINT_DELTA_RAD)
     assert len(chunks) == 1
+
+
+def test_plan_jobs_reads_glob_strings_and_splits(tmp_path):
+    """glob.glob 返回字符串；plan_jobs 必须能读，并自动分段。
+
+    2026-11-19 真机踩过：分段改动把 read_text 用在了字符串上，执行器第一步就崩，
+    机械臂一步都没动（好在这类失败不会发出任何轨迹）。
+    """
+    plan = make_plan([0, -60, -150, 0, 100, 80], [40, -60, -150, 0, 64, 80])
+    path = tmp_path / "plan.json"
+    path.write_text(__import__("json").dumps(plan), encoding="utf-8")
+
+    jobs, refused = executor.plan_jobs([str(path)])        # 故意传字符串，模拟 glob
+    assert refused is None
+    assert len(jobs) >= 2
+    assert jobs[0][0].startswith("plan.json#1/")
+
+
+def test_plan_jobs_refuses_when_auto_split_is_disabled(tmp_path):
+    plan = make_plan([0, -60, -150, 0, 100, 80], [40, -60, -150, 0, 64, 80])
+    path = tmp_path / "plan.json"
+    path.write_text(__import__("json").dumps(plan), encoding="utf-8")
+    jobs, refused = executor.plan_jobs([str(path)], no_auto_split=True)
+    assert refused == 13
+    assert jobs == []
+
+
+def test_plan_jobs_keeps_a_small_plan_as_one_job(tmp_path):
+    plan = make_plan([0, -60, -150, 0, 100, 80], [10, -60, -150, 0, 100, 80])
+    path = tmp_path / "plan.json"
+    path.write_text(__import__("json").dumps(plan), encoding="utf-8")
+    jobs, refused = executor.plan_jobs([str(path)])
+    assert refused is None and len(jobs) == 1

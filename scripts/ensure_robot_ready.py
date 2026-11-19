@@ -29,7 +29,7 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 
 
-def read_modes(node: Node, timeout: float = 2.0) -> tuple[int | None, int | None]:
+def read_modes(node: Node, timeout: float = 8.0) -> tuple[int | None, int | None]:
     seen: dict = {}
     qos = QoSProfile(depth=1, history=HistoryPolicy.KEEP_LAST,
                      reliability=ReliabilityPolicy.RELIABLE,
@@ -38,9 +38,15 @@ def read_modes(node: Node, timeout: float = 2.0) -> tuple[int | None, int | None
                              lambda m: seen.__setitem__("s", m.mode), qos)
     node.create_subscription(RobotMode, "/io_and_status_controller/robot_mode",
                              lambda m: seen.__setitem__("r", m.mode), qos)
+    # 2026-11-19：节点多时 DDS 发现可能超过 2 s，读到 (None, None) 会被误判成
+    # "安全模式不是 NORMAL"，把本来正常的机器人挡在门外。默认 8 s，且不足两条就再等。
     deadline = time.time() + timeout
     while time.time() < deadline and len(seen) < 2:
         rclpy.spin_once(node, timeout_sec=0.1)
+    if len(seen) < 2:
+        deadline = time.time() + 5.0
+        while time.time() < deadline and len(seen) < 2:
+            rclpy.spin_once(node, timeout_sec=0.1)
     return seen.get("s"), seen.get("r")
 
 

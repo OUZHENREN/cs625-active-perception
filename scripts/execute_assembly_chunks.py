@@ -141,6 +141,42 @@ def split_plan(data: dict, max_delta_rad: float) -> list[dict]:
     return chunks
 
 
+def plan_jobs(files, allow_large_move: bool = False,
+              no_auto_split: bool = False) -> tuple[list[tuple[str, dict]], int | None]:
+    """读入计划文件并按需要自动分段。
+
+    返回 (jobs, refused)。refused 非 None 时需要直接返回该退出码（用于 --no-auto-split）。
+    glob.glob 返回的是**字符串**，这里统一转成 Path（2026-11-19 真机踩过：字符串没有
+    read_text，导致执行器在第一步就崩、机械臂一步都没动）。
+    """
+    jobs: list[tuple[str, dict]] = []
+    for raw_path in files:
+        path = pathlib.Path(raw_path)
+        data = json.loads(path.read_text(encoding="utf-8"))
+        deltas = joint_deltas(data)
+        worst_joint, worst_delta = max(deltas.items(), key=lambda kv: kv[1])
+        if worst_delta <= MAX_JOINT_DELTA_RAD + 1e-9 or allow_large_move:
+            jobs.append((str(path), data))
+            continue
+        if no_auto_split:
+            table = "  ".join(f"{n.replace('_joint','')}={math.degrees(v):.1f}°"
+                              for n, v in deltas.items())
+            print(
+                f"REFUSED_LARGE_MOVE: {path.name} asks {worst_joint} to travel "
+                f"{math.degrees(worst_delta):.1f}° (> {math.degrees(MAX_JOINT_DELTA_RAD):.0f}° "
+                f"hard limit) and --no-auto-split was given.  Joint deltas: {table}.  "
+                "Nothing was sent."
+            )
+            return jobs, 13
+        chunks = split_plan(data, MAX_JOINT_DELTA_RAD)
+        print(f"[{path.name}] 单关节行程 {math.degrees(worst_delta):.1f}° > "
+              f"{math.degrees(MAX_JOINT_DELTA_RAD):.0f}°，**自动分 {len(chunks)} 段**执行"
+              f"（每段 ≤{math.degrees(MAX_JOINT_DELTA_RAD):.0f}°）")
+        for part, chunk in enumerate(chunks, 1):
+            jobs.append((f"{path.name}#{part}/{len(chunks)}", chunk))
+    return jobs, None
+
+
 def joint_deltas(data: dict) -> dict[str, float]:
     """每个关节在整个计划里的总行程（弧度）。"""
     names = data["joint_names"]
@@ -422,31 +458,10 @@ def main() -> int:
                 f"robot_mode={robot}({ROBOT_MODE_NAMES.get(robot, '?')})")
 
     # --- 2026-11-19 硬闸 1：单关节行程（超限自动分段，不再让人手工拆）---
-    jobs: list[tuple[str, dict]] = []
-    for path in files:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        deltas = joint_deltas(data)
-        worst_joint, worst_delta = max(deltas.items(), key=lambda kv: kv[1])
-        needs_split = worst_delta > MAX_JOINT_DELTA_RAD + 1e-9
-        if not needs_split or args.allow_large_move:
-            jobs.append((str(path), data))
-            continue
-        if args.no_auto_split:
-            table = "  ".join(f"{n.replace('_joint','')}={math.degrees(v):.1f}°"
-                              for n, v in deltas.items())
-            print(
-                f"REFUSED_LARGE_MOVE: {path.name} asks {worst_joint} to travel "
-                f"{math.degrees(worst_delta):.1f}° (> {math.degrees(MAX_JOINT_DELTA_RAD):.0f}° "
-                f"hard limit) and --no-auto-split was given.  Joint deltas: {table}.  "
-                "Nothing was sent."
-            )
-            return 13
-        chunks = split_plan(data, MAX_JOINT_DELTA_RAD)
-        print(f"[{path.name}] 单关节行程 {math.degrees(worst_delta):.1f}° > "
-              f"{math.degrees(MAX_JOINT_DELTA_RAD):.0f}°，**自动分 {len(chunks)} 段**执行"
-              f"（每段 ≤{math.degrees(MAX_JOINT_DELTA_RAD):.0f}°）")
-        for part, chunk in enumerate(chunks, 1):
-            jobs.append((f"{path.name}#{part}/{len(chunks)}", chunk))
+    jobs, refused = plan_jobs(files, allow_large_move=args.allow_large_move,
+                              no_auto_split=args.no_auto_split)
+    if refused is not None:
+        return refused
 
     for index, (path, data) in enumerate(jobs, 1):
         # --- 2026-11-19 硬闸 2：速度（不信任计划时间戳，按上限重新配时）---

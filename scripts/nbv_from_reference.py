@@ -160,7 +160,11 @@ def auto_station(target_pose: dict, execute: bool) -> int:
          "--output", str(STATION_PLAN)],
         capture_output=True, text=True, timeout=900)
     tail = (plan.stdout or "").strip().splitlines()
-    print("   换位规划:", tail[-1] if tail else f"(exit {plan.returncode})")
+    # 2026-11-19：以前只打最后一行，"构型分支/关节行程/自动分段"这些关键信息全被吞掉，
+    # 面板日志里看不到。现在把规划器的有信息量的行原样转发（前缀缩进保持层级）。
+    for line in tail:
+        if line.strip():
+            print("   " + line.strip())
     if plan.returncode != 0:
         # 越界(7) / 当前状态已接触(6) / IK 无解(5) / 轨迹接触或越界(4) / 超时长(2)
         # 一律视为"无法安全换位"，不做自动换位，继续原地精测（安全第一）。
@@ -172,9 +176,14 @@ def auto_station(target_pose: dict, execute: bool) -> int:
          "--time-scale", "3.0", "--goal-tolerance", "0.001",
          "--verify-final", "0.004", "--fault-poll", "0.1"],
         capture_output=True, text=True, timeout=600)
+    run_tail = (run.stdout or "").strip().splitlines()
+    # 执行器会打印"自动分 N 段""speed governor"等关键信息，必须转发到面板日志
+    for line in run_tail:
+        if line.strip() and ("自动分" in line or "speed governor" in line
+                             or "ALL_ASSEMBLY_CHUNKS_OK" in line):
+            print("   " + line.strip())
     if "ALL_ASSEMBLY_CHUNKS_OK" not in (run.stdout or ""):
-        rtail = (run.stdout or "").strip().splitlines()
-        print("   换位执行失败:", rtail[-1] if rtail else f"(exit {run.returncode})")
+        print("   换位执行失败:", run_tail[-1] if run_tail else f"(exit {run.returncode})")
         return 4
     verify = subprocess.run([sys.executable, str(REPO / "scripts" / "check_state_ok.py")],
                             capture_output=True, text=True, timeout=120)
