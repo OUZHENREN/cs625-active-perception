@@ -95,6 +95,33 @@ def publish_stage(node, stage: str, payload: dict) -> None:
         pass
 
 
+def row_is_credible(row: dict, coarse_stage: bool) -> bool:
+    """一组测量是否可信。
+
+    精观测：位姿有效 + 对称解可用 + **没有"缺一轴"**（2026-11-19）。
+    粗观测：只看覆盖率（扶手判据在粗观测不适用）。
+    """
+    check = row.get("symmetry_check") or {}
+    if coarse_stage:
+        return float(row.get("pose_fitness", 0.0)) >= 0.70
+    if row.get("unconstrained_axis_obj") is not None:
+        return False
+    return bool(row.get("pose_valid", True)) and bool(check.get("valid", True))
+
+
+def row_degenerate_reason(row: dict) -> str:
+    """说清楚一组为什么不可信（不要再把所有情况都叫"退化"）。"""
+    axis = row.get("unconstrained_axis_obj")
+    if axis is not None:
+        return f"缺一轴（沿对象轴 {axis} 无观测约束，需换视角）"
+    check = row.get("symmetry_check") or {}
+    if not check.get("valid", True):
+        return f"对称性判据不过（扶手 {check.get('handle_score')} < 0.5）"
+    if not row.get("pose_valid", True):
+        return "位姿置信不足"
+    return "退化"
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -305,15 +332,7 @@ def main() -> int:
     # 只统计"可信组"：位姿有效 + 对称解未判不可用。
     # 退化组（例如只有两个可见面）的解本身是错的，若把它算进重复性，
     # 会把一次本来合格的测量判成不合格（实测：3 组正解 0.1°，1 组退化把重复性拉到 3.9°）。
-    def credible(row) -> bool:
-        check = row.get("symmetry_check") or {}
-        if coarse_stage:
-            # 粗观测只要求"位姿大致可信"：覆盖率够、没有离谱的退化即可，
-            # 扶手判据（需要扶手清晰可见）在这里不作硬性要求。
-            return float(row.get("pose_fitness", 0.0)) >= 0.70
-        return bool(row.get("pose_valid", True)) and bool(check.get("valid", True))
-
-    credible_rows = [row for row in good if credible(row)]
+    credible_rows = [row for row in good if row_is_credible(row, coarse_stage)]
     dropped = len(good) - len(credible_rows)
     # 粗观测两组即可；精观测优先三组，但【两组若能高度一致（≤1 mm / ≤0.5°）】也接受——
     # 2026-11-13 实测：某些视角下会出现一组异常解，剩下两组差 0.1 mm / 0.039°，
@@ -334,8 +353,10 @@ def main() -> int:
         return subprocess.run(retry, check=False).returncode
 
     if len(credible_rows) < min_credible:
-        summary_reason = (f"可信组只有 {len(credible_rows)} 组（需要 ≥{min_credible}），"
-                          f"其余 {dropped} 组退化")
+        reasons = sorted({row_degenerate_reason(row) for row in good
+                          if not row_is_credible(row, coarse_stage)})
+        summary_reason = (f"可信组只有 {len(credible_rows)} 组（需要 ≥{min_credible}）；"
+                          f"其余 {dropped} 组：{'；'.join(reasons) if reasons else '退化'}")
         print(summary_reason, file=sys.stderr)
         if stage_node is not None:
             publish_stage(stage_node, "gate", {

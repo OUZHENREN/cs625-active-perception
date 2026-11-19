@@ -721,6 +721,12 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
         if init is None:
             result["error"] = "全局配准（FPFH+RANSAC）失败"
             return result
+        # 2026-11-19 修正（11-18 精观测失败的软件根因之一）：
+        # 剔点是为了几何拟合，**不能**用来判断"扶手是否可见"。两平面回退的初值可能偏
+        # 180°（正方形截面的镜像分支），用它 reject_with_pose 会删掉 84% 的扶手点；
+        # 随后在同一份被删空的云上算扶手分，就得到 0.18 的假阴性。这里保留原始云，
+        # 对称性判别（solve_pose_multistart）一律用原始云。
+        points_original = points
         refined = multiscale_icp(cad_points, points, init)
         for _ in range(2):                     # 与三平面路径一致：剔点后重跑，覆盖率按剩下的点算
             kept = reject_with_pose(points, refined, cad_points)
@@ -735,7 +741,8 @@ def analyse_group(directory: pathlib.Path, template: tuple | None = None,
             refined = multiscale_icp(cad_points, kept, init_k)
             points = kept
         if cad_points is not None and template is not None:
-            solved = solve_pose_multistart(points, cad_points, [refined], template[0], template[1],
+            solved = solve_pose_multistart(points_original, cad_points, [refined],
+                                           template[0], template[1],
                                            feature_region=feature_region,
                                            use_feature=use_feature)
             refined = solved["matrix"]
