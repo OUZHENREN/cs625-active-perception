@@ -115,6 +115,25 @@ def _wrap_deg(angle: float) -> float:
     return (angle + _m.pi) % (2 * _m.pi) - _m.pi
 
 
+# 构型标志（所有者 2026-11-19）：肩 / 肘 / 腕三个"分支"标志。
+#   · shoulder_pan 的符号 → 肩在左 / 右
+#   · elbow 的符号        → 肘上 / 肘下
+#   · wrist_2 的符号      → 腕翻转 / 不翻转
+# 同一个 TCP 位姿通常有 8 组 IK 解（2×2×2 分支），它们末端位置一样但整条手臂的构型不同。
+# 跨分支切换会让手臂在关节空间里大幅重排（可能撞、也可能让相机姿态跳变），
+# 所以选解时必须**优先同一分支**，同分支内再取关节变化最小的。
+SIGNATURE_JOINTS = ("shoulder_pan_joint", "elbow_joint", "wrist_2_joint")
+
+
+def configuration_signature(degrees_by_name: dict) -> tuple[int, int, int]:
+    """返回 (肩, 肘, 腕) 的符号三元组；0 表示该关节基本在零位。"""
+    signature = []
+    for name in SIGNATURE_JOINTS:
+        value = float(degrees_by_name.get(name, 0.0))
+        signature.append(0 if abs(value) < 1e-9 else (1 if value > 0 else -1))
+    return tuple(signature)
+
+
 def acceptable(candidate: list[float], names=None) -> bool:
     """判断一个关节构型是否可以接受。
 
@@ -203,8 +222,10 @@ def main() -> int:
         "wrist_3_joint": (-150.0, 150.0),
     }
 
-    # 同一个位姿有多组 IK 解；按"腕部变化最小"挑一个，避免为了视角把腕子拧过去。
+    # 同一个位姿有多组 IK 解；按"构型分支 + 腕部变化最小"挑一个。
     # 只用当前构型做种子通常会给出腕部变化最大的那个解，所以这里扰动种子多试几次。
+    start_signature = configuration_signature(
+        {name: math.degrees(start[i]) for i, name in enumerate(names)})
     candidates_pool = []
     rng = np.random.default_rng(7)
     for attempt in range(args.ik_seeds):
@@ -236,8 +257,13 @@ def main() -> int:
             continue
         arm_delta = sum(abs(candidate[i] - start[i]) for i in range(len(names)))
         wrist_delta = max(abs(candidate[i] - start[i]) for i in wrist_idx)
-        candidates_pool.append((arm_delta, wrist_delta, candidate))
-    candidates_pool.sort(key=lambda item: (item[0], item[1]))
+        signature = configuration_signature(
+            {name: math.degrees(candidate[i]) for i, name in enumerate(names)})
+        same_branch = 0 if signature == start_signature else 1
+        candidates_pool.append((same_branch, arm_delta, wrist_delta, candidate,
+                                signature))
+    # 先同分支、再整臂变化、最后腕部变化（所有者 2026-11-19：构型连续性优先）
+    candidates_pool.sort(key=lambda item: (item[0], item[1], item[2]))
     if not candidates_pool:
         print("IK_FAILED 所有种子都无解（或被安全区间拒绝）")
         return 5
@@ -273,39 +299,42 @@ def main() -> int:
                 return False, f"point {index} 接触 {pairs}"
         return True, ""
 
-    for arm_delta, wrist_delta, candidate in candidates_pool:
+    for same_branch, arm_delta, wrist_delta, candidate, signature in candidates_pool:
         if not acceptable(candidate, names):
             continue
         ok, reason = trajectory_ok(candidate)
         if not ok:
             print(f"  候选（整臂 {arm_delta:.2f} rad）被拒：{reason}")
             continue
-        target_choice = (arm_delta, wrist_delta, candidate)
+        target_choice = (same_branch, arm_delta, wrist_delta, candidate, signature)
         break
     if target_choice is None:
         print("code 4 所有 IK 候选轨迹都有接触或超出安全区间（拒绝）")
         return 4
 
-    target = target_choice[2]
-    wrist_delta = target_choice[1]
-    print(f"IK 解：整臂变化 {target_choice[0]:.2f} rad，腕部变化 {math.degrees(wrist_delta):.1f}°"
+    same_branch = target_choice[0]
+    target = target_choice[3]
+    wrist_delta = target_choice[2]
+    print(f"IK 解：整臂变化 {target_choice[1]:.2f} rad，腕部变化 {math.degrees(wrist_delta):.1f}°"
           f"（终点构型在绝对安全区间内，且轨迹抽样无接触）")
+    print(f"构型分支：当前 {start_signature}（肩/肘/腕符号）→ 目标 {target_choice[4]}"
+          + ("（同分支，连续）" if same_branch == 0 else
+             "（**跨分支**：该位姿在当前分支内无解，已按最小变化选最近分支）"))
 
-    # --- 2026-11-19 硬闸：单关节行程 ≤ 25°，否则拒绝写计划 ---
-    # 2026-11-18 事故：47.6° 腕部的计划被下发，机械臂最终停在"2 倍指令位移"的越界姿态。
+    # --- 2026-11-19：单关节行程硬闸（≥25°）由**执行器自动分段**处理 ---
+    # 2026-11-18 事故：47.6° 腕部的计划被一次性下发，机械臂停在"2 倍指令位移"的越界姿态。
+    # 现在执行器会把超限计划切成每段 ≤25° 依次执行（所有者 2026-11-19：不要让人手工拆），
+    # 这里只负责把行程打出来，让操作者提前知道会被分成几段。
     MAX_JOINT_DELTA_RAD = 0.44   # 25°
     deltas = {name: abs(target[i] - start[i]) for i, name in enumerate(names)}
     worst_joint, worst_delta = max(deltas.items(), key=lambda kv: kv[1])
-    if worst_delta > MAX_JOINT_DELTA_RAD and not args.allow_large_move:
-        table = "  ".join(f"{n.replace('_joint','')}={math.degrees(v):.1f}°"
-                          for n, v in deltas.items())
-        print(f"REFUSED_LARGE_MOVE: {worst_joint} 需要走 "
-              f"{math.degrees(worst_delta):.1f}°（> 25° 硬上限）。关节行程：{table}")
-        print("  未写出计划。请拆成更小的目标，或在打印上述 6 个关节角并取得所有者"
-              "明确同意后加 --allow-large-move。")
-        return 8
     print("关节行程：" + "  ".join(
         f"{n.replace('_joint','')}={math.degrees(v):.1f}°" for n, v in deltas.items()))
+    if worst_delta > MAX_JOINT_DELTA_RAD:
+        chunks = int(math.ceil(worst_delta / MAX_JOINT_DELTA_RAD))
+        print(f"  注意：{worst_joint} 需要走 {math.degrees(worst_delta):.1f}° > "
+              f"{math.degrees(MAX_JOINT_DELTA_RAD):.0f}°，执行时会被**自动分段**"
+              f"（约 {chunks} 段，每段 ≤{math.degrees(MAX_JOINT_DELTA_RAD):.0f}°）")
 
     points = [{"q": list(start), "t": 0.0}]
     for sample in range(1, args.steps + 1):

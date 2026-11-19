@@ -101,6 +101,46 @@ def govern_timestamps(data: dict, time_scale: float) -> tuple[list[float], dict]
     return times, info
 
 
+def split_plan(data: dict, max_delta_rad: float) -> list[dict]:
+    """把超出行程上限的计划切成若干段，每段任一关节的累计行程 ≤ max_delta_rad。
+
+    所有者 2026-11-19：超过 25° 硬闸、但终点仍在绝对角度区间内时，程序应自己分段执行，
+    不该让人手工拆。做法：先把关节空间折线加密（每步 ≤ 半个上限），再贪心切段；
+    相邻段共享边界点，因此拼起来与原轨迹完全重合（关节线性插值等分，几何一致）。
+    """
+    names = data["joint_names"]
+    points = data["points"]
+    idx = _arm_indices(names)
+    if len(points) < 2:
+        return [data]
+    half = max_delta_rad * 0.5
+    dense = [{"q": list(points[0]["q"]), "t": float(points[0]["t"])}]
+    for prev, cur in zip(points, points[1:]):
+        span = max(abs(cur["q"][j] - prev["q"][j]) for j in idx)
+        steps = max(1, int(math.ceil(span / half)))
+        for step in range(1, steps + 1):
+            alpha = step / steps
+            q = [prev["q"][i] + (cur["q"][i] - prev["q"][i]) * alpha
+                 for i in range(len(prev["q"]))]
+            dense.append({"q": q,
+                          "t": float(prev["t"]) + (float(cur["t"]) - float(prev["t"])) * alpha})
+    chunks = []
+    start = 0
+    while start < len(dense) - 1:
+        base = dense[start]["q"]
+        end = start + 1
+        while end + 1 < len(dense):
+            if max(abs(dense[end + 1]["q"][j] - base[j]) for j in idx) > max_delta_rad:
+                break
+            end += 1
+        chunk_points = [{"q": list(dense[k]["q"]),
+                         "t": float(dense[k]["t"]) - float(dense[start]["t"])}
+                        for k in range(start, end + 1)]
+        chunks.append({"joint_names": names, "points": chunk_points})
+        start = end
+    return chunks
+
+
 def joint_deltas(data: dict) -> dict[str, float]:
     """每个关节在整个计划里的总行程（弧度）。"""
     names = data["joint_names"]
@@ -152,8 +192,10 @@ def build_parser() -> argparse.ArgumentParser:
                              "silently and the arm then ignores accepted goals)")
     parser.add_argument("--no-auto-recover", dest="auto_recover", action="store_false")
     parser.add_argument("--allow-large-move", action="store_true",
-                        help="允许单关节行程 >25° 的计划（默认拒绝）。加这个参数前必须"
-                             "已打印 6 个关节角并得到所有者明确同意（AGENTS 安全红线）")
+                        help="不自动分段，直接一次性下发（默认会自动分段）。加这个参数前"
+                             "必须已打印 6 个关节角并得到所有者明确同意（AGENTS 安全红线）")
+    parser.add_argument("--no-auto-split", action="store_true",
+                        help="超过 25° 行程时拒绝而不是自动分段（默认分段，见 split_plan）")
     parser.add_argument("--action", default=DEFAULT_ACTION,
                         help="FollowJointTrajectory action name; the real-arm "
                              "controller by default, overridden for simulation "
@@ -379,28 +421,37 @@ def main() -> int:
         return (f"safety_mode={safety}({SAFETY_MODE_NAMES.get(safety, '?')}) "
                 f"robot_mode={robot}({ROBOT_MODE_NAMES.get(robot, '?')})")
 
-    for index, path in enumerate(files, 1):
-        data = json.load(open(path, encoding="utf-8"))
-
-        # --- 2026-11-19 硬闸 1：单关节行程 ---
+    # --- 2026-11-19 硬闸 1：单关节行程（超限自动分段，不再让人手工拆）---
+    jobs: list[tuple[str, dict]] = []
+    for path in files:
+        data = json.loads(path.read_text(encoding="utf-8"))
         deltas = joint_deltas(data)
         worst_joint, worst_delta = max(deltas.items(), key=lambda kv: kv[1])
-        if worst_delta > MAX_JOINT_DELTA_RAD and not args.allow_large_move:
+        needs_split = worst_delta > MAX_JOINT_DELTA_RAD + 1e-9
+        if not needs_split or args.allow_large_move:
+            jobs.append((str(path), data))
+            continue
+        if args.no_auto_split:
             table = "  ".join(f"{n.replace('_joint','')}={math.degrees(v):.1f}°"
                               for n, v in deltas.items())
             print(
-                f"REFUSED_LARGE_MOVE: {path} asks {worst_joint} to travel "
+                f"REFUSED_LARGE_MOVE: {path.name} asks {worst_joint} to travel "
                 f"{math.degrees(worst_delta):.1f}° (> {math.degrees(MAX_JOINT_DELTA_RAD):.0f}° "
-                f"hard limit).  Joint deltas: {table}.  Nothing was sent.  "
-                "Split the plan into smaller segments, or (only after printing the six "
-                "joint angles and getting the owner's explicit consent) pass "
-                "--allow-large-move."
+                f"hard limit) and --no-auto-split was given.  Joint deltas: {table}.  "
+                "Nothing was sent."
             )
             return 13
+        chunks = split_plan(data, MAX_JOINT_DELTA_RAD)
+        print(f"[{path.name}] 单关节行程 {math.degrees(worst_delta):.1f}° > "
+              f"{math.degrees(MAX_JOINT_DELTA_RAD):.0f}°，**自动分 {len(chunks)} 段**执行"
+              f"（每段 ≤{math.degrees(MAX_JOINT_DELTA_RAD):.0f}°）")
+        for part, chunk in enumerate(chunks, 1):
+            jobs.append((f"{path.name}#{part}/{len(chunks)}", chunk))
 
+    for index, (path, data) in enumerate(jobs, 1):
         # --- 2026-11-19 硬闸 2：速度（不信任计划时间戳，按上限重新配时）---
         governed, gov = govern_timestamps(data, args.time_scale)
-        print(f"[{index}/{len(files)}] speed governor: plan {gov['plan_duration']:.2f}s -> "
+        print(f"[{index}/{len(jobs)}] speed governor: plan {gov['plan_duration']:.2f}s -> "
               f"exec {gov['exec_duration']:.2f}s, max joint speed "
               f"{gov['max_speed']:.3f} rad/s ({math.degrees(gov['max_speed']):.1f}°/s, "
               f"cap {MAX_JOINT_SPEED_RAD_S:.3f})")
@@ -445,11 +496,11 @@ def main() -> int:
             tolerance.velocity = max(0.05, args.goal_tolerance * 5.0)
             goal.goal_tolerance.append(tolerance)
 
-            path = JointTolerance()
-            path.name = name
-            path.position = max(0.15, args.goal_tolerance * 10.0)
-            path.velocity = 1.0
-            goal.path_tolerance.append(path)
+            path_tolerance = JointTolerance()
+            path_tolerance.name = name
+            path_tolerance.position = max(0.15, args.goal_tolerance * 10.0)
+            path_tolerance.velocity = 1.0
+            goal.path_tolerance.append(path_tolerance)
 
         # +5 s, not +25: the controller must say "I did not make it" quickly.
         goal.goal_time_tolerance = Duration(sec=int(scaled_total + 5))
@@ -480,7 +531,7 @@ def main() -> int:
                 f"re-check before moving again.  robot_status={status}"
             )
             return 11
-        print(f"[{index}/{len(files)}] start {path} time_scale={args.time_scale} "
+        print(f"[{index}/{len(jobs)}] start {path} time_scale={args.time_scale} "
               f"effort_peak={peak:.2f}")
         future = client.send_goal_async(goal)
         rclpy.spin_until_future_complete(node, future, timeout_sec=10)
@@ -575,7 +626,7 @@ def main() -> int:
             return 5
         result = result_future.result()
         print(
-            f"[{index}/{len(files)}] status={result.status} "
+            f"[{index}/{len(jobs)}] status={result.status} "
             f"error={result.result.error_code}"
             f"({TRAJECTORY_ERROR_NAMES.get(result.result.error_code, '?')})"
         )
