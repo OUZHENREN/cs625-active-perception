@@ -264,3 +264,38 @@ def test_a_station_without_coverage_loses_to_one_with_it(world):
     plan = nbv_views.station_plan(tuned, ref_pose, pose(yaw_deg=-28.0), T_tcp_cam)
     # −30 偏转角最近且有实测 → 选中
     assert plan["station"][1] == "-30"
+
+
+def test_tier_one_beats_tier_two_even_with_worse_numbers(world):
+    """2026-11-19 所有者：新拍的那批首选，现有站位只作兜底。"""
+    ref_pose, T_tcp_cam, views = world
+    tuned = dict(views)
+    legacy = dict(tuned["-16"])
+    legacy["empirical_coverage"] = 0.98          # 旧站位覆盖率更高
+    tuned["-16"] = legacy
+    fresh = dict(tuned["-23"])
+    fresh["tier"] = 1                            # 新拍站位，覆盖率略低
+    fresh["empirical_coverage"] = 0.96
+    tuned["-23"] = fresh
+    plan = nbv_views.station_plan(tuned, ref_pose, pose(yaw_deg=-19.5), T_tcp_cam)
+    assert plan["station"][1] == "-23"           # tier 1 优先
+    assert plan["ranked"][0]["tier"] == 1
+
+
+def test_a_new_station_may_use_a_non_numeric_key_with_yaw_deg(world):
+    """新拍站位可能与已有角度撞名，所以允许 key 不是数字、用 yaw_deg 指定偏角。"""
+    ref_pose, T_tcp_cam, views = world
+    tuned = dict(views)
+    fresh = dict(tuned["-16"])
+    fresh["yaw_deg"] = -16.0
+    fresh["tier"] = 1
+    fresh["empirical_coverage"] = 0.97
+    tuned["-16@20261120"] = fresh
+    plan = nbv_views.station_plan(tuned, ref_pose, pose(yaw_deg=-16.0), T_tcp_cam)
+    assert plan["station"][1] == "-16@20261120"
+
+
+def test_entries_without_tier_default_to_two(world):
+    ref_pose, T_tcp_cam, views = world
+    plan = nbv_views.station_plan(views, ref_pose, pose(yaw_deg=-20.0), T_tcp_cam)
+    assert all(item["tier"] == 2 for item in plan["ranked"])

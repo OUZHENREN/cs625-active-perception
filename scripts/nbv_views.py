@@ -250,10 +250,15 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
     for key, entry in views.items():
         if not isinstance(entry, dict) or "tcp" not in entry:
             continue
-        try:
-            angle = float(key)
-        except ValueError:
-            continue
+        # 设计偏角：优先读 entry.yaw_deg（新拍站位可能与已有角度撞名，如 '+30@20261120'），
+        # 没有该字段时退回解析 key。
+        if entry.get("yaw_deg") is not None:
+            angle = float(entry["yaw_deg"])
+        else:
+            try:
+                angle = float(key)
+            except ValueError:
+                continue
         error = abs(angle - yaw)
         if nearest is None or error < nearest[0]:
             nearest = (error, key)
@@ -280,6 +285,8 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
             "family": entry.get("family", "relative_zero"),
             "coverage": (float(entry["empirical_coverage"])
                          if entry.get("empirical_coverage") is not None else None),
+            # 优先级：tier 1 = 新拍的首选站位；缺省 tier 2 = 现有站位（兜底）
+            "tier": int(entry.get("tier", 2)),
         })
     # 选站判据（2026-11-19 所有者定，实测数据驱动）：
     #   **主判据 = 该站位实测的 ICP 覆盖率（empirical_coverage）**，偏转角只是过滤条件。
@@ -288,9 +295,12 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
     #   没有实测覆盖率的站位（如 −23）排在有数据的后面，按偏转角误差兜底。
     def rank_key(item):
         coverage = item["coverage"]
-        if coverage is None:
-            return (1, 0.0, item["error_deg"], item["delta_mm"])
-        return (0, -float(coverage), item["error_deg"], item["delta_mm"])
+        has_coverage = 0 if coverage is not None else 1
+        return (item["tier"],            # ① 新拍的首选站位优先，现有站位兜底
+                has_coverage,            # ② 有实测覆盖率的优先
+                -float(coverage) if coverage is not None else 0.0,   # ③ 覆盖率高的优先
+                item["error_deg"],       # ④ 偏转角误差小的
+                item["delta_mm"])        # ⑤ 与当前工件匹配度高的
 
     candidates.sort(key=rank_key)
     best = None
@@ -304,7 +314,7 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
         "skipped_unvalidated": [(key, round(error, 2))
                                 for key, error in skipped_unvalidated],
         "ranked": [{k: item[k] for k in ("key", "error_deg", "delta_mm", "coverage",
-                                          "gap_mm", "gap_deg", "placement_ok")}
+                                          "tier", "gap_mm", "gap_deg", "placement_ok")}
                    for item in candidates[:5]],
     }
     if best is None:

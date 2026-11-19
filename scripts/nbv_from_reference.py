@@ -238,8 +238,20 @@ def main() -> int:
             return 6
         error, key, entry = plan["station"]
         family = entry.get("family", "relative_zero")
-        print(f"选中站位 {key}°（差 {error:.1f}°，family={family}）："
-              f"TCP {np.round(plan['stored_tcp'], 4)}")
+        tier = int(entry.get("tier", 2))
+        coverage = entry.get("empirical_coverage")
+        coverage_text = f"{float(coverage):.3f}" if coverage is not None else "未实测"
+        print(f"选中站位 {key}（tier {tier}，差 {error:.1f}°，family={family}，"
+              f"实测覆盖率 {coverage_text}）：TCP {np.round(plan['stored_tcp'], 4)}")
+        ranked = plan.get("ranked") or []
+        if ranked:
+            parts = []
+            for item in ranked:
+                cov = (f"{item['coverage']:.3f}" if item.get("coverage") is not None
+                       else "—")
+                parts.append(f"{item['key']}(t{item['tier']},cov {cov},"
+                             f"{item['error_deg']:.1f}°)")
+            print("候选排序：" + " > ".join(parts))
         print(f"0° 相对视角推导目标 TCP {np.round(plan['derived_tcp'], 4)}，"
               f"与站位差 {plan['delta_mm']:.1f} mm / {plan['delta_deg']:.1f}°")
         if plan["verdict"] == "station_far":
