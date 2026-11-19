@@ -271,6 +271,14 @@ def main() -> int:
     if not bad:
         return 0
     print("unhealthy:", bad)
+    if not checks["joint_states"]:
+        # 2026-11-19 教训：机器人断电后，驱动的 safety_mode 会变成 7
+        # （ROBOT_EMERGENCY_STOP），看起来像急停，其实是"读不到机器人"的产物。
+        # 判别依据必须是**数据流**，不是 latched 状态话题。
+        print("  [提示] /joint_states 没有数据流：驱动可能已停止，或机器人已断电。")
+        print("         此时 safety_mode / robot_mode 是陈旧的 latched 值，**不代表真实状态**：")
+        print("         2026-11-19 就把'机器人断电'误读成了'急停'。")
+        print("         要确认现场，请直接看示教器与机械臂；要恢复，先开机再起驱动栈。")
     if not checks["controller"]:
         # Point at this script, not the ros2 control CLI: under camera-cloud load
         # that CLI timed out three times at 10 s and made an active controller look

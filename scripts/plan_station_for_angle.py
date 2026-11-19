@@ -81,6 +81,53 @@ def derived_pose_for_yaw(reference_measurement: pathlib.Path,
     return T_base_tcp[:3, 3], R.from_matrix(T_base_tcp[:3, :3]).as_quat()
 
 
+def current_tcp(timeout: float = 12.0):
+    """读当前 TCP 位姿（位置 + 四元数）；读不到返回 None。"""
+    try:
+        import rclpy
+        from geometry_msgs.msg import PoseStamped
+        from rclpy.node import Node
+    except Exception:  # noqa: BLE001
+        return None
+    import time as _time
+    try:
+        rclpy.init()
+    except Exception:  # noqa: BLE001 - 已初始化
+        pass
+    node = Node("plan_station_for_angle_tcp")
+    box: dict = {}
+    node.create_subscription(PoseStamped, "/tcp_pose_broadcaster/pose",
+                             lambda m: box.setdefault("m", m), 10)
+    end = _time.time() + timeout
+    while "m" not in box and _time.time() < end:
+        rclpy.spin_once(node, timeout_sec=0.2)
+    node.destroy_node()
+    try:
+        rclpy.shutdown()
+    except Exception:  # noqa: BLE001
+        pass
+    message = box.get("m")
+    if message is None:
+        return None
+    p = message.pose.position
+    q = message.pose.orientation
+    return np.array([p.x, p.y, p.z]), np.array([q.x, q.y, q.z, q.w])
+
+
+def already_there(tcp: np.ndarray, quat: np.ndarray,
+                  position_tol_mm: float = 5.0, angle_tol_deg: float = 2.0) -> bool:
+    """当前臂位是否已经基本等于目标位姿（避免"在原地规划一次大改构型"）。"""
+    current = current_tcp()
+    if current is None:
+        return False
+    current_tcp_position, current_quat = current
+    distance_mm = float(np.linalg.norm(tcp - current_tcp_position) * 1000.0)
+    # 四元数夹角（q 与 -q 等价）
+    dot = abs(float(np.dot(quat, current_quat)))
+    angle_deg = float(np.degrees(2 * np.arccos(min(1.0, dot))))
+    return distance_mm <= position_tol_mm and angle_deg <= angle_tol_deg
+
+
 def plan_only(tcp: np.ndarray, quat: np.ndarray) -> tuple[int, str]:
     """对给定位姿做 plan_pose_ik（只规划，不动臂）。返回 (退出码, 最后一行)。"""
     command = [sys.executable, str(REPO / "scripts" / "plan_pose_ik.py"),
@@ -155,6 +202,11 @@ def main() -> int:
     print(f"\n[推导] 保持相对视角不变，{args.yaw:+.1f}° 的相机理论位置：")
     print("        tcp  = " + " ".join(f"{v:.5f}" for v in tcp))
     print("        quat = " + " ".join(f"{v:.6f}" for v in quat))
+
+    if already_there(tcp, quat):
+        print("[规划] 当前臂位已经在这个位姿附近（≤5 mm / ≤2°），无需移动。")
+        print("        直接拍摄即可；要微调请手动 jog 或给别的角度。")
+        return 0
 
     code, tail, lines = plan_only(tcp, quat)
     for line in lines:

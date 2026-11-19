@@ -42,6 +42,7 @@
 | 29 | 装入后转 10° 卡死 | 槽内只有约 1.5° 空间；能转多少度就是座好没座好的判据 |
 | 30 | 断电后 J4 可随意摆动、伴蜂鸣 | 夹爪自碰撞卡死把异常扭矩传进 J4，抱闸受损 |
 | 31 | 目标被接受但臂不动；报力矩死流 | ①力矩门把"没数据"误判为"力矩为 0" ②中止后机器人侧外部控制程序已停，robot_mode 仍报 7 |
+| 32 | 断电后 safety_mode=7（像急停） | 驱动读不到机器人就报急停；latched 话题不可信 |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -534,6 +535,31 @@ scripts/recover_driver_stack.sh --timeout 120
   这两个故障都会让"看起来一切正常"（状态话题绿、端口 ESTAB、目标被接受），
   但实际要么不动、要么误判。不区分"没数据"和"数据是 0"，就会把 DDS 延迟
   当成硬件故障，反过来也会把真故障当成延迟。
+```
+
+## 32. 机器人断电后 safety_mode 变成 7（像急停，其实是读不到机器人）
+
+```text
+现象（2026-11-19 晚）：
+  · 所有者把机械臂/相机/夹爪断电后，查询 /io_and_status_controller/safety_mode 得到 7；
+  · 7 在 Elite 的枚举里是 ROBOT_EMERGENCY_STOP（机器人急停），于是被误判成发生了急停；
+  · 同时 /joint_states 读到的是断电瞬间冻结的数值（TCP 与上次记录差 0.5 m），
+    又被误判成机械臂自己掉下来了。
+
+真因：
+  · 机器人断电后，驱动读不到机器人，safety_mode 变成 7；
+  · 驱动进程此时可能还活着（一直打印 Primary port receive package head ... End of file），
+    直到被 stop_all_drivers.sh 或 Ctrl-C 停掉；
+  · safety_mode 是 latched（TRANSIENT_LOCAL）话题：驱动停止后，读者仍能拿到最后那个值。
+
+判据（重要）：
+  · 判断机器人是否可用必须看数据流：/joint_states 有没有新数据、驱动进程在不在；
+  · latched 状态话题（safety_mode / robot_mode）在驱动失联后一律不可信；
+  · control_health.py 现在会在 /joint_states 无数据时打印这条提示，不要再只看 safety_mode。
+
+处置：
+  · 断电属于正常关机：开机 -> 起驱动栈 -> 四项门复查即可；
+  · 真急停（按钮被按下）时，示教器会有明确提示，且 safety_mode 恢复需要人工复位。
 ```
 
 ## 通用开工检查清单（每次上真机前）
