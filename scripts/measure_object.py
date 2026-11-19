@@ -123,7 +123,9 @@ def row_degenerate_reason(row: dict) -> str:
         return f"缺一轴（沿对象轴 {axis} 无观测约束，需换视角）"
     check = row.get("symmetry_check") or {}
     if not check.get("valid", True):
-        return f"对称性判据不过（扶手 {check.get('handle_score')} < 0.5）"
+        # 不确定是"扶手分低"还是"扶手余量不足"，只报实际数值，不要编造"< 0.5"
+        return (f"对称性判据不过（扶手 {check.get('handle_score')}，"
+                f"余量 {check.get('handle_margin')}）")
     if not row.get("pose_valid", True):
         return "位姿置信不足"
     return "退化"
