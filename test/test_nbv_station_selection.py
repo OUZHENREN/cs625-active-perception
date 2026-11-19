@@ -184,3 +184,54 @@ def test_real_measurements_validate_derivation_against_stored_stations():
     assert plan["verdict"] == "station"
     assert plan["station"][1] == "-30"
     assert plan["delta_mm"] < 10.0
+
+
+def test_yaw_error_is_not_the_only_criterion_any_more(world):
+    """2026-11-19：两个站位 yaw 误差几乎相同时，选"与当前工件更匹配"的那个。
+
+    复刻 11-18 的真实情形：−16 只差 3.46°、−23 差 3.54°，但 −16 的存储位姿
+    偏离当前推导位姿 80 mm，−23 只差 11 mm —— 按偏转角会选 −16（结果只看到两个面）。
+    """
+    ref_pose, T_tcp_cam, views = world
+    moved = dict(views)
+    # −16：把存储位姿沿 y 挪 80 mm（模拟"工件已离开它验证时的位置"）
+    shifted = dict(moved["-16"])
+    shifted["tcp"] = list(np.array(shifted["tcp"]) + np.array([0.0, 0.08, 0.0]))
+    moved["-16"] = shifted
+    # −23：挪 11 mm
+    shifted2 = dict(moved["-23"])
+    shifted2["tcp"] = list(np.array(shifted2["tcp"]) + np.array([0.0, 0.011, 0.0]))
+    moved["-23"] = shifted2
+
+    plan = nbv_views.station_plan(moved, ref_pose, pose(yaw_deg=-19.5), T_tcp_cam)
+    assert plan["station"][1] == "-16" or plan["station"][1] == "-23"
+    deltas = {item["key"]: item["delta_mm"] for item in plan["ranked"]}
+    assert deltas["-23"] < deltas["-16"]
+    # 排序里 −23 应排在 −16 前面
+    order = [item["key"] for item in plan["ranked"]]
+    assert order.index("-23") < order.index("-16")
+
+
+def test_ranked_diagnostics_are_reported(world):
+    ref_pose, T_tcp_cam, views = world
+    plan = nbv_views.station_plan(views, ref_pose, pose(yaw_deg=-20.0), T_tcp_cam)
+    assert plan["ranked"], "ranked 诊断不能为空"
+    first = plan["ranked"][0]
+    for key in ("key", "error_deg", "delta_mm"):
+        assert key in first
+    assert plan["station"][1] == first["key"]
+
+
+def test_placement_gap_is_computed_from_the_reference_file(tmp_path):
+    ref = tmp_path / "reference.json"
+    ref.write_text(json.dumps(measurement_payload(pose((0.70, 0.40, 0.12), 0.0))),
+                   encoding="utf-8")
+    entry = {"reference_measurement": str(ref)}
+    gap = nbv_views.placement_gap(entry, pose((0.71, 0.43, 0.12), 0.0))
+    assert gap is not None
+    assert gap[0] == pytest.approx(31.6, abs=1.0)   # 10 mm x, 30 mm y
+    assert gap[1] == pytest.approx(0.0, abs=0.1)
+
+
+def test_placement_gap_absent_reference_returns_none():
+    assert nbv_views.placement_gap({}, pose()) is None

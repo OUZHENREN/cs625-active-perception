@@ -132,6 +132,76 @@ def select_known_view(yaw_deg: float, tolerance: float | None = None):
     return best
 
 
+# 摆放约束（与 nbv_from_reference 同一组常数，2026-11-19 所有者定）
+PLACEMENT_MAX_MM = 30.0
+PLACEMENT_MAX_DEG = 3.5
+
+# 手摆（taught）站位在偏转角差小于这个值时优先选用（它是为那个偏转角手摆的）
+TAUGHT_PREFERENCE_DEG = 5.0
+
+
+def placement_gap(entry: dict, cur_pose: np.ndarray):
+    """工件相对该站位参考测量位置的 ``(平移 mm, 偏航差 °)``；没有参考返回 None。"""
+    reference = entry.get("reference_measurement")
+    if not reference:
+        return None
+    path = pathlib.Path(reference)
+    if not path.is_absolute():
+        path = REPO / path
+    try:
+        reference_pose = pose_from_payload(json.loads(path.read_text(encoding="utf-8")))
+    except (OSError, json.JSONDecodeError, KeyError, IndexError):
+        return None
+    offset = cur_pose[:3, 3] - reference_pose[:3, 3]
+    return (float(np.linalg.norm(offset)) * 1000.0,
+            abs(float(yaw_degrees_between(reference_pose, cur_pose))))
+
+
+def rank_known_views(views: dict, yaw_deg: float,
+                     cur_pose: np.ndarray | None = None,
+                     tolerance: float | None = None) -> list[dict]:
+    """容差内候选按"摆放一致性"排序（2026-11-19 所有者定）。
+
+    为什么改：只按偏转角最近选站，11-18 时 −16（差 3.46°）以 0.09° 击败 −23（差 3.54°），
+    但工件已偏离 −16 验证时的位置 80 mm（第三面只剩 2 个面），离 −23 的只有 11 mm。
+    yaw 误差几乎相同时，应该选"工件离它验证位置更近"的那个站位。
+
+    排序键（越小越优先）：
+      ① 有参考测量的站位优先（group 0），没有的排后面（group 1）——有参考才能判断摆放；
+      ② 归一化摆放偏差 max(平移/30 mm, yaw/3.5°)；
+      ③ 偏转角误差。
+    """
+    if tolerance is None:
+        tolerance = float(views.get("tolerance_deg", 12.0))
+    ranked = []
+    for key, entry in views.items():
+        if not isinstance(entry, dict) or "tcp" not in entry:
+            continue
+        if entry.get("validated", True) is False:
+            continue
+        try:
+            angle = float(key)
+        except ValueError:
+            continue
+        error = abs(angle - yaw_deg)
+        if error > tolerance + 1e-6:
+            continue
+        gap = placement_gap(entry, cur_pose) if cur_pose is not None else None
+        if gap is None:
+            ranked.append({"key": key, "entry": entry, "error_deg": error,
+                           "gap_mm": None, "gap_deg": None,
+                           "score": float("inf"), "group": 1})
+        else:
+            gap_mm, gap_deg = gap
+            ranked.append({"key": key, "entry": entry, "error_deg": error,
+                           "gap_mm": round(gap_mm, 2), "gap_deg": round(gap_deg, 2),
+                           "score": round(max(gap_mm / PLACEMENT_MAX_MM,
+                                              gap_deg / PLACEMENT_MAX_DEG), 4),
+                           "group": 0})
+    ranked.sort(key=lambda item: (item["group"], item["score"], item["error_deg"]))
+    return ranked
+
+
 def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
                  T_tcp_cam: np.ndarray, family_gate_mm: float = 200.0) -> dict:
     """方案 A 选站：按偏转角选最近的预教站位，并与"0° 相对视角推导"交叉核对。
@@ -155,9 +225,28 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
     """
     yaw = yaw_degrees_between(ref_pose, cur_pose)
     tolerance = float(views.get("tolerance_deg", 12.0))
-    best = None
-    nearest = None          # 无论是否在容差内，记下最近的站位（用于失败诊断）
+
+    # 0° 相对视角推导（与 nbv_from_reference.py 同一套数学）。放在选站之前：
+    # 选站要按"站位存储位姿与当前推导位姿的差"排序，而不是只看偏转角最近。
+    anchor = views.get("0")
+    if not isinstance(anchor, dict) or "tcp" not in anchor:
+        raise ValueError("workpiece_views 缺少 '0' 基准站位，无法做相对视角推导")
+    T_cam0 = np.eye(4)
+    T_cam0[:3, :3] = R.from_quat(anchor["quat"]).as_matrix()
+    T_cam0[:3, 3] = anchor["tcp"]
+    T_obj_cam0 = np.linalg.inv(ref_pose) @ (T_cam0 @ T_tcp_cam)
+    derived = cur_pose @ T_obj_cam0 @ np.linalg.inv(T_tcp_cam)
+    derived_tcp = derived[:3, 3]
+    derived_quat = R.from_matrix(derived[:3, :3]).as_quat()
+
+    # 候选排序（2026-11-19 所有者定）：容差内不再只取 yaw 最近。
+    #   主键 delta_mm = |站位存储位姿 − 当前推导位姿|：越小说明该站位的视角越贴合"当前
+    #   这件工件"。11-18 的实测：−16 差 80.2 mm、−23 只差 10.9 mm，而两者 yaw 误差几乎相同
+    #   （3.46° vs 3.54°）；按 yaw 选会选到 −16，第三面只剩 2 个面。
+    #   次键：摆放检查超限的候选排后面（它的精测大概率只看到两个面）。
+    nearest = None            # 无论是否在容差内，最近的站位（用于失败诊断）
     skipped_unvalidated = []  # 在容差内但未过精度门的站位
+    candidates = []
     for key, entry in views.items():
         if not isinstance(entry, dict) or "tcp" not in entry:
             continue
@@ -172,26 +261,54 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
             if error <= tolerance:
                 skipped_unvalidated.append((key, error))
             continue   # 未通过精度门的站位不参与自动选站（-45° 即此类）
-        if error <= tolerance + 1e-6 and (best is None or error < best[0]):
-            best = (error, key, entry)
-
-    # 0° 相对视角推导（与 nbv_from_reference.py 同一套数学），只用于交叉核对。
-    anchor = views.get("0")
-    if not isinstance(anchor, dict) or "tcp" not in anchor:
-        raise ValueError("workpiece_views 缺少 '0' 基准站位，无法做相对视角推导")
-    T_cam0 = np.eye(4)
-    T_cam0[:3, :3] = R.from_quat(anchor["quat"]).as_matrix()
-    T_cam0[:3, 3] = anchor["tcp"]
-    T_obj_cam0 = np.linalg.inv(ref_pose) @ (T_cam0 @ T_tcp_cam)
-    derived = cur_pose @ T_obj_cam0 @ np.linalg.inv(T_tcp_cam)
-    derived_tcp = derived[:3, 3]
-    derived_quat = R.from_matrix(derived[:3, :3]).as_quat()
+        if error > tolerance + 1e-6:
+            continue
+        delta_mm_i = float(np.linalg.norm(
+            np.asarray(entry["tcp"], dtype=float) - derived_tcp) * 1000.0)
+        gap = placement_gap(entry, cur_pose)
+        gap_bad = bool(gap and (gap[0] > PLACEMENT_MAX_MM + 1e-6
+                                or gap[1] > PLACEMENT_MAX_DEG + 1e-6))
+        candidates.append({
+            "key": key,
+            "entry": entry,
+            "error_deg": round(error, 2),
+            "delta_mm": round(delta_mm_i, 1),
+            "gap_mm": round(gap[0], 1) if gap else None,
+            "gap_deg": round(gap[1], 2) if gap else None,
+            "placement_ok": None if gap is None else (not gap_bad),
+            "blocked": gap_bad,
+            "family": entry.get("family", "relative_zero"),
+        })
+    # taught 族是所有者手摆的独立站位（+11 / +11_left8），delta 对它们**不是**质量指标：
+    # 它们本来就不是由 0° 推导出来的。所以分两族排序：
+    #   · taught：按偏转角误差（它是为那个偏转角手摆的）；
+    #   · relative_zero：按 delta_mm（与当前工件的匹配度）。
+    # 选谁：taught 的偏转角误差很小时优先用它（手摆的视角通常更贴合），否则用推导族。
+    taught = [c for c in candidates if c["family"] == "taught"]
+    derived_family = [c for c in candidates if c["family"] != "taught"]
+    taught.sort(key=lambda item: (item["blocked"], item["error_deg"]))
+    derived_family.sort(key=lambda item: (item["blocked"], item["delta_mm"],
+                                          item["error_deg"]))
+    chosen = None
+    if taught and taught[0]["error_deg"] <= TAUGHT_PREFERENCE_DEG:
+        chosen = taught[0]
+    elif derived_family:
+        chosen = derived_family[0]
+    elif taught:
+        chosen = taught[0]
+    candidates = derived_family[:4] + taught[:2]
+    best = None
+    if chosen is not None:
+        best = (chosen["error_deg"], chosen["key"], chosen["entry"])
 
     diagnostics = {
         "nearest_key": nearest[1] if nearest else None,
         "nearest_error_deg": round(nearest[0], 2) if nearest else None,
         "skipped_unvalidated": [(key, round(error, 2))
                                 for key, error in skipped_unvalidated],
+        "ranked": [{k: item[k] for k in ("key", "error_deg", "delta_mm",
+                                          "gap_mm", "gap_deg", "placement_ok")}
+                   for item in candidates[:5]],
     }
     if best is None:
         return {"yaw_deg": yaw, "station": None,
