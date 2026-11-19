@@ -81,6 +81,13 @@
         "cwd": "${workspaceFolder}"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "⑩ 续跑 · 效率入口",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; bash scripts/resume_task.sh",
+      "problemMatcher": [],
+      "detail": "从上次失败的那个阶段重试（读 runtime/run_task_resume.json）；先重挂、可选重启驱动栈"
     }
   ]
 }

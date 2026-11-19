@@ -136,3 +136,31 @@ Intentionally not done:
   · run_task.py 的 --resume / resume_task.sh（计划 P1，下一轮）；
   · 相机接入的真实启动验证（需要相机可启动时由所有者执行一次）。
 ```
+
+## 8. 补：效率入口的"重挂 + 断点续跑"（所有者 2026-11-19 追加）
+
+```text
+背景：示教链有 resume_teaching.sh（重启驱动栈 + --resume），但面板效率页用的
+     run_task.py 完全没有——失败只能从头重来。这就是"能力退化感"的技术根因。
+
+实现（三处）：
+① run_pick_and_place.py：新增 --start-index（按 0-based 序号跳过已完成阶段），
+   并在阶段日志里记录 index —— 必须按序号，因为 load_efficient 里
+   observe:slot_coarse 出现两次，按名字会定位到错误阶段。
+② run_task.py：新增 --resume，读 runtime/run_task_resume.json（失败时自动写入：
+   scope/mode/world/step/失败阶段/start_index/总数），校验 scope/mode/world 一致后
+   透传 --start-index；成功跑完自动删除续跑点；每次续跑前用 ensure_robot_ready --force。
+   同时把 experiment_recorder 的停止/归档移进 finally —— 失败提前 return 时它以前会
+   一直跑且不归档。
+③ 新增 scripts/resume_task.sh（对称 resume_teaching.sh，**人工执行不自动**）：
+   读状态 → 打印计划 → 夹爪夹持检查（恢复点在 grasp 之后时）→ ensure_robot_ready --force
+   → 可选 recover_driver_stack.sh --timeout 120 → run_task.py --resume。
+   符合"急停后人工确认安全再恢复、不自动续跑"的铁律。
+   .vscode/tasks.json 增加 ⑩ 续跑 · 效率入口（共 10 个任务）。
+
+离线验证：
+  · 单测 9 条（状态校验、重名阶段按 index、日志解析、runner_command 透传）；
+  · 合成续跑状态 + 机器人离线 → 脚本正确拒绝（safety_mode=7 不是 NORMAL），
+    未执行任何运动。
+```
+

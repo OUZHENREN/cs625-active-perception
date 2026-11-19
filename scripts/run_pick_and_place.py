@@ -2348,6 +2348,10 @@ def main() -> int:
     parser.add_argument("--log", default="/tmp/pick_place_run.json")
     parser.add_argument("--flow", default="pick_place", choices=["pick_place", "unload"])
     parser.add_argument("--until", default="", help="stop after this phase name")
+    parser.add_argument("--start-index", type=int, default=0,
+                        help="resume: skip every phase before this 0-based index. "
+                             "按序号而不是名字，因为流程里 observe:slot_coarse 会出现两次；"
+                             "从 grasp 之后开始前必须先确认夹爪确实夹着件（见 resume_task.sh）")
     parser.add_argument("--skip", default="", help="comma list of phases already satisfied")
     parser.add_argument("--allow-uneven-insert", action="store_true",
                         help="allow fast+slow profiles inside the tight slot clearance "
@@ -2560,6 +2564,8 @@ def main() -> int:
                                   "status": "ok" if ok else "failed",
                                   "detail": record[-1]["detail"],
                                   "plan_only": plan_only})
+        # 记录 0-based 序号：续跑按序号重试，避免重名阶段（observe:slot_coarse 出现两次）错位
+        record[-1]["index"] = index
         node.get_logger().info(f"[{name}] ok={ok} {record[-1]['detail']}")
         Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
         # --until：跑到指定阶段就停（这个 helper 之前漏了，导致 --until 不生效）
@@ -2649,6 +2655,9 @@ def main() -> int:
 
     for index, (name, kind) in enumerate(phases):
         if wanted and name not in wanted:
+            continue
+        if index < args.start_index:
+            # --resume：跳过已经完成的阶段（按序号，不按名字）
             continue
         notify_recorder(name, "enter")
         publish_task_state(node, {"flow": getattr(cfg, "scope", "") or args.flow,

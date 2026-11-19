@@ -340,7 +340,7 @@ run_pick_and_place.py 第 2728 行 grasp 阶段会把相机切到 fast；
    ⇒ 重试到 grasp 之后必须先确认夹爪确实夹着件，否则拒绝续跑。
 ② 失败路径自动重启驱动栈与 agent_memory 的"急停后人工确认安全再恢复、不自动续跑"冲突。
    ⇒ 自动只做 `ensure_robot_ready.py --force`（不动机器人）；
-     驱动栈重启 + 续跑做成**人工一键** scripts/resume_task.sh（计划新增，尚未存在）（对称 resume_teaching.sh），
+     驱动栈重启 + 续跑做成**人工一键** `scripts/resume_task.sh`（2026-11-19 已实现）（对称 resume_teaching.sh），
      run_task 失败时把这条命令打印出来，由所有者决定是否执行。
 ③ run_task 每步调 ensure_robot_ready 时**没带 --force**（11-18 "接受但不执行"识别不了）；
    resume_teaching.sh 只 `control_health --activate`，同样没 --force。

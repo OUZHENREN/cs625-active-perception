@@ -220,6 +220,54 @@ def print_model_summary(model: dict, model_path: pathlib.Path | None) -> None:
         print(f"  {name:<16}: z={table.get('z', float('nan')):.4f} m")
 
 
+# --------------------------------------------------------------------- resume
+RESUME_STATE = RUNTIME / "run_task_resume.json"
+
+
+def resolve_resume(state: dict, scope: str, mode: str, world: str) -> tuple[int, str]:
+    """校验续跑状态与本次运行是否一致，返回 (start_index, 说明)。
+
+    续跑必须按 **index** 而不是阶段名：load_efficient 流程里 observe:slot_coarse
+    出现两次，按名字定位会跑到错误的位置。
+    """
+    if not state:
+        raise ValueError(f"没有可续跑的状态：{RESUME_STATE} 不存在")
+    for key, want in (("scope", scope), ("mode", mode), ("world", world)):
+        got = state.get(key)
+        if got != want:
+            raise ValueError(f"续跑状态与本次运行不一致：{key}={got}，本次={want}")
+    index = state.get("start_index")
+    if not isinstance(index, int) or index < 0:
+        raise ValueError(f"续跑状态里的 start_index 无效：{index!r}")
+    return index, (f"从第 {index + 1} 个阶段（{state.get('failed_phase', '?')}）重试，"
+                   f"共 {state.get('phases_total', '?')} 个阶段")
+
+
+def write_resume_state(scope: str, mode: str, world: str, step: str,
+                       failed_phase: str, start_index: int, phases_total: int) -> None:
+    """失败时记录"从哪个阶段重试"，供 run_task.py --resume / resume_task.sh 使用。"""
+    RESUME_STATE.parent.mkdir(parents=True, exist_ok=True)
+    RESUME_STATE.write_text(json.dumps({
+        "scope": scope, "mode": mode, "world": world, "step": step,
+        "failed_phase": failed_phase, "start_index": start_index,
+        "phases_total": phases_total, "stamp": time.time(),
+    }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def failed_phase_from_log(log_path: pathlib.Path) -> tuple[str, int, int]:
+    """从阶段日志里取"失败的那个阶段"及其 0-based 序号与总数。"""
+    try:
+        record = json.loads(log_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return ("?", 0, 0)
+    for entry in reversed(record):
+        if entry.get("ok") is False:
+            return (str(entry.get("phase", "?")),
+                    int(entry.get("index", 0)),
+                    len(record))
+    return ("?", 0, len(record))
+
+
 # --------------------------------------------------------------------- runner
 def runner_command(effective: pathlib.Path, step: str, args) -> list[str]:
     command = [sys.executable, "-u", str(RUNNER), "--config", str(effective),
@@ -233,6 +281,9 @@ def runner_command(effective: pathlib.Path, step: str, args) -> list[str]:
         command += ["--phases", args.phases]
     if getattr(args, "until", ""):
         command += ["--until", args.until]
+    start_index = getattr(args, "_start_index_for_step", {}).get(step)
+    if start_index:
+        command += ["--start-index", str(start_index)]
     start_joints = getattr(args, "start_joints", "")
     if args.plan_only and start_joints:
         command += ["--start-joints", start_joints]
@@ -271,6 +322,9 @@ def main() -> int:
     parser.add_argument("--allow-release", action="store_true",
                         help="allow the gripper to release (owner approval for this run)")
     parser.add_argument("--summary", default="", help="where to write the run summary")
+    parser.add_argument("--resume", action="store_true",
+                        help="从上次失败的那个阶段重试（读 runtime/run_task_resume.json），"
+                             "按 index 而不是名字；从 grasp 之后恢复前请先确认夹爪仍夹着件")
     parser.add_argument("--no-record", action="store_true",
                         help="do not start the experiment recorder.  By default every "
                              "real run (--confirm) is recorded: 20 Hz timeseries, phase "
@@ -350,6 +404,26 @@ def main() -> int:
     # and each "modeling" call restarts the camera driver (tens of seconds), so a
     # five-waypoint flow restarted the camera five times mid-run.
 
+    # --- 续跑：把"从哪个阶段重试"解析成 --start-index ---
+    args._start_index_for_step = {}
+    if args.resume:
+        state = {}
+        if RESUME_STATE.exists():
+            try:
+                state = json.loads(RESUME_STATE.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as error:
+                print(f"[resume] 读不了 {RESUME_STATE}：{error}")
+                return 2
+        try:
+            start_index, note = resolve_resume(state, args.scope, args.mode, args.world)
+        except ValueError as error:
+            print(f"[resume] 拒绝续跑：{error}")
+            return 2
+        step_name = state.get("step") or steps[0]
+        args._start_index_for_step[step_name] = start_index
+        print(f"[resume] {note}；仅对 step={step_name} 生效，之前的阶段不重放")
+        print("[resume] 若恢复点在 grasp 之后，先确认夹爪仍夹着工件（resume_task.sh 会检查）。")
+
     recorder_started = False
     if args.confirm and not args.no_record:
         script = pathlib.Path(__file__).resolve().parent / "experiment_recorder.py"
@@ -363,61 +437,75 @@ def main() -> int:
         else:
             print("experiment recorder: script missing, run will not be recorded")
 
-    for index, step in enumerate(steps):
-        if index > 0 and args.handover == "confirm":
-            print("\n" + "=" * 60)
-            print("HANDOVER: load finished.  Check the workpiece is seated in the slot,")
-            print("then re-measure the pose and continue with the unload flow.")
-            print("Re-run with --handover auto to skip this stop.")
-            print("=" * 60)
-            summary["steps"].append({"step": step, "skipped": "handover stop"})
+    try:
+        for index, step in enumerate(steps):
+            if index > 0 and args.handover == "confirm":
+                print("\n" + "=" * 60)
+                print("HANDOVER: load finished.  Check the workpiece is seated in the slot,")
+                print("then re-measure the pose and continue with the unload flow.")
+                print("Re-run with --handover auto to skip this stop.")
+                print("=" * 60)
+                summary["steps"].append({"step": step, "skipped": "handover stop"})
+                _write_summary(summary, args.summary)
+                return 0
+            step_path, _ = effective_for_step(args.scope, args.mode, merged, step)
+            if (getattr(args, "world", "real") == "real"
+                    and not getattr(args, "dry_run", False)
+                    and not getattr(args, "plan_only", False)):
+                # 每次真机运行前重发一次外部控制脚本 + 恢复速度滑条：
+                # 示教器一旦接管过（本地控制），控制器会"接受但不执行"或报 PATH_TOLERANCE，
+                # 2026-11-12 一天之内踩了两次；2026-11-18 又踩了一次（--force 就是为此加的）。
+                force = ["--force"] if args.resume else []
+                ready = subprocess.run([sys.executable, "-u",
+                                        str(REPO / "scripts" / "ensure_robot_ready.py")]
+                                       + force,
+                                       capture_output=True, text=True, timeout=180)
+                print((ready.stdout or "").strip())
+                if ready.returncode != 0:
+                    print(f"[run_task] 机器人未就绪（code={ready.returncode}），先处理示教器状态")
+                    return ready.returncode
+            command = runner_command(step_path, step, args)
+            print(f"\n=== [{step}] {' '.join(command)}")
+            started = time.time()
+            completed = subprocess.run(command, cwd=str(REPO))
+            elapsed = time.time() - started
+            summary["steps"].append({"step": step, "returncode": completed.returncode,
+                                     "seconds": round(elapsed, 1)})
             _write_summary(summary, args.summary)
-            return 0
-        step_path, _ = effective_for_step(args.scope, args.mode, merged, step)
-        if (getattr(args, "world", "real") == "real"
-                and not getattr(args, "dry_run", False)
-                and not getattr(args, "plan_only", False)):
-            # 每次真机运行前重发一次外部控制脚本 + 恢复速度滑条：
-            # 示教器一旦接管过（本地控制），控制器会"接受但不执行"或报 PATH_TOLERANCE，
-            # 2026-11-12 一天之内踩了两次。
-            ready = subprocess.run([sys.executable, "-u",
-                                    str(REPO / "scripts" / "ensure_robot_ready.py")],
-                                   capture_output=True, text=True, timeout=180)
-            print((ready.stdout or "").strip())
-            if ready.returncode != 0:
-                print(f"[run_task] 机器人未就绪（code={ready.returncode}），先处理示教器状态")
-                return ready.returncode
-        command = runner_command(step_path, step, args)
-        print(f"\n=== [{step}] {' '.join(command)}")
-        started = time.time()
-        completed = subprocess.run(command, cwd=str(REPO))
-        elapsed = time.time() - started
-        summary["steps"].append({"step": step, "returncode": completed.returncode,
-                                 "seconds": round(elapsed, 1)})
+            if completed.returncode != 0:
+                failed_phase, failed_index, phases_total = failed_phase_from_log(
+                    RUNTIME / f"phase_log_{step}.json")
+                write_resume_state(args.scope, args.mode, args.world, step,
+                                   failed_phase, failed_index, phases_total)
+                print(f"[{step}] failed with code {completed.returncode}")
+                print(f"[resume] 已记录续跑点：阶段 {failed_index + 1}/{phases_total}"
+                      f"（{failed_phase}）。修复后运行：bash scripts/resume_task.sh")
+                return completed.returncode
+
+        elapsed = sum(item.get("seconds", 0) for item in summary["steps"])
+        print(f"\nall steps finished in {elapsed:.1f} s")
+        summary["recorder"] = {"started": recorder_started, "archived": None}
         _write_summary(summary, args.summary)
-        if completed.returncode != 0:
-            print(f"[{step}] failed with code {completed.returncode}")
-            return completed.returncode
-
-    elapsed = sum(item.get("seconds", 0) for item in summary["steps"])
-    print(f"\nall steps finished in {elapsed:.1f} s")
-    summary["recorder"] = {"started": recorder_started, "archived": None}
-    _write_summary(summary, args.summary)
-
-    if recorder_started:
-        stopped = subprocess.run(
-            [sys.executable, "-u",
-             str(pathlib.Path(__file__).resolve().parent / "experiment_recorder.py"),
-             "stop"], check=False)
-        run_dirs = sorted((RUNTIME / "experiments").glob("*"), key=lambda p: p.stat().st_mtime,
-                          reverse=True) if (RUNTIME / "experiments").exists() else []
-        if run_dirs and stopped.returncode == 0:
-            archived = subprocess.run(
+        if RESUME_STATE.exists():
+            RESUME_STATE.unlink()      # 跑完了，续跑点作废
+        return 0
+    finally:
+        # 2026-11-19：失败提前 return 时 recorder 会一直跑且不归档，所以收尾放进 finally。
+        if recorder_started:
+            stopped = subprocess.run(
                 [sys.executable, "-u",
-                 str(pathlib.Path(__file__).resolve().parent / "archive_experiment.py"),
-                 "--run-dir", str(run_dirs[0])], check=False)
-            if archived.returncode == 0:
-                print(f"experiment archived: {run_dirs[0].name}")
+                 str(pathlib.Path(__file__).resolve().parent / "experiment_recorder.py"),
+                 "stop"], check=False)
+            run_dirs = sorted((RUNTIME / "experiments").glob("*"),
+                              key=lambda p: p.stat().st_mtime,
+                              reverse=True) if (RUNTIME / "experiments").exists() else []
+            if run_dirs and stopped.returncode == 0:
+                archived = subprocess.run(
+                    [sys.executable, "-u",
+                     str(pathlib.Path(__file__).resolve().parent / "archive_experiment.py"),
+                     "--run-dir", str(run_dirs[0])], check=False)
+                if archived.returncode == 0:
+                    print(f"experiment archived: {run_dirs[0].name}")
                 summary["recorder"]["archived"] = run_dirs[0].name
                 _write_summary(summary, args.summary)
     return 0
