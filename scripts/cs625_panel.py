@@ -1047,9 +1047,19 @@ class SafeTab(QtWidgets.QWidget):
             stamp = log.split(" ", 1)[1][:28] if " " in log else "—"
         except (OSError, subprocess.SubprocessError):
             pass
-        self.key_labels["分支"].setText(branch)
-        self.key_labels["提交"].setText(f"{commit} · {stamp}")
+        self._set_key("分支", branch)
+        self._set_key("提交", f"{commit} · {stamp}")
         self._session_cache = True
+
+    def _set_key(self, name: str, text: str) -> None:
+        """安全写入"关键数值"卡：键不存在时忽略而不是抛 KeyError。
+
+        2026-11-19：`_refresh_keys` 曾写入从未注册的 "界面" 键，每 500 ms 抛一次异常，
+        把 `_tick` 后半段（会话信息、采集表、状态行）全部卡死。缺键不再能让刷新崩掉。
+        """
+        label = self.key_labels.get(name)
+        if label is not None:
+            label.setText(text)
 
     def _refresh_keys(self) -> None:
         """用最新采集与运行状态填充关键数值卡（无数据时显示 —）。"""
@@ -1073,19 +1083,18 @@ class SafeTab(QtWidgets.QWidget):
                 self.key_labels[name].setText("—")
         if newest:
             stamp = max(value[0] for value in newest.values())
-            self.key_labels["最近采集"].setText(
+            self._set_key("最近采集", 
                 time.strftime("%H:%M:%S", time.localtime(stamp)))
         state = read_run_state()
-        self.key_labels["上次阶段"].setText(str(state.get("last_phase") or "—"))
-        self.key_labels["反控"].setText(self.chips["channels"].value.text())
-        self.key_labels["当前阶段"].setText(
+        self._set_key("上次阶段", str(state.get("last_phase") or "—"))
+        self._set_key("反控", self.chips["channels"].value.text())
+        self._set_key("当前阶段", 
             str(self._current) if self._current is not None else "—")
         ready = sum(1 for row in self.status_card.rows.values()
                     if row.value.text() not in ("—", "缺失", "move_group 未运行"))
-        self.key_labels["相机"].setText(
+        self._set_key("相机", 
             "在线" if self.status_card.rows["cloud"].value.text().endswith("帧/秒") else "未就绪")
-        self.key_labels["RViz"].setText(f"{ready}/4 就绪")
-        self.key_labels["界面"].setText(f"{self.width()}×{self.height()}")
+        self._set_key("RViz", f"{ready}/4 就绪")
         self._refresh_session()
 
     def _tick(self) -> None:
