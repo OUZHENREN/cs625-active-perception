@@ -322,9 +322,9 @@ class StageTable(QtWidgets.QTableWidget):
             header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
             self.setColumnWidth(column, width)
         header.setSectionResizeMode(4, QtWidgets.QHeaderView.Stretch)
-        self.verticalHeader().setDefaultSectionSize(26)
-        fixed_height = 26 * len(STAGES) + 32
-        self.setFixedHeight(fixed_height)
+        self._row_h = row_height_for(self, 8)
+        self.verticalHeader().setDefaultSectionSize(self._row_h)
+        self.setFixedHeight(self._row_h * len(STAGES) + 32)
         self._rows: dict[int, int] = {}
         self._state: dict[int, str] = {}
         header = self.horizontalHeader()
@@ -523,7 +523,10 @@ class LogView(QtWidgets.QPlainTextEdit):
         super().__init__(parent)
         self.setReadOnly(True)
         self.setMaximumBlockCount(3000)
-        self.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+        # 长命令按窗口宽度自动换行，不再需要横向拖动查看
+        self.setLineWrapMode(QtWidgets.QPlainTextEdit.WidgetWidth)
+        self.setWordWrapMode(QtGui.QTextOption.WrapAtWordBoundaryOrAnywhere)
+        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
 
     def append_line(self, line: str, level: str | None = None) -> None:
@@ -598,6 +601,24 @@ def make_group(title: str, widget: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
     layout.setContentsMargins(2, 3, 2, 2)
     layout.addWidget(widget)
     return box
+
+
+def row_height_for(widget: QtWidgets.QWidget, extra: int = 8) -> int:
+    """按控件自己的字体算行高，避免把 24/34/78 这类像素值写死。
+
+    字体（或 DPI、--scale）一变，行高跟着变，不会再出现“字被行高裁掉”。
+    ensurePolished() 先让 QSS 里的 font-size 生效，否则读到的是默认字体。
+    """
+    widget.ensurePolished()
+    return max(12, widget.fontMetrics().lineSpacing() + extra)
+
+
+def table_body_height(table: QtWidgets.QTableWidget) -> int:
+    """表格表头 + 各行 + 边框所需的高度（用于把表格收紧到内容高度）。"""
+    table.ensurePolished()
+    header = table.horizontalHeader().sizeHint().height()
+    body = sum(table.rowHeight(row) for row in range(table.rowCount()))
+    return header + body + 2 * table.frameWidth() + 2
 
 
 # --------------------------------------------------------------------------- tabs
@@ -769,7 +790,7 @@ class SafeTab(QtWidgets.QWidget):
         self.captures.verticalHeader().setVisible(False)
         self.captures.setShowGrid(False)
         self.captures.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
-        self.captures.verticalHeader().setDefaultSectionSize(24)
+        self.captures.verticalHeader().setDefaultSectionSize(row_height_for(self.captures, 8))
         header = self.captures.horizontalHeader()
         header.setStretchLastSection(True)
         for column, width in {0: 46, 1: 66, 2: 60}.items():
@@ -993,18 +1014,41 @@ class SafeTab(QtWidgets.QWidget):
         if tcp is not None:
             self.tcp_label.set_tcp(tcp)
 
-    def _refresh_captures(self) -> None:
+    def _capture_entries(self) -> list[tuple[pathlib.Path, dict, float]]:
+        """最近 40 个 RVS 采集记录（路径/内容/修改时间），带 2 s 缓存。
+
+        安全页 `_tick` 是 500 ms；`runtime/rvs_teaching` 里现在有约 190 个 json，
+        原来的实现每 500 ms 重新 glob + stat + 读取 40 个文件。缓存后实际扫描
+        降到 0.5 Hz，界面刷新仍按原节奏执行。
+        """
+        now = time.time()
+        cache = getattr(self, "_captures_cache", None)
+        if cache is not None and now - cache["at"] < 2.0:
+            return cache["entries"]
         folder = REPO / "runtime" / "rvs_teaching"
-        if not folder.is_dir():
-            return
-        files = sorted(folder.glob("*.json"), key=lambda q: q.stat().st_mtime)[-40:]
-        self.captures.setRowCount(0)
-        shown = 0
-        for path in reversed(files):
+        candidates: list[pathlib.Path] = []
+        if folder.is_dir():
+            try:
+                candidates = sorted(folder.glob("*.json"),
+                                    key=lambda q: q.stat().st_mtime)[-40:]
+            except OSError:
+                candidates = []
+        entries: list[tuple[pathlib.Path, dict, float]] = []
+        for path in candidates:
             try:
                 data = json.loads(path.read_text())
+                stamp = path.stat().st_mtime
             except (OSError, json.JSONDecodeError):
                 continue
+            entries.append((path, data, stamp))
+        self._captures_cache = {"at": now, "entries": entries}
+        return entries
+
+    def _refresh_captures(self) -> None:
+        entries = self._capture_entries()
+        self.captures.setRowCount(0)
+        shown = 0
+        for path, data, stamp in reversed(entries):
             # 目录里还混着手工记录与历史文件；只展示真正的 RVS 采集
             if data.get("command") not in ("T0", "T1", "T2", "T3"):
                 continue
@@ -1020,7 +1064,7 @@ class SafeTab(QtWidgets.QWidget):
             values = [command,
                       "—" if fitness is None else f"{fitness:.3f}",
                       f"{position[2]:.3f}" if len(position) > 2 else "—",
-                      time.strftime("%H:%M:%S", time.localtime(path.stat().st_mtime))]
+                      time.strftime("%H:%M:%S", time.localtime(stamp))]
             for column, text in enumerate(values):
                 item = QtWidgets.QTableWidgetItem(text)
                 item.setTextAlignment(
@@ -1063,16 +1107,10 @@ class SafeTab(QtWidgets.QWidget):
 
     def _refresh_keys(self) -> None:
         """用最新采集与运行状态填充关键数值卡（无数据时显示 —）。"""
-        captures = sorted((REPO / "runtime" / "rvs_teaching").glob("*.json")) \
-            if (REPO / "runtime" / "rvs_teaching").is_dir() else []
         newest: dict[str, tuple[float, dict]] = {}
-        for path in captures[-40:]:
-            try:
-                data = json.loads(path.read_text())
-            except (OSError, json.JSONDecodeError):
-                continue
+        # 与下方采集表共用 2 s 缓存，避免每 500 ms 重读约 190 个 json。
+        for _path, data, stamp in self._capture_entries():
             command = data.get("command")
-            stamp = path.stat().st_mtime
             if command and (command not in newest or stamp > newest[command][0]):
                 newest[command] = (stamp, data)
         for command, name in (("T1", "T1 fitness"), ("T3", "T3 fitness")):
@@ -1144,8 +1182,23 @@ class VisionPipelineView(QtWidgets.QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.table.setShowGrid(False)
-        self.table.verticalHeader().setDefaultSectionSize(22)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        header = self.table.horizontalHeader()
+        header.setStretchLastSection(False)
+        # 输出列是长文本 → Stretch；耗时列固定 90，不再把空白都留给它。
+        for column, width in ((0, 90), (1, 70), (2, 150)):
+            header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
+            self.table.setColumnWidth(column, width)
+        header.setSectionResizeMode(3, QtWidgets.QHeaderView.Stretch)
+        header.setSectionResizeMode(4, QtWidgets.QHeaderView.Fixed)
+        self.table.setColumnWidth(4, 90)
+        for column, align in ((0, QtCore.Qt.AlignLeft), (1, QtCore.Qt.AlignLeft),
+                              (2, QtCore.Qt.AlignLeft), (3, QtCore.Qt.AlignLeft),
+                              (4, QtCore.Qt.AlignRight)):
+            item = self.table.horizontalHeaderItem(column)
+            if item is not None:
+                item.setTextAlignment(align | QtCore.Qt.AlignVCenter)
         self._started: dict[str, float] = {}
         for row, (key, label, _in, _out) in enumerate(self.STAGES):
             self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(label))
@@ -1153,16 +1206,8 @@ class VisionPipelineView(QtWidgets.QWidget):
             self.table.setItem(row, 2, QtWidgets.QTableWidgetItem("—"))
             self.table.setItem(row, 3, QtWidgets.QTableWidgetItem("—"))
             self.table.setItem(row, 4, QtWidgets.QTableWidgetItem("—"))
-            self.table.setRowHeight(row, 78)
-        self.table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.table.setColumnWidth(0, 90)
-        self.table.setColumnWidth(1, 60)
-        self.table.setColumnWidth(2, 140)
-        self.table.setColumnWidth(3, 360)
-        self.table.horizontalHeader().setStretchLastSection(False)
-        self.table.setColumnWidth(4, 80)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self._viewport_width = 0
+        self._autosize_rows()
         layout.addWidget(self.table, 1)
         # 只有真正带 ROS 的实例才起订阅线程：--no-probe / 截图模式不连 ROS，
         # 否则退出时会因为没有 rclpy 上下文而崩溃。
@@ -1189,6 +1234,42 @@ class VisionPipelineView(QtWidgets.QWidget):
         except Exception:  # noqa: BLE001 - 没有 ROS 时保持空白即可
             return
 
+    def _autosize_rows(self) -> None:
+        """按字体与列宽计算每行真正需要的高度，并把表格收紧到内容高度。
+
+        之前行高写死 78：字体/DPI 一变，3 行以上就被裁；同时容器比内容高
+        570 px，留白又太多。这里让行高跟着 QFontMetrics 和列宽走。
+        """
+        table = self.table
+        table.ensurePolished()
+        fm = table.fontMetrics()
+        line = fm.lineSpacing()
+        for row in range(table.rowCount()):
+            # 至少留出两行文本的高度（流程表的输入/输出经常折成 2 行），
+            # 内容真需要更多行时再按 QFontMetrics 的结果加高。
+            need = 2 * line + 12
+            for column in range(table.columnCount()):
+                item = table.item(row, column)
+                if item is None:
+                    continue
+                avail = max(24, table.columnWidth(column) - 10)
+                rect = fm.boundingRect(QtCore.QRect(0, 0, avail, 10000),
+                                       QtCore.Qt.TextWordWrap, item.text())
+                need = max(need, rect.height() + 10)
+            table.setRowHeight(row, need)
+        height = table_body_height(table)
+        if table.height() != height:
+            table.setFixedHeight(height)
+            self.updateGeometry()
+
+    def resizeEvent(self, event) -> None:            # noqa: N802
+        super().resizeEvent(event)
+        width = self.table.viewport().width()
+        if width != self._viewport_width:
+            self._viewport_width = width
+            # Stretch 列宽在布局完成后才确定，下一轮事件循环再算行高。
+            QtCore.QTimer.singleShot(0, self._autosize_rows)
+
     def reset(self) -> None:
         for row in range(self.table.rowCount()):
             self.table.item(row, 1).setText("待")
@@ -1196,6 +1277,7 @@ class VisionPipelineView(QtWidgets.QWidget):
             self.table.item(row, 3).setText("—")
             self.table.item(row, 4).setText("—")
         self._started.clear()
+        self._autosize_rows()
 
     def on_stage(self, payload: dict) -> None:
         stage = str(payload.get("stage") or "")
@@ -1237,6 +1319,7 @@ class VisionPipelineView(QtWidgets.QWidget):
         self.table.item(index, 2).setText(" / ".join(detail_in) or input_hint)
         self.table.item(index, 3).setText(" / ".join(detail_out) or output_hint)
         self.table.item(index, 4).setText(f"{elapsed:.1f} s")
+        self._autosize_rows()
 
 
 class VisionDataBox(QtWidgets.QGroupBox):
@@ -1263,39 +1346,68 @@ class VisionDataBox(QtWidgets.QGroupBox):
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
         self.table.setShowGrid(False)
-        # 不出现横向/纵向滚动条：宽度固定、列宽按 4K 面板分配
         self.table.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
         self.table.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        header = self.table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QtWidgets.QHeaderView.Fixed)
+        self.table.setColumnWidth(0, 190)
+        header.setSectionResizeMode(1, QtWidgets.QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QtWidgets.QHeaderView.Stretch)
+        for column in range(3):
+            item = self.table.horizontalHeaderItem(column)
+            if item is not None:
+                item.setTextAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignVCenter)
+        self._row_h = row_height_for(self.table, 12)
+        self.table.verticalHeader().setMinimumSectionSize(self._row_h)
         for row, name in enumerate(self.ROWS):
             self.table.setItem(row, 0, QtWidgets.QTableWidgetItem(name))
-            self.table.setRowHeight(row, 34)
-        self.table.setColumnWidth(0, 190)
-        self.table.setColumnWidth(1, 250)
-        self.table.setColumnWidth(2, 250)
+            self.table.setItem(row, 1, QtWidgets.QTableWidgetItem("—"))
+            self.table.setItem(row, 2, QtWidgets.QTableWidgetItem("—"))
+            self.table.setRowHeight(row, self._row_h)
+        # 表格收紧到内容高度：外层只占需要的空间，剩余高度留给“动态伸缩区”。
+        self.table.setFixedHeight(table_body_height(self.table))
         layout.addWidget(self.table)
         self._last = 0.0
         self.refresh()
 
+    @staticmethod
+    def _value_or_dash(value, formatter) -> str:
+        """None（未采集/字段缺失）显示 —，绝不再把缺失值显示成 0.00。"""
+        if value is None:
+            return "—"
+        try:
+            return formatter(value)
+        except (TypeError, ValueError):
+            return "—"
+
     def refresh(self) -> None:
         for column, (_label, path) in enumerate(self.TARGETS, start=1):
-            data = {}
+            data: dict = {}
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 data = {}
+            if not isinstance(data, dict):
+                data = {}
             verdict = str(data.get("verdict") or "—")
+            groups = data.get("groups")
+            dropped = data.get("degenerate_groups_dropped")
+            repeat = data.get("repeatability") or {}
+            if not isinstance(repeat, dict):
+                repeat = {}
+            centre = data.get("pose_base_centre_mm") or []
             values = [
                 verdict,
-                f"{data.get('coverage_median', 0):.3f}" if data else "—",
-                (f"{data.get('groups', 0) - data.get('degenerate_groups_dropped', 0)}"
-                 f"/{data.get('degenerate_groups_dropped', 0)}") if data else "—",
-                f"{data.get('repeatability', {}).get('translation_mm', 0):.2f} mm"
-                if data else "—",
-                f"{data.get('repeatability', {}).get('rotation_deg', 0):.2f}°"
-                if data else "—",
-                ", ".join(f"{v:.1f}" for v in (data.get("pose_base_centre_mm") or []))
-                if data else "—",
+                self._value_or_dash(data.get("coverage_median"),
+                                    lambda v: f"{float(v):.3f}"),
+                "—" if groups is None else
+                f"{int(groups) - int(dropped or 0)}/{int(dropped or 0)}",
+                self._value_or_dash(repeat.get("translation_mm"),
+                                    lambda v: f"{float(v):.2f} mm"),
+                self._value_or_dash(repeat.get("rotation_deg"),
+                                    lambda v: f"{float(v):.2f}°"),
+                ", ".join(f"{float(v):.1f}" for v in centre) if centre else "—",
                 time.strftime("%H:%M:%S", time.localtime(path.stat().st_mtime))
                 if path.exists() else "—",
             ]
@@ -1309,7 +1421,8 @@ class VisionDataBox(QtWidgets.QGroupBox):
                     level = "#3ec98a" if verdict == "OK" else (
                         "#d6a52f" if verdict == "—" else "#e05252")
                     item.setForeground(QtGui.QColor(level))
-        self.table.resizeColumnsToContents()
+        # 不再调用 resizeColumnsToContents()：它会每 2 s 覆盖固定/拉伸列宽，
+        # 把“工件”列压到几十像素、把“插槽”列拉成一条。
 
 
 class EfficiencyTab(QtWidgets.QWidget):
@@ -1335,7 +1448,7 @@ class EfficiencyTab(QtWidgets.QWidget):
 
         # ---------------- 左：配置 ----------------
         left = QtWidgets.QWidget()
-        left.setFixedWidth(400)
+        left.setFixedWidth(1200)      # 400 → 1200：日志横向约 3 倍（388→1188 px）
         left_layout = QtWidgets.QVBoxLayout(left)
         left_layout.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(4)
@@ -1359,7 +1472,8 @@ class EfficiencyTab(QtWidgets.QWidget):
             check = QtWidgets.QCheckBox(f"{index + 1:02d} {label}")
             check.setChecked(key in ("pre_grasp", "grasp", "grip"))
             self.stage_checks[index] = check
-            stage_grid.addWidget(check, index // 2, index % 2)
+            # 左栏 1200 px 用 3 列（21 项 → 7 行）；原来 2 列时阶段名会被截断。
+            stage_grid.addWidget(check, index // 3, index % 3)
         left_layout.addWidget(stage_box, 0)
 
         speed_box = QtWidgets.QGroupBox("速度覆盖 m/s（留空＝用默认）")
@@ -1374,9 +1488,11 @@ class EfficiencyTab(QtWidgets.QWidget):
             edit = QtWidgets.QLineEdit()
             edit.setPlaceholderText("默认")
             edit.setFixedWidth(66)
+            edit.setToolTip("run_task.py 目前没有速度覆盖参数，此项暂不生效（见 _build_command 的告警）")
             self.speed_edits[phase] = edit
-            speed_grid.addWidget(label, index // 2, (index % 2) * 2)
-            speed_grid.addWidget(edit, index // 2, (index % 2) * 2 + 1)
+            # 1200 px 宽下 4 组/行（8 项 → 2 行），省出的高度给日志。
+            speed_grid.addWidget(label, index // 4, (index % 4) * 2)
+            speed_grid.addWidget(edit, index // 4, (index % 4) * 2 + 1)
         left_layout.addWidget(speed_box, 0)
 
         param_box = QtWidgets.QGroupBox("运行参数")
@@ -1386,14 +1502,19 @@ class EfficiencyTab(QtWidgets.QWidget):
         param_grid.setVerticalSpacing(4)
         self.repeat_edit = QtWidgets.QLineEdit("1")
         self.repeat_edit.setFixedWidth(56)
+        self.repeat_edit.setToolTip("run_task.py 目前没有 --repeat 参数，此项暂不生效")
         self.check_nogates = QtWidgets.QCheckBox("跳过位姿门")
+        self.check_nogates.setToolTip("run_task.py 目前没有 --no-gates 参数，此项暂不生效")
         self.check_nosettle = QtWidgets.QCheckBox("跳过静置")
+        self.check_nosettle.setToolTip("run_task.py 目前没有 --no-settle 参数，此项暂不生效")
         self.check_dry = QtWidgets.QCheckBox("预演（不动臂）")
+        # 1200 px 宽下参数并成 1 行，避免 3 行白占高度。
         param_grid.addWidget(QtWidgets.QLabel("重复次数"), 0, 0)
         param_grid.addWidget(self.repeat_edit, 0, 1)
-        param_grid.addWidget(self.check_nogates, 1, 0)
-        param_grid.addWidget(self.check_nosettle, 1, 1)
-        param_grid.addWidget(self.check_dry, 2, 0)
+        param_grid.addWidget(self.check_nogates, 0, 2)
+        param_grid.addWidget(self.check_nosettle, 0, 3)
+        param_grid.addWidget(self.check_dry, 0, 4)
+        param_grid.setColumnStretch(5, 1)
         left_layout.addWidget(param_box, 0)
 
         buttons = QtWidgets.QHBoxLayout()
@@ -1421,32 +1542,47 @@ class EfficiencyTab(QtWidgets.QWidget):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(4)
 
-        # 相机：效率模式下同样需要看实时画面（1:1，不缩放）
-        # 相机 + 视觉流程 + 视觉实验数据 同一排：相机右侧的空白正好放这两块，
-        # 三者都不需要拖动就能看全（4K 下 1280 + 720 + 780 ≈ 2780 px）。
+        # 相机 + 右侧 tail（视觉流程在上、实验数据在下、底部是可伸缩区）。
+        # 相机不再固定 1300 px：最小 660（快档 640 也放得下），最大 1314
+        # （1280 图按 1:1 显示时的自然宽度），中间宽度由 tail 拉伸。
         camera_row = QtWidgets.QWidget()
         camera_row_layout = QtWidgets.QHBoxLayout(camera_row)
         camera_row_layout.setContentsMargins(0, 0, 0, 0)
         camera_row_layout.setSpacing(4)
 
-        self.camera = CameraView(probe=self._probe)
-        camera_group = make_group("相机（1:1 原始像素）", self.camera)
-        camera_group.setFixedWidth(1300)          # 略宽于 1280 的原始像素，不拉伸不浪费
-        camera_row_layout.addWidget(camera_group, 0)
+        self.camera = CameraView(probe=self._probe, fit=True)
+        camera_group = make_group("相机（等比适应，可切 1:1）", self.camera)
+        camera_group.setMinimumWidth(660)
+        camera_group.setMaximumWidth(1314)
+        camera_group.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                   QtWidgets.QSizePolicy.Expanding)
+        camera_row_layout.addWidget(camera_group, 2)
 
         self.pipeline = VisionPipelineView(probe=self._probe)
         pipeline_group = make_group("视觉流程（每一步的输入/输出）", self.pipeline)
-        pipeline_group.setMinimumWidth(760)
-        camera_row_layout.addWidget(pipeline_group, 1)
+        pipeline_group.setMinimumWidth(640)
+        pipeline_group.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
+                                     QtWidgets.QSizePolicy.Fixed)
 
         self.vision_data = VisionDataBox(compact=True)
+        # VisionDataBox 自己就是带标题的 QGroupBox：不再套第二层 make_group，
+        # 否则左上角会出现两个同名标题（审计时看到的实际现象）。
         self.vision_data.setSizePolicy(QtWidgets.QSizePolicy.Expanding,
-                                       QtWidgets.QSizePolicy.Expanding)
-        data_group = make_group("视觉实验数据", self.vision_data)
-        data_group.setMinimumWidth(700)
-        camera_row_layout.addWidget(data_group, 1)
+                                       QtWidgets.QSizePolicy.Fixed)
 
-        right_layout.addWidget(camera_row, 3)
+        tail = QtWidgets.QWidget()
+        tail_layout = QtWidgets.QVBoxLayout(tail)
+        tail_layout.setContentsMargins(0, 0, 0, 0)
+        tail_layout.setSpacing(4)
+        tail_layout.addWidget(pipeline_group, 0)
+        tail_layout.addWidget(self.vision_data, 0)
+        # 原第三列（实验数据）的宽度并入这里；底部剩余高度就是“动态伸缩区域”。
+        tail_layout.addStretch(1)
+        camera_row_layout.addWidget(tail, 1)
+
+        # 4:1:1 的竖向权重：相机行 ~1065 px（1280×960 按原生像素显示），
+        # 力矩/六维力各约 267 px，底行固定 320 px。
+        right_layout.addWidget(camera_row, 4)
 
         self.effort_chart = EffortChart()
         right_layout.addWidget(make_group("插入力矩曲线（debug_runs/*/effort.csv）",
@@ -1459,10 +1595,11 @@ class EfficiencyTab(QtWidgets.QWidget):
         self.results.setHorizontalHeaderLabels(["时间", "成功", "时长 s", "卡滞", "力峰值", "备注"])
         self.results.verticalHeader().setVisible(False)
         self.results.setShowGrid(False)
-        self.results.verticalHeader().setDefaultSectionSize(24)
+        self._results_row_h = row_height_for(self.results, 6)
+        self.results.verticalHeader().setMinimumSectionSize(self._results_row_h)
         header = self.results.horizontalHeader()
         header.setStretchLastSection(True)
-        for column, width in {0: 96, 1: 52, 2: 62, 3: 52, 4: 70}.items():
+        for column, width in {0: 120, 1: 60, 2: 70, 3: 60, 4: 80}.items():
             header.setSectionResizeMode(column, QtWidgets.QHeaderView.Fixed)
             self.results.setColumnWidth(column, width)
         for column in range(6):
@@ -1482,11 +1619,12 @@ class EfficiencyTab(QtWidgets.QWidget):
         bottom_row.setContentsMargins(0, 0, 0, 0)
         bottom_row.setSpacing(3)
         status_box = make_group("3D 状态（RViz）", self.status_card)
-        status_box.setFixedHeight(206)
-        bottom_row.addWidget(status_box, 1)
+        status_box.setFixedWidth(640)          # 4 行短信息不需要 1500 px 宽
+        bottom_row.addWidget(status_box, 0)
         results_box = make_group("运行记录", self.results)
-        results_box.setFixedHeight(206)
         bottom_row.addWidget(results_box, 1)
+        # 320 px：10 条运行记录（10×行高 + 表头）刚好放得下，不再只露 5 行。
+        bottom.setFixedHeight(320)
         right_layout.addWidget(bottom, 0)
 
         root.addWidget(right, 1)
@@ -1516,7 +1654,33 @@ class EfficiencyTab(QtWidgets.QWidget):
                     self.log.append_line(
                         f"[面板] 选中起点 {first}，但 runner 不支持 --start-from："
                         f"将从流程开头跑到 {last}", "warn")
+        unsupported = self._pending_unsupported_overrides()
+        if unsupported:
+            self.log.append_line(
+                "[面板] run_task.py 没有 --speed-override / --repeat / --no-gates / "
+                f"--no-settle 参数，以下设置本轮不生效：{', '.join(unsupported)}", "warn")
         return command
+
+    def _pending_unsupported_overrides(self) -> list[str]:
+        """检查界面上“暂时没有后端参数”的控件是否被改过。
+
+        读 run_task.py 的 argparse 确认：它只有 --scope/--mode/--world/--confirm/
+        --plan-only/--dry-run/--model/--phases/--until/--start-joints/--handover/
+        --allow-release/--summary/--no-record。速度覆盖、重复次数、跳过位姿门、
+        跳过静置都没有对应参数；在面板里拼上不认识的参数只会让 run_task.py 启动即
+        报错，所以这里明确提示“本轮不生效”，而不是猜测参数名。
+        """
+        pending: list[str] = []
+        for phase, edit in self.speed_edits.items():
+            if edit.text().strip():
+                pending.append(f"速度 {phase}")
+        if self.repeat_edit.text().strip() not in ("", "1"):
+            pending.append("重复次数>1")
+        if self.check_nogates.isChecked():
+            pending.append("跳过位姿门")
+        if self.check_nosettle.isChecked():
+            pending.append("跳过静置")
+        return pending
 
     def _run(self) -> None:
         if self._process is not None:
@@ -1565,8 +1729,12 @@ class EfficiencyTab(QtWidgets.QWidget):
                 continue
             row = self.results.rowCount()
             self.results.insertRow(row)
+            self.results.setRowHeight(row, self._results_row_h)
             name = path.parent.name
-            values = [name[9:15] if len(name) > 15 else name,
+            # 目录名是 YYYYMMDD_HHMMSS；只显示 HHMMSS（原逻辑在长度恰好 15 时
+            # 退回显示全名，被 96 px 列省略成“20261107…”）。完整名字放 tooltip。
+            stamp = name[9:15] if len(name) >= 15 else name
+            values = [stamp,
                       "是" if data.get("success") is True else
                       ("否" if data.get("success") is False else "预演"),
                       str(data.get("duration_s", "—")),
@@ -1574,6 +1742,8 @@ class EfficiencyTab(QtWidgets.QWidget):
                       str(data.get("force_peak_n", "—"))]
             for column, text in enumerate(values):
                 item = QtWidgets.QTableWidgetItem(text)
+                if column == 0:
+                    item.setToolTip(name)
                 item.setTextAlignment(
                     (QtCore.Qt.AlignLeft if column in (0, 5) else QtCore.Qt.AlignRight)
                     | QtCore.Qt.AlignVCenter)
@@ -1607,23 +1777,36 @@ class PanelWindow(QtWidgets.QMainWindow):
         self.tabs = QtWidgets.QTabWidget()
         self.safe = SafeTab(probe=probe and not smoke)
         self.efficient = EfficiencyTab(probe=probe and not smoke)
-        # 两个标签页的相机都走同一条"把窗口撑够大"的路径：1:1 且不允许滚动，
-        # 唯一能保证看得全的办法就是窗口/列必须放得下整幅图像。
+        # 安全页相机仍是 1:1，需要窗口给它留出整幅图像的空间；
+        # 效率页相机是 fit（等比缩放），由布局自己解决，不再按图像宽度撑窗口。
         for tab in (self.safe, self.efficient):
             camera = getattr(tab, "camera", None)
-            if camera is not None:
-                camera.image_size.connect(self._ensure_camera_room)
-                if camera._image is not None:
-                    self._ensure_camera_room(camera._image.width(), camera._image.height())
+            if camera is None or getattr(camera, "is_fit", False):
+                continue
+            camera.image_size.connect(self._ensure_camera_room)
+            if camera._image is not None:
+                self._ensure_camera_room(camera._image.width(), camera._image.height())
         self.tabs.addTab(self.safe, "安全模式")
         self.tabs.addTab(self.efficient, "效率模式")
         layout.addWidget(self.tabs, 1)
         self.setCentralWidget(central)
 
     def _ensure_camera_room(self, width: int, height: int) -> None:
-        """1:1 不滚动的前提：窗口与最小尺寸必须能装下整幅图像。"""
+        """1:1 相机：给整幅图像留空间，但不让窗口越出当前屏幕太多。
+
+        效率页相机是 fit 模式（不接这个槽）；这里只剩安全页的 1:1 相机。
+        下限保持原来的 1280×960 时代（2280×1180），避免小屏/离屏 smoke
+        反而被压得比改动前更挤；上限按屏幕可用区域封顶（2560 图不再把窗口
+        顶到屏幕外）。
+        """
         need_w = width + 1000          # 左列 + 中列 + 边距
         need_h = height + 220
+        floor_w, floor_h = 2280, 1180
+        screen = QtWidgets.QApplication.primaryScreen()
+        if screen is not None:
+            available = screen.availableGeometry()
+            need_w = min(need_w, max(floor_w, available.width() - 16))
+            need_h = min(need_h, max(floor_h, available.height() - 16))
         if self.minimumWidth() < need_w or self.minimumHeight() < need_h:
             self.setMinimumSize(max(MIN_SIZE[0], need_w), max(MIN_SIZE[1], need_h))
         if self.width() < need_w or self.height() < need_h:

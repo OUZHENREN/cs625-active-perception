@@ -23,9 +23,15 @@ type/field shape at runtime and then uses the restart path.
 Usage
 -----
     python3 scripts/camera_mode.py status
+    python3 scripts/camera_mode.py health [--expect modeling]
     python3 scripts/camera_mode.py fast
     python3 scripts/camera_mode.py modeling
     python3 scripts/camera_mode.py probe
+
+``health`` is read-only: it never starts, stops or restarts the camera.  It
+reports the pid, the publisher counts of the colour/depth/camera_info topics and
+one resolution sample, which is what the startup task needs before deciding
+whether it has to launch the camera at all.
 
 ``choose_fast_mode()`` is a pure function and can be imported without a ROS
 runtime.
@@ -87,21 +93,34 @@ def _machine_local(name: str) -> str:
     return ""
 
 
-CAMERA_IP = _machine_local("CS625_CAMERA_IP")
-if not CAMERA_IP:
-    raise SystemExit(
-        "CS625_CAMERA_IP is not set. Add it to ~/.cs625_local.env "
-        "(e.g. CS625_CAMERA_IP=<camera address>) or export it before running.")
+def _camera_ip() -> str:
+    """Resolve the camera address when a launch is actually being started.
+
+    The check lives here rather than at import time so that the read-only
+    commands (``health``/``status``/``stop``) still work on a machine where the
+    camera IP is not configured yet -- for example while shutting the cell down.
+    """
+    value = _machine_local("CS625_CAMERA_IP")
+    if not value:
+        raise SystemExit(
+            "CS625_CAMERA_IP is not set. Add it to ~/.cs625_local.env "
+            "(e.g. CS625_CAMERA_IP=<camera address>) or export it before running.")
+    return value
+
 
 COLOR_TOPIC = "/camera/color/image_raw"
 COLOR_INFO_TOPIC = "/camera/color/camera_info"
 DEPTH_TOPIC = "/camera/depth/image_raw"
+DEPTH_INFO_TOPIC = "/camera/depth/camera_info"
 CAMERA_NODE = "/camera/camera"
 DYNAMIC_CONFIG_TOPIC = "/camera/dynamic_config"
 
 MEASURE_SECONDS = 5.0
 READY_TIMEOUT_S = 75.0
 FAST_MIN_FPS = 10.0
+# Read-only health check: waits for graph discovery and one CameraInfo sample.
+HEALTH_PUBLISHER_TIMEOUT_S = 5.0
+HEALTH_INFO_TIMEOUT_S = 5.0
 
 MODELING_SPEC = {
     "label": "modeling",
@@ -156,19 +175,25 @@ FAST_CANDIDATES = [
 # Launcher arguments shared by every mode.  These mirror the command line that
 # is known to work on this machine; ``laser_power:=100`` keeps the depth stream
 # usable on the metal workpiece.
-COMMON_LAUNCH_ARGS = [
-    f"device_ip:={CAMERA_IP}",
-    "laser_power:=100",
-    # RELIABLE image QoS.  A 1280x960 BGR8 image is ~3.7 MiB, larger than the
-    # default Fast DDS shared-memory segment; with SENSOR_DATA (best effort) the
-    # transport silently drops most of those messages, so a 5 s subscriber count
-    # fell to ~0.2-0.4 fps even though the camera published at 0.73 fps.
-    # Reliable QoS retransmits the lost fragments and reproduces the real rate.
-    # Best-effort consumers remain compatible with a reliable publisher.
-    "depth_qos:=default",
-    "color_qos:=default",
-    "color_enable:=true",
-]
+def common_launch_args() -> list[str]:
+    """Return the launch arguments shared by every mode.
+
+    ``device_ip`` is resolved when a launch is built, not at import time, so the
+    read-only commands do not require ``CS625_CAMERA_IP``.
+    """
+    return [
+        f"device_ip:={_camera_ip()}",
+        "laser_power:=100",
+        # RELIABLE image QoS.  A 1280x960 BGR8 image is ~3.7 MiB, larger than the
+        # default Fast DDS shared-memory segment; with SENSOR_DATA (best effort) the
+        # transport silently drops most of those messages, so a 5 s subscriber count
+        # fell to ~0.2-0.4 fps even though the camera published at 0.73 fps.
+        # Reliable QoS retransmits the lost fragments and reproduces the real rate.
+        # Best-effort consumers remain compatible with a reliable publisher.
+        "depth_qos:=default",
+        "color_qos:=default",
+        "color_enable:=true",
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -425,7 +450,7 @@ def describe_spec(spec):
 
 
 def build_launch_command(spec):
-    args = list(COMMON_LAUNCH_ARGS)
+    args = list(common_launch_args())
     args.append(f"color_resolution:={spec['color_res']}")
     if spec.get("depth_enable"):
         args.extend(
@@ -583,6 +608,9 @@ def stop_camera(verbose=True):
 
 
 def restart_camera(spec, verbose=True):
+    # Resolve the device address before stopping anything: a missing
+    # CS625_CAMERA_IP must not leave a working camera stopped.
+    _camera_ip()
     stop_camera(verbose=verbose)
     pid = start_camera(spec, verbose=verbose)
     return pid
@@ -617,7 +645,7 @@ def observe_streams(
     ``color_fps``, ``depth_fps``, ``color_dim`` and ``depth_dim``.
 
     ``qos`` is ``"reliable"`` for cameras started by this script (see
-    ``COMMON_LAUNCH_ARGS``), ``"best_effort"`` for a legacy SENSOR_DATA launch,
+    ``common_launch_args()``), ``"best_effort"`` for a legacy SENSOR_DATA launch,
     or ``"auto"`` to inspect the live publisher first.
     """
     import rclpy
@@ -954,6 +982,157 @@ def quality_note(fps):
 
 
 # ---------------------------------------------------------------------------
+# Read-only health check (no start, no stop, no restart)
+# ---------------------------------------------------------------------------
+def _model_label(color_dim, depth_dim):
+    """Human/model label from the sampled resolutions (health only)."""
+    if color_dim == (1280, 960):
+        return "modeling"
+    if color_dim and color_dim[0] >= 2560:
+        return "high"
+    if color_dim:
+        return "fast"
+    return "off"
+
+
+def _publisher_counts(node, topics, timeout):
+    """Poll the rclpy graph until every topic has a publisher, or timeout."""
+    import rclpy
+
+    counts = {topic: 0 for topic in topics}
+    deadline = time.monotonic() + timeout
+    while True:
+        for topic in topics:
+            counts[topic] = int(node.count_publishers(topic))
+        if all(count > 0 for count in counts.values()):
+            return counts
+        if time.monotonic() >= deadline:
+            return counts
+        rclpy.spin_once(node, timeout_sec=0.1)
+
+
+def _sample_camera_info(node, topic, timeout):
+    """Return ``(width, height)`` from one CameraInfo message, or ``None``."""
+    import rclpy
+    from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
+    from sensor_msgs.msg import CameraInfo
+
+    qos = QoSProfile(depth=10, history=HistoryPolicy.KEEP_LAST,
+                     reliability=ReliabilityPolicy.RELIABLE)
+    sample = {}
+    subscription = node.create_subscription(
+        CameraInfo, topic, lambda msg: sample.setdefault("msg", msg), qos)
+    deadline = time.monotonic() + timeout
+    try:
+        while "msg" not in sample and time.monotonic() < deadline:
+            rclpy.spin_once(node, timeout_sec=0.1)
+    finally:
+        node.destroy_subscription(subscription)
+    message = sample.get("msg")
+    if message is None:
+        return None
+    return (int(message.width), int(message.height))
+
+
+def _fmt_dim(dim):
+    return f"{dim[0]}x{dim[1]}" if dim else "unknown"
+
+
+def _health_line(pid, color_pubs, depth_pubs, info_pubs, color_dim, depth_dim):
+    return (
+        f"camera={_model_label(color_dim, depth_dim)} pid={pid or 'none'} "
+        f"color_pubs={color_pubs} depth_pubs={depth_pubs} info_pubs={info_pubs} "
+        f"color_res={_fmt_dim(color_dim)} depth_res={_fmt_dim(depth_dim)}"
+    )
+
+
+def health_command(expect="any"):
+    """Read-only camera health.
+
+    Exit codes: 0 = healthy (and matches ``--expect`` when given);
+    1 = no live camera launch recorded in ``runtime/camera.pid``;
+    2 = the launch is alive but the topics/resolution are not usable.
+
+    This function never starts, stops or restarts the camera, and never writes
+    the pid file (a stale pid is reported, not cleaned).
+    """
+    pid = read_pidfile()
+    if pid is None:
+        log(_health_line(None, 0, 0, 0, None, None))
+        log("[health] reason=pid_missing: runtime/camera.pid does not exist; the "
+            "camera was not started by camera_mode.py")
+        return 1
+    if not pid_alive(pid) or not is_camera_launch(pid):
+        log(_health_line(pid, 0, 0, 0, None, None))
+        log(f"[health] reason=stale_pid: pid {pid} is not a live percipio_camera launch")
+        return 1
+
+    import rclpy
+    from rclpy.node import Node
+
+    try:
+        rclpy.init()
+    except Exception:  # noqa: BLE001 - already initialised by an embedding caller
+        pass
+    node = Node("camera_mode_health")
+    color_dim = depth_dim = None
+    color_pubs = depth_pubs = info_pubs = 0
+    error = None
+    try:
+        counts = _publisher_counts(
+            node, (COLOR_TOPIC, DEPTH_TOPIC, COLOR_INFO_TOPIC),
+            HEALTH_PUBLISHER_TIMEOUT_S)
+        color_pubs = counts[COLOR_TOPIC]
+        depth_pubs = counts[DEPTH_TOPIC]
+        info_pubs = counts[COLOR_INFO_TOPIC]
+        if color_pubs:
+            color_dim = _sample_camera_info(node, COLOR_INFO_TOPIC,
+                                            HEALTH_INFO_TIMEOUT_S)
+        if depth_pubs:
+            depth_dim = _sample_camera_info(node, DEPTH_INFO_TOPIC,
+                                            HEALTH_INFO_TIMEOUT_S)
+    except Exception as exc:  # noqa: BLE001 - report, never traceback in startup
+        error = exc
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+    log(_health_line(pid, color_pubs, depth_pubs, info_pubs,
+                     color_dim, depth_dim))
+    if error is not None:
+        log(f"[health] read-only graph query failed: {error}; treat as not ready")
+        return 2
+
+    if color_pubs <= 0 or info_pubs <= 0 or color_dim is None:
+        log("[health] the launch is alive but no colour image/camera_info is being "
+            "published; check runtime/camera.log for device errors")
+        return 2
+    if expect == "fast":
+        if _model_label(color_dim, depth_dim) != "fast":
+            log(f"[health] expecting fast, got {_model_label(color_dim, depth_dim)} "
+                f"({_fmt_dim(color_dim)})")
+            return 2
+        if depth_pubs <= 0 or depth_dim is None:
+            log("[health] fast mode is running without depth (colour-only candidate)")
+        return 0
+    if depth_pubs <= 0 or depth_dim is None:
+        log("[health] colour is publishing but depth is missing (colour-only mode, or "
+            "the depth stream failed to open)")
+        return 2
+    if expect == "modeling":
+        if color_dim != (1280, 960) or depth_dim != (1280, 960):
+            log(f"[health] expecting modeling 1280x960+1280x960, got "
+                f"{_fmt_dim(color_dim)}+{_fmt_dim(depth_dim)}")
+            return 2
+    elif expect == "high":
+        if color_dim is None or color_dim[0] < 2560:
+            log(f"[health] expecting high-2560, got {_fmt_dim(color_dim)}")
+            return 2
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
 def cmd_status(_args):
@@ -1141,6 +1320,11 @@ def main(argv=None):
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("status", help="print resolution, real fps and health")
+    health_parser = subparsers.add_parser(
+        "health", help="read-only: pid + publisher counts + resolution (no restart)")
+    health_parser.add_argument(
+        "--expect", choices=("any", "modeling", "fast", "high"), default="any",
+        help="require a specific mode (default: any publishing camera)")
     subparsers.add_parser("fast", help="switch to the first fast candidate with fps >= 10")
     subparsers.add_parser("modeling", help="switch back to 1280x960")
     subparsers.add_parser("probe", help="measure every candidate mode and print a table")
@@ -1152,6 +1336,7 @@ def main(argv=None):
 
     def cmd_high(_args):
         """切/起 2560 档：先停掉现有相机，再用 HIGH_SPEC 启动并测量。"""
+        _camera_ip()          # fail before stopping a working camera
         stop_camera(verbose=False)
         result = run_spec(HIGH_SPEC)
         print_measurement(HIGH_SPEC["label"], result)
@@ -1161,6 +1346,7 @@ def main(argv=None):
         "high": cmd_high,
         "stop": lambda _args: (stop_camera(verbose=True), 0)[1],
         "status": cmd_status,
+        "health": lambda cmd_args: health_command(expect=cmd_args.expect),
         "fast": cmd_fast,
         "modeling": cmd_modeling,
         "probe": cmd_probe,

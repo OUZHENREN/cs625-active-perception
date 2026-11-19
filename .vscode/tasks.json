@@ -3,9 +3,9 @@
   "tasks": [
     {
       "label": "① 开工 · 真机",
-      "detail": "启动驱动栈 + MoveIt（已在跑就跳过），然后打印四项门。控制器激活由任务 ② 负责。",
+      "detail": "启动驱动栈 + MoveIt + 相机（已在跑就跳过），然后打印四项门与自检汇总。相机默认 auto：检测到 Windows RVS_AI_Center 占用相机就跳过并说明原因（--no-camera 可显式跳过）。控制器激活由本任务负责。",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; bash scripts/start_real_stack.sh; echo \"[开工] 完成：① 真机就绪后可运行 ②/③\"",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; bash scripts/start_real_stack.sh; code=$?; if [ $code -eq 0 ]; then echo '[开工] 完成：① 真机就绪后可运行 ②/③'; else echo \"[开工] 未完成（exit $code）：见上方原因\"; fi; exit $code",
       "problemMatcher": [],
       "group": {
         "kind": "build",
@@ -64,7 +64,7 @@
     {
       "label": "⑧ 收工 · 关闭所有驱动",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; bash scripts/stop_all_drivers.sh; echo '[收工] 完成：机械臂驱动 / 相机 / 查看器 已全部关闭'",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; bash scripts/stop_all_drivers.sh; code=$?; if [ $code -eq 0 ]; then echo '[收工] 完成：机械臂驱动 / 相机 / 查看器 已全部关闭'; else echo \"[收工] 有残留（exit $code）：见上方列表\"; fi; exit $code",
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",

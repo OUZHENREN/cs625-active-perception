@@ -151,12 +151,15 @@ class CameraView(QtWidgets.QWidget):
 
     image_size = QtCore.pyqtSignal(int, int)      # 真实像素尺寸变化时发出
 
-    def __init__(self, probe: bool = True, parent=None) -> None:
+    def __init__(self, probe: bool = True, parent=None, fit: bool = False) -> None:
         super().__init__(parent)
         self.setStyleSheet(f"background:{C_BG}; border:1px solid {C_BORDER};")
-        self._fit = False         # 默认 1:1 原始像素（所有者要求：不缩放）
+        # fit=True：等比缩放（保持纵横比，只缩小不放大），供效率页使用；
+        # fit=False：1:1 原始像素，安全页沿用。
+        self._fit = bool(fit)
         self._image: QtGui.QImage | None = None
         self._source = "color"
+        self._render_scheduled = False
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(2, 2, 2, 2)
@@ -192,6 +195,8 @@ class CameraView(QtWidgets.QWidget):
         self.btn_color.clicked.connect(lambda: self._set_source("color"))
         self.btn_depth.clicked.connect(lambda: self._set_source("depth"))
         self.btn_fit.clicked.connect(self._toggle_fit)
+        self.canvas.viewport().installEventFilter(self)
+        self._apply_fit_mode()
 
         self._worker: CameraWorker | None = None
         if probe:
@@ -238,36 +243,113 @@ class CameraView(QtWidgets.QWidget):
         if self._worker is not None:
             self._worker.set_source(source)
 
-    def _toggle_fit(self) -> None:
-        self._fit = not self._fit
+    @property
+    def is_fit(self) -> bool:
+        return self._fit
+
+    def _toggle_fit(self, checked: bool | None = None) -> None:
+        self._fit = bool(checked) if checked is not None else not self._fit
+        self._apply_fit_mode()
+
+    def _apply_fit_mode(self) -> None:
+        """按当前模式设置画布尺寸策略 / 滚动条 / 控件最小尺寸。"""
         self.btn_fit.setChecked(self._fit)
-        self.canvas.setWidgetResizable(self._fit)
+        if self._fit:
+            # 等比适应：画布跟随视口，图片在 _render 里按 KeepAspectRatio 缩放。
+            self.canvas.setWidgetResizable(True)
+            self.canvas.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+            self.canvas.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+            # 1:1 模式的 setFixedSize 会锁住画布尺寸，切回适应模式必须先解除。
+            self.canvas.setMinimumSize(0, 0)
+            self.canvas.setMaximumSize(16777215, 16777215)
+            self.canvas.updateGeometry()
+            self._schedule_render()
+            # setFixedSize 会同时锁住 min/max，切回适应模式时必须解除。
+            self.inner.setMinimumSize(0, 0)
+            self.inner.setMaximumSize(16777215, 16777215)
+            self.inner.setSizePolicy(QtWidgets.QSizePolicy.Ignored,
+                                     QtWidgets.QSizePolicy.Ignored)
+            self.setMinimumSize(240, 200)
+        else:
+            # 1:1 原始像素：大图允许滚动查看，而不是被静默裁掉。
+            self.canvas.setWidgetResizable(False)
+            self.canvas.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+            self.canvas.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAsNeeded)
+            self.inner.setSizePolicy(QtWidgets.QSizePolicy.Preferred,
+                                     QtWidgets.QSizePolicy.Preferred)
+            self.setMinimumSize(0, 0)
+            if self._image is not None:
+                self._set_native_size(self._image)
+        self._render()
+
+    def _set_native_size(self, image: QtGui.QImage) -> None:
+        """1:1 模式：画布本身就是图像大小；控件最小尺寸给个上限。
+
+        不再把 CameraView 的最小宽高锁成整幅图像：否则 2560×1920 会撑爆
+        1314 px 宽的相机列（子控件比父控件还大，滚动条也救不了）。现在大图
+        由 QScrollArea 的 AsNeeded 滚动条平移查看，小图仍按原生像素显示。
+        """
+        self.canvas.setFixedSize(image.width() + 2, image.height() + 2)
+        self.inner.setFixedSize(image.width(), image.height())
+        self.setMinimumWidth(min(image.width() + 24, 680))
+        self.setMinimumHeight(min(image.height() + 56, 520))
+
+    def _schedule_render(self) -> None:
+        """布局完成后按新的视口尺寸再画一次（fit 模式专用）。"""
+        if not self._fit or self._render_scheduled:
+            return
+        self._render_scheduled = True
+        QtCore.QTimer.singleShot(0, self._render_now)
+
+    def _render_now(self) -> None:
+        self._render_scheduled = False
         self._render()
 
     def _on_image(self, image: QtGui.QImage, source: str) -> None:
         self._image = image
-        # 1:1 且不允许滚动 → 让控件本身变成图像大小，由分割器/窗口给它留位置
-        self.canvas.setFixedSize(image.width() + 2, image.height() + 2)
-        self.inner.setFixedSize(image.width(), image.height())
-        self.setMinimumWidth(image.width() + 24)
-        self.setMinimumHeight(image.height() + 56)
+        if not self._fit:
+            self._set_native_size(image)
         self.image_size.emit(image.width(), image.height())
-        self.label_status.setText(f"{source} · {image.width()}×{image.height()} · "
-                                  f"{'适应窗口' if self._fit else '1:1'}")
+        self.label_status.setText(
+            f"{source} · {image.width()}×{image.height()} · "
+            f"{'等比适应' if self._fit else '1:1'}")
         self._render()
+        self._schedule_render()
 
     def _render(self) -> None:
         if self._image is None:
             return
         pixmap = QtGui.QPixmap.fromImage(self._image)
-        self.inner.setPixmap(pixmap)      # 恒为 1:1，不缩放
+        if self._fit:
+            target = self.canvas.viewport().size()
+            # 只缩小、不放大：小图保持原始像素（640 档不被拉糊），
+            # 大图按视口等比缩小（2560 档不再被裁掉一半）。
+            if target.width() > 4 and target.height() > 4 and (
+                    pixmap.width() > target.width()
+                    or pixmap.height() > target.height()):
+                pixmap = pixmap.scaled(target, QtCore.Qt.KeepAspectRatio,
+                                       QtCore.Qt.SmoothTransformation)
+            self.inner.setPixmap(pixmap)
+            self.label_status.setText(
+                f"{self._source} · {self._image.width()}×{self._image.height()} · "
+                f"等比适应（保持纵横比，只缩小不放大）")
+            return
+        self.inner.setPixmap(pixmap)      # 1:1，不缩放
         need_w = pixmap.width() + 1000
         room = self.window().width() if self.window() is not None else 0
         hint = "" if room >= need_w else f" · 需窗口 ≥{need_w} px 宽"
         self.label_status.setText(
-            f"{self._source} · {pixmap.width()}×{pixmap.height()} · 1:1（不缩放、不滚动）{hint}")
+            f"{self._source} · {pixmap.width()}×{pixmap.height()} · 1:1（不缩放、可滚动）{hint}")
+
+    def eventFilter(self, obj, event) -> bool:    # noqa: N802
+        """视口尺寸变化时在 fit 模式重新等比缩放（QLabel 不会自己缩放 pixmap）。"""
+        if (obj is self.canvas.viewport()
+                and event.type() == QtCore.QEvent.Resize
+                and self._fit):
+            self._schedule_render()
+        return super().eventFilter(obj, event)
 
     def resizeEvent(self, event) -> None:         # noqa: N802
         super().resizeEvent(event)
         if self._fit:
-            self._render()
+            self._schedule_render()
