@@ -1011,17 +1011,23 @@ def _publisher_counts(node, topics, timeout):
         rclpy.spin_once(node, timeout_sec=0.1)
 
 
-def _sample_camera_info(node, topic, timeout):
-    """Return ``(width, height)`` from one CameraInfo message, or ``None``."""
+def _sample_image_dim(node, topic, timeout):
+    """从一条 Image 消息读 ``(width, height)``，读不到返回 None。
+
+    2026-11-19：原来用 CameraInfo 判断分辨率，但 Percipio 驱动虽然**注册了**
+    ``/camera/depth/camera_info`` 发布者，却一条消息都不发（RELIABLE 与 BEST_EFFORT
+    都收不到），于是开工自检把"相机其实完全正常"误判成"深度缺失"。
+    Image 消息自带 width/height，直接读它更可靠。
+    """
     import rclpy
     from rclpy.qos import HistoryPolicy, QoSProfile, ReliabilityPolicy
-    from sensor_msgs.msg import CameraInfo
+    from sensor_msgs.msg import Image
 
     qos = QoSProfile(depth=10, history=HistoryPolicy.KEEP_LAST,
                      reliability=ReliabilityPolicy.RELIABLE)
     sample = {}
     subscription = node.create_subscription(
-        CameraInfo, topic, lambda msg: sample.setdefault("msg", msg), qos)
+        Image, topic, lambda msg: sample.setdefault("msg", msg), qos)
     deadline = time.monotonic() + timeout
     try:
         while "msg" not in sample and time.monotonic() < deadline:
@@ -1085,12 +1091,11 @@ def health_command(expect="any"):
         color_pubs = counts[COLOR_TOPIC]
         depth_pubs = counts[DEPTH_TOPIC]
         info_pubs = counts[COLOR_INFO_TOPIC]
+        # 分辨率从 Image 消息读（CameraInfo 在这台驱动上不可靠，见 _sample_image_dim）
         if color_pubs:
-            color_dim = _sample_camera_info(node, COLOR_INFO_TOPIC,
-                                            HEALTH_INFO_TIMEOUT_S)
+            color_dim = _sample_image_dim(node, COLOR_TOPIC, HEALTH_INFO_TIMEOUT_S)
         if depth_pubs:
-            depth_dim = _sample_camera_info(node, DEPTH_INFO_TOPIC,
-                                            HEALTH_INFO_TIMEOUT_S)
+            depth_dim = _sample_image_dim(node, DEPTH_TOPIC, HEALTH_INFO_TIMEOUT_S)
     except Exception as exc:  # noqa: BLE001 - report, never traceback in startup
         error = exc
     finally:
