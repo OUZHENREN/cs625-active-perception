@@ -1493,7 +1493,10 @@ class EfficiencyTab(QtWidgets.QWidget):
             # 1200 px 宽下 4 组/行（8 项 → 2 行），省出的高度给日志。
             speed_grid.addWidget(label, index // 4, (index % 4) * 2)
             speed_grid.addWidget(edit, index // 4, (index % 4) * 2 + 1)
-        left_layout.addWidget(speed_box, 0)
+        # 2026-11-19 所有者决定：run_task.py 没有速度覆盖参数，这一块隐藏。
+        # 保留对象引用，将来 run_task.py 接了参数可一行恢复显示。
+        self.speed_box = speed_box
+        speed_box.setVisible(False)
 
         param_box = QtWidgets.QGroupBox("运行参数")
         param_grid = QtWidgets.QGridLayout(param_box)
@@ -1508,13 +1511,14 @@ class EfficiencyTab(QtWidgets.QWidget):
         self.check_nosettle = QtWidgets.QCheckBox("跳过静置")
         self.check_nosettle.setToolTip("run_task.py 目前没有 --no-settle 参数，此项暂不生效")
         self.check_dry = QtWidgets.QCheckBox("预演（不动臂）")
-        # 1200 px 宽下参数并成 1 行，避免 3 行白占高度。
-        param_grid.addWidget(QtWidgets.QLabel("重复次数"), 0, 0)
-        param_grid.addWidget(self.repeat_edit, 0, 1)
-        param_grid.addWidget(self.check_nogates, 0, 2)
-        param_grid.addWidget(self.check_nosettle, 0, 3)
-        param_grid.addWidget(self.check_dry, 0, 4)
-        param_grid.setColumnStretch(5, 1)
+        # 2026-11-19 所有者决定：重复次数 / 跳过位姿门 / 跳过静置 没有后端参数，
+        # 隐藏（对象保留，便于将来接线后恢复）；只保留真正生效的"预演（不动臂）"。
+        repeat_label = QtWidgets.QLabel("重复次数")
+        for widget in (repeat_label, self.repeat_edit,
+                       self.check_nogates, self.check_nosettle):
+            widget.setVisible(False)
+        param_grid.addWidget(self.check_dry, 0, 0)
+        param_grid.setColumnStretch(1, 1)
         left_layout.addWidget(param_box, 0)
 
         buttons = QtWidgets.QHBoxLayout()
@@ -1654,33 +1658,7 @@ class EfficiencyTab(QtWidgets.QWidget):
                     self.log.append_line(
                         f"[面板] 选中起点 {first}，但 runner 不支持 --start-from："
                         f"将从流程开头跑到 {last}", "warn")
-        unsupported = self._pending_unsupported_overrides()
-        if unsupported:
-            self.log.append_line(
-                "[面板] run_task.py 没有 --speed-override / --repeat / --no-gates / "
-                f"--no-settle 参数，以下设置本轮不生效：{', '.join(unsupported)}", "warn")
         return command
-
-    def _pending_unsupported_overrides(self) -> list[str]:
-        """检查界面上“暂时没有后端参数”的控件是否被改过。
-
-        读 run_task.py 的 argparse 确认：它只有 --scope/--mode/--world/--confirm/
-        --plan-only/--dry-run/--model/--phases/--until/--start-joints/--handover/
-        --allow-release/--summary/--no-record。速度覆盖、重复次数、跳过位姿门、
-        跳过静置都没有对应参数；在面板里拼上不认识的参数只会让 run_task.py 启动即
-        报错，所以这里明确提示“本轮不生效”，而不是猜测参数名。
-        """
-        pending: list[str] = []
-        for phase, edit in self.speed_edits.items():
-            if edit.text().strip():
-                pending.append(f"速度 {phase}")
-        if self.repeat_edit.text().strip() not in ("", "1"):
-            pending.append("重复次数>1")
-        if self.check_nogates.isChecked():
-            pending.append("跳过位姿门")
-        if self.check_nosettle.isChecked():
-            pending.append("跳过静置")
-        return pending
 
     def _run(self) -> None:
         if self._process is not None:
