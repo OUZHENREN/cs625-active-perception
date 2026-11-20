@@ -31,6 +31,22 @@
   抓取位到位容差过松、门检失败不纠偏。凡是"质量标准"类要求（速度、容差、核验），
   都要同时写进本文件或 manuals 手册，避免只存在于代码注释里。
 
+## 1.5 2026-11-20 新增的两条铁律
+
+```text
+① 运动脚本不得有"重新武装机器人"的副作用
+   执行器曾经在 NO_MOTION 时自动重发 external_control，导致控制器回放旧目标、
+   机械臂全速冲出去两次（一次跳 240 mm，一次 J6 越过 ±150° 被急停）。
+   现在执行器只报告，不恢复；恢复必须由所有者确认臂位后手工执行。
+
+② 下运动指令前先确认系统时钟稳定
+   WSL 时钟曾反复倒退最多 5.5 秒，控制器按时间戳推进轨迹 → 中途停住"等时间追上"
+   → 表现为卡顿、越界、以及测量结果随机变差（帧配对靠时间戳）。
+   检查：dmesg | grep -c "Time jumped backwards" 不增长；30 秒探针最大倒退 0 ms。
+   WSL 里只保留 Hyper-V 主机同步：sudo systemctl disable --now systemd-timesyncd
+   详见手册第 36、37 条。
+```
+
 ## 2. 安全红线（原 §132–§138 的核心；事故经过与原文见 history）
 
 > 事故代价（原 §135 开头）：夹爪与机械臂碰撞导致 J4 轴信号中断、机器人无法重启；
@@ -113,6 +129,10 @@
 | 手眼链 | `T_base_cam = T_base_tcp @ T_tcp_cam`（2026-11-10 验明，≤3 mm 量级） | `docs/reference/pose_conventions.md` §4.1、原 §131 |
 | 当前主线 | 两模式跑同一条链路（`scripts/teaching/teaching_sequence.py`）：效率 `scripts/teaching/teaching_debug.py`（开发中）、示教/安全 `scripts/resume_teaching.sh`（已冻结）；六模式按 ADR-005 冻结，不是入口 | 原 §139④、ADR-005 |
 | 工件粗观测基准点 | (0.62380, 0.37375, 0.50762)，效率模式起点，2026-11-13 所有者确认 | `config/tasks/common.yaml` 的 `workpiece_views`、原 §139⑤ |
+| 关节速度硬上限 | `MAX_JOINT_SPEED_RAD_S = 0.10` rad/s（5.7°/s，2026-11-20 由 0.05 提高；2.86°/s 落在伺服死区，导致抖动与终点容差中止） | `scripts/execute_assembly_chunks.py:67`、手册第 34 条 |
+| 示教位覆盖率门槛 | **0.95**（测量硬底线 0.90；0.90–0.95 只算"可接受但证据偏弱"，不得登记为示教位） | `scripts/add_station_from_measurement.py --min-coverage`、手册第 38 条 |
+| 新示教位（tier 1） | +27 / +23 / +18 / +13 / 0 / −9 / −19 / −29 / −36（实测 yaw，覆盖率均 ≥0.95）；旧站位为 tier 2 兜底 | `config/tasks/common.yaml` 的 `workpiece_views` |
+| 速度滑块换算 | 滑块 = `MAX_JOINT_SPEED_RAD_S × 3 / 额定 2.094` ≈ 14.3%（上限 17.2°/s），开工与恢复脚本自动设置 | `scripts/set_speed_slider.py`、手册第 34 条 |
 
 - 插入目标的读取顺序（原 §139①）：`runtime/slot_reference_verified.json` →
   `config/tasks/common.yaml` 的 `teaching_slot_reference` → 当天 R1（仅兜底并打印警告）。

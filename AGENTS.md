@@ -385,42 +385,52 @@ owner decision. The rule covers repository documents and the Obsidian vault alik
 - Generated artifacts (build output, screenshots, `.bak`) are the only exception, and they
   still get a log line.
 
-## Documentation split: what goes into which file (owner directive 2026-11-20)
+## 文档分工与写入边界（所有者 2026-11-20 定，必须自动遵守）
 
-Every piece of writing has exactly one home. Do not duplicate a whole narrative across files;
-write the fact once in its home and link to it.
+仓库里的文档**各有唯一归属**。同一件事只写在它的归属文件里，其它地方用链接引用，
+不允许把整段叙事复制到多个文件。
 
-| File | Holds | Does NOT hold |
+| 文件 | 只放什么 | 不放什么 |
 |---|---|---|
-| `docs/worklogs/YYYY-MM/YYYY-MM-DD_*.md` | The chronological record of one day: what was attempted, exact commands, results, incidents in order, numbers as measured | Durable rules; anything that will still matter in a month |
-| `docs/manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md` | Reusable real-machine experience, one numbered entry per lesson: **symptom → root cause → confirming command → handling → prevention**. Includes troubleshooting orders and diagnostic procedures | Day-by-day narrative; "we did X at 19:40"; anything specific to a single session |
-| `docs/agent_memory.md` | Durable environment facts and red lines the agent must obey every session | Incident stories; transient observations |
-| `docs/decisions/ADR-*.md` | Architecture/scope decisions with rationale and date | Implementation detail that the code already states |
-| `docs/evidence/experiment_index.md` | One line per archived experiment run | Analysis; put that in the work log |
-| Obsidian vault | Mirror of work logs via `scripts/sync_worklog.sh` | Standing alone as the only copy |
+| `docs/README.md` | **唯一导航入口**：当前状态一句话、"下次开工先看"清单、各文档的用途 | 具体经验、事故细节 |
+| `docs/agent_memory.md` | **每次开工必读**的当前权威值 + 硬规则 + 安全红线（控制在 300 行内） | 事故经过、调试流水、历史口径 |
+| `docs/agent_memory_history.md` | 旧条目**只读存档**，供溯源；编号与标题保持不变 | 新内容（新内容进 agent_memory.md） |
+| `docs/manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md` | **可复用的真机经验**，一条一个编号：`症状 → 真因 → 确认命令 → 处置 → 预防`；含排查顺序与诊断流程 | 逐日流水、"今天 19:40 我们…"、只对一次会话有意义的内容 |
+| `docs/manuals/debug/` | **看不到数据时**用的命令速查（相机、ROS 图），正常输出与失败含义 | 系统性经验（进手册正文） |
+| `docs/worklogs/YYYY-MM/YYYY-MM-DD_*.md` | **当天的时间线**：做了什么、确切命令、结果、按顺序的事故、实测数字 | 长期规则；一个月后还重要的内容 |
+| `docs/plans/` | 月度/专题计划：做什么、验收线、明确不做 | 已完成事实的流水账 |
+| `docs/decisions/ADR-*.md` | 架构与范围**决策**：背景、选项、结论、日期 | 代码里已经写清的实现细节 |
+| `docs/reference/` | **参考资料**：坐标系与话题、位姿口径、状态码、真机工位、接口契约 | 临时观察、未验证结论 |
+| `docs/evidence/experiment_index.md` | 每次归档实验一行 | 分析与解释（放工作日志） |
+| `docs/literature/` | 文献阅读主表 | 项目结论 |
+| Obsidian 库 | **工作日志的镜像**（`scripts/sync_worklog.sh`） | 作为唯一副本 |
 
-**When to write where — automatically, no need to be asked:**
+### 什么时候自动写、写到哪里（不需要所有者再提醒）
 
-- After any incident, once the root cause is confirmed: append **one** entry to the manual
-  (symptom / cause / confirming command / handling / prevention) **and** record the trail in
-  that day's work log. The manual entry must be usable by someone who never saw the incident.
-- When a procedure changes (speed limits, recovery steps, start-up checklist): update the
-  manual entry **and** the corresponding checklist in the same turn.
-- When a limit or constant changes: update the code, the tests, the manual and
-  `docs/agent_memory.md` in the same commit — never leave a document quoting the old number.
-- At the end of a working session: make sure every lesson of the session exists in the manual
-  and every fact exists in the work log, then mirror the work log to the vault.
+```text
+1. 事故处理完、真因确认后：
+   · 立刻在真机手册追加**一条**编号条目（症状/真因/确认命令/处置/预防），
+     标准是"没见过这次事故的人照着也能用"；
+   · 同时在当天工作日志里记下排查过程与实测数字。
+2. 流程或常量发生变化（速度上限、恢复步骤、开工清单）：
+   · 代码 + 测试 + 真机手册 + agent_memory.md **在同一个提交里**一起改，
+     绝不允许文档还写着旧数字。
+3. 每轮工作结束：
+   · 检查本轮每一条经验是否已进手册、每一个事实是否已进工作日志；
+   · 工作日志必须镜像到 Obsidian（`scripts/sync_worklog.sh`），失败要报告不能静默丢弃。
+4. 展示成果（新站位、新脚本、新能力）：
+   · 写进工作日志与对应手册条目；涉及数值的门槛（如覆盖率 0.95）写进 agent_memory.md。
+```
 
-**Boundaries:**
+### 边界（违反即视为写错）
 
-- The manual is not a scratchpad: an entry that only says "we tried several things" is not
-  acceptable; it must name the cause and the command that proves it.
-- Work logs are append-only records; do not rewrite yesterday's log to match today's
-  understanding — write a new entry and cross-reference.
-- Never delete or archive a document without the owner's written approval (see the section
-  above); a newer document never supersedes an older one by itself.
-- Manual entries keep their numbers forever; new lessons get the next number, and the index
-  table gets the matching row in the same edit.
+```text
+· 手册不是草稿本：只写"我们试了几种办法"而不写清真因与证据的条目不算数。
+· 工作日志只追加：不要用今天的理解改写昨天的日志，新增一节并交叉引用。
+· 归档、改名、让新文档取代旧文档，必须事先取得所有者书面同意（见上一节）。
+· 手册条目编号永久占用；新经验取下一个编号，索引表必须在同一次编辑里补行。
+· 同一事实在不同文件里出现时，数字必须完全一致（速度上限、日期、测试数、脚本名）。
+```
 
 ## Branch policy (frozen 2026-11-13, owner decision)
 
