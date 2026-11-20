@@ -47,6 +47,7 @@
 | 34 | 突然全速、越过安全区间 | 伺服按 100% 滑块追位置跳变；恢复脚本已改为 30% |
 | 35 | 遗留未验证项：越界看门狗取消动作、controller 自行失活 | 见条目，下一次复现时按清单取证 |
 | 36 | 机械臂卡住/摆动、测量不稳 | WSL 时钟反复倒退 5.5 秒；关闭 timesyncd，只留 Hyper-V 同步 |
+| 37 | 卡住/停—冲—停/目标接受不动/测量不稳 | 按 6 层顺序查，根因多半在系统时钟 |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -680,6 +681,47 @@ scripts/recover_driver_stack.sh --timeout 120
   · execute_assembly_chunks 每次成功执行后写 runtime/last_commanded_pose.json；
   · ensure_robot_ready --force 会先比对"当前实测 vs 最后指令位姿"，
     偏差 >2° 直接拒绝并打印原因（退出码 5）。
+```
+
+## 37. "机械臂不听话"的分层排查顺序（2026-11-20 一晚排查出来的套路）
+
+```text
+适用症状（看起来完全不同，其实常是同一根因）：
+  · 轨迹执行到一半停住，几秒后突然加速冲过去
+  · 到位后不停、来回摆几下才稳定
+  · 目标被接受但机械臂完全不动（NO_MOTION）
+  · 示教器刷 "Velocity ... exceeding the joint velocity limits. Ignoring commands"
+  · 同一相机位姿测两次，覆盖率相差 0.09 以上
+
+按下面顺序查，**从下往上**（越底层越可能是根因）：
+```
+
+| 顺序 | 查什么 | 命令 | 正常应该看到 |
+|---|---|---|---|
+| 第1步 | 系统时钟是否在倒退 | `dmesg \| grep -c "Time jumped backwards"` | 计数不再增长 |
+| 第1'步 | 时钟倒退幅度 | 见下面 30 秒探针 | 最大倒退 0 ms（<100 ms 可接受） |
+| 第2步 | 驱动是否报告时间倒退 | `grep "Moved backwards in time" runtime/logs/driver_*.log` | 无 |
+| 第3步 | 控制器记忆 vs 实际位置 | `python3 scripts/sync_command_position.py` | 记忆偏差 ≤2° |
+| 第4步 | 反控端口 / 控制器状态 | `python3 scripts/control_health.py` | sockets/controller/joint_states 全 True |
+| 第5步 | 示教器速度滑块 | 驱动日志 `grep "Setting speed slider"` | 14.3%（= 轨迹上限的 3 倍） |
+| 第6步 | 轨迹速度上限 | `grep MAX_JOINT_SPEED_RAD_S scripts/execute_assembly_chunks.py` | 0.10 rad/s |
+
+```text
+30 秒时钟探针（复制即用）：
+  python3 -c "
+  import time
+  prev=time.time(); worst=0
+  for _ in range(300):
+      time.sleep(0.1); now=time.time(); worst=max(worst,prev-now); prev=now
+  print(f'最大倒退 {worst*1000:.0f} ms')"
+
+判据（2026-11-20 实测）：
+  · 时钟倒退 5525 ms、轨迹只有 6 秒 → 必然中途卡住，控制器在"等时间追上"
+  · 同一相机位姿：时钟坏时 0.887（REFUSE），时钟好后 0.972（3/3）
+    —— 因为帧配对靠时间戳，时钟一跳彩色/深度就错位
+
+**核心判据：运动是"连续匀速"还是"停—冲—停"。前者正常；后者直接查第 1 项，
+不要怀疑规划和轨迹代码。**
 ```
 
 ## 通用开工检查清单（每次上真机前）

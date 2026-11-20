@@ -385,6 +385,43 @@ owner decision. The rule covers repository documents and the Obsidian vault alik
 - Generated artifacts (build output, screenshots, `.bak`) are the only exception, and they
   still get a log line.
 
+## Documentation split: what goes into which file (owner directive 2026-11-20)
+
+Every piece of writing has exactly one home. Do not duplicate a whole narrative across files;
+write the fact once in its home and link to it.
+
+| File | Holds | Does NOT hold |
+|---|---|---|
+| `docs/worklogs/YYYY-MM/YYYY-MM-DD_*.md` | The chronological record of one day: what was attempted, exact commands, results, incidents in order, numbers as measured | Durable rules; anything that will still matter in a month |
+| `docs/manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md` | Reusable real-machine experience, one numbered entry per lesson: **symptom → root cause → confirming command → handling → prevention**. Includes troubleshooting orders and diagnostic procedures | Day-by-day narrative; "we did X at 19:40"; anything specific to a single session |
+| `docs/agent_memory.md` | Durable environment facts and red lines the agent must obey every session | Incident stories; transient observations |
+| `docs/decisions/ADR-*.md` | Architecture/scope decisions with rationale and date | Implementation detail that the code already states |
+| `docs/evidence/experiment_index.md` | One line per archived experiment run | Analysis; put that in the work log |
+| Obsidian vault | Mirror of work logs via `scripts/sync_worklog.sh` | Standing alone as the only copy |
+
+**When to write where — automatically, no need to be asked:**
+
+- After any incident, once the root cause is confirmed: append **one** entry to the manual
+  (symptom / cause / confirming command / handling / prevention) **and** record the trail in
+  that day's work log. The manual entry must be usable by someone who never saw the incident.
+- When a procedure changes (speed limits, recovery steps, start-up checklist): update the
+  manual entry **and** the corresponding checklist in the same turn.
+- When a limit or constant changes: update the code, the tests, the manual and
+  `docs/agent_memory.md` in the same commit — never leave a document quoting the old number.
+- At the end of a working session: make sure every lesson of the session exists in the manual
+  and every fact exists in the work log, then mirror the work log to the vault.
+
+**Boundaries:**
+
+- The manual is not a scratchpad: an entry that only says "we tried several things" is not
+  acceptable; it must name the cause and the command that proves it.
+- Work logs are append-only records; do not rewrite yesterday's log to match today's
+  understanding — write a new entry and cross-reference.
+- Never delete or archive a document without the owner's written approval (see the section
+  above); a newer document never supersedes an older one by itself.
+- Manual entries keep their numbers forever; new lessons get the next number, and the index
+  table gets the matching row in the same edit.
+
 ## Branch policy (frozen 2026-11-13, owner decision)
 
 - `main` is the only active branch. **Every commit goes directly to `main`** and is
