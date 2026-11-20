@@ -54,6 +54,27 @@ HAND_EYE = REPO / "config" / "handeye" / "tcp_to_camera.json"
 COMMON = REPO / "config" / "tasks" / "common.yaml"
 
 
+def derived_pose_from_pose(reference_measurement: pathlib.Path,
+                           current_pose: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """用**实测的当前工件位姿**推导相机位姿（推荐）。
+
+    工件平移过之后，按角度合成出来的位置是错的；直接拿实测位姿最准。
+    """
+    views = yaml.safe_load(COMMON.read_text(encoding="utf-8"))["workpiece_views"]
+    anchor = views["0"]
+    T_tcp_cam = np.array(json.loads(HAND_EYE.read_text(encoding="utf-8"))["T_tcp_cam"])
+
+    T_cam0 = np.eye(4)
+    T_cam0[:3, :3] = R.from_quat(anchor["quat"]).as_matrix()
+    T_cam0[:3, 3] = anchor["tcp"]
+
+    T_base_obj_ref = nbv_views.load_pose(reference_measurement)
+    T_obj_cam = np.linalg.inv(T_base_obj_ref) @ (T_cam0 @ T_tcp_cam)
+    T_base_cam = current_pose @ T_obj_cam
+    T_base_tcp = T_base_cam @ np.linalg.inv(T_tcp_cam)
+    return T_base_tcp[:3, 3], R.from_matrix(T_base_tcp[:3, :3]).as_quat()
+
+
 def derived_pose_for_yaw(reference_measurement: pathlib.Path,
                          workpiece_yaw_deg: float) -> tuple[np.ndarray, np.ndarray]:
     """按"相对视角不变"推导该偏角下的相机位姿。
@@ -198,8 +219,16 @@ def main() -> int:
     if args.skip_derived:
         return 0
 
-    tcp, quat = derived_pose_for_yaw(pathlib.Path(args.reference_measurement), args.yaw)
-    print(f"\n[推导] 保持相对视角不变，{args.yaw:+.1f}° 的相机理论位置：")
+    # 有实测位姿就用实测（工件平移过之后，按角度合成的位置是错的）
+    if args.current_measurement:
+        current_pose = nbv_views.load_pose(pathlib.Path(args.current_measurement))
+        tcp, quat = derived_pose_from_pose(pathlib.Path(args.reference_measurement),
+                                           current_pose)
+        source = f"实测工件位姿（{pathlib.Path(args.current_measurement).name}）"
+    else:
+        tcp, quat = derived_pose_for_yaw(pathlib.Path(args.reference_measurement), args.yaw)
+        source = "按角度合成（未给 --current-measurement）"
+    print(f"\n[推导] 保持相对视角不变，{args.yaw:+.1f}° 的相机理论位置（{source}）：")
     print("        tcp  = " + " ".join(f"{v:.5f}" for v in tcp))
     print("        quat = " + " ".join(f"{v:.6f}" for v in quat))
 

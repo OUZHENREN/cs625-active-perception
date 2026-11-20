@@ -41,7 +41,9 @@ sweep_orphans() {
   # 兜底：对 SIGTERM 不敏感的组件容器/驱动组件，被 init 收养后仍会占端口/设备。
   # 只处理"父进程是 1（孤儿）+ 名字属于 ROS 组件"的进程，不动别的东西。
   local pid ppid parent_args
-  for pid in $(pgrep -f "rclcpp_components/component_container|eli_cs_robot_driver/lib" 2>/dev/null); do
+  # 2026-11-20：以前漏了 move_group。旧栈被停掉后它的 move_group 会被 /init 收养并
+  # 继续占着规划服务，新栈再起一个 → 同一时刻两个 move_group，规划/状态互相干扰。
+  for pid in $(pgrep -f "rclcpp_components/component_container|eli_cs_robot_driver/lib|moveit_ros_move_group" 2>/dev/null); do
     [ "$pid" = "$$" ] && continue
     ppid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
     parent_args=$(ps -o args= -p "${ppid:-0}" 2>/dev/null)

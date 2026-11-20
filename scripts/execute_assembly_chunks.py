@@ -734,6 +734,24 @@ def main() -> int:
     node.destroy_node()
     if rclpy.ok():
         rclpy.shutdown()
+    # 2026-11-20 事故：控制器把"最后一条轨迹的终点"当作保持目标。
+    # 之后人手拖动机械臂，控制器仍记着这个旧目标；一旦重挂外部控制脚本
+    # （ensure_robot_ready --force / recover_control.sh），它会把这个旧目标
+    # 重新下发给机器人 —— 机械臂就会"抽搐着快速跳回旧位置"。
+    # 所以每次成功执行都记下来，供 ensure_robot_ready 判断"是否被人手动挪过"。
+    try:
+        final = jobs[-1][1]["points"][-1]["q"]
+        names = jobs[-1][1]["joint_names"]
+        target = pathlib.Path("runtime/last_commanded_pose.json")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(json.dumps({
+            "joint_names": names,
+            "positions": [float(v) for v in final],
+            "stamp": time.time(),
+            "source": "execute_assembly_chunks",
+        }, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:  # noqa: BLE001 - 记录失败不影响执行结果
+        pass
     print("ALL_ASSEMBLY_CHUNKS_OK")
     return 0
 

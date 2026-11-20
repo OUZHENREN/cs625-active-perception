@@ -30,6 +30,7 @@
 from __future__ import annotations
 
 import argparse
+import datetime
 import json
 import pathlib
 import sys
@@ -117,7 +118,7 @@ def build_entry(args, payload: dict, tcp, quat, tcp_source: str) -> dict:
         "quat": round_list(quat, 6),
         "empirical_coverage": round(float(coverage), 3),
         "reference_measurement": str(relative),
-        "note": (f"2026-11-19 精拍登记：覆盖 {float(coverage):.3f}，"
+        "note": (f"{datetime.date.today().isoformat()} 精拍登记：覆盖 {float(coverage):.3f}，"
                  f"可信组 {credible}/{payload.get('groups', '?')}，"
                  f"重复性 {repeat_text(payload.get('repeatability'))}，"
                  f"相机位姿来自 {tcp_source}"),
@@ -185,7 +186,8 @@ def main() -> int:
     parser.add_argument("--tier", type=int, default=1,
                         help="1 = 新拍首选（默认）；2 = 既有兜底")
     parser.add_argument("--min-coverage", type=float, default=0.95,
-                        help="低于这个覆盖率拒绝登记")
+                        help="低于这个覆盖率拒绝登记。示教位要长期复用，标准比测量硬底线"
+                             "（0.90）更高：0.95 以上才登记（所有者 2026-11-20 定）")
     parser.add_argument("--tcp", default="", help="相机位姿 x,y,z（默认读当前机器人）")
     parser.add_argument("--quat", default="", help="相机四元数 x,y,z,w")
     parser.add_argument("--write", action="store_true", help="真正写入 common.yaml")
