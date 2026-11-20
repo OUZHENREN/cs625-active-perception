@@ -279,6 +279,8 @@ def build_parser() -> argparse.ArgumentParser:
                              "and retry (2026-11-03: the reverse-control channel drops "
                              "silently and the arm then ignores accepted goals)")
     parser.add_argument("--no-auto-recover", dest="auto_recover", action="store_false")
+    parser.add_argument("--skip-command-sync", action="store_true",
+                        help="跳过下发前的控制器记忆校正（不推荐）")
     parser.add_argument("--allow-large-move", action="store_true",
                         help="不自动分段，直接一次性下发（默认会自动分段）。加这个参数前"
                              "必须已打印 6 个关节角并得到所有者明确同意（AGENTS 安全红线）")
@@ -574,6 +576,25 @@ def main() -> int:
         # +5 s, not +25: the controller must say "I did not make it" quickly.
         goal.goal_time_tolerance = Duration(sec=int(scaled_total + 5))
 
+        # 2026-11-20 硬闸 0：下发前校正"控制器记忆位置"。
+        # 人手拖动机械臂后，控制器记忆仍停在旧目标；此时重连/重发脚本会让它
+        # 全速冲向旧位置（当天三次事故）。这里在**静止状态、下发之前**把记忆
+        # 对齐到实测位置，所以不需要所有者手动归位。
+        sync = pathlib.Path(__file__).resolve().parent / "sync_command_position.py"
+        if sync.exists() and not args.skip_command_sync:
+            check = subprocess.run([sys.executable, str(sync)],
+                                   capture_output=True, text=True, timeout=120)
+            if check.returncode == 1:      # 需要校正
+                print("控制器记忆与实际位置不一致，先校正（旧记忆会被作废）：")
+                for line in (check.stdout or "").strip().splitlines()[-3:]:
+                    print("  " + line)
+                fix = subprocess.run([sys.executable, str(sync), "--apply", "--force"],
+                                     capture_output=True, text=True, timeout=180)
+                for line in (fix.stdout or "").strip().splitlines()[-4:]:
+                    print("  " + line)
+                if fix.returncode != 0:
+                    print("命令位置校正失败；拒绝下发轨迹（不做无同步的移动）")
+                    return 18
         offset = first_point_far(data)
         if offset > args.max_start_offset:
             print(

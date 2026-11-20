@@ -122,3 +122,12 @@ def test_executor_no_longer_rearms_the_robot_on_its_own():
     body = source[source.index("def main"):]
     assert "resend_external_script(" not in body, "运动脚本里不允许自动重挂机器人"
     assert "REFUSING TO AUTO-RECOVER" in body
+
+
+def test_sync_step_is_wired_before_the_first_goal():
+    """2026-11-20：下发前必须先校正控制器记忆位置，且可显式跳过。"""
+    source = (ROOT / "scripts" / "execute_assembly_chunks.py").read_text(encoding="utf-8")
+    body = source[source.index("def main"):]
+    assert "sync_command_position.py" in body
+    assert body.index("sync_command_position.py") < body.index("client.send_goal_async")
+    assert "--skip-command-sync" in source
