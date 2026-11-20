@@ -88,6 +88,20 @@
       "command": "source scripts/source_dev_env.sh --full || exit 1; bash scripts/resume_task.sh",
       "problemMatcher": [],
       "detail": "从上次失败的那个阶段重试（读 runtime/run_task_resume.json）；先重挂、可选重启驱动栈"
+    },
+    {
+      "label": "⑪ 回停车位姿 · J4 安全位",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; python3 scripts/goto_park_pose.py --execute",
+      "problemMatcher": [],
+      "detail": "回到 j4_park_pose（J4 转轴与重力平行，断电后不摆动）；记录当前位姿用 --record"
+    },
+    {
+      "label": "⑫ 记录停车位姿",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; python3 scripts/goto_park_pose.py --record",
+      "problemMatcher": [],
+      "detail": "把当前六轴位姿写入 config/tasks/common.yaml 的 j4_park_pose（不动臂）"
     }
   ]
 }

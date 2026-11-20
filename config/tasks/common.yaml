@@ -476,6 +476,32 @@ workpiece_zero_quat:
 - 0.999888
 - 0.004504
 - 0.005061
+# 2026-11-20 所有者指定：一键回位用的"J4 停车位姿"。
+# 用途：J4 抱闸失效期间，把腕部停在一个指定的角度，减少断电后 J4 自由摆动带来的风险。
+# 记录方式：所有者在场确认位置后，由 scripts/record_j4_park_pose.py 写入（含 TCP 复核）。
+# 一键回位任务尚未实现（所有者要求先只记录）；实现时按 joints_deg 做关节空间移动。
+j4_park_pose:
+  recorded_at: "2026-11-20T14:29"
+  j4_deg: -80.53
+  joints_deg:
+  - 34.29      # shoulder_pan_joint
+  - -69.94      # shoulder_lift_joint
+  - -148.29      # elbow_joint
+  - -80.53      # wrist_1_joint
+  - 104.75      # wrist_2_joint
+  - 78.41      # wrist_3_joint
+  tcp:
+  - 0.15570
+  - 0.05791
+  - 0.06194
+  quat:
+  - 0.345071
+  - -0.897120
+  - -0.073481
+  - 0.265900
+  note: J4 停车位姿：J4 转轴与重力平行，断电后重力不会带动 J4；
+    一键回位见 scripts/goto_park_pose.py（VS Code 任务 ⑪）。
+
 workpiece_views:
   "0@20261119":
     yaw_deg: 0.0
