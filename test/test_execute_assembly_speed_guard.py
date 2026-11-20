@@ -79,3 +79,24 @@ def test_large_delta_is_above_the_hard_limit():
                  [86.0, -55.0, -151.4, -16.1, 49.2, 121.9]], [0.0, 6.0])
     deltas = executor.joint_deltas(data)
     assert max(deltas.values()) > executor.MAX_JOINT_DELTA_RAD
+
+
+def test_the_governor_is_the_only_speed_authority():
+    """2026-11-20：time_scale 不再叠加，否则实际速度变成上限的 1/3。
+
+    事故：调用方习惯性传 --time-scale 3.0，J4 转 94° 花了 98 s（0.95°/s），
+    所有者反馈"太慢"。现在治理器是唯一权威。
+    """
+    data = plan([[0, 0, 0, 0, 0, 0], [30, 0, 0, 0, 0, 0]], [0.0, 0.1])
+    times_default, info_default = executor.govern_timestamps(data, 1.0)
+    times_scaled, info_scaled = executor.govern_timestamps(data, 3.0)
+    assert times_default[-1] == pytest.approx(times_scaled[-1])
+    assert info_default["max_speed"] <= executor.MAX_JOINT_SPEED_RAD_S + 1e-9
+    assert info_scaled["max_speed"] <= executor.MAX_JOINT_SPEED_RAD_S + 1e-9
+
+
+def test_a_thirty_degree_move_takes_the_expected_time():
+    """30° 在 0.05 rad/s 下应当约 10.5 s（不是 31 s）。"""
+    data = plan([[0, 0, 0, 0, 0, 0], [30, 0, 0, 0, 0, 0]], [0.0, 6.0])
+    _times, info = executor.govern_timestamps(data, 1.0)
+    assert info["exec_duration"] == pytest.approx(10.47, abs=0.3)

@@ -87,8 +87,11 @@ def govern_timestamps(data: dict, time_scale: float) -> tuple[list[float], dict]
         dq = max(abs(points[i]["q"][j] - points[i - 1]["q"][j]) for j in idx)
         needed = dq / MAX_JOINT_SPEED_RAD_S
         times.append(times[-1] + max(plan_dt, needed, MIN_SEGMENT_SEC))
-    scale = max(1.0, float(time_scale))
-    times = [value * scale for value in times]
+    # 2026-11-20：治理器已经是速度的唯一权威（MAX_JOINT_SPEED_RAD_S 就是硬上限）。
+    # 以前这里再乘 time_scale，调用方习惯性传 3.0，实际速度变成上限的 1/3
+    # （J4 转 94° 要 98 s，所有者反馈"太慢"）。现在 time_scale 不再叠加。
+    # 需要额外放慢时，改 MAX_JOINT_SPEED_RAD_S 或按段拆分，而不是乘一个倍数。
+    del time_scale
     info = {
         "plan_duration": float(points[-1]["t"]),
         "exec_duration": times[-1],
@@ -139,6 +142,45 @@ def split_plan(data: dict, max_delta_rad: float) -> list[dict]:
         chunks.append({"joint_names": names, "points": chunk_points})
         start = end
     return chunks
+
+
+def trajectory_contact_free(node, joint_names: list[str], samples: list[list[float]],
+                            steps: int = 8):
+    """在发送前逐点校验轨迹是否有接触（2026-11-20 所有者：这是绝对底线）。
+
+    规划器已经抽检过，但自动分段会把一条轨迹切成多段，**每段都必须自己再过一遍**，
+    不能因为"上游检查过"就跳过。返回 (ok, reason)：
+      · ok=True  → 可以发；
+      · ok=False → 有接触，拒绝发送；
+      · ok=None  → /check_state_validity 不可用，调用方按"拒绝"处理（不做无验证的移动）。
+    """
+    from moveit_msgs.msg import RobotState
+    from moveit_msgs.srv import GetStateValidity
+
+    client = node.create_client(GetStateValidity, "/check_state_validity")
+    if not client.wait_for_service(timeout_sec=5.0):
+        return None, "/check_state_validity 不可用"
+    count = max(2, int(steps))
+    indices = sorted({int(round(i * (len(samples) - 1) / (count - 1)))
+                      for i in range(count)})
+    for index in indices:
+        request = GetStateValidity.Request()
+        request.group_name = "cs625_arm"
+        state = RobotState()
+        state.joint_state.name = list(joint_names)
+        state.joint_state.position = [float(v) for v in samples[index]]
+        request.robot_state = state
+        future = client.call_async(request)
+        rclpy.spin_until_future_complete(node, future, timeout_sec=8.0)
+        result = future.result()
+        if result is None:
+            return None, f"碰撞服务无响应（sample {index}）"
+        if not result.valid and result.contacts:
+            pairs = [(c.contact_body_1, c.contact_body_2) for c in result.contacts[:3]]
+            return False, f"point {index} 接触 {pairs}"
+        if not result.valid and not result.contacts:
+            return False, f"point {index} 状态无效（无接触信息）"
+    return True, ""
 
 
 def plan_jobs(files, allow_large_move: bool = False,
@@ -193,11 +235,10 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser()
     parser.add_argument("pattern")
-    parser.add_argument("--time-scale", type=float, default=2.0,
-                        help="MULTIPLIES the trajectory timestamps: >1 plays SLOWER, "
-                             "<1 plays FASTER and is refused.  2026-10-30: time-scale "
-                             "0.5 was passed believing it meant 'half speed'; it meant "
-                             "double speed and the arm hit the workpiece table.")
+    parser.add_argument("--time-scale", type=float, default=1.0,
+                        help="已废弃：速度由治理器（MAX_JOINT_SPEED_RAD_S）统一决定，"
+                             "这个倍数不再叠加到配时上。<1 仍会被拒绝（历史教训："
+                             "2026-10-30 把 0.5 当成'半速'，实际是双倍速并撞了工作台）。")
     parser.add_argument("--tail-fraction", type=float, default=0.0,
                         help="last fraction of the trajectory to run slower (0 disables)")
     parser.add_argument("--tail-scale", type=float, default=2.0,
@@ -230,6 +271,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--allow-large-move", action="store_true",
                         help="不自动分段，直接一次性下发（默认会自动分段）。加这个参数前"
                              "必须已打印 6 个关节角并得到所有者明确同意（AGENTS 安全红线）")
+    parser.add_argument("--skip-contact-check", action="store_true",
+                        help="跳过发送前的逐点碰撞校验（**不推荐**，默认每段都校验）")
     parser.add_argument("--no-auto-split", action="store_true",
                         help="超过 25° 行程时拒绝而不是自动分段（默认分段，见 split_plan）")
     parser.add_argument("--action", default=DEFAULT_ACTION,
@@ -546,7 +589,19 @@ def main() -> int:
                 f"re-check before moving again.  robot_status={status}"
             )
             return 11
-        print(f"[{index}/{len(jobs)}] start {path} time_scale={args.time_scale} "
+        # --- 2026-11-20 硬闸 3：发送前逐点碰撞校验（每段独立校验，不信任上游）---
+        if not args.skip_contact_check:
+            samples = [[float(v) for v in point.positions] for point in goal.trajectory.points]
+            ok, reason = trajectory_contact_free(node, list(goal.trajectory.joint_names),
+                                                 samples)
+            if ok is None:
+                print(f"CONTACT_CHECK_UNAVAILABLE: {reason}；拒绝发送（不做无验证的移动）")
+                return 16
+            if not ok:
+                print(f"REFUSED_CONTACT: {reason}；这一段不发送")
+                return 15
+            print(f"[{index}/{len(jobs)}] 碰撞校验：{len(samples)} 点全部无接触 ✅")
+        print(f"[{index}/{len(jobs)}] start {path} "
               f"effort_peak={peak:.2f}")
         future = client.send_goal_async(goal)
         rclpy.spin_until_future_complete(node, future, timeout_sec=10)

@@ -173,7 +173,7 @@ def auto_station(target_pose: dict, execute: bool) -> int:
 
     run = subprocess.run(
         [sys.executable, str(CHUNK_EXECUTOR), str(STATION_PLAN),
-         "--time-scale", "3.0", "--goal-tolerance", "0.001",
+         "--time-scale", "1.0", "--goal-tolerance", "0.001",
          "--verify-final", "0.004", "--fault-poll", "0.1"],
         capture_output=True, text=True, timeout=600)
     run_tail = (run.stdout or "").strip().splitlines()

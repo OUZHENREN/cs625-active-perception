@@ -212,7 +212,7 @@ def main() -> int:
 
     run = subprocess.run(
         [sys.executable, str(EXECUTOR), str(PLAN_FILE),
-         "--time-scale", "3.0", "--goal-tolerance", "0.001",
+         "--time-scale", "1.0", "--goal-tolerance", "0.001",
          "--verify-final", "0.004", "--fault-poll", "0.1"],
         capture_output=True, text=True, timeout=900)
     output = run.stdout or ""
