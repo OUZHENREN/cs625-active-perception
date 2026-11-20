@@ -36,10 +36,15 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 DEFAULT_RATED_RAD_S = 2.0943951023931953     # URDF 六轴 velocity 限位（120°/s）
 SERVICE = "/io_and_status_controller/set_speed_slider"
 MIN_FRACTION = 0.01
-# 滑块必须比轨迹速度高几倍才有跟踪余量：等于轨迹速度时伺服会一直贴着极限跑，
-# 表现为滞后、抖动、PATH_TOLERANCE_VIOLATED。3 倍余量足够跟踪，又能把失控跳变
-# 限制在 8.6°/s（出事实测是 120°/s）。
-TRACKING_HEADROOM = 3.0
+# 2026-11-20 21:2x 实测结论：滑块按"额定 120°/s 换算"是不可靠的——
+# 14.3%（推算 17.2°/s）时伺服**跟不上** 5.7°/s 的多关节轨迹，
+# 表现为落后 0.15–0.20 rad → PATH_TOLERANCE_VIOLATED（任务⑪ 连续失败两次）；
+# 30% / 50% / 100% 下同样动作全部 SUCCESSFUL。
+# 说明这台机器滑块的实际基准远低于额定值。因此默认取**实测可靠**的 50%：
+#   · 长行程（−29 站位）与停车位任务在 50% 下均验证通过；
+#   · 失控跳变速度仍只有满滑块的一半。
+DEFAULT_FRACTION = 0.50
+TRACKING_HEADROOM = 3.0        # 仅用于打印"理论换算"，不作默认值
 
 
 def joint_speed_cap() -> float:
@@ -75,13 +80,15 @@ def main() -> int:
 
     cap = joint_speed_cap()
     rated = rated_speed()
-    fraction = args.fraction if args.fraction else cap * TRACKING_HEADROOM / rated
+    fraction = args.fraction if args.fraction else DEFAULT_FRACTION
     fraction = max(MIN_FRACTION, min(1.0, fraction))
     max_speed = fraction * rated
 
     print(f"[slider] 我们的关节速度上限 : {cap:.4f} rad/s = {cap*57.2958:.2f}°/s")
     print(f"[slider] 机器人额定关节速度 : {rated:.4f} rad/s = {rated*57.2958:.1f}°/s")
-    print(f"[slider] 应设滑块比例       : {fraction:.4f}（{fraction*100:.1f}%）"
+    print(f"[slider] 理论换算（仅供参考）: {cap * TRACKING_HEADROOM / rated:.4f}"
+          f"（按额定 {rated*57.2958:.0f}°/s 推算；实测不可靠，见文件头说明）")
+    print(f"[slider] 实际采用           : {fraction:.4f}（{fraction*100:.1f}%）"
           f" → 最大 {max_speed*57.2958:.2f}°/s"
           f"（轨迹上限 {cap*57.2958:.2f}°/s 的 {max_speed/cap:.1f} 倍余量）")
     if args.show:

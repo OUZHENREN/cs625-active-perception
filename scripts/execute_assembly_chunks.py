@@ -283,6 +283,8 @@ def build_parser() -> argparse.ArgumentParser:
                              "and retry (2026-11-03: the reverse-control channel drops "
                              "silently and the arm then ignores accepted goals)")
     parser.add_argument("--no-auto-recover", dest="auto_recover", action="store_false")
+    parser.add_argument("--launch-hold", type=float, default=1.2,
+                        help="每段开头原地保持的秒数，给伺服启动留时间（默认 1.2，0=关闭）")
     parser.add_argument("--skip-command-sync", action="store_true",
                         help="跳过下发前的控制器记忆校正（不推荐）")
     parser.add_argument("--allow-large-move", action="store_true",
@@ -536,11 +538,24 @@ def main() -> int:
 
         goal = FollowJointTrajectory.Goal()
         goal.trajectory.joint_names = data["joint_names"]
+        # 2026-11-20：每段开头加一个"保持原地"的死区（默认 1.2 s）。
+        # 机械臂从静止起步有约 1.0–1.5 s 的伺服启动延迟；速度提到 5.7°/s 后，
+        # 25° 的段只有 4.4 s，延迟占比过大 → 控制器在 t≈1.5 s 检查时发现
+        # "目标已在动、机械臂还没动"，判 PATH_TOLERANCE_VIOLATED 直接中止
+        # （2026-11-20 21:12 任务⑪ 就是这样失败的）。
+        # 开头保持不动后，这段时间期望位置与实际位置都是静止，检查必然通过。
+        lead = max(0.0, float(args.launch_hold))
+        if lead > 0.0:
+            hold = JointTrajectoryPoint()
+            hold.positions = list(data["points"][0]["q"])
+            hold.time_from_start = Duration(sec=0, nanosec=0)
+            goal.trajectory.points.append(hold)
         for point, stamp in zip(data["points"], governed):
             message = JointTrajectoryPoint()
             message.positions = point["q"]
+            shifted = stamp + lead
             message.time_from_start = Duration(
-                sec=int(stamp), nanosec=int((stamp - int(stamp)) * 1e9)
+                sec=int(shifted), nanosec=int((shifted - int(shifted)) * 1e9)
             )
             goal.trajectory.points.append(message)
         scaled_total = governed[-1]

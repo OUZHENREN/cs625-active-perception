@@ -18,20 +18,15 @@ tool = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(tool)
 
 
-def test_fraction_leaves_tracking_headroom():
-    """滑块必须比轨迹速度快几倍，否则伺服一直贴着极限跑会滞后/抖动。"""
-    cap = tool.joint_speed_cap()
-    rated = tool.DEFAULT_RATED_RAD_S
-    fraction = cap * tool.TRACKING_HEADROOM / rated
-    # 2.094 rad/s 额定 + 0.10 上限 + 3 倍余量 → 约 14.3%（17.2°/s）
-    assert fraction == pytest.approx(0.1433, abs=0.005)
-    assert fraction * rated > cap * 2, "余量必须明显大于 1 倍"
-    assert fraction < 0.2, "仍要远低于额定，避免失控跳变全速"
+def test_default_fraction_is_the_verified_value():
+    """2026-11-20：按额定速度算的 14.3% 实测跟不上，默认改用实测可靠的 50%。"""
+    assert tool.DEFAULT_FRACTION == pytest.approx(0.50)
 
 
-def test_headroom_is_not_one():
-    """等于轨迹速度（余量 1.0）是之前踩过的坑，必须大于 1。"""
-    assert tool.TRACKING_HEADROOM > 2.0
+def test_default_is_far_below_full_slider():
+    """50% 仍显著低于满滑块，失控跳变速度被压掉一半。"""
+    assert tool.DEFAULT_FRACTION < 0.8
+    assert tool.DEFAULT_FRACTION > 0.2      # 太低会跟不住，14.3% 已失败过
 
 
 def test_min_fraction_never_zero():
