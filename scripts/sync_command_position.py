@@ -134,6 +134,60 @@ def switch(activate: bool) -> bool:
     return "Successfully" in text or "successful" in text.lower()
 
 
+def hold_at_current(measured: dict[str, float], duration: float = 0.8) -> bool:
+    """发一条"停在当前位置"的零位移轨迹，让控制器记忆 = 当前实际位置。
+
+    2026-11-20：这比"失活→激活"安全得多——失活会让伺服释放约 1.8 秒，
+    J4 抱闸已损坏，机械臂会在这段时间轻微下沉，做几次就累积成可见漂移
+    （所有者当场观察到"为什么现在总是漂移"）。零位移轨迹不释放伺服，
+    只把控制器的命令更新为当前位姿。
+    """
+    import rclpy
+    from control_msgs.action import FollowJointTrajectory
+    from rclpy.action import ActionClient
+    from rclpy.node import Node
+    from trajectory_msgs.msg import JointTrajectoryPoint
+
+    names = [name for name in ORDER if name in measured]
+    if len(names) != 6:
+        return False
+
+    rclpy.init()
+    node = Node("sync_hold_sender")
+    client = ActionClient(node, FollowJointTrajectory, "/arm_controller/follow_joint_trajectory")
+    if not client.wait_for_server(timeout_sec=10.0):
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+        return False
+
+    goal = FollowJointTrajectory.Goal()
+    goal.trajectory.joint_names = names
+    for stamp in (0.2, duration):
+        point = JointTrajectoryPoint()
+        point.positions = [float(measured[name]) for name in names]
+        point.velocities = [0.0] * 6
+        point.time_from_start.sec = int(stamp)
+        point.time_from_start.nanosec = int((stamp - int(stamp)) * 1e9)
+        goal.trajectory.points.append(point)
+
+    send = client.send_goal_async(goal)
+    rclpy.spin_until_future_complete(node, send, timeout_sec=10.0)
+    handle = send.result()
+    if handle is None or not handle.accepted:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+        return False
+    result = handle.get_result_async()
+    rclpy.spin_until_future_complete(node, result, timeout_sec=15.0)
+    done = result.done()
+    node.destroy_node()
+    if rclpy.ok():
+        rclpy.shutdown()
+    return bool(done)
+
+
 def resend_script() -> bool:
     command = ["ros2", "service", "call",
                "/io_and_status_controller/resend_external_script",
@@ -196,20 +250,21 @@ def main() -> int:
         return 3
 
     before = measured
-    if not switch(False):
-        print("[sync] 失活 arm_controller 失败；未做任何改动")
-        return 4
-    if not switch(True):
-        print("[sync] 重新激活失败；请运行 scripts/recover_driver_stack.sh")
-        return 5
-    print("[sync] 控制器已重新激活（记忆 = 当前实际位置）")
-
-    if not ports_up():
-        if resend_script():
+    # 优先：零位移轨迹（不释放伺服，因此不会漂移）
+    if ports_up() and hold_at_current(measured):
+        print("[sync] 已用零位移轨迹把记忆对齐（伺服未释放，不会漂移）")
+    else:
+        print("[sync] 零位移轨迹不可用（端口断开或控制器未就绪），改用失活→激活；")
+        print("       注意：这一步会让伺服释放约 1.8 秒，J4 无抱闸，可能轻微下沉")
+        if not switch(False):
+            print("[sync] 失活 arm_controller 失败；未做任何改动")
+            return 4
+        if not switch(True):
+            print("[sync] 重新激活失败；请运行 scripts/recover_driver_stack.sh")
+            return 5
+        print("[sync] 控制器已重新激活（记忆 = 当前实际位置）")
+        if not ports_up() and resend_script():
             print("[sync] 已重发外部控制脚本，反控端口恢复")
-        else:
-            print("[sync] 重发外部控制脚本失败；请检查示教器与网络")
-            return 6
     time.sleep(1.5)
 
     after = read_measured()

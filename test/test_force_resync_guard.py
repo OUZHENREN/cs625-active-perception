@@ -59,3 +59,13 @@ def test_malformed_baseline_is_not_fatal(tmp_path, monkeypatch):
             return None
 
     assert tool.measured_vs_last_commanded(Dummy()) is None
+
+
+def test_sync_prefers_the_hold_trajectory_over_deactivation():
+    """2026-11-20：优先用零位移轨迹同步，失活/激活会让伺服释放 ~1.8 s 并造成漂移。"""
+    source = (ROOT / "scripts" / "sync_command_position.py").read_text(encoding="utf-8")
+    body = source[source.index("def main"):]
+    assert "hold_at_current" in body
+    # 零位移轨迹必须先于 switch(False)
+    assert body.index("hold_at_current") < body.index("switch(False)")
+    assert "伺服未释放" in body or "不会漂移" in body
