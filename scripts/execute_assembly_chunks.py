@@ -66,6 +66,17 @@ DEFAULT_ACTION = "/arm_controller/follow_joint_trajectory"
 # 的位置并越界（J1 128.7°、J6 156.8°），随后驱动失联。此后速度与行程由代码强制。
 MAX_JOINT_SPEED_RAD_S = 0.05     # 单关节速度硬上限 ≈ 2.9 °/s（远低于任何示教/装配需求）
 MAX_JOINT_DELTA_RAD = 0.44       # 单个计划文件里任一关节的行程硬上限 = 25°
+
+
+# 绝对安全关节区间（弧度）。超出即认为"不该在这里"，执行中立即取消。
+SAFE_JOINT_LIMITS = (
+    ("shoulder_pan_joint", math.radians(-100.0), math.radians(100.0)),
+    ("shoulder_lift_joint", math.radians(-110.0), math.radians(10.0)),
+    ("elbow_joint", math.radians(-160.0), math.radians(-100.0)),
+    ("wrist_1_joint", math.radians(-150.0), math.radians(150.0)),
+    ("wrist_2_joint", math.radians(-150.0), math.radians(150.0)),
+    ("wrist_3_joint", math.radians(-150.0), math.radians(150.0)),
+)
 MIN_SEGMENT_SEC = 0.25           # 每段最短时间，避免时间戳过密导致控制器插值抖动
 
 
@@ -682,15 +693,40 @@ def main() -> int:
                     print("  a protective stop happened < 60 s ago; refusing to "
                           "auto-recover -- operator must review first")
                     return 8
-                if args.auto_recover and not reverse_ports_up():
-                    print("  reverse-control ports are down; re-sending "
-                          "external_control on the robot")
-                    if resend_external_script():
-                        time.sleep(2.0)
-                        print("  resend succeeded; the caller may retry this chunk")
-                        return 10
-                    print("  resend FAILED; owner intervention needed")
+                # 2026-11-20 事故：这里以前会自动 resend_external_script。
+                # 重发脚本会让控制器把它记着的"旧目标"重新下发 —— 机械臂会
+                # 不受控地快速冲向旧位置（当天两次：一次抽搐着跳回轨迹终点，
+                # 一次大角度偏转越过 J6 ±150° 安全区间，所有者按下急停）。
+                # **运动脚本绝不能有"重新武装机器人"这种副作用。**
+                # 现在只报告事实，由所有者确认臂位后再手工恢复。
+                if not reverse_ports_up():
+                    print("  reverse-control ports are down (protective stop / robot "
+                          "powered off).")
+                    print("  REFUSING TO AUTO-RECOVER: re-sending external_control "
+                          "makes the controller replay its held target and the arm "
+                          "can move uncontrolled.")
+                    print("  Owner action: confirm the arm's pose on the pendant, "
+                          "then run scripts/recover_control.sh deliberately.")
                 return 8
+        # 2026-11-20 硬闸：等待执行时持续采样关节角，任一关节超出绝对安全区间
+        # 立即取消目标。原因：当天出现过"臂走到 J6=157°，越过 ±150° 安全区间"，
+        # 而原来的实现只在执行结束后才校验。
+        deadline = time.time() + wait_budget
+        out_of_range = None
+        while not result_future.done() and time.time() < deadline:
+            rclpy.spin_once(node, timeout_sec=0.05)
+            for name, low, high in SAFE_JOINT_LIMITS:
+                value = latest.get(name)
+                if value is not None and not (low <= value <= high):
+                    out_of_range = (name, value, low, high)
+                    break
+            if out_of_range:
+                print(f"JOINT_OUT_OF_RANGE during execution: {out_of_range[0]}="
+                      f"{out_of_range[1]:.3f} rad outside [{out_of_range[2]:.3f}, "
+                      f"{out_of_range[3]:.3f}]; cancelling the goal NOW")
+                cancel = client.cancel_goal_async(handle)
+                rclpy.spin_until_future_complete(node, cancel, timeout_sec=5.0)
+                return 17
         if not result_future.done():
             print(f"TIMEOUT after {wait_budget:.0f} s; {robot_state_text()}")
             return 5

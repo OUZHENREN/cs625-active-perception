@@ -100,3 +100,25 @@ def test_a_thirty_degree_move_takes_the_expected_time():
     data = plan([[0, 0, 0, 0, 0, 0], [30, 0, 0, 0, 0, 0]], [0.0, 6.0])
     _times, info = executor.govern_timestamps(data, 1.0)
     assert info["exec_duration"] == pytest.approx(10.47, abs=0.3)
+
+
+def test_safe_joint_limits_cover_all_six_joints():
+    """执行中看门狗用的绝对安全区间：六轴齐全，且上下界有序。"""
+    limits = executor.SAFE_JOINT_LIMITS
+    assert len(limits) == 6
+    names = {name for name, _, _ in limits}
+    assert names == {"shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+                     "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"}
+    for name, low, high in limits:
+        assert low < high, name
+    wrist3 = [item for item in limits if item[0] == "wrist_3_joint"][0]
+    # 2026-11-20：臂实际走到 J6=157°，越过 ±150° 区间；这条守住上限不被放宽
+    assert math.degrees(wrist3[2]) == pytest.approx(150.0)
+
+
+def test_executor_no_longer_rearms_the_robot_on_its_own():
+    """执行器**不得**有"重发 external_control"这种副作用（2026-11-20 事故）。"""
+    source = (ROOT / "scripts" / "execute_assembly_chunks.py").read_text(encoding="utf-8")
+    body = source[source.index("def main"):]
+    assert "resend_external_script(" not in body, "运动脚本里不允许自动重挂机器人"
+    assert "REFUSING TO AUTO-RECOVER" in body
