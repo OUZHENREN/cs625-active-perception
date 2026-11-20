@@ -178,8 +178,12 @@ def test_real_measurements_validate_derivation_against_stored_stations():
     handeye = json.loads((REPO / "config" / "handeye" / "tcp_to_camera.json").read_text())
     ref = nbv_views.load_pose(REPO / "runtime" / "measurements" / "workpiece_zero.json")
     cur = nbv_views.load_pose(REPO / "runtime" / "measurements" / "workpiece_minus30.json")
-    plan = nbv_views.station_plan(config["workpiece_views"], ref, cur,
-                                  np.array(handeye["T_tcp_cam"]))
+    # 2026-11-20：今天精拍了一批 tier 1 站位，且工件本身被移动过。
+    # 这个回归的意图是"旧 −30 站位与 0° 相对视角推导一致"，所以只喂旧站位，
+    # 否则会选中更新的 tier 1 站位（它的工件位姿是另一天记录的，偏差自然大）。
+    legacy = {key: value for key, value in config["workpiece_views"].items()
+              if isinstance(value, dict) and value.get("tier", 2) != 1}
+    plan = nbv_views.station_plan(legacy, ref, cur, np.array(handeye["T_tcp_cam"]))
     assert plan["yaw_deg"] == pytest.approx(-29.6, abs=0.5)
     assert plan["verdict"] == "station"
     assert plan["station"][1] == "-30"

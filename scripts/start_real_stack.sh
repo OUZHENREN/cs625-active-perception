@@ -147,6 +147,12 @@ start_driver() {
     return 1
   fi
   mkdir -p runtime/logs
+  # 2026-11-20 自愈：起栈前清掉上次运行留下的僵尸 FastDDS 共享内存段。
+  # 僵尸段会占住端口，导致新进程建参与者失败 → "节点进程活着、图里却没有发布者"。
+  # 清理器只删"没有任何活进程占用"的段（含 open() 打开的 _el 文件，见脚本注释）。
+  if [ -f scripts/clean_dds_shm.py ]; then
+    python3 scripts/clean_dds_shm.py --clean --threshold 8 || true
+  fi
   local log="runtime/logs/driver_$(date +%H%M%S).log"
   # setsid：让整棵驱动进程树属于同一个进程组，后面可以整组停掉
   setsid nohup ros2 launch cs625_bringup real_base.launch.py \
