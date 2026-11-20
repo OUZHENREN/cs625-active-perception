@@ -163,6 +163,9 @@ start_driver() {
     launch_sensor_adapter:=false activate_joint_controller:=false \
     execute:=false require_confirmation:=true >> "$log" 2>&1 &
   echo $! > runtime/driver.pgid
+  # 2026-11-20：滑块必须按我们的关节速度上限换算，避免失控跳变时全速冲出安全区间。
+  sleep 1
+  python3 scripts/set_speed_slider.py || echo "[开工] 警告：速度滑块未设置成功"
   echo "[开工] 已在后台启动驱动栈（进程组 $(cat runtime/driver.pgid)），日志 $log"
 }
 
