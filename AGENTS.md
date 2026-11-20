@@ -461,7 +461,7 @@ Hard rules, already implemented in `scripts/execute_assembly_chunks.py` and
 `scripts/plan_pose_ik.py`:
 
 - **The executor never trusts the plan's timestamps.** It re-times every trajectory so no
-  joint exceeds `MAX_JOINT_SPEED_RAD_S = 0.05 rad/s` (~2.9 deg/s), and only ever slows a plan
+  joint exceeds `MAX_JOINT_SPEED_RAD_S = 0.10 rad/s` (~5.7 deg/s; raised from 0.05 on 2026-11-20 by the owner because 2.86 deg/s sat at the servo deadband and caused jitter plus 'state tolerance' aborts), and only ever slows a plan
   (`time_scale < 1` is refused; the governor applies `max(1.0, time_scale)`).
 - **Single-joint travel is capped at `MAX_JOINT_DELTA_RAD = 0.44 rad` (25 deg) per plan.**
   A plan that exceeds it is refused (`REFUSED_LARGE_MOVE`) unless the six joint angles have

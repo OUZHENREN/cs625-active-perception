@@ -23,8 +23,8 @@ def test_fraction_leaves_tracking_headroom():
     cap = tool.joint_speed_cap()
     rated = tool.DEFAULT_RATED_RAD_S
     fraction = cap * tool.TRACKING_HEADROOM / rated
-    # 2.094 rad/s 额定 + 0.05 上限 + 3 倍余量 → 约 7.2%（8.6°/s）
-    assert fraction == pytest.approx(0.0716, abs=0.002)
+    # 2.094 rad/s 额定 + 0.10 上限 + 3 倍余量 → 约 14.3%（17.2°/s）
+    assert fraction == pytest.approx(0.1433, abs=0.005)
     assert fraction * rated > cap * 2, "余量必须明显大于 1 倍"
     assert fraction < 0.2, "仍要远低于额定，避免失控跳变全速"
 

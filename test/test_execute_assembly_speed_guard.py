@@ -96,10 +96,17 @@ def test_the_governor_is_the_only_speed_authority():
 
 
 def test_a_thirty_degree_move_takes_the_expected_time():
-    """30° 在 0.05 rad/s 下应当约 10.5 s（不是 31 s）。"""
-    data = plan([[0, 0, 0, 0, 0, 0], [30, 0, 0, 0, 0, 0]], [0.0, 6.0])
+    """30° 在 0.10 rad/s 下应当约 5.2 s（2026-11-20 上限翻倍前是 10.5 s）。"""
+    # 计划只给 0.1 s（相当于 300°/s），必须被拉长到 30° / 0.10 rad/s ≈ 5.24 s。
+    # 注意治理器只减速不加速：计划本身更慢时保持计划时长。
+    data = plan([[0, 0, 0, 0, 0, 0], [30, 0, 0, 0, 0, 0]], [0.0, 0.1])
     _times, info = executor.govern_timestamps(data, 1.0)
-    assert info["exec_duration"] == pytest.approx(10.47, abs=0.3)
+    assert info["exec_duration"] == pytest.approx(5.24, abs=0.3)
+    assert info["max_speed"] <= executor.MAX_JOINT_SPEED_RAD_S + 1e-9
+
+    slower = plan([[0, 0, 0, 0, 0, 0], [30, 0, 0, 0, 0, 0]], [0.0, 6.0])
+    _times2, info2 = executor.govern_timestamps(slower, 1.0)
+    assert info2["exec_duration"] == pytest.approx(6.0, abs=0.05)
 
 
 def test_safe_joint_limits_cover_all_six_joints():
