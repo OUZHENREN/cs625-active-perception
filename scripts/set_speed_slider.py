@@ -36,6 +36,10 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 DEFAULT_RATED_RAD_S = 2.0943951023931953     # URDF 六轴 velocity 限位（120°/s）
 SERVICE = "/io_and_status_controller/set_speed_slider"
 MIN_FRACTION = 0.01
+# 滑块必须比轨迹速度高几倍才有跟踪余量：等于轨迹速度时伺服会一直贴着极限跑，
+# 表现为滞后、抖动、PATH_TOLERANCE_VIOLATED。3 倍余量足够跟踪，又能把失控跳变
+# 限制在 8.6°/s（出事实测是 120°/s）。
+TRACKING_HEADROOM = 3.0
 
 
 def joint_speed_cap() -> float:
@@ -71,14 +75,15 @@ def main() -> int:
 
     cap = joint_speed_cap()
     rated = rated_speed()
-    fraction = args.fraction if args.fraction else cap / rated
+    fraction = args.fraction if args.fraction else cap * TRACKING_HEADROOM / rated
     fraction = max(MIN_FRACTION, min(1.0, fraction))
     max_speed = fraction * rated
 
     print(f"[slider] 我们的关节速度上限 : {cap:.4f} rad/s = {cap*57.2958:.2f}°/s")
     print(f"[slider] 机器人额定关节速度 : {rated:.4f} rad/s = {rated*57.2958:.1f}°/s")
     print(f"[slider] 应设滑块比例       : {fraction:.4f}（{fraction*100:.1f}%）"
-          f" → 最大 {max_speed*57.2958:.2f}°/s")
+          f" → 最大 {max_speed*57.2958:.2f}°/s"
+          f"（轨迹上限 {cap*57.2958:.2f}°/s 的 {max_speed/cap:.1f} 倍余量）")
     if args.show:
         return 0
 
