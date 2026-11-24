@@ -130,7 +130,7 @@
 | 当前主线 | 两模式跑同一条链路（`scripts/teaching/teaching_sequence.py`）：效率 `scripts/teaching/teaching_debug.py`（开发中）、示教/安全 `scripts/resume_teaching.sh`（已冻结）；六模式按 ADR-005 冻结，不是入口 | 原 §139④、ADR-005 |
 | 工件粗观测基准点 | (0.62380, 0.37375, 0.50762)，效率模式起点，2026-11-13 所有者确认 | `config/tasks/common.yaml` 的 `workpiece_views`、原 §139⑤ |
 | 关节速度硬上限 | `MAX_JOINT_SPEED_RAD_S = 0.10` rad/s（5.7°/s，2026-11-20 由 0.05 提高；2.86°/s 落在伺服死区，导致抖动与终点容差中止） | `scripts/execute_assembly_chunks.py:67`、手册第 34 条 |
-| 非自然构型规则 | 腕部奇异解（\|wrist_2\| 距 90° ≤3°）**无条件拒绝**；腕部翻转（wrist_1/wrist_3 行程 >90°）默认拒绝，需 `--allow-flip` 显式放行 | `scripts/plan_pose_ik.py`、手册第 42 条 |
+| 非自然构型规则 | 腕部**奇异不拒绝**（垂直抓取天然 w2≈90°，已验证 pre_grasp 就是 90.8°）；拒绝的是腕部翻转（wrist_1/wrist_3 行程 >90°，需 `--allow-flip`）与离已验证姿态 >60° 的解 | `scripts/plan_pose_ik.py`、手册第 42 条 |
 | 肘部安全区间 | **(−160, −60)**（2026-11-24 所有者批准，原 −100；真机验证过的姿态肘部到 −107/−102/−92，预抓取解为 −69） | `scripts/plan_pose_ik.py` 两处限位表、手册第 41 条 |
 | 预抓取位口径 | **抓取点正上方 150 mm**（示教链与效率模式一致）；config 里的 `pre_grasp` 键是横向 120 mm 旧值，预抓取阶段不使用 | `scripts/teaching/pose_math.py` 的 `APPROACH_HEIGHT_M`、`scripts/run_pick_and_place.py` 的 `approach_pose()` |
 | 示教位覆盖率门槛 | **0.95**（测量硬底线 0.90；0.90–0.95 只算"可接受但证据偏弱"，不得登记为示教位） | `scripts/add_station_from_measurement.py --min-coverage`、手册第 38 条 |

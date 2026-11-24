@@ -135,9 +135,15 @@ PROVEN_POSTURES = (
 
 # 2026-11-24 所有者定：非自然构型（翻转解 / 腕部奇异解）**直接拒绝**，不许在真机上执行。
 # 起因：预抓取位只有 w2=±90°（奇异）的解，执行后机械臂走到怪异构型，所有者按了急停。
-WRIST_SINGULARITY_DEG = 90.0     # 腕部奇异：wrist_2 接近 ±90° 时两轴对齐，数值解不稳定
-SINGULARITY_TOLERANCE_DEG = 3.0  # 距奇异点多少度以内算"落在奇异点上"
-FLIP_TRAVEL_DEG = 90.0           # wrist_1 或 wrist_3 需要转这么多度 = 腕部翻转
+# 注意：垂直抓取（工具朝下）本来就把 wrist_2 压在 ±90° 附近，真机验证过的
+# pre_grasp 就是 90.8°，所以**奇异本身不是错误**，不做拒绝。
+FLIP_TRAVEL_DEG = 90.0           # wrist_1 或 wrist_3 需转这么多度 = 腕部翻转，拒绝
+PROVEN_WARN_DEG = 60.0           # 离所有已验证姿态都超过这个角度 → 提示风险
+# 2026-11-24：位姿正好落在腕部奇异点时，把工具沿 x 轴倾斜一点点就能离开奇异。
+# 实测（工件 x=0.638 的预抓取位）：0° 奇异；10°→w2 97.7；15°→102.0；20°→106.5。
+# 倾斜本身是装配里已经在用的手法（插入段就是 Ry(−10°)），不是新引入的风险。
+AUTO_TILT_STEP_DEG = 5.0
+AUTO_TILT_MAX_DEG = 20.0
 
 SIGNATURE_JOINTS = ("shoulder_pan_joint", "elbow_joint", "wrist_2_joint")
 
@@ -199,6 +205,9 @@ def main() -> int:
     parser.add_argument("--allow-large-move", action="store_true",
                         help="允许单关节行程 >25°（默认拒绝）。加之前必须已打印 6 个关节角"
                              "并得到所有者明确同意（2026-11-18 事故后新增强制闸）")
+    parser.add_argument("--auto-tilt", action="store_true",
+                        help="位姿落在腕部奇异点时，自动绕 x 轴小幅倾斜后重试"
+                             f"（步长 {AUTO_TILT_STEP_DEG:.0f}°，最多 {AUTO_TILT_MAX_DEG:.0f}°）")
     parser.add_argument("--allow-flip", action="store_true",
                         help="允许腕部翻转解（默认拒绝：翻转属大角度重构，需逐段确认）")
     parser.add_argument("--ik-seeds", type=int, default=12,
@@ -252,8 +261,8 @@ def main() -> int:
     start_signature = configuration_signature(
         {name: math.degrees(start[i]) for i, name in enumerate(names)})
     candidates_pool = []
-    rejected_singular: list = []
     rejected_flip: list = []
+    far_from_proven: list = []
     rng = np.random.default_rng(7)
     # 种子顺序：已验证姿态优先（它们能收敛到可用分支），再用当前位姿与随机扰动。
     seeds = [[math.radians(v) for v in posture] for posture in PROVEN_POSTURES]
@@ -286,17 +295,23 @@ def main() -> int:
         candidate = [solution.get(name, start[i]) for i, name in enumerate(names)]
         if not acceptable(candidate, names):
             continue
-        # 2026-11-24：拒绝腕部奇异解。w2 落在 ±90° 附近时 w1/w3 有无穷多组合，
-        # 解出来的构型"看着能到"但实际运动不可预测（真机上走到过怪异位置）。
-        w2_deg = math.degrees(candidate[names.index("wrist_2_joint")])
-        if abs(abs(w2_deg) - WRIST_SINGULARITY_DEG) <= SINGULARITY_TOLERANCE_DEG:
-            rejected_singular.append((w2_deg, [round(math.degrees(v), 1) for v in candidate]))
-            continue
+        # 2026-11-24（第二版，所有者纠正）：**不拒绝腕部奇异**。
+        # 垂直抓取（工具朝下）本来就把 wrist_2 压在 90° 附近——真机验证过的
+        # pre_grasp 就是 w2=90.8°，一直正常执行。把奇异当错误会挡住正常抓取。
+        # 真正要拒绝的是"腕部翻转/离已验证姿态过远"的解：那种解要求腕部大角度
+        # 重构，中途构型会变得很奇怪（今天真机上就走到过，所有者按了急停）。
         # 拒绝腕部翻转：w1 或 w3 相对当前要大角度重构
         w1_travel = abs(math.degrees(candidate[names.index("wrist_1_joint")]
                                      - start[names.index("wrist_1_joint")]))
         w3_travel = abs(math.degrees(candidate[names.index("wrist_3_joint")]
                                      - start[names.index("wrist_3_joint")]))
+        candidate_deg = [math.degrees(v) for v in candidate]
+        nearest_proven = min(
+            (max(abs(a - b) for a, b in zip(candidate_deg, posture))
+             for posture in PROVEN_POSTURES), default=0.0)
+        if nearest_proven > PROVEN_WARN_DEG:
+            far_from_proven.append((nearest_proven,
+                                    [round(v, 1) for v in candidate_deg]))
         if not args.allow_flip and max(w1_travel, w3_travel) > FLIP_TRAVEL_DEG:
             rejected_flip.append((max(w1_travel, w3_travel),
                                   [round(math.degrees(v), 1) for v in candidate]))
@@ -312,13 +327,6 @@ def main() -> int:
     candidates_pool.sort(key=lambda item: (item[0], item[1], item[2]))
     if not candidates_pool:
         print("IK_FAILED 所有种子都无解（或被安全区间拒绝）")
-        if rejected_singular:
-            print(f"  · {len(rejected_singular)} 个解落在腕部奇异点"
-                  f"（wrist_2 ≈ ±{WRIST_SINGULARITY_DEG:.0f}°，"
-                  f"容差 {SINGULARITY_TOLERANCE_DEG:.0f}°）："
-                  + " / ".join(f"w2={w:.1f}°" for w, _ in rejected_singular[:3]))
-            print("    奇异点上 wrist_1/wrist_3 有无穷多组合，实际运动不可预测，"
-                  "按所有者 2026-11-24 的规则**拒绝执行**。")
         if rejected_flip:
             worst = max(rejected_flip, key=lambda item: item[0])
             print(f"  · {len(rejected_flip)} 个解需要腕部翻转"
