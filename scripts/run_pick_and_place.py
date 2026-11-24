@@ -148,6 +148,9 @@ class Config:
     # 2026-11-24：抓取点相对工件的固定位姿（所有者手工验证，见手册第 43 条）。
     # 有它就跟随实测工件位姿推导抓取点，不再依赖 workpiece_frame_offset。
     grasp_in_workpiece_frame: dict = field(default_factory=dict)
+    # 2026-11-24（三次碰撞后）：接近工件的运动策略（config/tasks/common.yaml 的
+    # approach_motion）。远距离用关节空间，最后 cartesian_radius_m 以内必须笛卡尔直线。
+    approach_motion: dict = field(default_factory=dict)
     lift_total_mm: float = 155.0
     safe_clear_mm: float = 150.0
     velocity_scale: float = 0.02
@@ -222,6 +225,7 @@ def load_config(path: str) -> Config:
         workpiece_reference=dict(raw.get("workpiece_reference") or {}),
         workpiece_bbox=list(raw.get("workpiece_bbox") or []),
         grasp_in_workpiece_frame=dict(raw.get("grasp_in_workpiece_frame") or {}),
+        approach_motion=dict(raw.get("approach_motion") or {}),
         lift_total_mm=float(raw.get("lift_total_mm", 155.0)),
         safe_clear_mm=float(raw.get("safe_clear_mm", 150.0)),
         velocity_scale=float(raw.get("velocity_scale", 0.02)),
@@ -1471,6 +1475,7 @@ class UnloadConfig:
     # 2026-11-24：抓取点相对工件的固定位姿（所有者手工验证，见手册第 43 条）。
     # 有它就跟随实测工件位姿推导抓取点，不再依赖 workpiece_frame_offset。
     grasp_in_workpiece_frame: dict = field(default_factory=dict)
+    approach_motion: dict = field(default_factory=dict)
     extract_steps_mm: float = 40.0
     lift_total_mm: float = 155.0
     velocity_scale: float = 0.02
@@ -1527,6 +1532,7 @@ def load_unload_config(path: str) -> UnloadConfig:
         workpiece_reference=dict(raw.get("workpiece_reference") or {}),
         workpiece_bbox=list(raw.get("workpiece_bbox") or []),
         grasp_in_workpiece_frame=dict(raw.get("grasp_in_workpiece_frame") or {}),
+        approach_motion=dict(raw.get("approach_motion") or {}),
         extract_steps_mm=float(raw.get("extract_steps_mm", 40.0)),
         lift_total_mm=float(raw.get("lift_total_mm", 155.0)),
         velocity_scale=float(raw.get("velocity_scale", 0.02)),
@@ -2261,6 +2267,34 @@ def approach_pose(grasp_xyz) -> np.ndarray:
     return point
 
 
+def approach_staging_point(pre_xyz, radius_m: float) -> np.ndarray:
+    """预抓取位正上方 ``radius_m`` 处的关节空间终点。
+
+    2026-11-24（一天三次撞到工件之后定）：接近工件必须"远处关节空间 + 近处笛卡尔直线"。
+    关节空间插值只保证终点，路径上 TCP 会走出弧线——当天三次碰撞全是这么撞的
+    （target z=0.0895 但实际停在 z=0.2767，横摆 49 mm）。所以关节空间只走到离工件
+    ≥ ``cartesian_radius_m`` 的高处，最后一段交给 move_tcp_linear.py（笛卡尔 + 点云间隙闸）。
+    """
+    point = np.asarray(pre_xyz, dtype=float).copy()
+    point[2] += float(radius_m)
+    return point
+
+
+def cartesian_move(xyz, velocity: float, time_scale: float) -> bool:
+    """用 move_tcp_linear.py 走一段笛卡尔直线（保持当前工具姿态）。
+
+    选它而不是 node.plan_cartesian，是因为只有它带**工件点云间隙闸**
+    （规划场景里没有工件/桌子，MoveIt 的 avoid_collisions 只覆盖自碰撞——手册第 45 条）。
+    """
+    command = [sys.executable, "-u", str(REPO / "scripts" / "move_tcp_linear.py"),
+               *[f"{float(v):.6f}" for v in xyz],
+               "300", f"{float(velocity):.3f}", f"{float(time_scale):.2f}"]
+    code, text = run(command, timeout=900.0)
+    for line in (text or "").strip().splitlines()[-8:]:
+        print("   ", line)
+    return code == 0
+
+
 def proximity_velocity(distance_m: float, base_velocity: float) -> float:
     """按距离降速：越靠近目标越慢，最少降到 GRASP_SLOW_VELOCITY。"""
     if distance_m >= GRASP_SLOW_RADIUS_M:
@@ -2741,15 +2775,24 @@ def main() -> int:
                 grasp_xyz, grasp_quat, pre, note = grip_targets()
                 profile = profile_for(cfg.speeds, name, cfg.velocity_scale,
                                       cfg.time_scale, 6)
+                radius = float((cfg.approach_motion or {}).get("cartesian_radius_m", 0.20))
+                staging_point = approach_staging_point(pre, radius)
                 here = current_tcp()
-                distance = float(np.linalg.norm(pre - here)) if here is not None else 1.0
+                distance = (float(np.linalg.norm(staging_point - here))
+                            if here is not None else 1.0)
                 velocity = proximity_velocity(distance, min(profile.velocity, 0.02))
-                goal = node.ik(pre, grasp_quat, seed=start_positions())
+                # 2026-11-24（三次碰撞后）：关节空间只走到"预抓取位正上方 radius"，
+                # 这一段的高处离工件 >cartesian_radius_m，弧线扫不到工件；
+                # 最后 radius 米改用笛卡尔直线（move_tcp_linear，点云间隙闸在线）。
+                goal = node.ik(staging_point, grasp_quat, seed=start_positions())
                 points = (node.plan_joint(goal, velocity, start_positions())
                           if goal else None)
                 ok = deliver(points, profile)
+                if ok and not plan_only:
+                    ok = cartesian_move(pre, velocity, max(2.0, cfg.time_scale))
                 step(name, ok, f"v={velocity:.3f} ts={profile.time_scale}"
-                               f" 上方{APPROACH_HEIGHT_M*1000:.0f}mm {detail(goal, points)}")
+                               f" 关节到上方{radius*1000:.0f}mm + 笛卡尔{radius*1000:.0f}mm"
+                               f" {detail(goal, points)}")
                 if ok:
                     ok = verify(name, pre, grasp_quat)
             elif name == "grasp":
@@ -2763,12 +2806,15 @@ def main() -> int:
                 here = current_tcp()
                 distance = float(np.linalg.norm(grasp_xyz - here)) if here is not None else 1.0
                 velocity = proximity_velocity(distance, min(profile.velocity, 0.01))
-                goal = node.ik(grasp_xyz, grasp_quat, seed=start_positions())
-                points = (node.plan_joint(goal, velocity, start_positions())
-                          if goal else None)
-                ok = deliver(points, profile)
-                step(name, ok, f"v={velocity:.3f} ts={profile.time_scale}"
-                               f" 回退{GRASP_CLEARANCE_M*1000:.0f}mm {detail(goal, points)}")
+                # 2026-11-24（三次碰撞后）：最后这段必须是笛卡尔直线 + 点云间隙闸。
+                # 原来用 node.plan_joint(...)：150 mm 的"垂直下降"在关节空间里是弧线，
+                # TCP 会横摆几十毫米直接扫到工件（手册第 48 条）。半速下降（所有者认可）。
+                ok = True
+                if not plan_only:
+                    ok = cartesian_move(grasp_xyz, velocity, max(2.0, cfg.time_scale))
+                step(name, ok, f"v={velocity:.3f} 笛卡尔下降 "
+                               f"{distance*1000:.0f}mm (半速, 间隙闸在线)"
+                               + ("" if not plan_only else " [plan-only 未执行]"))
                 if ok:
                     ok = verify(name, grasp_xyz, grasp_quat)
                 if ok and not plan_only:
@@ -2983,6 +3029,10 @@ def main() -> int:
             else:
                 step(name, False, "unknown phase")
         except Exception as exc:  # noqa: BLE001 - recorded, then stop
+            # 2026-11-24：只记 "TypeError: 'str' object is not callable" 无法定位
+            # （observe:tables 就报过这一句，日志里没有栈，白查半小时）。
+            # 现在把完整栈打到运行日志里：阶段记录仍然只放一行摘要。
+            print(f"[{name}] 阶段异常，完整栈：\n{__import__('traceback').format_exc()}")
             step(name, False, f"{type(exc).__name__}: {exc}")
             break
         if len(record) > records_before and not record[-1]["ok"]:
