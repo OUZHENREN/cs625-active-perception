@@ -153,3 +153,95 @@ G = np.eye(4); G[:3,:3] = R.from_quat(g['quaternion']).as_matrix(); G[:3,3] = g[
 print('往返误差 mm:', round(float(np.linalg.norm((T@G)[:3,3] - np.array(c['grasp'])))*1000, 3))
 "
 ```
+
+## 6. 19:00–19:36 晚班：撤出 + 效率模式拍摄复验（4K 面板同一条命令）
+
+### 19:05 撤出前先核对"机械臂到底在哪"
+
+```text
+起因：要给"撤出"定路线，必须先确认抓取姿态离工件多远。
+  ros2 run tf2_ros tf2_echo base_link tool0  → (0.864, 0.493, 0.292)
+  /tcp_pose_broadcaster/pose --once          → (0.8594, 0.5396, −0.0605)
+两者差 353 mm，差点按"已经在 29 cm 高处"下结论。
+
+核对：/compute_fk 分别算 tool0 与 my_end_effector_link
+  tool0                → (0.86404, 0.49318, 0.29241)
+  my_end_effector_link → (0.85935, 0.53956, −0.06051)  ← 与 broadcaster 完全一致
+结论：末端是 my_end_effector_link，tool0 是占位 link（= tool_flange_to_tcp_mm 353 mm）。
+     当时机械臂确实**还贴在抓取位**（z=−0.0605），撤出还没做。
+→ 手册第 50 条；agent_memory 增加"TCP 位姿口径"一行。
+```
+
+### 19:10–19:20 缓慢撤出（夹爪闭合、工件未抬起）
+
+```text
+全部走 scripts/move_tcp_linear.py（笛卡尔直线，点云间隙闸在线），半速 time_scale 2.0：
+  ① (0.8594, 0.5396, −0.0605) → (0.8594, 0.4896, −0.0605)  −Y 50 mm   间隙 29.4 → 54.6 mm
+  ② 同上 → (0.8594, 0.4896,  0.0895)                        +Z 150 mm  间隙 54.5 → 56.7 mm
+  ③ 同上 → (0.8594, 0.4896,  0.4500)                        +Z 360 mm  间隙 61.3 → 151.9 mm
+三段后 TCP 在 (0.8594, 0.4896, 0.4500)，离工件点云 151.9 mm。
+撤出后立刻抓一帧相机画面复核：红色标记仍平放在木板上、工件未被带走、夹爪未夹持。
+```
+
+### 19:20–19:24 到观测位的重构（5 段，所有者已同意）
+
+```text
+从抓取构型到 observe.workpiece_coarse 需要 wrist_1 走 101.7°（>90° 翻转阈值），
+按规则先打印六个关节角并向所有者确认，得到"同意，分 5 段执行"。
+  plan_pose_ik --allow-flip → 同分支 (1,-1,1)→(1,-1,1)，25 点轨迹抽样无接触
+  execute_assembly_chunks --time-scale 2.0 → 5 段全部 SUCCESSFUL，到位误差 <0.01 mm
+到达 (0.5886, 0.3482, 0.7075) 后才看清问题：**画面大半是墙**（见 19:29 一节）。
+```
+
+### 19:29 粗观测位搞错了：config 里有两个"工件粗观测位"
+
+```text
+用 observe.workpiece_coarse (0.5886, 0.3482, 0.7075) 拍粗观测：
+  相机对着房间，工件只在画面最下沿露一点；
+  measure_object 报"离群组 >2 mm 已剔除 → 紧密簇不足 2 组"，拒收。
+
+回推今天每一次成功粗观测的站位（T_base_cam × inv(T_tcp_cam)）：
+  eff_flow_coarse / eff2_coarse / eff3_coarse → 全部是 TCP (0.6238, 0.3737, 0.5076)
+  对应 config 的 observe.workpiece_coarse_efficient = efficient_start_pose
+  （= 效率模式起点，2026-11-13 所有者确认）
+而 observe.workpiece_coarse 与 observe.tables 完全相同，是示教链路（RVS）的桌面扫描位。
+→ 手册第 52 条。
+换到 (0.6238, 0.37375, 0.50762) 重测（1 段，12.9° 最大行程，到位 1e-6）：
+  工件中心 (850.5, 554.5, 125.9) mm，yaw +9.2°，覆盖率 0.871，重复性 0.64 mm / 1.23°，verdict OK
+  [table] 报文同时确认：桌面在 base z = −0.111 m
+手跑选站：+13@20261120（tier1，覆盖 0.985，差 4.0°，摆放检查 31.1 mm / 3.98°，限 50 mm / 5.0° → 通过）
+```
+
+### 19:32–19:35 改用 4K 面板效率模式同一条命令跑拍摄复验
+
+```text
+所有者指出应走"效率模式"（面板效率页 / teaching_debug 之外的正式入口是 run_task.py），
+于是用面板效率页 _build_command 的同一串参数：
+  python3 scripts/run_task.py --scope load --mode efficient --world real \
+      --until measure:workpiece_fine --confirm        （--until = 面板勾选阶段后的截断）
+
+结果（四段全 ok，实验已归档）：
+  observe:workpiece_coarse_efficient  3 点、0.2 s（本来就在起点）
+  measure:workpiece_coarse            **先验新鲜（4.4 分钟 < 30）→ 不重新测量**
+  nbv:workpiece                       到位复核：无接触 ✅（站姿与 eff3_fine 完全同一站）
+  measure:workpiece_fine              实拍：覆盖率 0.973、yaw 10.0°、
+                                      中心 (852.4, 552.3, 126.5) mm、重复性 0.1 mm / 0.083°、verdict OK
+  精测位姿 T_base_cam 与 eff3_fine 逐元素相同（差 1e-5）→ 选站落在 +13@20261120
+
+实验归档：~/cs625_experiment_archive/20261124_193256_real_load_efficient
+         （2123 行时序、12 张图像、索引已追加）
+当前 TCP：(0.74711, 0.18444, 0.59582)，即 +13@20261120 站位。
+
+**必须写清楚的一点**：这次"拍摄验证"的粗观测阶段**没有实拍**——它复用了 19:29 的先验。
+要看真·全链路拍摄，需要把 measure 阶段的 --prior-max-age-min 改成 0 再跑一次。
+→ 手册第 53 条；agent_memory 增加"效率模式粗观测的先验"一行。
+```
+
+### 19:36 收尾状态
+
+```text
+· 机械臂已离开工件（间隙 151.9 mm 起，现在停在 +13@20261120 站位）
+· 工件未被移动、未被带走：粗测 (850.5, 554.5) 与精测 (852.4, 552.3) 差 2.9 mm
+· 本轮新增手册条目：50（tool0 陷阱）、51（平移后腕部重解）、52（两个粗观测位）、53（先验顶替实拍）
+· 仍缺：完整搬运（J4 抱闸）、规划场景缺工件/桌子
+```

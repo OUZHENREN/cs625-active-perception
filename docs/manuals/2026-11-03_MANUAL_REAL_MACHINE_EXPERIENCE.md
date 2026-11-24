@@ -60,6 +60,10 @@
 | 47 | 进程在但 ROS 图里没有发布者 | /dev/shm 僵尸段占端口；clean_dds_shm.py 清理 |
 | 48 | 接近工件时撞到工件（一天三次） | 用了关节空间插值；改用笛卡尔直线 + 点云间隙闸 |
 | 49 | 笛卡尔接近分二十多步、太慢 | step_mm 是规划长度不是安全限制；默认 300 mm + dwell 0.05 |
+| 50 | 读出来的"机械臂位置"差 353 mm | tool0 是占位 link；真正末端是 my_end_effector_link，与 tcp_pose_broadcaster 交叉核对 |
+| 51 | 长距离平移后腕部"看起来像要翻转" | 平移只保证末端位姿不变，腕关节值必然重解；按现状判断别用旧基线 |
+| 52 | 从粗观测位拍照只拍到墙、测量拒收 | 效率模式要用 workpiece_coarse_efficient（= efficient_start_pose），不是 observe.workpiece_coarse |
+| 53 | 效率模式"拍摄验证"通过但一张新图都没拍 | 粗观测先验 30 分钟内直接复用；要真拍就 `--prior-max-age-min 0` |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -1170,6 +1174,120 @@ config/tasks/common.yaml 里，代码在 scripts/run_pick_and_place.py 的 grip_
 
 注意：分段少不等于可以省安全检查。
   点云间隙闸（第 48 条）仍然逐步生效，抓取段（最后 120 mm）才豁免。
+```
+
+## 50. "机械臂现在在哪"要用 my_end_effector_link：tool0 差 353 mm
+
+```text
+症状（2026-11-24 19:1x）：要判断"夹爪是贴着工件、还是已经退到半空"。
+  ros2 run tf2_ros tf2_echo base_link tool0        → (0.864, 0.493, 0.292)
+  据此得出"已经抬到 29 cm 高、离工件 373 mm"——**错的**。
+  同一时刻 /tcp_pose_broadcaster/pose              → (0.8594, 0.5396, −0.0605)
+  两者相差 353 mm。差一点就按错误结论下发抬升/接近。
+
+真因：这套 URDF 里 tool0 只是装配占位 link，不是夹爪尖。
+  MoveIt 规划（/compute_cartesian_path 的 link_name）、execute_assembly_chunks 的到位复核、
+  workspace_bounds 判断、抓取位推导，用的末端全是 **my_end_effector_link**。
+  本仓库 config 里 tool_flange_to_tcp_mm = 353.0 —— 就是这个差值的来源。
+
+确认命令（两条必须一致，位置差 < 0.1 mm 才下结论）：
+  ros2 topic echo /tcp_pose_broadcaster/pose --once
+  ros2 service call /compute_fk moveit_msgs/srv/GetPositionFK \
+    "{header: {frame_id: 'base_link'}, fk_link_names: ['my_end_effector_link'],
+      robot_state: {joint_state: {name: [...6 个关节...], position: [...]}}}"
+  实测两条都给 (0.85935, 0.53956, −0.06051)。
+
+处置：所有"当前位置"判断、抬起高度计算、抓取位推导，一律用 my_end_effector_link
+  或 tcp_pose_broadcaster；tool0 只当占位符，永远不要用它判断高度。
+
+预防：任何"机械臂在哪"的结论都必须两个独立来源交叉核对（broadcaster + compute_fk）。
+  单一 TF 来源（尤其 tool0）不足以支持动臂决定。
+```
+
+## 51. 长距离笛卡尔平移后，腕部关节值会重解（不是漂移，不是坐标系错）
+
+```text
+症状：抬升 510 mm（纯 +Z，工具姿态应保持不变）之后，wrist_1 从 −44.7° 变成 −87.4°。
+  接着规划到观测位时被判"腕部翻转 101.7° > 90°"而拒绝，看起来像腕部自己乱转。
+
+真因：笛卡尔平移只保证**末端位姿**不变；肩/肘/腕要一起重解才能在新的 TCP 高度上
+  保持同一姿态。姿态（四元数）确实没变——本次抬升前后 TCP 四元数差 1e-5（<0.001°）；
+  变的是"同一姿态对应的关节值分解"。腕部接近奇异（wrist_2 ≈ ±90°）时这种重解尤其明显。
+
+确认命令：
+  · 比较抬升前后的 /tcp_pose_broadcaster/pose 四元数（应差 <1e-4）
+  · 重新读 /joint_states 拿当前关节值，用它算行程，别用上一段的旧值
+
+处置：判"是否翻转"必须用重解后的真实行程；真要走大角度就打印六个关节角 + 所有者同意，
+  交给 execute_assembly_chunks 自动分段（≤25°/段）。本次 wrist_1 101.7° → 分 5 段，
+  每段 5.7°/s、逐段碰撞校验，到位误差 < 0.01 mm。
+
+预防：看到"腕部突然要转很大角度"时，先确认姿态四元数是否守恒——
+  守恒 = 正常重解（分段执行即可）；不守恒 = 真重构，需所有者确认。
+```
+
+## 52. 工件的两个粗观测位：示教用 observe.workpiece_coarse，效率模式用 workpiece_coarse_efficient
+
+```text
+症状（2026-11-24 19:3x）：按 config 的 observe.workpiece_coarse
+  (0.5886, 0.3482, 0.7075) 移过去拍粗观测，画面里**几乎全是墙和窗帘**，
+  工件只在画面最下沿露一点；measure_object 报
+  "离群组 >2 mm 已剔除 → 紧密簇不足 2 组，无法给出一致位姿"（覆盖率算不出来）。
+
+真因：`observe.workpiece_coarse` 与 `observe.tables` 的 xyz/quat **完全相同**，
+  它是示教链路（RVS）的桌面扫描基准位，不是效率模式的工件粗观测位。
+  效率模式用的是另一条：
+    observe.workpiece_coarse_efficient
+    = efficient_start_pose
+    = (0.6238, 0.37375, 0.50762)  quat (−0.383818, 0.748045, 0.213452, 0.497544)
+    （2026-11-13 所有者确认：效率模式起点就是这个粗观测基准点位）
+
+确认命令（回推今天每一次成功粗观测用的位姿，三条完全一致即可判定）：
+  python3 - <<'EOF'
+  import json, numpy as np, yaml
+  from scipy.spatial.transform import Rotation as R
+  Ttc = np.array(json.load(open("config/handeye/tcp_to_camera.json"))["T_tcp_cam"])
+  for n in ("eff_flow_coarse","eff2_coarse","eff3_coarse"):
+      T = np.array(json.load(open(f"runtime/measurements/{n}.json"))["T_base_cam"])
+      Tt = T @ np.linalg.inv(Ttc)
+      print(n, np.round(Tt[:3,3],4), np.round(R.from_matrix(Tt[:3,:3]).as_quat(),4))
+  EOF
+  → 三条都是 TCP (0.6238, 0.3737, 0.5076) quat (−0.3838, 0.748, 0.2134, 0.4975)
+
+处置：效率模式的拍摄/测量一律从 workpiece_coarse_efficient 起步；
+  observe.* 下的 pose 属于示教链路，两者不要混用。
+
+预防：config 里带 _efficient 后缀的位姿才是效率模式入口；改位姿前先用上面这段代码
+  回推"上一次成功的测量到底站在哪儿"，别信名字。
+```
+
+## 53. 效率模式的"拍摄验证"会拿先验顶替实拍：30 分钟内的旧测量直接复用
+
+```text
+症状（2026-11-24 19:3x）：跑效率模式（面板效率页同一条命令）
+  run_task.py --scope load --mode efficient --world real --until measure:workpiece_fine --confirm
+  四个阶段全部 ok，但 measure:workpiece_coarse 的日志是
+  "先验新鲜（4.4 分钟 < 30.0）→ 粗观测直接采用先验，不再测量"。
+  也就是说：这一次"拍摄验证"**一张新图都没拍**，用的是几分钟前那一轮的结果。
+
+真因：measure 阶段的命令固定带
+  --prior auto --auto-release --prior-max-age-min 30
+  （见 scripts/run_pick_and_place.py 的 measure 分支）。
+  先验文件 runtime/measurements/workpiece_prior.json 在 30 分钟内 → 直接采用，
+  连相机都不采集。这是"效率"的设计（省一次 3–6 分钟采集），
+  但它让"验证拍摄链路"这件事失真。
+
+确认命令：
+  grep -n "prior-max-age-min" scripts/run_pick_and_place.py
+  ls -l --time-style=+%H:%M runtime/measurements/workpiece_prior.json
+
+处置：
+  · 只想验证下游（选站/精测）：默认行为即可，但要**明确知道粗观测没重拍**；
+  · 要验证整条拍摄链路：把该阶段的 --prior-max-age-min 改成 0（或先删先验文件），
+    再跑；否则看到的"成功"不包含粗观测实拍。
+
+预防：任何"拍摄验证/示教位精拍"都要在日志里写清楚：这一次是实拍还是复用先验，
+  并且写清先验的时间戳。不要用"四段全 ok"代替"真的拍了"。
 ```
 
 ## 通用开工检查清单（每次上真机前）
