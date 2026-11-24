@@ -133,6 +133,7 @@
 | 非自然构型规则 | 腕部**奇异不拒绝**（垂直抓取天然 w2≈90°，已验证 pre_grasp 就是 90.8°）；拒绝的是腕部翻转（wrist_1/wrist_3 行程 >90°，需 `--allow-flip`）与离已验证姿态 >60° 的解 | `scripts/plan_pose_ik.py`、手册第 42 条 |
 | 预抓取位定义 | 抓取位 + **150 mm 垂直 + 10 mm 侧向（2026-11-24 实测取 −Y，+Y 会撞）**；纯垂直下降会让电机保护座蹭工件 | `config/tasks/common.yaml` 的 `pre_grasp`、手册第 44 条 |
 | 接近段减速 | `approach_slowdown`：最后 40% 行程 `tail_scale 2.0`（半速）；纯下降段全程 `--tail-fraction 1.0 --tail-scale 2.0` | 手册第 44 条 |
+| 接近工件的运动方式 | **必须用 `scripts/move_tcp_linear.py`（笛卡尔直线）**；关节空间插值只用于远离工件的换位；<200 mm 内禁用关节空间运动 | 手册第 48 条 |
 | 规划场景现状 | **world.collision_objects 为空**——"无接触"只对自碰撞有效，工件/桌面不在场景里；贴工件动作要用点云最近距离判断（<5 mm 视为风险） | 手册第 45 条 |
 | 抓取点权威定义 | `grasp = T_工件实测 @ grasp_in_workpiece_frame`（2026-11-24 所有者手工验证，往返误差 0.000 mm）；**不要**经过示教链的 box 系常数 | `config/tasks/common.yaml` 的 `grasp_in_workpiece_frame`、手册第 43 条 |
 | 肩部安全区间 | **(−130, 10)**（2026-11-24 批准，原 −110；验证过的抓取位姿肩部 −124.5） | `scripts/plan_pose_ik.py` 两处限位表 |

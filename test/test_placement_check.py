@@ -62,8 +62,9 @@ def test_the_2026_11_18_case_is_refused(tmp_path):
     entry = {"reference_measurement": str(ref)}
     current = pose((0.638, 0.687, 0.121), 159.01)
     gap_mm, gap_deg, _name = nbv.placement_gap(entry, current)
-    assert gap_mm > nbv.PLACEMENT_MAX_MM            # 58.7 mm > 30 mm
-    assert gap_deg == pytest.approx(nbv.PLACEMENT_MAX_DEG, abs=1e-3)  # yaw 3.50° 刚好在限内
+    # 2026-11-24 限位放宽到 50 mm / 5.0° 后，这个案例靠平移超限被拒
+    assert gap_mm > nbv.PLACEMENT_MAX_MM            # 58.7 mm > 50 mm
+    assert gap_deg < nbv.PLACEMENT_MAX_DEG          # yaw 3.50° 在新限 5.0° 内
 
 
 def test_a_yaw_shift_alone_is_caught(tmp_path):

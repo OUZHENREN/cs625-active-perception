@@ -10,7 +10,6 @@ node, a single subscription, then a step loop of cartesian plans.
   python3 scripts/move_tcp_linear.py X Y Z step velocity time_scale ROTATE_DEG
 """
 
-from __future__ import annotations
 
 import json
 import subprocess
@@ -24,6 +23,55 @@ from geometry_msgs.msg import Pose, PoseStamped
 from moveit_msgs.srv import GetCartesianPath
 from rclpy.node import Node
 from scipy.spatial.transform import Rotation as R
+
+# 2026-11-24 事故后的硬闸：笛卡尔直线运动也要知道工件在哪。
+# 规划场景里 world.collision_objects 是空的，avoid_collisions 只覆盖自碰撞；
+# 今天三次碰撞都是"末端走了弧线/斜线扫过工件"造成的。
+# 这里用最近一次精观测保存的点云做间隙检查：任何一步的终点若离工件点云
+# 小于 CLEARANCE_MIN_M，直接拒绝，不再往下走。
+CLEARANCE_MIN_M = 0.015        # 15 mm：夹爪/工件都不该比这更近
+CLOUD_RADIUS_M = 0.40          # 只在工件附近裁点云，避免整幅场景
+
+
+def workpiece_clearance(target_xyz, measurement_path=None):
+    """返回 (最近距离 m, 点云点数)；拿不到点云时返回 (None, 0)。"""
+    import glob
+    import os
+
+    import yaml
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    candidates = []
+    if measurement_path:
+        candidates.append(pathlib.Path(measurement_path))
+    latest = repo / "runtime" / "measurements"
+    candidates.extend(sorted(latest.glob("eff*_fine*.json"), key=os.path.getmtime,
+                             reverse=True))
+    candidates.extend(sorted(latest.glob("workpiece*_fine*.json"), key=os.path.getmtime,
+                             reverse=True))
+    for path in candidates:
+        try:
+            payload = json.loads(pathlib.Path(path).read_text(encoding="utf-8"))
+            dataset = pathlib.Path(payload["dataset"])
+            clouds = sorted(glob.glob(str(dataset / "*" / "cloud.npy")))
+            if not clouds:
+                continue
+            T = np.array(payload["T_base_cam"])
+            group = (payload.get("per_group") or [{}])[0].get("pose_base") or {}
+            centre = np.asarray(group.get("translation", [0, 0, 0]), dtype=float)
+            pts = np.load(clouds[0])[:, :3]
+            base = (T @ np.hstack([pts, np.ones((len(pts), 1))]).T).T[:, :3]
+            keep = (np.linalg.norm(base - centre, axis=1) < CLOUD_RADIUS_M) & (base[:, 2] > -0.10)
+            near = base[keep]
+            if len(near) < 100:
+                continue
+            distance = float(np.linalg.norm(near - np.asarray(target_xyz, float), axis=1).min())
+            return distance, len(near)
+        except (OSError, KeyError, ValueError, IndexError):
+            continue
+    return None, 0
+
+
 
 sys.stdout.reconfigure(line_buffering=True)
 
@@ -146,6 +194,15 @@ def main() -> int:
             print("ARRIVED")
             break
         target = current + delta / distance * min(step / 1000.0, distance)
+        clearance, cloud_points = workpiece_clearance(target)
+        if clearance is None:
+            print("CLEARANCE_UNKNOWN: 拿不到工件点云，拒绝移动（不做无验证的接近）")
+            return 5
+        if clearance < CLEARANCE_MIN_M:
+            print(f"REFUSED_TOO_CLOSE: 该步终点离工件点云 {clearance*1000:.1f} mm "
+                  f"< {CLEARANCE_MIN_M*1000:.0f} mm（点云 {cloud_points} 点）；停止")
+            return 6
+        print(f"  clearance {clearance*1000:.1f} mm (cloud {cloud_points})")
         pose = Pose()
         pose.position.x, pose.position.y, pose.position.z = target
         (pose.orientation.x, pose.orientation.y,

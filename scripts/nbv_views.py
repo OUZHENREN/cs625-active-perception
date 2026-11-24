@@ -133,8 +133,10 @@ def select_known_view(yaw_deg: float, tolerance: float | None = None):
 
 
 # 摆放约束（与 nbv_from_reference 同一组常数，2026-11-19 所有者定）
-PLACEMENT_MAX_MM = 30.0
-PLACEMENT_MAX_DEG = 3.5
+# 2026-11-24 所有者决定：30 mm → 50 mm（30 mm 过于严格，正常摆放波动就会被拒）。
+PLACEMENT_MAX_MM = 50.0
+# 2026-11-24 所有者决定：3.5° → 5.0°（实测 3.87° 偏差仍可拍出 0.95+ 覆盖）。
+PLACEMENT_MAX_DEG = 5.0
 
 # 手摆（taught）站位在偏转角差小于这个值时优先选用（它是为那个偏转角手摆的）
 TAUGHT_PREFERENCE_DEG = 5.0

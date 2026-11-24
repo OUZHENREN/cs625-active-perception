@@ -49,8 +49,10 @@ GAP_DIR = REPO / "runtime" / "measurements"
 # 摆放约束（2026-11-19，所有者定）：工件相对"该站位验证时的位置"允许的偏差。
 # 依据（capture 审计的投影模型）：yaw 差 3.3° 时，第三面要稳定出 3 个面
 # 需要平移 ≤30 mm；超出后第三面会掠射到只剩 2 个面，精观测必然失败。
-PLACEMENT_MAX_MM = 30.0
-PLACEMENT_MAX_DEG = 3.5
+# 2026-11-24 所有者决定：30 mm → 50 mm（30 mm 过于严格，正常摆放波动就会被拒）。
+PLACEMENT_MAX_MM = 50.0
+# 2026-11-24 所有者决定：3.5° → 5.0°（实测 3.87° 偏差仍可拍出 0.95+ 覆盖）。
+PLACEMENT_MAX_DEG = 5.0
 
 
 def placement_gap(entry: dict, current_pose: np.ndarray):
