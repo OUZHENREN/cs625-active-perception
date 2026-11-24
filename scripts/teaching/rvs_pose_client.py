@@ -48,8 +48,13 @@ from scipy.spatial.transform import Rotation as R
 
 sys.stdout.reconfigure(line_buffering=True)
 
-RVS_HOST = "127.0.0.1"
-RVS_PORT = 7000
+# RVS 可能跑在 WSL 里（127.0.0.1），也可能跑在 Windows 主机上
+# （从 WSL 看是默认网关，例如 198.18.0.2）。地址属于机器本地配置，
+# 放 ~/.cs625_local.env 的 CS625_RVS_HOST，不在代码里写死。
+import os as _os
+
+RVS_HOST = _os.environ.get("CS625_RVS_HOST", "127.0.0.1")
+RVS_PORT = int(_os.environ.get("CS625_RVS_PORT", "7000"))
 
 ANSWER_TOPIC = {
     "T2": "/box_precision_view_tcp_pose",

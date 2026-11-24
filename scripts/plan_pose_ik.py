@@ -169,7 +169,10 @@ def acceptable(candidate: list[float], names=None) -> bool:
     """
     limits = {
         "shoulder_pan_joint": (-100.0, 100.0),
-        "shoulder_lift_joint": (-110.0, 10.0),
+        # 2026-11-24 所有者批准：下限从 -110 放宽到 -130。
+        # 依据：所有者亲手摆出并验证可抓取的位姿 shoulder_lift = -124.52°，
+        # 以及真机长期执行的 pre_grasp(-120.3°) / grasp(-123.0°)。旧限位把这些全挡住。
+        "shoulder_lift_joint": (-130.0, 10.0),
         # 2026-11-24 所有者批准：上限从 -100 放宽到 -60。真机验证过的姿态肘部到
         # -107.2(pre_grasp)/-101.7(grasp)/-91.9(baseline)，本次预抓取所需 IK 解为
         # -69.2；旧上限全部挡掉，表现为"能看见工件但抓不到"。
@@ -205,6 +208,11 @@ def main() -> int:
     parser.add_argument("--allow-large-move", action="store_true",
                         help="允许单关节行程 >25°（默认拒绝）。加之前必须已打印 6 个关节角"
                              "并得到所有者明确同意（2026-11-18 事故后新增强制闸）")
+    parser.add_argument("--allow-outside-tcp-box", action="store_true",
+                        help="允许目标 TCP 落在 workspace_bounds 框外（所有者 2026-11-24 批准）。"
+                             "只放开 TCP 框；关节安全区间、碰撞校验、翻转/奇异拒绝全部保留。"
+                             "观察位经常需要相机靠近基座，此时框外并不等于危险——"
+                             "真正的碰撞风险在夹爪与电机保护座，必须另用 check_tool_envelope.py 校验。")
     parser.add_argument("--auto-tilt", action="store_true",
                         help="位姿落在腕部奇异点时，自动绕 x 轴小幅倾斜后重试"
                              f"（步长 {AUTO_TILT_STEP_DEG:.0f}°，最多 {AUTO_TILT_MAX_DEG:.0f}°）")
@@ -229,8 +237,13 @@ def main() -> int:
     # 目标点必须落在安全作业空间内（只查关节区间不够：今天曾把 TCP 移到 y=-0.17）
     inside, reason = target_inside_workspace(args.pose[:3])
     if not inside:
-        print(f"code 7 {reason}（拒绝）")
-        return 7
+        if not args.allow_outside_tcp_box:
+            print(f"code 7 {reason}（拒绝）")
+            return 7
+        print(f"[警告] {reason}")
+        print("       已按 --allow-outside-tcp-box 放行（所有者 2026-11-24 批准）。")
+        print("       注意：关节区间、碰撞校验、翻转/奇异拒绝仍然生效；")
+        print("       执行前请用 scripts/check_tool_envelope.py 复核工具包络。")
 
     # 移动前硬性自检：当前状态已接触则一律不动（agent_memory 135）
     if not require_current_state_valid(node, names, start):
@@ -246,7 +259,10 @@ def main() -> int:
     # 之前用的"相对当前 ±45°"其实是电缆缠绕的代理指标，会误杀"终点仍在安全区内"的移动。
     ABSOLUTE_LIMITS = {
         "shoulder_pan_joint": (-100.0, 100.0),
-        "shoulder_lift_joint": (-110.0, 10.0),
+        # 2026-11-24 所有者批准：下限从 -110 放宽到 -130。
+        # 依据：所有者亲手摆出并验证可抓取的位姿 shoulder_lift = -124.52°，
+        # 以及真机长期执行的 pre_grasp(-120.3°) / grasp(-123.0°)。旧限位把这些全挡住。
+        "shoulder_lift_joint": (-130.0, 10.0),
         # 2026-11-24 所有者批准：上限从 -100 放宽到 -60。真机验证过的姿态肘部到
         # -107.2(pre_grasp)/-101.7(grasp)/-91.9(baseline)，本次预抓取所需 IK 解为
         # -69.2；旧上限全部挡掉，表现为"能看见工件但抓不到"。
