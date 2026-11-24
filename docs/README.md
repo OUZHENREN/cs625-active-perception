@@ -1,6 +1,6 @@
 # CS625 视触融合精密装配 — 文档导航
 
-> 更新：**2026-11-20**。本页是**唯一入口**，其余文档按"现在有效 / 历史归档"分区。
+> 更新：**2026-11-24**。本页是**唯一入口**，其余文档按"现在有效 / 历史归档"分区。
 > 旧文档一律保留在 `archive/`，只读，不再维护。
 
 ---
@@ -12,7 +12,8 @@
 主线：效率模式（`teaching_debug.py`，开发中）+ 示教模式（`resume_teaching.sh`，已冻结）
 已完成：观测 → 抓取 → 抬升 → 转运 → 分级 → 旋转 → 预插入（示教链路真机跑通）；
         视觉测量链真机 0.14–0.5 mm（粗观测带先验 → 精观测带先验）
-示教位：2026-11-20 精拍 9 个角度（+27…−36，覆盖率均 ≥0.95，全部 tier 1）
+示教位：2026-11-20/24 精拍 **10 个角度**（+27…−44，覆盖率均 ≥0.95，全部 tier 1）；
+效率模式抓取链 2026-11-24 首次端到端打通（粗测→选站→精测→推导→预抓取→下降，到位 0.01 mm）
 未完成：插入到底（三面接触，371–372 mm 不是物理底部，重复性 1.1 mm）、槽内转 10°、六维力（十二月）、
         规划场景里没有桌子/夹具（自动运动的前置阻塞）、方案 A 真机验收
 ```
@@ -34,7 +35,7 @@
 |---|---|---|
 | 1 | [`agent_memory.md`](agent_memory.md) | **每次开工先扫一遍**：硬规则、当前权威值、安全红线（≤300 行；历史条目见 [`agent_memory_history.md`](agent_memory_history.md)，不必每轮读） |
 | 2 | [`reference/architecture_current.md`](reference/architecture_current.md) | 想知道代码怎么分层、示教链路 0–18 步是什么 |
-| 3 | [`manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md`](manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md) | **上真机前**：38 条实机经验（含装配工艺、断联排障、排查顺序、示教位精拍、安全） |
+| 3 | [`manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md`](manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md) | **上真机前**：47 条实机经验（含装配工艺、断联排障、排查顺序、示教位精拍、效率模式抓取链、安全） |
 | 4 | [`reference/experiment_metrics.md`](reference/experiment_metrics.md) | 要做实验、要出数据之前 |
 | 5 | [`reference/real_cell.md`](reference/real_cell.md) | 换场地、网络异常、开工就绪检查 |
 | 6 | [`manuals/debug/README.md`](manuals/debug/README.md) | **看不到数据时**：相机/ROS 图的常用调试命令，正常输出与失败含义 |

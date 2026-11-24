@@ -56,6 +56,8 @@
 | 43 | 抓取点到底在哪 / 怎么推导 | 一次手工验证 + 工件系相对变换；不要用 box 系常数 |
 | 44 | 下降时电机保护座撞工件 / 接近太快 | 预抓取位再外移 10 mm；接近段 tail_scale 2.0 降半速 |
 | 45 | 碰撞校验说无接触但实际会撞工件 | 规划场景里没有工件/桌子；用点云最近距离判断 |
+| 46 | 效率模式抓取链的完整口径 | 粗测→选站→精测→相对变换推导→预抓取(带10mm侧移)→半速下降 |
+| 47 | 进程在但 ROS 图里没有发布者 | /dev/shm 僵尸段占端口；clean_dds_shm.py 清理 |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -1025,6 +1027,87 @@ plan_pose_ik 的轨迹抽样，**都只检查了机器人自碰撞**，
 **要真正解决，必须把工件与桌面加进规划场景**
 （scripts/apply_real_cell_scene.py / attach_workpiece.py 有相关能力，
 但当前流程没有调用）。在那之前，贴工件的动作要靠点云距离判断 + 人工确认。
+```
+
+## 46. 效率模式抓取链的完整口径（2026-11-24 固化的版本）
+
+```text
+这一条是"效率模式到底该怎么做抓取"的唯一口径。所有数字都在
+config/tasks/common.yaml 里，代码在 scripts/run_pick_and_place.py 的 grip_targets()。
+```
+
+### 数据流
+
+```text
+粗观测 measure_object --stage coarse
+  → yaw + 工件位姿
+  → nbv_from_reference --auto-station 查表选站（tier1 优先、摆放检查 blocked 排后）
+  → 移到站位 → measure_object --stage fine（带先验）
+  → 工件实测位姿 T_工件
+  → grasp     = T_工件 @ grasp_in_workpiece_frame
+  → pre_grasp = grasp + (0, -0.010, +0.150)      ← 150 mm 垂直 + 10 mm 沿 −Y
+  → 先到 pre_grasp（末段减速），再下降到 grasp（全程半速）
+```
+
+### 四个必须遵守的数值
+
+| 项 | 值 | 出处 |
+|---|---|---|
+| 抓取点相对工件 | `grasp_in_workpiece_frame`：t=(−0.208788, 0.026625, 0.179313) | 所有者 2026-11-24 手工验证，往返 0.000 mm |
+| 预抓取偏移 | 垂直 +150 mm、水平 −10 mm（沿 base −Y） | 手册第 44 条；+Y 会撞（点云最近 0.8 mm） |
+| 接近减速 | `approach_slowdown`：末段 40% 时间 ×2（半速）；纯下降段全程 ×2 | 手册第 44 条 |
+| 关节区间 | 肩 (−130, 10)、肘 (−160, −60)、腕 ±150 | 手册第 41 条 |
+
+### 已实测通过的完整链路（2026-11-24）
+
+```text
+① 粗观测位 4 段移动                       SUCCESSFUL
+② 粗测                                    yaw −7.7°，覆盖 0.896，2/3 组
+③ 选站                                    −9@20261120（差 1.1°），摆放 7.7 mm / 1.11°
+④ 到站位 2 段                             SUCCESSFUL
+⑤ 精测                                    覆盖 0.97，重复性 0.1 mm / 0.045°
+⑥ 推导抓取点                              与 config 差 0.31 mm
+⑦ 到预抓取位（含 −Y 10 mm）               间隙 17.2 mm（原 8.1 mm）
+⑧ 下降到抓取位（半速 1.9°/s）             到位 (0.85436, 0.61629, −0.06033) 精确
+```
+
+### 三个仍然存在的缺口（不要当成已解决）
+
+```text
+① 规划场景里 world.collision_objects 是空的（手册第 45 条）
+   → 工件/桌面不参与碰撞检查，贴工件的动作只能靠点云最近距离判断
+
+② 保护停止后反控通道静默失效（ESTAB 仍显示 3 条但机器人不执行）
+   → 必须 ensure_robot_ready --force 重发脚本；重发前先确认记忆偏差 ≤2°
+
+③ J4 抱闸未修复 → 不做完整搬运流程（抬升/转运/插入）
+   → 当前只验证到"到达抓取位"，闭合夹爪之后不再继续
+```
+
+## 47. "进程还活着、ROS 图里却没有发布者"——先查 /dev/shm 僵尸段
+
+```text
+症状（2026-11-20 出现两次）：
+  · move_group 进程在（ps 看得到），但 ros2 node list 里没有它，/check_state_validity 不可用
+  · 相机同样：进程在、日志还在打帧率，但 /camera/camera 节点下没有任何发布者
+  · 日志里反复出现：
+      [RTPS_TRANSPORT_SHM Error] Failed init_port fastrtps_port7005: open_and_lock_file failed
+
+真因：FastDDS 给每个参与者建 /dev/shm/fastrtps_<hash> 段；进程异常退出（SIGKILL、
+崩溃）时段文件残留。残留段占住端口，新进程建参与者失败 → 节点"半死"。
+实测当天 /dev/shm 里累积了 100 个段，最早的来自前一天。
+
+处置：
+  python3 scripts/clean_dds_shm.py            # 只报告
+  python3 scripts/clean_dds_shm.py --clean    # 清理（只删没有活进程占用的）
+  已接入 start_real_stack.sh：每次起栈前自动 --clean --threshold 8
+
+**第一版清理脚本是错的**（必须记住）：
+  它只扫 /proc/<pid>/maps，把 `_el`（事件循环）文件当成僵尸删了——
+  但 `_el` 是 open() 打开的普通文件、**不出现在 maps 里**，结果删掉了**在用**的段，
+  运行中的驱动栈通信直接断掉（joint_states 收不到、规划服务消失）。
+  修复：占用检测同时扫 maps 与 fd，且 `_el` 的死活跟随它的主段。
+  判据：运行中执行清理应报"在用 N，僵尸 0"。
 ```
 
 ## 通用开工检查清单（每次上真机前）

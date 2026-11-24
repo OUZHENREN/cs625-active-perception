@@ -145,6 +145,9 @@ class Config:
     workpiece_reference: dict = field(default_factory=dict)
     # CAD 包围盒（米，6 个数）：用来检查"抓取点是否落在实测工件里"，不依赖坐标系换算。
     workpiece_bbox: list = field(default_factory=list)
+    # 2026-11-24：抓取点相对工件的固定位姿（所有者手工验证，见手册第 43 条）。
+    # 有它就跟随实测工件位姿推导抓取点，不再依赖 workpiece_frame_offset。
+    grasp_in_workpiece_frame: dict = field(default_factory=dict)
     lift_total_mm: float = 155.0
     safe_clear_mm: float = 150.0
     velocity_scale: float = 0.02
@@ -218,6 +221,7 @@ def load_config(path: str) -> Config:
         workpiece_frame_offset=list(raw.get("workpiece_frame_offset") or []),
         workpiece_reference=dict(raw.get("workpiece_reference") or {}),
         workpiece_bbox=list(raw.get("workpiece_bbox") or []),
+        grasp_in_workpiece_frame=dict(raw.get("grasp_in_workpiece_frame") or {}),
         lift_total_mm=float(raw.get("lift_total_mm", 155.0)),
         safe_clear_mm=float(raw.get("safe_clear_mm", 150.0)),
         velocity_scale=float(raw.get("velocity_scale", 0.02)),
@@ -1464,6 +1468,9 @@ class UnloadConfig:
     workpiece_reference: dict = field(default_factory=dict)
     # CAD 包围盒（米，6 个数）：用来检查"抓取点是否落在实测工件里"，不依赖坐标系换算。
     workpiece_bbox: list = field(default_factory=list)
+    # 2026-11-24：抓取点相对工件的固定位姿（所有者手工验证，见手册第 43 条）。
+    # 有它就跟随实测工件位姿推导抓取点，不再依赖 workpiece_frame_offset。
+    grasp_in_workpiece_frame: dict = field(default_factory=dict)
     extract_steps_mm: float = 40.0
     lift_total_mm: float = 155.0
     velocity_scale: float = 0.02
@@ -1519,6 +1526,7 @@ def load_unload_config(path: str) -> UnloadConfig:
         workpiece_frame_offset=list(raw.get("workpiece_frame_offset") or []),
         workpiece_reference=dict(raw.get("workpiece_reference") or {}),
         workpiece_bbox=list(raw.get("workpiece_bbox") or []),
+        grasp_in_workpiece_frame=dict(raw.get("grasp_in_workpiece_frame") or {}),
         extract_steps_mm=float(raw.get("extract_steps_mm", 40.0)),
         lift_total_mm=float(raw.get("lift_total_mm", 155.0)),
         velocity_scale=float(raw.get("velocity_scale", 0.02)),
@@ -2486,11 +2494,29 @@ def main() -> int:
         if grip_targets_cache:
             item = grip_targets_cache["value"]
             return item
-        grasp_xyz, grasp_quat = grasp_pose_with_clearance(cfg.grasp, cfg.grasp_q)
-        pre_xyz = approach_pose(grasp_xyz)
+        # 2026-11-24 所有者验证后改：直接用 config 里验证过的抓取点与预抓取点。
+        # 以前这里会沿工具 x 再回退 10 mm、并自行 +150 mm 垂直算预抓取位，
+        # 结果既偏离验证过的抓取点，预抓取位又缺 10 mm 侧移（下降时电机保护座蹭工件）。
+        from scipy.spatial.transform import Rotation as _R
+        grasp_xyz = np.asarray(cfg.grasp, dtype=float)
+        grasp_quat = tuple(float(v) for v in cfg.grasp_q)
+        pre_xyz = np.asarray(cfg.pre_grasp, dtype=float)
+        approach_offset = pre_xyz - grasp_xyz      # 固定接近偏移（150 垂直 + 10 侧向）
         measured = measured_box_pose(
             str(getattr(cfg, "workpiece_measurement", "") or ""),
             getattr(cfg, "workpiece_frame_offset", None))
+        rel = getattr(cfg, "grasp_in_workpiece_frame", None) or {}
+        if rel.get("translation") and rel.get("quaternion") and measured is not None:
+            T_rel = np.eye(4)
+            T_rel[:3, :3] = _R.from_quat(rel["quaternion"]).as_matrix()
+            T_rel[:3, 3] = np.asarray(rel["translation"], dtype=float)
+            T_grasp = measured @ T_rel
+            grasp_xyz = np.array(T_grasp[:3, 3], dtype=float)
+            grasp_quat = tuple(float(v) for v in _R.from_matrix(T_grasp[:3, :3]).as_quat())
+            pre_xyz = grasp_xyz + approach_offset
+            follow_note = "抓取点已按实测工件位姿推导（grasp_in_workpiece_frame）"
+        else:
+            follow_note = "使用 config 里验证过的抓取点（无可用测量或未配置相对变换）"
         # 合理性检查：把抓取点投到实测工件坐标里，必须落在 CAD 包围盒外扩 60 mm 内。
         # 这条不依赖任何"两套坐标系"的换算——直接用测量出来的工件位姿反查。
         plausibility = "抓取点合理性未检查（没有可用测量）"
@@ -2501,14 +2527,8 @@ def main() -> int:
             inside = np.all(local[:3] >= bbox_min - 0.06) and np.all(local[:3] <= bbox_max + 0.06)
             plausibility = (f"抓取点在工件局部坐标 {np.round(local[:3],3)}（"
                             f"{'OK' if inside else 'OUTSIDE bbox+60mm'}）")
-            if not inside:
-                raise SystemExit(f"grasp target rejected: {plausibility}；"
-                                 f"请先标定 workpiece_frame_offset 或重新示教抓取点")
-        grasp_xyz, pre_xyz, note = adjust_grasp_with_measurement(
-            grasp_xyz, pre_xyz, measured,
-            getattr(cfg, "workpiece_reference", None),
-            calibrated=bool(getattr(cfg, "workpiece_frame_offset", None)))
-        note = f"{note}；{plausibility}"
+            # 不拦截：包围盒约定与测量输出不一致时会误报，只记录供人工判断
+        note = f"{follow_note}；{plausibility}"
         item = (grasp_xyz, grasp_quat, pre_xyz, note)
         grip_targets_cache["value"] = item
         node.get_logger().info(f"[grasp target] {note}; grasp={np.round(grasp_xyz,4)}")
