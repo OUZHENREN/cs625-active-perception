@@ -102,6 +102,13 @@
       "command": "source scripts/source_dev_env.sh --full || exit 1; python3 scripts/goto_park_pose.py --record",
       "problemMatcher": [],
       "detail": "把当前六轴位姿写入 config/tasks/common.yaml 的 j4_park_pose（不动臂）"
+    },
+    {
+      "label": "⑬ 回工件粗观测位 · 效率模式起点",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; python3 scripts/goto_workpiece_coarse.py --execute",
+      "problemMatcher": [],
+      "detail": "回到 config observe.workpiece_coarse_efficient（效率模式起点）；规划走 plan_pose_ik，换位段 0.20 rad/s 单段执行；默认只规划，加 --execute 才动臂"
     }
   ]
 }

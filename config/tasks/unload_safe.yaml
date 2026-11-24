@@ -5,9 +5,10 @@
 #            d3c 先做 3 mm 拉拔测试确认"工件跟着走"，测不出位移就不许继续抽。
 # 数值来源：config/unload_real.yaml（位姿在 common.yaml），time_scale/dwell 沿用其
 #           更保守的 5.0 / 1.5（load 基线是 2.0 / 1.0，unload 更慢）。
-# 校正说明：进槽/槽内四段（d2b_entrance_tilted、d2c_straighten、d4_tilt_for_removal、d5_extract_*）
-#           一律 0.005 m/s 均匀慢速，并去掉慢尾段——新版 runner 把 d2b 也算作槽内紧间隙，
-#           "快巡航 + 慢尾段"在那里会憋住。d2a_pre_insert 按装配段上限从 0.05 降到 0.03。
+# 校正说明：槽内三段（d2c_straighten、d4_tilt_for_removal、d5_extract_*）一律 0.005 m/s
+#           均匀慢速，并去掉慢尾段（TIGHT_CLEARANCE_PHASES 强制均匀）。d2b_entrance_tilted
+#           是空夹爪进入段、真机已验证 0.03 m/s，**不算**紧间隙（run_pick_and_place.py
+#           TIGHT_CLEARANCE_PHASES 刻意不含它；2026-11-24 audit 修正旧注释的错误说法）。
 
 scope: unload
 mode: safe

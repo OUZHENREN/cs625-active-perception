@@ -48,3 +48,20 @@ def test_efficiency_flows_never_substitute_a_prior_for_a_capture():
         assert "--prior-max-age-min 30" not in text, (
             f"{name} 仍会把 30 分钟内的先验顶替成实拍")
         assert text.count("--prior-max-age-min 0") == 2, name
+
+
+def test_coarse_is_two_groups_of_two_frames_and_fine_is_unchanged():
+    """所有者 2026-11-24：粗观测 2 组×2 帧提速，精观测保持 3 组×3 帧。"""
+    import yaml
+
+    for name in ("load_efficient.yaml", "full_efficient.yaml"):
+        cfg = yaml.safe_load((ROOT / "config" / "tasks" / name).read_text(encoding="utf-8"))
+        checks = cfg["observe_checks"]
+        coarse = [v for k, v in checks.items() if k.startswith("workpiece_coarse")]
+        assert coarse, name
+        for command in coarse:
+            assert "--stage coarse" in command, (name, command)
+            assert "--groups 2" in command and "--frames 2" in command, (name, command)
+        fine = checks["workpiece_fine"]
+        assert "--stage fine" in fine and "--groups 3" in fine, (name, fine)
+        assert "--frames" not in fine, (name, fine)

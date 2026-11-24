@@ -8,7 +8,7 @@
   规则和数值；每个数字都能在原文件对应小节里查到。
 - 需要看某条旧结论的完整上下文、事故经过或旧口径写法时，按小节编号去 history 里查，
   原编号与标题保持不变。
-最后更新：2026-11-13
+最后更新：2026-11-24
 
 ## 1. 铁律 / 工作方式
 
@@ -141,12 +141,16 @@
 | TCP 作业空间框 | x[0.3, 1.1] y[0.1, 0.9] **z[−0.08, 0.95]**（2026-11-24 批准 z 下限 0.05→−0.08；桌面在 −0.11，抓取位 z=−0.060 需更低下限） | `config/tasks/common.yaml` 的 `workspace_bounds` |
 | TCP 位姿口径 | 末端是 **`my_end_effector_link`**（MoveIt 规划/到位复核/抓取推导都用它），与 `/tcp_pose_broadcaster/pose` 一致；**`tool0` 是占位 link，与真实尖端差 353 mm**（= `tool_flange_to_tcp_mm`），不可用于判断高度 | `config/tasks/common.yaml` 的 `tool_flange_to_tcp_mm`、手册第 50 条 |
 | 效率模式的跑法 | **每次开跑前先把阶段清单列给所有者，确认这次要哪几步**（面板效率页同样可勾选；命令行用 `run_task.py ... --phases a,b,c` 或 `--until x`）。不允许不确认就整条流程跑 | 所有者 2026-11-24 要求；`scripts/run_task.py --phases/--until` |
-| 效率模式的阶段清单 | load_efficient 已去掉 `observe:slot_fine` 与 `baseline`（插槽位姿固定、baseline 多余）；`observe_settle_sec: 3.0`、`process_images: false` | `config/tasks/load_efficient.yaml`、手册第 54 条 |
+| 效率模式的阶段清单 | 观察链 = 工件粗观测(实拍 2 组×2 帧) → 选站 → 工件精观测(3 组×3 帧不变) → tables → **slot_coarse → slot_fine（精观测后跑 `check_slot_reference.py` 与历史基线对比）→ baseline** → pre_grasp…；`observe_settle_sec: 3.0`、`process_images: false` | `config/tasks/load_efficient.yaml`、手册第 54/55 条 |
+| 插槽位置可信度检查 | `observe:slot_fine` 的检查：`check_slot_reference.py` 把 slot_latest 与 `runtime/slot_measurement_baseline.json` 自比（同一测量管线自比，避开坐标系约定差）：>10 mm / 2° REFUSE，>3 mm / 1° WARN；基线由所有者确认插槽在标准位置后 `--record` | `scripts/check_slot_reference.py`、手册第 55 条 |
+| 安全换位段提速 | `SAFE_TRANSIT_PHASES` 白名单（observe:* / baseline / pre_grasp 关节腿 / goto_park_pose / goto_workpiece_coarse）：**0.20 rad/s（11.5°/s）、单段执行不自动分段、时间戳地板 0.05 s**；接触/装配段仍 0.10 rad/s + 25° 自动分段 + 0.25 s 地板。白名单在执行器代码里，调用方传 `--phase` 才生效；>0.20 被夹断，非白名单传了也不提速 | `scripts/execute_assembly_chunks.py`、手册第 55 条 |
+| 一键回粗观测位 | `scripts/goto_workpiece_coarse.py`（VS Code 任务 ⑬）：回 config `observe.workpiece_coarse_efficient`（效率模式起点）；规划走 `plan_pose_ik`，执行走换位白名单；默认只规划，`--execute` 才动臂 | 手册第 55 条 |
+| `--time-scale` 现状 | 自 2026-11-20 起**不再叠加**到速度（治理器只取 max(计划时间戳, dq/上限)）；传 >1.0 会打印提示。要慢：改计划时间戳（速度缩放因子）或 `--max-joint-speed` | `scripts/execute_assembly_chunks.py` 的 `govern_timestamps`、手册第 44 条 |
 | 每阶段的固定开销 | `control_health.py --fix` 6.8 s（现缓存 30 s）、执行器子进程 4.2 s、`sync_command_position` 1.1 s、静置 10 s（现 3 s）——这些叠加就是"发命令一两分钟才动" | 手册第 54 条 |
 | 效率模式粗观测的先验 | 先验 = `runtime/measurements/workpiece_prior.json`（**一个工件位姿** + 时间戳，任何 OK 测量都会写回）。阶段命令为 `--prior auto --prior-max-age-min 0`（**2026-11-24 由 30 改为 0**）：先验只作配准引导，粗观测**一律实拍**（约 46 s）；万一再被顶替，占位记录写 `coverage_median = None` + `measured = false`，不再编造 0.97 | `config/tasks/{load,full}_efficient.yaml` 的 `observe_checks`、`scripts/measure_object.py` 的 `prior_stub_payload`、手册第 53 条 |
 | 真实桌面高度 | base 系 **z ≈ −0.11**（不是 0.12）；判断"低于桌面"前先看 `[table] 桌面在 base z=` | 手册第 43 条 |
 | 肘部安全区间 | **(−160, −60)**（2026-11-24 所有者批准，原 −100；真机验证过的姿态肘部到 −107/−102/−92，预抓取解为 −69） | `scripts/plan_pose_ik.py` 两处限位表、手册第 41 条 |
-| 预抓取位口径 | **抓取点正上方 150 mm**（示教链与效率模式一致）；config 里的 `pre_grasp` 键是横向 120 mm 旧值，预抓取阶段不使用 | `scripts/teaching/pose_math.py` 的 `APPROACH_HEIGHT_M`、`scripts/run_pick_and_place.py` 的 `approach_pose()` |
+| 预抓取位口径 | 示教链 = `pose_math.APPROACH_HEIGHT_M` 正上方 150 mm；效率模式 = config `pre_grasp`（= 抓取点 +150 mm 垂直 −10 mm 侧向，`grip_targets` 直接使用它并随实测工件位姿平移） | `scripts/teaching/pose_math.py`、`scripts/run_pick_and_place.py` 的 `grip_targets`、手册第 44 条 |
 | 示教位覆盖率门槛 | **0.95**（测量硬底线 0.90；0.90–0.95 只算"可接受但证据偏弱"，不得登记为示教位） | `scripts/add_station_from_measurement.py --min-coverage`、手册第 38 条 |
 | 新示教位（tier 1） | **10 个**：+27 / +23 / +18 / +13 / 0 / −9 / −19 / −29 / −36 / −44（实测 yaw，覆盖率均 ≥0.95）；旧站位为 tier 2 兜底 | `config/tasks/common.yaml` 的 `workpiece_views` |
 | 速度滑块换算 | 滑块 = `MAX_JOINT_SPEED_RAD_S × 3 / 额定 2.094` ≈ 14.3%（上限 17.2°/s），开工与恢复脚本自动设置 | `scripts/set_speed_slider.py`、手册第 34 条 |

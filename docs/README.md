@@ -35,7 +35,7 @@
 |---|---|---|
 | 1 | [`agent_memory.md`](agent_memory.md) | **每次开工先扫一遍**：硬规则、当前权威值、安全红线（≤300 行；历史条目见 [`agent_memory_history.md`](agent_memory_history.md)，不必每轮读） |
 | 2 | [`reference/architecture_current.md`](reference/architecture_current.md) | 想知道代码怎么分层、示教链路 0–18 步是什么 |
-| 3 | [`manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md`](manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md) | **上真机前**：47 条实机经验（含装配工艺、断联排障、排查顺序、示教位精拍、效率模式抓取链、安全） |
+| 3 | [`manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md`](manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md) | **上真机前**：55 条实机经验（含装配工艺、断联排障、排查顺序、示教位精拍、效率模式抓取链、安全） |
 | 4 | [`reference/experiment_metrics.md`](reference/experiment_metrics.md) | 要做实验、要出数据之前 |
 | 5 | [`reference/real_cell.md`](reference/real_cell.md) | 换场地、网络异常、开工就绪检查 |
 | 6 | [`manuals/debug/README.md`](manuals/debug/README.md) | **看不到数据时**：相机/ROS 图的常用调试命令，正常输出与失败含义 |
@@ -51,7 +51,7 @@ docs/
 ├── README.md               ← 本页
 ├── agent_memory.md         ← 当前权威值 + 硬规则（精简版，开工必读）
 ├── agent_memory_history.md ← 历史条目存档（只读溯源，不必每轮读）
-├── reference/              ← 现在有效的技术参考（13 份，常用 8 份列在这里）
+├── reference/              ← 现在有效的技术参考（14 份，常用 8 份列在这里）
 │   ├── architecture_current.md      架构 + 链路 0–18 步 + 两模式
 │   ├── experiment_metrics.md        六类 18 项指标体系
 │   ├── real_cell.md                 真机工位 + 就绪检查 + 网络排障
@@ -61,7 +61,7 @@ docs/
 │   ├── frames_and_topics.md         TF 链与话题契约
 │   ├── task_pose_derivation.md      任务位姿推导（插槽/插入链）
 │   └── 其余：interfaces / dependencies / project_layout / file_viewer
-├── manuals/                ← 实机经验手册（29 条）+ debug/ 调试命令分册
+├── manuals/                ← 实机经验手册（55 条）+ debug/ 调试命令分册
 ├── plans/                  ← 月度计划（YYYY-MM.md，一个月一份；旧月份不重写）
 ├── decisions/              ← ADR（含 ADR-005 两模式与插入权威）
 ├── worklogs/               ← 工作日志，按月份分目录
@@ -104,7 +104,7 @@ python3 scripts/teaching/teaching_debug.py --stage 14 --repeat 3 --no-settle
 
 ---
 
-## VS Code 任务（8 个）
+## VS Code 任务（13 个）
 
 | # | 任务 | 说明 |
 |---|---|---|
@@ -116,6 +116,11 @@ python3 scripts/teaching/teaching_debug.py --stage 14 --repeat 3 --no-settle
 | ⑥ | DSH · 启动/打开界面 | 复用已在跑的 dsh web 实例 |
 | ⑦ | 相机 · 查看/换档 | `camera_view.py`（只碰相机，不碰机械臂/夹爪） |
 | ⑧ | 收工 · 关闭所有驱动 | `stop_all_drivers.sh` |
+| ⑨ | 提交前检查 · 三连 | `pre_commit_check.sh`（--fast 跳过 pytest） |
+| ⑩ | 续跑 · 效率入口 | `resume_task.sh`（读 run_task_resume.json） |
+| ⑪ | 回停车位姿 · J4 安全位 | `goto_park_pose.py --execute` |
+| ⑫ | 记录停车位姿 | `goto_park_pose.py --record` |
+| ⑬ | 回工件粗观测位 · 效率模式起点 | `goto_workpiece_coarse.py --execute` |
 
 ---
 

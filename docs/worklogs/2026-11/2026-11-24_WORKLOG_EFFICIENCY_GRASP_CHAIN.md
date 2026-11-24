@@ -370,3 +370,66 @@ sync_command_position 1.1 s、静置 10 s、过程图 ~3 s、位姿复核 ~5 s�
 要放开"绝对安全的换位段"必须由所有者给具体数值（例如 0.20 rad/s ≈ 11.5°/s）。
 测量组数/帧数（粗测 3 组×3 帧 ≈ 55 s、精测 ≈ 84 s）也没动：那是证据质量，属所有者口径。
 ```
+
+### 21:0x–21:3x 真机关机后：一键回粗观测位 + 全面审计（3 个只读审计并行）
+
+```text
+所有者要求：① 增加"一键回到工件粗观测位"任务（参照回停机位）；② 解释插槽粗观测
+为什么在"最后第 19 步"、插槽精观测去哪了、为什么不对比历史位姿；③ 重新想清楚分段
+的意义；④ 全面读取工作区找问题；⑤ 回答"为什么一上真机就这么慢"。
+
+做的：
+1. scripts/goto_workpiece_coarse.py（新）：回 observe.workpiece_coarse_efficient；
+   规划走 plan_pose_ik（全套安全闸），执行走换位白名单（0.20 rad/s 单段）。
+   默认只规划，--execute 才动臂。VS Code 任务 ⑬ 已加（tasks.json + README 表）。
+2. 恢复 observe:slot_fine + baseline（我上一轮删错了：插槽精观测位姿是固定示教位，
+   但"精观测这一步"必须保留；baseline 是避免关节空间横穿时扫到工件的中间换位点）。
+   第 19 步的 observe:slot_coarse 是**原设计**：流程结尾回到插槽粗观测位，
+   让下一个流程从已知视角开始，不是我挪过去的。
+3. scripts/check_slot_reference.py（新）：observe:slot_fine 的检查。
+   把本次 slot_latest 与 runtime/slot_measurement_baseline.json 自比
+   （同一测量管线自比，避开"示教链反算位姿 vs CAD 模板"的坐标系约定差：
+    2026-11-24 实测两者差 x≈36 mm 常数）。>10 mm/2° REFUSE、>3 mm/1° WARN。
+   基线已从今晚 20:23 的测量初始化（真机已关机、插槽未再碰动），下次开工所有者
+   确认后可重新 --record。
+4. 分段问题（所有者："该碰撞的分段也会撞，不会撞的长行程照样一次性走完"）：
+   · 写清分段的真实意义（手册第 55 条）：分段不改变路径几何，防的不是"路径会撞"，
+     而是把"驱动失联/跑飞"的损失截在 25° 内（2026-11-18 事故的教训）；
+   · SAFE_TRANSIT_PHASES 白名单（observe:* / baseline / pre_grasp 关节腿 /
+     goto_park_pose / goto_workpiece_coarse）：0.20 rad/s、单段执行、时间戳地板 0.05 s；
+   · 接触/装配段不变：0.10 rad/s、25° 自动分段、0.25 s 地板；
+   · 回停机位从三段并一段（goto_park_pose 传 --phase goto_park_pose）。
+
+【全面审计（3 个子智能体并行，只读）发现并已修】：
+  · 执行器看门狗 SAFE_JOINT_LIMITS 仍是旧区间（lift −110/elbow −100），
+    规划器已按所有者批准放宽到 −130/−60 → 已验证抓取位姿会被看门狗误杀。已对齐。
+  · resolve_speed_cap 把"更慢的请求"静默抬到 0.10 → 现在照办。
+  · --time-scale 自 2026-11-20 起不叠加但无提示 → 现在打印"不再叠加"提示。
+  · move_tcp_linear 间隙闸三键（8 mm/20/120 mm）硬编码、config 同名键是死配置
+    → 运行时绑定 config approach_motion；cartesian_velocity 绑定为默认速度。
+  · runner cartesian_move 步长写死 "300" → 读 config cartesian_step_mm。
+  · joint_deltas 用 |末点−起点| 净值做 25° 闸，"摆出去再摆回来"可绕过 → 改累计行程。
+  · 下发前不查轨迹点区间（看门狗只在执行中轮询）→ 全轨迹点预查，越界 exit 19。
+  · full_*.yaml phases_load 把 grip 排在 grasp 前（会在下降前张爪）→ 修正；
+    run_task.py LOAD_PHASES 同步修正。
+  · approach_slowdown 块与 far_joint_space/descent_time_scale 无人读取 → 删除死键，
+    手册 44 改写真实减速机制（proximity_velocity + 速度缩放因子写进计划时间戳）。
+  · 文档口径：README 任务表 8→13（补 ⑨–⑬）、手册条数 47→55、目录 29→55、reference 13→14；
+    agent_memory 最后更新 11-13→11-24、预抓取位口径行更正。
+
+【审计发现、本轮未动（需要所有者决定或真机在场）】：
+  · model_environment.py 从 config/unload_real.yaml 读 slot_origin，而权威在
+    common.yaml（两处数值今天相同）；改读取来源需要相机在场跑一次环境建模验证。
+  · full_*.yaml phases_unload 缺 observe:tables/slot_fine（与独立 unload 配置不一致）；
+    full_*.yaml phases_load 仍用 observe:workpiece_coarse（RVS 桌面扫描位，对着墙）。
+    full scope 需要一次专门梳理。
+  · unload dry-run 打印的阶段表缺 d3d/d3e（仅展示问题）。
+  · move_tcp_linear/run_pick_and_place 把 m/s 量纲速度当缩放因子用（数值小、方向安全）。
+
+验证：
+  python3 -m pytest test/ -q → 392 passed（新增 test/test_audit_regressions.py 等）
+  python3 scripts/check_docs.py → ALL DOC CHECKS PASSED
+  check_slot_reference 离线自测：基线自比 PASS（0.0 mm）、模拟移动 15 mm → REFUSE exit 2
+  真机已关机：goto_workpiece_coarse、单段换位、0.20 速度均**未在真机上执行**，
+  下次开工第一件事就是逐一复核（先只规划 --execute 前先看打印）。
+```

@@ -35,16 +35,23 @@ from scipy.spatial.transform import Rotation as R
 # 小于 CLEARANCE_MIN_M，直接拒绝，不再往下走。
 # 8 mm：抓取位本身就该贴近扶手（实测第20近邻 12.5 mm），所以阈值必须低于它；
 # 真正碰撞时距离会掉到 3 mm 以下，8 mm 仍能拦住。
-CLEARANCE_MIN_M = 0.008  # 见 config approach_motion.clearance_min_mm
-# 0.25 m：必须小于"工件中心到夹爪"的距离（实测 0.29 m），否则会把夹爪自己的点
-# 当成工件点——2026-11-24 就是这样误判的（最近点正好落在 TCP 上）。
+# 2026-11-24 audit：这些常量以前硬编码，config approach_motion 里的同名键
+# （clearance_min_mm / clearance_k / gate_until_mm）只活在注释里，改 config 无效。
+# 现在运行时读取 config，改一处即可生效；读不到才退回这里的默认值。
+CLEARANCE_MIN_M = 0.008
 CLOUD_RADIUS_M = 0.25
-# 抗噪声：用"第 k 近邻距离"而不是"最近点距离"。
-# 单个离群点（深度噪声）的最近距离可能只有 1–2 mm，但它附近没有别的点；
-# 真实的工件表面在同一半径内会有几十个点。k=20 能同时挡住误报与漏报。
 CLEARANCE_K = 20
-# 最后这段属于抓取动作，间隙闸让路（否则夹爪永远贴不到扶手）
-GATE_UNTIL_M = 0.12    # 见 config approach_motion.gate_until_mm
+GATE_UNTIL_M = 0.12
+try:
+    import yaml as _yaml
+    _AM = (_yaml.safe_load((pathlib.Path(__file__).resolve().parents[1]
+                            / "config" / "tasks" / "common.yaml").read_text())
+           or {}).get("approach_motion") or {}
+    CLEARANCE_MIN_M = float(_AM.get("clearance_min_mm", CLEARANCE_MIN_M * 1000)) / 1000.0
+    CLEARANCE_K = int(_AM.get("clearance_k", CLEARANCE_K))
+    GATE_UNTIL_M = float(_AM.get("gate_until_mm", GATE_UNTIL_M * 1000)) / 1000.0
+except Exception:  # noqa: BLE001 - 默认值仍然生效
+    pass
 
 
 def workpiece_clearance(target_xyz, measurement_path=None):
@@ -108,10 +115,11 @@ def main() -> int:
     except Exception:  # noqa: BLE001
         _am = {}
     step = float(sys.argv[4]) if len(sys.argv) > 4 else float(_am.get("cartesian_step_mm", 300))
-    velocity = float(sys.argv[5]) if len(sys.argv) > 5 else 0.02
+    velocity = float(sys.argv[5]) if len(sys.argv) > 5 else float(
+        _am.get("cartesian_velocity", 0.03))
     time_scale = float(sys.argv[6]) if len(sys.argv) > 6 else 2.0
     # 每步之间的停顿：原来写死 1.0 s，25 步就白等 25 秒（所有者 2026-11-24 问"为什么这么慢"）。
-    # 现在默认 0.15 s，够让控制器结算，又不拖时间。
+    # 默认值来自 config approach_motion.cartesian_dwell_s（2026-11-24 audit 修正注释）。
     rotate_deg = float(sys.argv[7]) if len(sys.argv) > 7 else 0.0
     dwell = float(sys.argv[8]) if len(sys.argv) > 8 else float(_am.get("cartesian_dwell_s", 0.05))
 
@@ -208,9 +216,10 @@ def main() -> int:
              "--time-scale", str(time_scale), "--dwell", str(dwell),
              "--goal-tolerance", "0.002"],
             capture_output=True)
-        if b"ALL_ASSEMBLY_CHUNKS_OK" not in (run.stdout or b""):
+        if run.returncode != 0 or b"ALL_ASSEMBLY_CHUNKS_OK" not in (run.stdout or b""):
             message = (run.stdout or b"").decode("utf-8", "replace").strip().splitlines()
-            print("ROTATE_FAILED", message[-1] if message else "")
+            print(f"ROTATE_FAILED rc={run.returncode}",
+                  message[-1] if message else "")
             return 4
         print(f"ROTATED {rotate_deg:+.1f} deg in place")
         return 0
@@ -285,9 +294,10 @@ def main() -> int:
              "--goal-tolerance", "0.002"],
             capture_output=True,
         )
-        if b"ALL_ASSEMBLY_CHUNKS_OK" not in (run.stdout or b""):
+        if run.returncode != 0 or b"ALL_ASSEMBLY_CHUNKS_OK" not in (run.stdout or b""):
             message = (run.stdout or b"").decode("utf-8", "replace").strip().splitlines()
-            print("STEP_FAILED", message[-1] if message else "")
+            print(f"STEP_FAILED rc={run.returncode}",
+                  message[-1] if message else "")
             return 4
         print(f"  step ok -> {np.round(target, 4).tolist()}")
 

@@ -13,8 +13,16 @@ grasp_q:
 - 0.000899
 approach_motion:
   # 2026-11-24 固化：接近工件的运动方式（三次碰撞后定的规矩）。
-  # 远距离用关节空间换位（快），最后一段用笛卡尔直线（不会斜扫到工件）。
-  far_joint_space: true          # 距工件 > cartesian_radius_m 时用关节空间
+  # 每个键都有真实消费者（2026-11-24 audit 清掉了 far_joint_space/descent_time_scale/
+  # approach_slowdown 这些没人读的死键，并让 move_tcp_linear 真正读取间隙闸三键）。
+  #   cartesian_radius_m  → run_pick_and_place.pre_grasp（关节空间只到预抓取位上方这么高）
+  #   cartesian_step_mm   → run_pick_and_place.cartesian_move + move_tcp_linear 默认步长
+  #   cartesian_dwell_s   → move_tcp_linear 默认停顿
+  #   cartesian_velocity  → move_tcp_linear 默认速度缩放上限
+  #   clearance_* / gate_until_mm → move_tcp_linear 点云间隙闸（运行时读取）
+  # 下降/靠近的"慢"不靠这里的键，而是两处真实机制：
+  #   ① run_pick_and_place.proximity_velocity 按距离降速（<0.15 m 时降到 base×0.3 起）
+  #   ② move_tcp_linear 的速度缩放因子直接写进 compute_cartesian_path 请求（计划时间戳更慢）
   cartesian_radius_m: 0.20       # 这个距离以内必须用笛卡尔
   cartesian_step_mm: 300         # 每次笛卡尔规划的直线长度（不是安全限制）
   cartesian_dwell_s: 0.05        # 每段之间的停顿
@@ -22,14 +30,6 @@ approach_motion:
   clearance_min_mm: 8            # 点云第 20 近邻距离低于此值拒绝（抗噪声）
   clearance_k: 20                # 用第 k 近邻而不是最近点
   gate_until_mm: 120             # 最后这段属于抓取动作，间隙闸让路
-  descent_time_scale: 2.0        # 抓取段半速
-
-approach_slowdown:
-  # 2026-11-24 所有者要求：靠近工件那一段必须减速（示教模式做得很夸张，效率模式至少降 50%）。
-  # 机制：把轨迹最后 tail_fraction 的时间拉长 tail_scale 倍 → 该段速度降为 1/tail_scale。
-  tail_fraction: 0.4      # 最后 40% 的行程进入减速段
-  tail_scale: 2.0         # 速度降为 50%
-  descent_scale: 2.0      # 预抓取 → 抓取 的纯下降段：全程按 50% 速度
 
 grasp_in_workpiece_frame:
   # 2026-11-24 所有者亲手验证：夹爪夹住扶手（未抬起），记录当时 TCP 与工件位姿。
@@ -504,7 +504,8 @@ workpiece_zero_quat:
 # 2026-11-20 所有者指定：一键回位用的"J4 停车位姿"。
 # 用途：J4 抱闸失效期间，把腕部停在一个指定的角度，减少断电后 J4 自由摆动带来的风险。
 # 记录方式：所有者在场确认位置后，由 scripts/record_j4_park_pose.py 写入（含 TCP 复核）。
-# 一键回位任务尚未实现（所有者要求先只记录）；实现时按 joints_deg 做关节空间移动。
+# 一键回位见 scripts/goto_park_pose.py（--execute，VS Code 任务 ⑪）；
+#   工件粗观测位的一键回位见 scripts/goto_workpiece_coarse.py（任务 ⑬）。
 j4_park_pose:
   recorded_at: "2026-11-20T14:29"
   j4_deg: -80.53

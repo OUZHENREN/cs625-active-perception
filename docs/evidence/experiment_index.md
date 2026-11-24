@@ -22,3 +22,6 @@
 | 20261124_195532_real_load_efficient | 2026-11-24 | real | load | efficient | 32.95 | ok | /home/oy/cs625_experiment_archive/20261124_195532_real_load_efficient |
 | 20261124_195640_real_load_efficient | 2026-11-24 | real | load | efficient | 365.11 | ok | /home/oy/cs625_experiment_archive/20261124_195640_real_load_efficient |
 | 20261124_200306_real_load_efficient | 2026-11-24 | real | load | efficient | 200.11 | ok | /home/oy/cs625_experiment_archive/20261124_200306_real_load_efficient |
+| 20261124_201912_real_load_efficient | 2026-11-24 | real | load | efficient | 66.90 | ok | /home/oy/cs625_experiment_archive/20261124_201912_real_load_efficient |
+| 20261124_202034_real_load_efficient | 2026-11-24 | real | load | efficient | 192.96 | ok | /home/oy/cs625_experiment_archive/20261124_202034_real_load_efficient |
+| 20261124_202348_real_load_efficient | 2026-11-24 | real | load | efficient | 76.35 | ok | /home/oy/cs625_experiment_archive/20261124_202348_real_load_efficient |

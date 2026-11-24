@@ -102,6 +102,11 @@ class SpeedProfile:
     # workpiece handles needs the slow treatment -- the rest of the travel does
     # not and used to waste most of the phase's time.
     slow_band_mm: tuple[float, float] | None = None
+    # 关节速度上限（rad/s），透传给执行器的 --max-joint-speed。
+    # 0 / None = 用执行器默认值 0.10（5.7°/s）。只有"绝对安全的换位段"
+    # 才配 0.20（所有者 2026-11-24 批准，见手册第 55 条）。执行器还会再查白名单，
+    # 别的阶段传了也不生效。
+    joint_speed_rad_s: float = 0.0
 
     @staticmethod
     def from_dict(raw: dict | None, fallback_velocity: float, fallback_scale: float,
@@ -115,6 +120,7 @@ class SpeedProfile:
             slow_tail_mm=float(raw.get("slow_tail_mm", 0.0)),
             slow_velocity=float(raw.get("slow_velocity", 0.005)),
             slow_time_scale=float(raw.get("slow_time_scale", 3.0)),
+            joint_speed_rad_s=float(raw.get("joint_speed", 0.0)),
             slow_band_mm=(
                 (float(raw["slow_band_mm"][0]), float(raw["slow_band_mm"][1]))
                 if raw.get("slow_band_mm") else None),
@@ -1263,7 +1269,7 @@ class Runner(Node):
 
     # ------------------------------------------------------------ execution
     def run_chunks(self, points: list[dict], chunks: int, time_scale: float,
-                   dwell: float) -> bool:
+                   dwell: float, phase: str = "", max_joint_speed: float = 0.0) -> bool:
         total = len(points)
         chunks = chunk_count(total, chunks)
         if chunks == 0:
@@ -1286,7 +1292,8 @@ class Runner(Node):
                     f"chunk {index} starts far from the current state; refusing to replay"
                 )
                 return False
-            ok = self._exec_chunk(path, time_scale, dwell)
+            ok = self._exec_chunk(path, time_scale, dwell, phase=phase,
+                                  max_joint_speed=max_joint_speed)
             if not ok:
                 # Never replay: the arm may already be inside this chunk, and
                 # replaying would snap it back to the chunk start.
@@ -1316,10 +1323,15 @@ class Runner(Node):
         return any(abs(point["q"][i] - current.get(name, point["q"][i])) > limit_rad
                    for i, name in enumerate(JOINTS))
 
-    def _exec_chunk(self, path: Path, time_scale: float, dwell: float) -> bool:
+    def _exec_chunk(self, path: Path, time_scale: float, dwell: float,
+                    phase: str = "", max_joint_speed: float = 0.0) -> bool:
         command = ["python3", "-u", "scripts/execute_assembly_chunks.py", str(path),
                    "--time-scale", str(time_scale), "--dwell", str(dwell),
                    "--goal-tolerance", str(self.goal_tolerance)]
+        if phase:
+            command += ["--phase", phase]
+        if max_joint_speed:
+            command += ["--max-joint-speed", str(float(max_joint_speed))]
         if self.action_name:
             command += ["--action", self.action_name]
         if self.world == "sim":
@@ -2293,9 +2305,16 @@ def cartesian_move(xyz, velocity: float, time_scale: float) -> bool:
     选它而不是 node.plan_cartesian，是因为只有它带**工件点云间隙闸**
     （规划场景里没有工件/桌子，MoveIt 的 avoid_collisions 只覆盖自碰撞——手册第 45 条）。
     """
+    try:
+        import yaml as _yaml
+        _am = (_yaml.safe_load((REPO / "config" / "tasks" / "common.yaml").read_text())
+               or {}).get("approach_motion") or {}
+        step_mm = float(_am.get("cartesian_step_mm", 300))
+    except Exception:  # noqa: BLE001 - 默认值兜底
+        step_mm = 300.0
     command = [sys.executable, "-u", str(REPO / "scripts" / "move_tcp_linear.py"),
                *[f"{float(v):.6f}" for v in xyz],
-               "300", f"{float(velocity):.3f}", f"{float(time_scale):.2f}"]
+               f"{step_mm:.0f}", f"{float(velocity):.3f}", f"{float(time_scale):.2f}"]
     code, text = run(command, timeout=900.0)
     for line in (text or "").strip().splitlines()[-8:]:
         print("   ", line)
@@ -2594,6 +2613,8 @@ def main() -> int:
         """
         record_verdict(node.sim_grasp_baseline())
 
+    current_phase = ""                # 由阶段循环更新，deliver() 读取
+
     def step(name: str, ok: bool, detail: str = "") -> None:
         record.append({"phase": name, "ok": ok, "detail": detail,
                        "tcp": current_tcp().round(4).tolist(),
@@ -2653,7 +2674,8 @@ def main() -> int:
             node.advance_sim(points)
             return True
         return node.run_chunks(points, profile.chunks, profile.time_scale,
-                               cfg.dwell_sec)
+                               cfg.dwell_sec, phase=current_phase,
+                               max_joint_speed=profile.joint_speed_rad_s)
 
     def verify(name: str, xyz, quat) -> bool:
         """Measured-pose acceptance after an executed phase (skipped in plan-only).
@@ -2724,6 +2746,7 @@ def main() -> int:
             # --resume：跳过已经完成的阶段（按序号，不按名字）
             continue
         phase_started = time.time()
+        current_phase = name          # deliver()/run_chunks 用它查"可提速白名单"
         notify_recorder(name, "enter")
         publish_task_state(node, {"flow": getattr(cfg, "scope", "") or args.flow,
                                   "mode": getattr(cfg, "mode", ""),

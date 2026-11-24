@@ -65,6 +65,7 @@
 | 52 | 从粗观测位拍照只拍到墙、测量拒收 | 效率模式要用 workpiece_coarse_efficient（= efficient_start_pose），不是 observe.workpiece_coarse |
 | 53 | 效率模式"拍摄验证"通过但一张新图都没拍 | 粗观测先验 30 分钟内直接复用；要真拍就 `--prior-max-age-min 0` |
 | 54 | 效率模式"一条命令要等一两分钟才动" | 每阶段/每腿都在起子进程：control_health 6.8 s、执行器 4.2 s、sync 1.1 s、静置 10 s 全叠加 |
+| 55 | 安全换位段提速 0.20 + 单段执行；分段防的是失控不是路径 | 白名单 SAFE_TRANSIT_PHASES；接触/装配段不变；看门狗区间与规划器对齐 |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -997,17 +998,24 @@ scripts/recover_driver_stack.sh --timeout 120
 ```text
 所有者要求：示教模式对接近段做了很夸张的减速；效率模式至少要降到 50%。
 
-执行器已有机制（不需要新代码）：
-  --tail-fraction F --tail-scale S
-  把轨迹最后 F 比例的**时间**拉长 S 倍 → 该段速度降为 1/S。
+两套机制（2026-11-24 audit 后写清，旧文里"approach_slowdown 配置"已删除——
+它没有任何脚本读取，是死配置；真实机制如下）：
 
-config 里固化（approach_slowdown）：
-  tail_fraction: 0.4      # 最后 40% 行程进入减速段
-  tail_scale:    2.0      # 降为 50% 速度
-  descent_scale: 2.0      # 预抓取 → 抓取 的纯下降段，全程 50%
+① 示教链（teaching_sequence / run_teaching_chain）：
+   execute_assembly_chunks 的 --tail-fraction F --tail-scale S
+   把轨迹最后 F 比例的时间拉长 S 倍 → 该段速度降为 1/S。
 
-用法示例（下降段全程半速）：
-  python3 scripts/execute_assembly_chunks.py <plan> --tail-fraction 1.0 --tail-scale 2.0
+② 效率模式（run_pick_and_place）：
+   · proximity_velocity(distance, base)：距目标 < 0.15 m 时按距离降速
+     （0.3×base 起、线性回升）；
+   · move_tcp_linear 的速度缩放因子直接写进 compute_cartesian_path 请求
+     → 计划的**时间戳**本身更慢 → 治理器按计划时间戳执行（真的慢，不是乘倍数）。
+   注意：--time-scale 自 2026-11-20 起不再叠加到速度上（治理器只取 max(plan_dt, dq/cap)），
+   传 2.0 只会收到一条"注意：--time-scale 不再叠加"的提示；要慢就改计划时间戳
+   （缩放因子）或 --max-joint-speed。
+
+实测（2026-11-24）：grasp 下降 150 mm，velocity=0.01（proximity 降速后）
+   → 约 30 s 走完，半速以下。
 ```
 
 ## 45. 规划场景里没有工件/桌子 → "无接触"校验只对自碰撞有效
@@ -1336,6 +1344,55 @@ config/tasks/common.yaml 里，代码在 scripts/run_pick_and_place.py 的 grip_
     属安全红线，必须所有者给具体数值）。
 ```
 
+
+## 55. 安全换位段按 0.20 rad/s 单段执行：分段防的是"失控"，不是"路径会撞"
+
+```text
+症状（2026-11-24 所有者）：效率模式前置观测要 20 多分钟；每个大行程都被自动分段
+（回停车位要分三段），已验证的自由空间换位也只有 5.7°/s。
+
+真因（三层叠加）：
+  ① 每阶段/每条笛卡尔腿都起子进程：control_health 6.8 s + 执行器 4.2 s + sync 1.1 s
+     + 静置 10 s + 过程图 3 s + 位姿复核 5 s（见第 54 条）；
+  ② 所有 >25° 单关节行程一律自动分段——包括自由空间换位；
+  ③ 时间戳地板 0.25 s/点：MoveIt 轨迹点密（160 点/16 s ≈ 0.1 s 一点）时，
+     16 s 的计划被逐点拉长成 39 s（2026-11-24 实测"计划 15.6 s → 墙钟 69 s"）。
+
+分段的意义到底是什么（2026-11-18 事故后定，这里写清楚）：
+  · 分段**不改变路径几何**——分段前后轨迹完全重合，所以"会不会撞"与分段无关；
+    该撞的长行程一次走完照样撞，不该撞的分三段也撞不上。
+  · 分段的真实作用：每 ≤25° 停一次核对终点/碰撞/力矩，把"驱动失联、机械臂跑飞"
+    这类失控的损失截在 25° 以内；再配合执行中的在线关节区间看门狗
+    （JOINT_OUT_OF_RANGE，exit 17）。
+  · 因此：**有在线看门狗 + 整段到位复核 + 所有者在旁**时，已验证的自由空间换位
+    单段执行是合理的；接触/装配段保留分段（那里跑飞 10° 就可能压坏东西）。
+
+处置（所有者 2026-11-24 批准）：
+  · execute_assembly_chunks.SAFE_TRANSIT_PHASES 白名单：observe:*（六个观测位）、
+    baseline、pre_grasp（只含"关节到预抓取位上方 200 mm"那一段；最后 200 mm 由
+    move_tcp_linear 执行、不带 --phase，仍是 0.10）、goto_park_pose、
+    goto_workpiece_coarse。白名单里的段：0.20 rad/s（11.5°/s）、**不自动分段**、
+    时间戳地板 0.05 s。
+  · 白名单在执行器代码里，调用方传 --phase 才生效；请求 >0.20 被夹到 0.20，
+    非白名单阶段传了也不提速；请求 <0.10（更慢）现在会被**照办**而不是静默提速。
+  · 接触/装配段不变：0.10 rad/s、25° 自动分段、0.25 s 地板。
+
+同轮修掉的三个隐患（2026-11-24 全面审计发现）：
+  ① 执行器看门狗 SAFE_JOINT_LIMITS 还是旧区间（lift −110 / elbow −100），
+     而规划器已按所有者批准放宽到 −130 / −60 —— 已验证的抓取位姿（lift −124.5°）
+     会在执行中被看门狗误判取消。已对齐。
+  ② joint_deltas 用 |末点−起点| 净值做 25° 闸，"摆出去再摆回来"可绕过；改累计行程。
+  ③ 下发前不查轨迹点区间（看门狗只在执行中轮询，短轨迹可能一次都不跑）；
+     现在下发前把整条轨迹每个点比对 SAFE_JOINT_LIMITS，越界 exit 19 拒绝。
+
+实测（2026-11-24 夜，当晚真机随后关机）：
+  observe:tables 计划 15.6 s、墙钟 60.8 s（还包含 10 s 静置等固定开销）；
+  停车回位由三段并一段。全部待真机复核。
+
+确认命令：
+  grep -n "SAFE_TRANSIT_PHASES" -A12 scripts/execute_assembly_chunks.py
+  python3 scripts/goto_park_pose.py          # 只规划，打印行程与"安全换位段"提示
+```
 ## 通用开工检查清单（每次上真机前）
 
 ```text

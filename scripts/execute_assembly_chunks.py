@@ -71,12 +71,33 @@ MAX_JOINT_SPEED_RAD_S = 0.10     # 单关节速度硬上限 ≈ 5.7 °/s（所�
 # 任何示教/装配需求，是原有速度的 2 倍。
 MAX_JOINT_DELTA_RAD = 0.44       # 单个计划文件里任一关节的行程硬上限 = 25°
 
+# 2026-11-24 所有者批准：**绝对安全的换位段**可以按 0.20 rad/s（11.5°/s）跑。
+# 只对下面这些阶段生效（白名单在代码里，不在调用方），其余一律 0.10。
+# 依据：这些段是"去固定示教观测位"和"从观测位到预抓取位上方"，不携带工件、
+# 不接触任何东西，也不在工件的 0.2 m 接近半径内。
+HARD_MAX_JOINT_SPEED_RAD_S = 0.20   # 任何调用方都不得超过这个绝对上限
+SAFE_TRANSIT_PHASES = (
+    "observe:workpiece_coarse_efficient",
+    "observe:tables",
+    "observe:slot_coarse",
+    "observe:slot_fine",
+    "baseline",             # 已验证的中间换位点（z≈0.73，高位自由空间）
+    "pre_grasp",            # 只覆盖"关节空间到预抓取位上方 200 mm"那一段；
+                            # 最后 200 mm 由 move_tcp_linear.py 执行，不带 --phase，
+                            # 因此仍然是 0.10
+    "goto_park_pose",       # 一键回停车位（goto_park_pose.py）
+    "goto_workpiece_coarse",  # 一键回工件粗观测位（goto_workpiece_coarse.py）
+)
+
 
 # 绝对安全关节区间（弧度）。超出即认为"不该在这里"，执行中立即取消。
 SAFE_JOINT_LIMITS = (
     ("shoulder_pan_joint", math.radians(-100.0), math.radians(100.0)),
-    ("shoulder_lift_joint", math.radians(-110.0), math.radians(10.0)),
-    ("elbow_joint", math.radians(-160.0), math.radians(-100.0)),
+    # 2026-11-24 与 plan_pose_ik 的 ABSOLUTE_LIMITS 对齐（所有者当天批准）：
+    # 肩部 -130、肘部 -60。旧值（-110/-100）比规划器严，已验证的抓取位姿
+    # （lift=-124.5°、elbow=-69~-102°）会在执行中被看门狗误判 JOINT_OUT_OF_RANGE。
+    ("shoulder_lift_joint", math.radians(-130.0), math.radians(10.0)),
+    ("elbow_joint", math.radians(-160.0), math.radians(-60.0)),
     ("wrist_1_joint", math.radians(-150.0), math.radians(150.0)),
     ("wrist_2_joint", math.radians(-150.0), math.radians(150.0)),
     ("wrist_3_joint", math.radians(-150.0), math.radians(150.0)),
@@ -88,10 +109,14 @@ def _arm_indices(names: list[str]) -> list[int]:
     return [j for j, n in enumerate(names) if "finger" not in n]
 
 
-def govern_timestamps(data: dict, time_scale: float) -> tuple[list[float], dict]:
-    """按 MAX_JOINT_SPEED_RAD_S 重新配时：只会更慢，绝不会比计划更快。
+def govern_timestamps(data: dict, time_scale: float,
+                      speed_cap: float = MAX_JOINT_SPEED_RAD_S,
+                      min_segment_sec: float = MIN_SEGMENT_SEC) -> tuple[list[float], dict]:
+    """按 speed_cap 重新配时：只会更慢，绝不会比计划更快。
 
     返回 (times, info)。times 已经乘过 time_scale（>=1，只会更慢）。
+    speed_cap 由 resolve_speed_cap() 决定：默认 MAX_JOINT_SPEED_RAD_S，
+    只有白名单阶段且调用方显式要求时才升到 HARD_MAX_JOINT_SPEED_RAD_S。
     """
     names = data["joint_names"]
     points = data["points"]
@@ -100,13 +125,15 @@ def govern_timestamps(data: dict, time_scale: float) -> tuple[list[float], dict]
     for i in range(1, len(points)):
         plan_dt = float(points[i]["t"]) - float(points[i - 1]["t"])
         dq = max(abs(points[i]["q"][j] - points[i - 1]["q"][j]) for j in idx)
-        needed = dq / MAX_JOINT_SPEED_RAD_S
-        times.append(times[-1] + max(plan_dt, needed, MIN_SEGMENT_SEC))
+        needed = dq / speed_cap
+        times.append(times[-1] + max(plan_dt, needed, min_segment_sec))
     # 2026-11-20：治理器已经是速度的唯一权威（MAX_JOINT_SPEED_RAD_S 就是硬上限）。
     # 以前这里再乘 time_scale，调用方习惯性传 3.0，实际速度变成上限的 1/3
     # （J4 转 94° 要 98 s，所有者反馈"太慢"）。现在 time_scale 不再叠加。
-    # 需要额外放慢时，改 MAX_JOINT_SPEED_RAD_S 或按段拆分，而不是乘一个倍数。
-    del time_scale
+    # 需要额外放慢时，让计划自己的时间戳更慢（缩放因子），而不是乘一个倍数。
+    if time_scale > 1.0 + 1e-9:
+        print(f"注意：--time-scale {time_scale} 自 2026-11-20 起不再叠加到速度上；"
+              f"慢速请改计划时间戳或 --max-joint-speed（否则按治理上限执行）")
     info = {
         "plan_duration": float(points[-1]["t"]),
         "exec_duration": times[-1],
@@ -117,6 +144,44 @@ def govern_timestamps(data: dict, time_scale: float) -> tuple[list[float], dict]
         ) if len(times) > 1 else 0.0,
     }
     return times, info
+
+
+def safe_transit_min_segment(phase: str) -> float:
+    """安全换位段的时间戳地板。
+
+    MIN_SEGMENT_SEC（0.25 s）是为了避免"时间戳过密导致控制器抖动"而设的**每段**
+    地板。但 MoveIt 给出的轨迹点很密（160 点 / 16 s ≈ 0.1 s 一点），逐点套 0.25 s
+    会把 16 s 的轨迹拉成 39 s——2026-11-24 实测"计划 15.6 s、墙钟 69 s"就是这么来的。
+    换位段不接触任何东西，抖动风险低，地板降到 0.05 s；接触/装配段保持 0.25 s。
+    """
+    if phase.strip() in SAFE_TRANSIT_PHASES:
+        return 0.05
+    return MIN_SEGMENT_SEC
+
+
+def resolve_speed_cap(requested: float, phase: str) -> tuple[float, str]:
+    """决定这次下发用多大的关节速度上限。
+
+    规则（所有者 2026-11-24）：默认 0.10（5.7°/s）；只有 SAFE_TRANSIT_PHASES
+    白名单里的阶段可以提到最多 HARD_MAX_JOINT_SPEED_RAD_S（0.20）。任何超出
+    硬上限的请求都不是"降级放行"，而是**夹到硬上限并打印**——不再允许把速度
+    上限当成调用方随手可调的参数（2026-11-18 的速度事故就是这么来的）。
+    """
+    try:
+        asked = float(requested)
+    except (TypeError, ValueError):
+        return MAX_JOINT_SPEED_RAD_S, f"非法请求 {requested!r}"
+    if asked <= 0:
+        return MAX_JOINT_SPEED_RAD_S, "默认"
+    if asked < MAX_JOINT_SPEED_RAD_S - 1e-9:
+        # 调用方显式请求"比默认更慢"：照办（2026-11-24 audit 发现旧代码会静默抬到 0.10，
+        # 任何"更慢"的请求都被反向加速）。plan 时间戳本身更慢时，治理器取 max 不会冲突。
+        return asked, f"调用方请求更慢 {asked:.3f}"
+    if phase.strip() not in SAFE_TRANSIT_PHASES:
+        return MAX_JOINT_SPEED_RAD_S, f"阶段 {phase or '(空)'} 不在可提速白名单"
+    cap = min(asked, HARD_MAX_JOINT_SPEED_RAD_S)
+    note = "安全换位段" if cap < HARD_MAX_JOINT_SPEED_RAD_S - 1e-9 else "安全换位段（硬上限）"
+    return cap, note
 
 
 def split_plan(data: dict, max_delta_rad: float) -> list[dict]:
@@ -199,7 +264,8 @@ def trajectory_contact_free(node, joint_names: list[str], samples: list[list[flo
 
 
 def plan_jobs(files, allow_large_move: bool = False,
-              no_auto_split: bool = False) -> tuple[list[tuple[str, dict]], int | None]:
+              no_auto_split: bool = False,
+              single_shot_phase: str = "") -> tuple[list[tuple[str, dict]], int | None]:
     """读入计划文件并按需要自动分段。
 
     返回 (jobs, refused)。refused 非 None 时需要直接返回该退出码（用于 --no-auto-split）。
@@ -212,7 +278,17 @@ def plan_jobs(files, allow_large_move: bool = False,
         data = json.loads(path.read_text(encoding="utf-8"))
         deltas = joint_deltas(data)
         worst_joint, worst_delta = max(deltas.items(), key=lambda kv: kv[1])
-        if worst_delta <= MAX_JOINT_DELTA_RAD + 1e-9 or allow_large_move:
+        # 2026-11-24 所有者批准：安全换位段（白名单）不自动分段。
+        # 分段的真实作用是"每 ≤25° 停一次核对终点、把失控损失截在 25° 内"，
+        # 它不改变路径（分段前后几何完全一致），因此"会不会撞"与分段无关。
+        # 白名单里的段都是已验证的自由空间换位，且在线关节区间看门狗（JOINT_OUT_OF_RANGE）
+        # 与整段到位复核仍然生效；接触/装配段保持 25° 自动分段不变。
+        single_shot = single_shot_phase.strip() in SAFE_TRANSIT_PHASES
+        if worst_delta <= MAX_JOINT_DELTA_RAD + 1e-9 or allow_large_move or single_shot:
+            if single_shot and worst_delta > MAX_JOINT_DELTA_RAD + 1e-9:
+                print(f"[{path.name}] 安全换位段 {single_shot_phase}：单关节行程 "
+                      f"{math.degrees(worst_delta):.1f}° 一次性执行（不自动分段；"
+                      f"在线关节区间看门狗 + 到位复核仍生效）")
             jobs.append((str(path), data))
             continue
         if no_auto_split:
@@ -235,11 +311,18 @@ def plan_jobs(files, allow_large_move: bool = False,
 
 
 def joint_deltas(data: dict) -> dict[str, float]:
-    """每个关节在整个计划里的总行程（弧度）。"""
+    """每个关节在整个计划里的**累计**行程（弧度）。
+
+    2026-11-24 audit：旧实现用 |末点−起点| 净值做 25° 闸，"摆出去再摆回来"
+    的大幅振荡计划可以绕过自动分段。累计行程才是"这个关节实际走了多远"。
+    """
     names = data["joint_names"]
     points = data["points"]
-    return {names[j]: abs(points[-1]["q"][j] - points[0]["q"][j])
-            for j in _arm_indices(names)}
+    travel = {names[j]: 0.0 for j in _arm_indices(names)}
+    for i in range(1, len(points)):
+        for j in _arm_indices(names):
+            travel[names[j]] += abs(points[i]["q"][j] - points[i - 1]["q"][j])
+    return travel
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -292,6 +375,11 @@ def build_parser() -> argparse.ArgumentParser:
                              "必须已打印 6 个关节角并得到所有者明确同意（AGENTS 安全红线）")
     parser.add_argument("--skip-contact-check", action="store_true",
                         help="跳过发送前的逐点碰撞校验（**不推荐**，默认每段都校验）")
+    parser.add_argument("--phase", default="",
+                        help="阶段名；只有 SAFE_TRANSIT_PHASES 白名单里的阶段才允许提速")
+    parser.add_argument("--max-joint-speed", type=float, default=MAX_JOINT_SPEED_RAD_S,
+                        help=f"请求的关节速度上限（rad/s）；默认 {MAX_JOINT_SPEED_RAD_S}，"
+                             f"硬上限 {HARD_MAX_JOINT_SPEED_RAD_S}")
     parser.add_argument("--no-auto-split", action="store_true",
                         help="超过 25° 行程时拒绝而不是自动分段（默认分段，见 split_plan）")
     parser.add_argument("--action", default=DEFAULT_ACTION,
@@ -521,20 +609,38 @@ def main() -> int:
 
     # --- 2026-11-19 硬闸 1：单关节行程（超限自动分段，不再让人手工拆）---
     jobs, refused = plan_jobs(files, allow_large_move=args.allow_large_move,
-                              no_auto_split=args.no_auto_split)
+                              no_auto_split=args.no_auto_split,
+                              single_shot_phase=args.phase)
     if refused is not None:
         return refused
 
     for index, (path, data) in enumerate(jobs, 1):
         # --- 2026-11-19 硬闸 2：速度（不信任计划时间戳，按上限重新配时）---
-        governed, gov = govern_timestamps(data, args.time_scale)
+        speed_cap, cap_note = resolve_speed_cap(args.max_joint_speed, args.phase)
+        governed, gov = govern_timestamps(
+            data, args.time_scale, speed_cap,
+            min_segment_sec=safe_transit_min_segment(args.phase))
         print(f"[{index}/{len(jobs)}] speed governor: plan {gov['plan_duration']:.2f}s -> "
               f"exec {gov['exec_duration']:.2f}s, max joint speed "
               f"{gov['max_speed']:.3f} rad/s ({math.degrees(gov['max_speed']):.1f}°/s, "
-              f"cap {MAX_JOINT_SPEED_RAD_S:.3f})")
-        if gov["max_speed"] > MAX_JOINT_SPEED_RAD_S + 1e-6:
+              f"cap {speed_cap:.3f} [{cap_note}])")
+        if gov["max_speed"] > speed_cap + 1e-6:
             print(f"REFUSED_SPEED: governed trajectory still exceeds the cap; nothing sent.")
             return 14
+
+        # --- 2026-11-24 硬闸 2.5：下发前全轨迹点安全区间检查 ---
+        # 执行中的看门狗（JOINT_OUT_OF_RANGE）只在等待循环里轮询，短轨迹可能一次都不跑；
+        # 这里在发送前就把轨迹的每个点与 SAFE_JOINT_LIMITS 比对，越界直接拒绝（exit 19）。
+        for point in data["points"]:
+            for j in _arm_indices(data["joint_names"]):
+                name = data["joint_names"][j]
+                low, high = dict(SAFE_JOINT_LIMITS).get(name, (-math.inf, math.inf))
+                value = float(point["q"][j])
+                if not (low - 1e-9 <= value <= high + 1e-9):
+                    print(f"REFUSED_OUT_OF_RANGE_PLAN: 计划点里 {name}={math.degrees(value):.1f}° "
+                          f"超出安全区间 [{math.degrees(low):.0f}, {math.degrees(high):.0f}]；"
+                          f"不下发（第 {data['points'].index(point)} 点）")
+                    return 19
 
         goal = FollowJointTrajectory.Goal()
         goal.trajectory.joint_names = data["joint_names"]

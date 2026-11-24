@@ -8,6 +8,8 @@ phases:
 - measure:workpiece_fine
 - observe:tables
 - observe:slot_coarse
+- observe:slot_fine
+- baseline
 - pre_grasp
 - gripper_init
 - grasp
@@ -27,10 +29,32 @@ time_scale: 1.0
 dwell_sec: 0.0
 max_chunks: 1
 phase_speeds:
+  # 2026-11-24 所有者批准：绝对安全的换位段按 0.20 rad/s（11.5°/s）跑。
+  # 白名单在执行器里（execute_assembly_chunks.SAFE_TRANSIT_PHASES），这里是请求值；
+  # 不在白名单的阶段即使写了也不会生效。pre_grasp 只提速它的"关节到高位"那一段，
+  # 最后 200 mm 由 move_tcp_linear.py 执行，仍是 0.10。
+  # chunks: 1 —— 执行器自己会按 25° 自动分段并逐段复核，外层再切成 3 段
+  # 只是多起两个子进程（每段 4.2 s 启动 + 1.1 s 同步 + 力矩探针），实测白等十几秒。
+  workpiece_coarse_efficient:
+    joint_speed: 0.20
+    chunks: 1
+  tables:
+    joint_speed: 0.20
+    chunks: 1
+  slot_coarse:
+    joint_speed: 0.20
+    chunks: 1
+  slot_fine:
+    joint_speed: 0.20
+    chunks: 1
+  baseline:
+    joint_speed: 0.20
+    chunks: 1
   pre_grasp:
     velocity: 0.03
     time_scale: 1.0
     chunks: 1
+    joint_speed: 0.20
   grasp:
     velocity: 0.02
     time_scale: 1.0
@@ -66,27 +90,24 @@ phase_speeds:
     slow_band_mm:
     - 0
     - 80
-  baseline:
-    velocity: 0.12
-    time_scale: 1.0
-    chunks: 1
 observe_checks:
   workpiece_fine: python3 scripts/measure_object.py --preset workpiece --stage fine
     --groups 3 --out runtime/measurements/workpiece_latest.json --prior runtime/measurements/workpiece_coarse.json
   slot_coarse: python3 scripts/measure_object.py --preset slot --observe-pose slot_coarse
     --groups 5 --out runtime/measurements/slot_latest.json
   tables: none
-  slot_fine: none
+  slot_fine: python3 scripts/check_slot_reference.py --measurement
+    runtime/measurements/slot_latest.json
   # 2026-11-24 所有者批准：--prior-max-age-min 由 30 改为 0。
   # 30 的含义是"先验文件 30 分钟内就直接采用、根本不拍照"，导致
   # "拍摄验证"可以通过而一张新图都没拍（当天 19:34 就发生了：手工测量刷新的先验
   # 只差 4.4 分钟，粗观测被整段跳过）。改成 0 后先验仍然作为配准引导使用，
   # 但粗观测一律实拍；代价是每次约多 1 分钟（当天实测 3 组×3 帧共 46 秒）。
   workpiece_coarse: python3 scripts/measure_object.py --preset workpiece --stage coarse
-    --groups 3 --out runtime/measurements/workpiece_coarse.json --prior auto --auto-release
+    --groups 2 --frames 2 --out runtime/measurements/workpiece_coarse.json --prior auto --auto-release
     --prior-max-age-min 0
   workpiece_coarse_efficient: python3 scripts/measure_object.py --preset workpiece
-    --stage coarse --groups 3 --out runtime/measurements/workpiece_coarse.json --prior
+    --stage coarse --groups 2 --frames 2 --out runtime/measurements/workpiece_coarse.json --prior
     auto --auto-release --prior-max-age-min 0
 observe_settle_sec: 3.0
 process_images: false

@@ -52,7 +52,7 @@ MODES = ("safe", "efficient")
 # Phase lists are owned by the runner; these are used for reporting and for the
 # full-flow handover point.  Keep them in sync with phase_plan() / run_unload().
 LOAD_PHASES = [
-    "pre_grasp", "gripper_init", "grip", "grasp", "lift", "transit", "staging",
+    "pre_grasp", "gripper_init", "grasp", "grip", "lift", "transit", "staging",
     "pre_insert", "insert", "straighten", "release", "withdraw", "baseline",
 ]
 UNLOAD_PHASES = [

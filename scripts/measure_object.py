@@ -167,7 +167,10 @@ def main() -> int:
     parser.add_argument("--stage", choices=["coarse", "fine"], default="fine",
                         help="coarse=只要能给出一个'够用来算精观测位'的粗略位姿（5–20 mm 可接受）；"
                              "fine=严格质量门（给最终位姿）")
-    parser.add_argument("--groups", type=int, default=4, help="采集组数（每组 3 帧取中位）")
+    parser.add_argument("--groups", type=int, default=4, help="采集组数（每组取中位）")
+    parser.add_argument("--frames", type=int, default=3,
+                        help="每组帧数（默认 3，取中位）。所有者 2026-11-24："
+                             "粗观测用 2 组×2 帧提速，精观测保持 3 组×3 帧不变")
     parser.add_argument("--prior", default="",
                         help="先验 JSON（粗观测/上次成功结果）；写 auto 表示用 "
                              "runtime/measurements/workpiece_prior.json（会自动更新）")
@@ -225,7 +228,7 @@ def main() -> int:
     dataset = REPO / "runtime" / "vision_dataset" / f"measure_{stamp}"
     capture = subprocess.run(
         [sys.executable, "-u", str(REPO / "scripts" / "vision_capture.py"),
-         "--groups", str(args.groups), "--frames", "3", "--tag", "m",
+         "--groups", str(args.groups), "--frames", str(args.frames), "--tag", "m",
          "--out", str(dataset)], capture_output=True, text=True, timeout=600)
     if "产物" not in (capture.stdout or ""):
         print("采集失败：\n" + (capture.stdout or "")[-800:], file=sys.stderr)

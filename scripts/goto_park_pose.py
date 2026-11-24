@@ -48,11 +48,11 @@ PLAN_FILE = pathlib.Path("/tmp/j4_park_pose_plan.json")
 
 JOINT_ORDER = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
                "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"]
-# 与 plan_pose_ik 的绝对安全区间一致（2026-11-19：肘下限放宽到 −160）
+# 与 plan_pose_ik 的绝对安全区间一致（2026-11-24 所有者批准：肩部 −130、肘部 −60）
 ABSOLUTE_LIMITS_DEG = {
     "shoulder_pan_joint": (-100.0, 100.0),
-    "shoulder_lift_joint": (-110.0, 10.0),
-    "elbow_joint": (-160.0, -100.0),
+    "shoulder_lift_joint": (-130.0, 10.0),
+    "elbow_joint": (-160.0, -60.0),
     "wrist_1_joint": (-150.0, 150.0),
     "wrist_2_joint": (-150.0, 150.0),
     "wrist_3_joint": (-150.0, 150.0),
@@ -213,14 +213,17 @@ def main() -> int:
     run = subprocess.run(
         [sys.executable, str(EXECUTOR), str(PLAN_FILE),
          "--time-scale", "1.0", "--goal-tolerance", "0.001",
-         "--verify-final", "0.004", "--fault-poll", "0.1"],
+         "--verify-final", "0.004", "--fault-poll", "0.1",
+         "--phase", "goto_park_pose", "--max-joint-speed", "0.20"],
         capture_output=True, text=True, timeout=900)
     output = run.stdout or ""
     for line in output.strip().splitlines():
-        if any(key in line for key in ("自动分", "speed governor", "status=", "ALL_ASSEMBLY")):
+        if any(key in line for key in ("speed governor", "安全换位段", "status=",
+                                       "ALL_ASSEMBLY", "REFUSED", "FAILED", "取消")):
             print("  " + line.strip())
-    if "ALL_ASSEMBLY_CHUNKS_OK" not in output:
-        print("执行失败：" + (output.strip().splitlines()[-1] if output.strip() else "?"))
+    if run.returncode != 0 or "ALL_ASSEMBLY_CHUNKS_OK" not in output:
+        print(f"执行失败（rc={run.returncode}）："
+              + (output.strip().splitlines()[-1] if output.strip() else "?"))
         return 5
     print("\n已回到停车位姿。")
     return 0

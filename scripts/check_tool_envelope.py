@@ -95,7 +95,7 @@ def cross_check_config() -> str:
     """Compare the mesh box with the conservative 150 mm figure in the config."""
     task = yaml.safe_load(TASK_CONFIG.read_text())
     flange_to_tcp = float(task.get("tool_flange_to_tcp_mm", 353.0)) / 1000.0
-    body_forward = float(task.get("tool_body_forward_from_flange_mm", 150.0)) / 1000.0
+    body_forward = float(task.get("tool_body_forward_from_flange_mm", 207.0)) / 1000.0
     front_from_tcp = -(flange_to_tcp - body_forward)
     return (f"tool front face: mesh {-TOOL_BOX_MAX[2] * 1000:.0f} mm behind TCP, "
             f"measured arms {(-front_from_tcp) * 1000:.0f} mm "
