@@ -133,6 +133,12 @@ PROVEN_POSTURES = (
     (6.8, -87.9, -91.9, -50.5, 94.4, 91.2),       # baseline
 )
 
+# 2026-11-24 所有者定：非自然构型（翻转解 / 腕部奇异解）**直接拒绝**，不许在真机上执行。
+# 起因：预抓取位只有 w2=±90°（奇异）的解，执行后机械臂走到怪异构型，所有者按了急停。
+WRIST_SINGULARITY_DEG = 90.0     # 腕部奇异：wrist_2 接近 ±90° 时两轴对齐，数值解不稳定
+SINGULARITY_TOLERANCE_DEG = 3.0  # 距奇异点多少度以内算"落在奇异点上"
+FLIP_TRAVEL_DEG = 90.0           # wrist_1 或 wrist_3 需要转这么多度 = 腕部翻转
+
 SIGNATURE_JOINTS = ("shoulder_pan_joint", "elbow_joint", "wrist_2_joint")
 
 
@@ -193,6 +199,8 @@ def main() -> int:
     parser.add_argument("--allow-large-move", action="store_true",
                         help="允许单关节行程 >25°（默认拒绝）。加之前必须已打印 6 个关节角"
                              "并得到所有者明确同意（2026-11-18 事故后新增强制闸）")
+    parser.add_argument("--allow-flip", action="store_true",
+                        help="允许腕部翻转解（默认拒绝：翻转属大角度重构，需逐段确认）")
     parser.add_argument("--ik-seeds", type=int, default=12,
                         help="用多少个扰动种子求 IK，取腕部变化最小的解")
     args = parser.parse_args()
@@ -244,6 +252,8 @@ def main() -> int:
     start_signature = configuration_signature(
         {name: math.degrees(start[i]) for i, name in enumerate(names)})
     candidates_pool = []
+    rejected_singular: list = []
+    rejected_flip: list = []
     rng = np.random.default_rng(7)
     # 种子顺序：已验证姿态优先（它们能收敛到可用分支），再用当前位姿与随机扰动。
     seeds = [[math.radians(v) for v in posture] for posture in PROVEN_POSTURES]
@@ -276,6 +286,21 @@ def main() -> int:
         candidate = [solution.get(name, start[i]) for i, name in enumerate(names)]
         if not acceptable(candidate, names):
             continue
+        # 2026-11-24：拒绝腕部奇异解。w2 落在 ±90° 附近时 w1/w3 有无穷多组合，
+        # 解出来的构型"看着能到"但实际运动不可预测（真机上走到过怪异位置）。
+        w2_deg = math.degrees(candidate[names.index("wrist_2_joint")])
+        if abs(abs(w2_deg) - WRIST_SINGULARITY_DEG) <= SINGULARITY_TOLERANCE_DEG:
+            rejected_singular.append((w2_deg, [round(math.degrees(v), 1) for v in candidate]))
+            continue
+        # 拒绝腕部翻转：w1 或 w3 相对当前要大角度重构
+        w1_travel = abs(math.degrees(candidate[names.index("wrist_1_joint")]
+                                     - start[names.index("wrist_1_joint")]))
+        w3_travel = abs(math.degrees(candidate[names.index("wrist_3_joint")]
+                                     - start[names.index("wrist_3_joint")]))
+        if not args.allow_flip and max(w1_travel, w3_travel) > FLIP_TRAVEL_DEG:
+            rejected_flip.append((max(w1_travel, w3_travel),
+                                  [round(math.degrees(v), 1) for v in candidate]))
+            continue
         arm_delta = sum(abs(candidate[i] - start[i]) for i in range(len(names)))
         wrist_delta = max(abs(candidate[i] - start[i]) for i in wrist_idx)
         signature = configuration_signature(
@@ -287,6 +312,21 @@ def main() -> int:
     candidates_pool.sort(key=lambda item: (item[0], item[1], item[2]))
     if not candidates_pool:
         print("IK_FAILED 所有种子都无解（或被安全区间拒绝）")
+        if rejected_singular:
+            print(f"  · {len(rejected_singular)} 个解落在腕部奇异点"
+                  f"（wrist_2 ≈ ±{WRIST_SINGULARITY_DEG:.0f}°，"
+                  f"容差 {SINGULARITY_TOLERANCE_DEG:.0f}°）："
+                  + " / ".join(f"w2={w:.1f}°" for w, _ in rejected_singular[:3]))
+            print("    奇异点上 wrist_1/wrist_3 有无穷多组合，实际运动不可预测，"
+                  "按所有者 2026-11-24 的规则**拒绝执行**。")
+        if rejected_flip:
+            worst = max(rejected_flip, key=lambda item: item[0])
+            print(f"  · {len(rejected_flip)} 个解需要腕部翻转"
+                  f"（wrist_1/wrist_3 行程 {worst[0]:.0f}° > {FLIP_TRAVEL_DEG:.0f}°）："
+                  f"{worst[1]}")
+            print("    翻转属于大角度重构，按规则**拒绝执行**；"
+                  "确需执行请显式加 --allow-flip 并逐段确认。")
+        print("  建议：换一个工件摆放位置，或改用接近姿态，不要强行执行。")
         return 5
     target_choice = None
     wrist_limit_note = ""
