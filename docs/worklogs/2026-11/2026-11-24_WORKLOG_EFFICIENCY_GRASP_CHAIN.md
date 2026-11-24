@@ -22,6 +22,19 @@
 | 15:5x | 修正预抓取位：外移 10 mm（−Y）+ 接近段减速 50% | 间隙 8.1→17.2 mm |
 | 16:0x | 效率模式 `grip_targets` 改用验证值 + 相对变换 | 与 config 差 0.31 mm |
 | 16:1x | 夹爪缓慢退出工件（半速 1.9°/s） | 到位精确 |
+| 16:4x | eff3 工件粗测（16:41）→ 选站 → 精测（16:47） | 粗测 cov 0.933 / yaw 9.3°；精测 cov 0.977 / 0.42 mm |
+| 17:2x | eff3 链下降到抓取位（17:22 到位，夹爪闭合未抬起）；所有者：**不抬升了，撤出后重拍验证** | 机械臂停在抓取位过夜前状态 |
+| 19:05 | 核对"机械臂在哪"：`tool0` 差 353 mm 的坑（手册 50） | 确认机械臂仍贴在抓取位，撤出未做 |
+| 19:10–19:20 | 三段缓慢撤出（笛卡尔直线 + 间隙闸，半速） | −Y 50 mm → +Z 150 → +Z 360，间隙 29.4→151.9 mm |
+| 19:20–19:24 | 5 段重构到观测位（wrist_1 101.7°，所有者同意） | 到位误差 <0.01 mm |
+| 19:29 | 发现 config 有两个"工件粗观测位"（手册 52）；换效率起点重测 | yaw +9.2°、cov 0.871、桌面 z=−0.111 复确认 |
+| 19:32–19:35 | 面板效率模式同命令跑拍摄复验 | 四段全 ok，但**粗观测被 30 分钟先验顶替、一帧没拍**（手册 53） |
+| 19:42 | A + B 修复：先验不再顶替实拍、占位不再编造 0.97 覆盖率 | 提交 `32008e8` |
+| 19:48–20:06 | 效率模式全程跑到抓取位（三遍：全流程 / 阶段子集 / 只下降） | 纯流程约 6.5–7 分钟；暴露 observe:tables TypeError 与夹爪串口 bad status response；提交 `fb64e24`、`ddfbd56` |
+| 20:25 | 提速与精简：删两段无用位移、静置 3 s、process_images off、control_health 缓存 30 s | 提交 `fbfe612` |
+| 20:2x | 换位提速实测（tables 计划 15.6 s → 墙钟 60.8 s）；20:23 插槽粗测 cov 0.97 | 插槽测量成为基线来源 |
+| 21:0x–21:3x | 一键回粗观测位任务 ⑬ + 恢复插槽精观测 + 插槽基线检查 + 安全换位单段执行 + 3 路并行只读审计 | 12 处修复；提交 `8df2ca3` |
+| 22:24 | 收工：补全时间线与本收工节；真机已关机 | 全天 6 个提交，392 测试全过 |
 
 ## 1. 完整链路验证结果（本日核心）
 
@@ -433,3 +446,61 @@ sync_command_position 1.1 s、静置 10 s、过程图 ~3 s、位姿复核 ~5 s�
   真机已关机：goto_workpiece_coarse、单段换位、0.20 速度均**未在真机上执行**，
   下次开工第一件事就是逐一复核（先只规划 --execute 前先看打印）。
 ```
+
+## 7. 22:24 收工：全天状态与明日开工清单
+
+```text
+收工时的仓库状态
+  HEAD      : 8df2ca3（2026-11-24 全天 6 个提交：8b9d095 → 32008e8 → fb64e24
+              → ddfbd56 → fbfe612 → 8df2ca3，已全部推送 origin/main）
+  测试      : 392 passed（新增 test_approach_cartesian_policy / test_prior_stub_no_fake_coverage
+              / test_joint_speed_whitelist / test_audit_regressions 等 4 个文件）
+  文档      : check_docs.py ALL DOC CHECKS PASSED；本日志已镜像 Obsidian
+  真机      : 已关机。今晚 19:48 之后的新运动代码（单段换位、0.20 速度、
+              goto_workpiece_coarse）全部**未在真机上执行**
+
+全天的交付（按顺序）
+  ① 抓取链端到端验证（粗测→选站→精测→推导→预抓取→半速下降，到位 0.01 mm）
+  ② 夹爪闭合状态下的三段缓慢撤出（间隙 29.4 → 151.9 mm）
+  ③ 效率模式跑通到抓取位（纯流程 6.5–7 分钟；精测 cov 0.973 / 0.1 mm）
+  ④ 先验不再顶替实拍（--prior-max-age-min 0），占位不再编造覆盖率
+  ⑤ 抓取接近改"关节到高位 + 笛卡尔直线"（消除一天三撞的那条关节空间路径）
+  ⑥ 插槽精观测恢复 + 插槽历史基线对比检查（check_slot_reference.py）
+  ⑦ 一键回粗观测位（goto_workpiece_coarse.py，VS Code 任务 ⑬）
+  ⑧ 安全换位段 0.20 rad/s 单段执行（白名单，接触/装配段不变）
+  ⑨ 3 路并行只读审计：12 处一致性/安全隐患修复（含看门狗区间旧值会误杀已验证
+     抓取位姿、25° 闸可被"摆出去再摆回来"绕过、下发前全轨迹点区间预查等）
+  ⑩ 手册新增 50–55 共 6 条；agent_memory 口径同步；README 任务表补全到 13 个
+
+仍然没解决的问题（按优先级，供下次开工）
+  1. 夹爪串口：127.0.0.1:7500 桥在线但 status 返回 bad status response
+     → gripper_init/grip 做不了（"能到位、不能夹"）。查 COM9 / 夹爪供电 /
+     HITBOT Studio 是否占用（手册第 5 条开工清单有"夹爪状态"项）。
+  2. observe:tables → TypeError: 'str' object is not callable（单跑不复现）。
+     已给阶段异常加完整 traceback 打印，下次复现即可定位（勿再只凭一行摘要猜）。
+  3. full scope 需要一次专门梳理：phases_load 的观测位是 observe:workpiece_coarse
+     （RVS 桌面扫描位，对着墙——手册 52）；phases_unload 缺 observe:tables/slot_fine。
+  4. model_environment.py 仍从 config/unload_real.yaml 读 slot_origin（权威在
+     common.yaml，两处今天数值相同）；改读取来源要相机在场跑一次环境建模验证。
+  5. 规划场景 world.collision_objects 仍为空（手册 45）；J4 抱闸未修复（不做完整搬运）。
+
+明日开工清单（真机）
+  1. 开工任务 ①（四项门 + control_health）
+  2. python3 scripts/goto_park_pose.py            # 先只规划，看"安全换位段"打印
+  3. python3 scripts/goto_park_pose.py --execute  # 单段回停机位（今晚未验）
+  4. 确认插槽未被碰动 → python3 scripts/check_slot_reference.py --record 重记基线
+  5. python3 scripts/goto_workpiece_coarse.py --execute  # 一键回粗观测位（今晚未验）
+  6. 与所有者确认本次实验的阶段清单后，按清单跑效率模式（agent_memory 规矩）
+  7. 复核每阶段的 secs 字段，把"固定开销"在真机上的新数值记回手册第 54 条
+```
+
+## 8. 本日提交与对应内容（供溯源）
+
+| 提交 | 内容 |
+|---|---|
+| `8b9d095` | 晚班撤出记录、两个粗观测位、先验顶替实拍的现象（文档） |
+| `32008e8` | 先验不再顶替实拍 + 占位不编造覆盖率（A+B） |
+| `fb64e24` | 抓取接近改"关节到高位 + 笛卡尔直线" + 阶段异常打印栈 |
+| `ddfbd56` | 效率模式跑到抓取位的实测与两个阻断的记录（文档） |
+| `fbfe612` | 每阶段子进程开销削减 + 删两段无用位移 + 静置 3 s |
+| `8df2ca3` | 一键回粗观测位 + 插槽基线检查 + 安全换位单段执行 + 12 处审计修复 |
