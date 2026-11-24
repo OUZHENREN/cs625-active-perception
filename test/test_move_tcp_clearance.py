@@ -12,9 +12,14 @@ tool = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(tool)
 
 
-def test_clearance_threshold_is_conservative():
-    """15 mm 是夹爪与工件之间的最小安全距离。"""
-    assert tool.CLEARANCE_MIN_M == 0.015
+def test_clearance_threshold_and_robust_metric():
+    """8 mm 阈值 + 第 k 近邻（k=20）抗噪声。
+
+    抓取位本身离扶手只有 12.5 mm（夹爪就是要夹住它），所以阈值必须低于该值；
+    真正碰撞时距离会掉到 3 mm 以下，8 mm 仍能拦住。
+    """
+    assert tool.CLEARANCE_MIN_M == 0.008
+    assert tool.CLEARANCE_K == 20
     assert tool.CLOUD_RADIUS_M <= 0.5
 
 

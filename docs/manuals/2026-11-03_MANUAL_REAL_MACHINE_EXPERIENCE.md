@@ -59,6 +59,7 @@
 | 46 | 效率模式抓取链的完整口径 | 粗测→选站→精测→相对变换推导→预抓取(带10mm侧移)→半速下降 |
 | 47 | 进程在但 ROS 图里没有发布者 | /dev/shm 僵尸段占端口；clean_dds_shm.py 清理 |
 | 48 | 接近工件时撞到工件（一天三次） | 用了关节空间插值；改用笛卡尔直线 + 点云间隙闸 |
+| 49 | 笛卡尔接近分二十多步、太慢 | step_mm 是规划长度不是安全限制；默认 300 mm + dwell 0.05 |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -1047,8 +1048,16 @@ config/tasks/common.yaml 里，代码在 scripts/run_pick_and_place.py 的 grip_
   → 工件实测位姿 T_工件
   → grasp     = T_工件 @ grasp_in_workpiece_frame
   → pre_grasp = grasp + (0, -0.010, +0.150)      ← 150 mm 垂直 + 10 mm 沿 −Y
-  → 先到 pre_grasp（末段减速），再下降到 grasp（全程半速）
+  → 接近（2026-11-24 修正，见第 48/49 条）：
+       · 距工件 >200 mm：关节空间换位（快，一步到位）
+       · 距工件 <200 mm：**笛卡尔直线**（move_tcp_linear.py，step 300 mm，
+         2–3 段即可，不要再拆二十多步）
+       · 每步先查点云第 20 近邻距离，<8 mm 且正在接近 → 拒绝
+       · 最后 120 mm 属于抓取动作，间隙闸让路
+  → 抓取段半速（time_scale 2.0）
 ```
+
+参数全部在 `config/tasks/common.yaml` 的 `approach_motion` 与 `approach_slowdown` 里。
 
 ### 四个必须遵守的数值
 
@@ -1134,6 +1143,33 @@ config/tasks/common.yaml 里，代码在 scripts/run_pick_and_place.py 的 grip_
      < CLEARANCE_MIN_M(15 mm) 直接 REFUSED_TOO_CLOSE，拿不到点云则 CLEARANCE_UNKNOWN 拒绝
 
 判据：如果一次"垂直下降"的实测 TCP 在水平方向也移动了，就是走了关节空间，必须停。
+```
+
+## 49. 笛卡尔接近不必分很多段：step 是规划长度，不是安全限制
+
+```text
+问题（2026-11-24 所有者）：笛卡尔接近要分二十多步，效率太低，"每次最多三段"。
+
+真因：move_tcp_linear.py 的 step_mm 参数被当成"安全步长"用了 10–50 mm，
+      每一步都要跑一次 compute_cartesian_path + execute_assembly_chunks + dwell，
+      460 mm 的下降就变成 10 次循环、每次 1–1.5 秒开销。
+
+正确理解：
+  · step_mm 只是"每次 compute_cartesian_path 覆盖的直线长度"；
+  · 请求里 max_step = 0.003 m 才决定插值密度（3 mm 一个点）；
+  · 所以 step=400 mm 依然是**真正的直线**，只是少了很多次规划循环。
+
+优化后的默认值（2026-11-24）：
+  step_mm  = 300       # 300 mm 以上的移动通常 2–3 段
+  dwell    = 0.05      # 原来写死 1.0 s，纯属白等
+  velocity = 0.03      # 上限
+  time_scale = 1.0
+
+实测效果：460 mm 的接近从 10 步降到 3 步，总时间从约 40 秒降到约 15 秒
+（其中大部分是物理运动时间：5.7°/s × 关节行程）。
+
+注意：分段少不等于可以省安全检查。
+  点云间隙闸（第 48 条）仍然逐步生效，抓取段（最后 120 mm）才豁免。
 ```
 
 ## 通用开工检查清单（每次上真机前）

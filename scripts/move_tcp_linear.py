@@ -4,10 +4,14 @@
 Kept deliberately small so it starts in about a second: one rclpy context, one
 node, a single subscription, then a step loop of cartesian plans.
 
-  python3 scripts/move_tcp_linear.py X Y Z [step_mm] [velocity] [time_scale]
+  python3 scripts/move_tcp_linear.py X Y Z [step_mm] [velocity] [time_scale] [ROTATE_DEG] [dwell]
+
+step_mm 默认 300：它只是"每次笛卡尔规划的直线长度"，不是安全限制。
+内部 max_step=0.003 m 保证 3 mm 插值密度，放大 step 不会让路径变弯，
+只是减少"规划+执行"循环次数。300 mm 以上的移动通常 2–3 段即可。
 
   # 原地绕工具 z 轴旋转（手眼验证用：纯平移验证不了旋转口径）
-  python3 scripts/move_tcp_linear.py X Y Z step velocity time_scale ROTATE_DEG
+  python3 scripts/move_tcp_linear.py X Y Z step velocity time_scale ROTATE_DEG [dwell]
 """
 
 
@@ -29,8 +33,18 @@ from scipy.spatial.transform import Rotation as R
 # 今天三次碰撞都是"末端走了弧线/斜线扫过工件"造成的。
 # 这里用最近一次精观测保存的点云做间隙检查：任何一步的终点若离工件点云
 # 小于 CLEARANCE_MIN_M，直接拒绝，不再往下走。
-CLEARANCE_MIN_M = 0.015        # 15 mm：夹爪/工件都不该比这更近
-CLOUD_RADIUS_M = 0.40          # 只在工件附近裁点云，避免整幅场景
+# 8 mm：抓取位本身就该贴近扶手（实测第20近邻 12.5 mm），所以阈值必须低于它；
+# 真正碰撞时距离会掉到 3 mm 以下，8 mm 仍能拦住。
+CLEARANCE_MIN_M = 0.008  # 见 config approach_motion.clearance_min_mm
+# 0.25 m：必须小于"工件中心到夹爪"的距离（实测 0.29 m），否则会把夹爪自己的点
+# 当成工件点——2026-11-24 就是这样误判的（最近点正好落在 TCP 上）。
+CLOUD_RADIUS_M = 0.25
+# 抗噪声：用"第 k 近邻距离"而不是"最近点距离"。
+# 单个离群点（深度噪声）的最近距离可能只有 1–2 mm，但它附近没有别的点；
+# 真实的工件表面在同一半径内会有几十个点。k=20 能同时挡住误报与漏报。
+CLEARANCE_K = 20
+# 最后这段属于抓取动作，间隙闸让路（否则夹爪永远贴不到扶手）
+GATE_UNTIL_M = 0.12    # 见 config approach_motion.gate_until_mm
 
 
 def workpiece_clearance(target_xyz, measurement_path=None):
@@ -65,7 +79,11 @@ def workpiece_clearance(target_xyz, measurement_path=None):
             near = base[keep]
             if len(near) < 100:
                 continue
-            distance = float(np.linalg.norm(near - np.asarray(target_xyz, float), axis=1).min())
+            distances = np.linalg.norm(near - np.asarray(target_xyz, float), axis=1)
+            distances.sort()
+            k = min(CLEARANCE_K, len(distances))
+            # 第 k 近邻距离：噪声点凑不出 k 个邻居，真实表面一定凑得出
+            distance = float(distances[k - 1])
             return distance, len(near)
         except (OSError, KeyError, ValueError, IndexError):
             continue
@@ -78,10 +96,24 @@ sys.stdout.reconfigure(line_buffering=True)
 
 def main() -> int:
     xyz = np.array([float(v) for v in sys.argv[1:4]])
-    step = float(sys.argv[4]) if len(sys.argv) > 4 else 20.0
+    # step 是"每次 compute_cartesian_path 覆盖的直线长度"，不是安全限制：
+    # 内部 max_step=0.003 m 保证 3 mm 插值密度，所以 step 放大仍是真直线，
+    # 只是把"规划+执行"的循环次数降下来（2026-11-24 所有者：分段太繁琐、效率低）。
+    # 参数默认值来自 config/tasks/common.yaml 的 approach_motion（2026-11-24 固化）
+    try:
+        import yaml as _yaml
+        _cfg = _yaml.safe_load((pathlib.Path(__file__).resolve().parents[1]
+                                / "config" / "tasks" / "common.yaml").read_text())
+        _am = (_cfg or {}).get("approach_motion") or {}
+    except Exception:  # noqa: BLE001
+        _am = {}
+    step = float(sys.argv[4]) if len(sys.argv) > 4 else float(_am.get("cartesian_step_mm", 300))
     velocity = float(sys.argv[5]) if len(sys.argv) > 5 else 0.02
     time_scale = float(sys.argv[6]) if len(sys.argv) > 6 else 2.0
+    # 每步之间的停顿：原来写死 1.0 s，25 步就白等 25 秒（所有者 2026-11-24 问"为什么这么慢"）。
+    # 现在默认 0.15 s，够让控制器结算，又不拖时间。
     rotate_deg = float(sys.argv[7]) if len(sys.argv) > 7 else 0.0
+    dwell = float(sys.argv[8]) if len(sys.argv) > 8 else float(_am.get("cartesian_dwell_s", 0.05))
 
     # 目标必须落在安全作业空间内（2026-11-13：一次"纯平移"把 TCP 移到 y=-0.17 的危险位置）
     try:
@@ -173,7 +205,7 @@ def main() -> int:
             json.dump(payload, handle)
         run = subprocess.run(
             ["python3", "-u", "scripts/execute_assembly_chunks.py", "/tmp/mtl.json",
-             "--time-scale", str(time_scale), "--dwell", "1.0",
+             "--time-scale", str(time_scale), "--dwell", str(dwell),
              "--goal-tolerance", "0.002"],
             capture_output=True)
         if b"ALL_ASSEMBLY_CHUNKS_OK" not in (run.stdout or b""):
@@ -198,11 +230,23 @@ def main() -> int:
         if clearance is None:
             print("CLEARANCE_UNKNOWN: 拿不到工件点云，拒绝移动（不做无验证的接近）")
             return 5
-        if clearance < CLEARANCE_MIN_M:
-            print(f"REFUSED_TOO_CLOSE: 该步终点离工件点云 {clearance*1000:.1f} mm "
-                  f"< {CLEARANCE_MIN_M*1000:.0f} mm（点云 {cloud_points} 点）；停止")
+        here, _ = workpiece_clearance(current)
+        # 只有"更靠近工件"才拦。已经在很近的位置时，退开是允许的
+        # （2026-11-24：撞到工件后想抬升退开，旧逻辑会把退开也拦掉）。
+        getting_closer = here is None or clearance < here - 1e-6
+        # 最后 GATE_UNTIL_M 属于抓取动作本身：夹爪必须贴到扶手才能夹住，
+        # 这段不能再按"离点云太近"拒绝（2026-11-24 实测最后 110 mm 被误拦）。
+        remaining = float(np.linalg.norm(xyz - target))
+        final_approach = remaining < GATE_UNTIL_M
+        if clearance < CLEARANCE_MIN_M and getting_closer and not final_approach:
+            print(f"REFUSED_TOO_CLOSE: 该步终点第 {CLEARANCE_K} 近邻距离 "
+                  f"{clearance*1000:.1f} mm < {CLEARANCE_MIN_M*1000:.0f} mm，"
+                  f"且比当前 {here*1000 if here else float('nan'):.1f} mm 更近"
+                  f"（点云 {cloud_points} 点）；停止")
             return 6
-        print(f"  clearance {clearance*1000:.1f} mm (cloud {cloud_points})")
+        print(f"  clearance {clearance*1000:.1f} mm (k={CLEARANCE_K}, "
+              f"current {here*1000 if here else float('nan'):.1f} mm, "
+              f"{'抓取段' if final_approach else ('接近' if getting_closer else '退开')})")
         pose = Pose()
         pose.position.x, pose.position.y, pose.position.z = target
         (pose.orientation.x, pose.orientation.y,
@@ -237,7 +281,7 @@ def main() -> int:
             json.dump(payload, handle)
         run = subprocess.run(
             ["python3", "-u", "scripts/execute_assembly_chunks.py", "/tmp/mtl.json",
-             "--time-scale", str(time_scale), "--dwell", "1.0",
+             "--time-scale", str(time_scale), "--dwell", str(dwell),
              "--goal-tolerance", "0.002"],
             capture_output=True,
         )
