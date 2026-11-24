@@ -1395,6 +1395,11 @@ class Runner(Node):
         """
         if self.world == "sim":
             return self._ensure_sim_control_ready()
+        # 2026-11-24 性能：control_health.py --fix 实测 6.8 s，原来每段/每条笛卡尔腿
+        # 都重跑一次，一次流程十几次就是一两分钟。控制链状态不会在 30 s 内自己坏掉，
+        # 失败仍然立刻返回 False（不缓存失败），所以安全性不变。
+        if time.time() - getattr(self, "_control_ready_at", 0.0) < 30.0:
+            return True
         safety, robot = self.robot_modes()
         if safety != 1 or robot != 7:
             self.get_logger().error(
@@ -1415,6 +1420,8 @@ class Runner(Node):
         if not healthy:
             self.get_logger().error("control chain unhealthy after recovery")
             self.get_logger().error((result.stdout or "").strip()[:400])
+        else:
+            self._control_ready_at = time.time()
         return healthy
 
     def _ensure_sim_control_ready(self) -> bool:
@@ -2609,6 +2616,9 @@ def main() -> int:
                     record[-1]["detail"] = ((detail + " | " if detail else "")
                                             + verdict["detail"])
         ok = record[-1]["ok"]
+        # 2026-11-24：所有者问"为什么发一条命令要一两分钟才动"。阶段记录里带上墙钟
+        # 耗时，慢在哪里一眼能看出来（原来是靠人肉对时间戳）。
+        record[-1]["secs"] = round(time.time() - phase_started, 1)
         notify_recorder(name, "exit")
         publish_task_state(node, {"flow": getattr(cfg, "scope", "") or args.flow,
                                   "mode": getattr(cfg, "mode", ""),
@@ -2713,6 +2723,7 @@ def main() -> int:
         if index < args.start_index:
             # --resume：跳过已经完成的阶段（按序号，不按名字）
             continue
+        phase_started = time.time()
         notify_recorder(name, "enter")
         publish_task_state(node, {"flow": getattr(cfg, "scope", "") or args.flow,
                                   "mode": getattr(cfg, "mode", ""),

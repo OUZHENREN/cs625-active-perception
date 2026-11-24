@@ -8,8 +8,6 @@ phases:
 - measure:workpiece_fine
 - observe:tables
 - observe:slot_coarse
-- observe:slot_fine
-- baseline
 - pre_grasp
 - gripper_init
 - grasp
@@ -90,6 +88,8 @@ observe_checks:
   workpiece_coarse_efficient: python3 scripts/measure_object.py --preset workpiece
     --stage coarse --groups 3 --out runtime/measurements/workpiece_coarse.json --prior
     auto --auto-release --prior-max-age-min 0
+observe_settle_sec: 3.0
+process_images: false
 environment_gate: measurement
 measurement_targets:
 - workpiece_fine

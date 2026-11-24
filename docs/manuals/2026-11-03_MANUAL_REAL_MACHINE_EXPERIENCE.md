@@ -64,6 +64,7 @@
 | 51 | 长距离平移后腕部"看起来像要翻转" | 平移只保证末端位姿不变，腕关节值必然重解；按现状判断别用旧基线 |
 | 52 | 从粗观测位拍照只拍到墙、测量拒收 | 效率模式要用 workpiece_coarse_efficient（= efficient_start_pose），不是 observe.workpiece_coarse |
 | 53 | 效率模式"拍摄验证"通过但一张新图都没拍 | 粗观测先验 30 分钟内直接复用；要真拍就 `--prior-max-age-min 0` |
+| 54 | 效率模式"一条命令要等一两分钟才动" | 每阶段/每腿都在起子进程：control_health 6.8 s、执行器 4.2 s、sync 1.1 s、静置 10 s 全叠加 |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -1297,6 +1298,42 @@ config/tasks/common.yaml 里，代码在 scripts/run_pick_and_place.py 的 grip_
 
 预防：任何"拍摄验证/示教位精拍"都要在日志里写清楚：这一次是实拍还是复用先验，
   并且写清先验的时间戳。不要用"四段全 ok"代替"真的拍了"。
+```
+
+## 54. 效率模式"发了命令要等一两分钟才动"：固定开销被重复叠加
+
+```text
+症状（2026-11-24 所有者）：给机械臂下命令，经常一分钟甚至两分钟之后才动；
+以前不会这样。一次"跑到抓取位"实际二十多分钟，而计划运动时间只有一分半。
+
+实测固定开销（本机，2026-11-24）：
+  control_health.py --fix        6.8 s   ← 原来**每个阶段、每条笛卡尔腿**都重跑一次
+  execute_assembly_chunks.py     4.2 s   ← 每段轨迹都起一个新进程（ROS 初始化）
+  sync_command_position.py       1.1 s   ← 执行器内部还要再起一个进程对齐记忆位置
+  observe 阶段的静置            10.0 s   ← observe_settle_sec 默认值
+  capture_process_images.py      ~3 s    ← process_images 默认 true（录像其实另有 recorder）
+  位姿复核 verify_pose.py        ~5 s
+  相机等新帧                     ~1.2 s
+
+对照同一份日志里"计划运动时长"和真实墙钟：
+  observe:slot_fine  计划 5.0 s  → 墙钟 34 s（固定开销 29 s）
+  baseline           计划 4.2 s  → 墙钟 39 s（固定开销 35 s）
+  pre_grasp          计划 35.7 s → 墙钟 161 s（固定开销 125 s）
+
+处置（2026-11-24，所有者批准"这些是安全步骤，可以快"）：
+  · control_health 结果缓存 30 s（失败不缓存，仍然立刻拒绝）→ 每阶段省 6.8 s
+  · 阶段记录新增 `secs` 字段（墙钟耗时），慢在哪里不用再对时间戳
+  · 效率模式 observe_settle_sec 10 → 3（固定示教位上臂本来就停稳了）
+  · 效率模式 process_images false（实验录像由 experiment_recorder 负责，不重复抓图）
+  · 去掉 load_efficient 里两段无用位移：observe:slot_fine、baseline
+    （插槽粗/精观测位姿都是固定示教位，插入用的是 config 常量，这两趟纯属多走）
+
+预防：
+  · 判断"是不是真的很慢"要同时看计划时长和墙钟；只看墙钟会误以为速度上限太低。
+  · 任何"每阶段起子进程"的检查，先问一句"这一步 30 秒内会变吗"——不会就缓存。
+  · 想再提速只剩两条路：①降低测量组数/帧数（影响证据质量，需所有者定）；
+    ②放开安全流段的关节速度上限（`MAX_JOINT_SPEED_RAD_S = 0.10 rad/s`，
+    属安全红线，必须所有者给具体数值）。
 ```
 
 ## 通用开工检查清单（每次上真机前）

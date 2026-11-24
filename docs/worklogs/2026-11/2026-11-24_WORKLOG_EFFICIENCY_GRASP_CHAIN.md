@@ -344,3 +344,29 @@ print('往返误差 mm:', round(float(np.linalg.norm((T@G)[:3,3] - np.array(c['g
 正确做法：先把"跑到抓取位这一步当下会用关节空间接近、有碰撞风险"讲清楚，
 给出"要么先只跑到 pre_grasp、要么允许我改这两处"的选项，让所有者选。
 ```
+
+### 20:25 按所有者要求提速与精简（不改安全红线）
+
+```text
+所有者三点要求：①插槽粗/精观测位姿都是固定示教位，别在插槽粗观测之后再跑去两个莫名其妙的位姿；
+②效率模式的观测要在 2 分钟内完成；③安全的中间段要能加速；④每次实验前要确认这次跑哪些步骤。
+
+做的（都已提交）：
+  · config/tasks/{load,full}_efficient.yaml 删掉两段无用位移：observe:slot_fine、baseline
+    （插槽位姿是固定示教位，插入用的是 config 常量；baseline 只是又一次侧向换位）
+  · 同一文件加 observe_settle_sec: 3.0（原默认 10）、process_images: false
+    （实验录像由 experiment_recorder 负责，不重复抓过程图）
+  · scripts/run_pick_and_place.py：
+      - control_health.py --fix 结果缓存 30 s（实测 6.8 s/次，原来每阶段+每条笛卡尔腿都跑）
+      - 阶段记录新增 secs（墙钟耗时），慢在哪里不用再对时间戳
+  · docs/agent_memory.md 新增三条：跑前必须列阶段清单请所有者确认 / 新阶段清单 / 固定开销清单
+  · docs/manuals 第 54 条：固定开销实测 + 处置 + "想再快只剩两条路"
+
+实测固定开销（本机）：control_health --fix 6.8 s、执行器子进程 4.2 s、
+sync_command_position 1.1 s、静置 10 s、过程图 ~3 s、位姿复核 ~5 s。
+对照计划时长与墙钟：slot_fine 5.0 s→34 s、baseline 4.2 s→39 s、pre_grasp 35.7 s→161 s。
+
+没动的（需要所有者给数）：MAX_JOINT_SPEED_RAD_S = 0.10 rad/s 是安全红线，
+要放开"绝对安全的换位段"必须由所有者给具体数值（例如 0.20 rad/s ≈ 11.5°/s）。
+测量组数/帧数（粗测 3 组×3 帧 ≈ 55 s、精测 ≈ 84 s）也没动：那是证据质量，属所有者口径。
+```
