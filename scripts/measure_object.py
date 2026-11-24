@@ -131,6 +131,31 @@ def row_degenerate_reason(row: dict) -> str:
     return "退化"
 
 
+def prior_stub_payload(pose_base: dict, age_min: float) -> dict:
+    """先验顶替实拍时写下的记录。
+
+    2026-11-24 修正（所有者：为什么这次粗观测没有实拍）：这里**不再编造覆盖率**。
+    旧代码是 ``coverage = float(payload.get("coverage", 0.97))``，而先验文件里
+    根本没有 coverage 字段，于是每次都写成 0.97——下游看到"覆盖率 0.97"，
+    实际上一张照片都没有。现在如实写 ``coverage_median = None`` + ``measured=false``，
+    宁可让下游拒绝（例如 add_station_from_measurement 会直接报"无法登记"），
+    也不给假证据。
+    """
+    return {
+        "stamp": time.strftime("%Y%m%d_%H%M%S"),
+        "source": "prior",
+        "measured": False,
+        "prior_age_min": round(float(age_min), 1),
+        "groups": 0,
+        "verdict": "OK",
+        "reasons": [],
+        "coverage_median": None,
+        "coverage_note": "来自先验，未实测（measure 阶段命中 --prior-max-age-min 捷径）",
+        "per_group": [{"group": "g00_m", "planes": 0, "pose_fitness": None,
+                       "pose_base": pose_base, "source": "prior"}],
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -256,18 +281,15 @@ def main() -> int:
             if age_min <= args.prior_max_age_min:
                 print(f"先验新鲜（{age_min:.1f} 分钟 < {args.prior_max_age_min:.1f}）"
                       f"→ 粗观测直接采用先验，不再测量")
+                print("  注意：本次**没有拍照**，coverage_median 记为 None（不再用 0.97 顶替）")
                 payload = json.loads(candidate.read_text(encoding="utf-8"))
                 pose = payload["per_group"][0]["pose_base"]
                 out = pathlib.Path(args.out) if args.out else None
                 if out:
                     out.parent.mkdir(parents=True, exist_ok=True)
-                    out.write_text(json.dumps({
-                        "stamp": time.strftime("%Y%m%d_%H%M%S"), "source": "prior",
-                        "groups": 0, "verdict": "OK", "reasons": [],
-                        "coverage_median": float(payload.get("coverage", 0.97)),
-                        "per_group": [{"group": "g00_m", "planes": 0, "pose_fitness": 0.97,
-                                       "pose_base": pose, "source": "prior"}],
-                    }, ensure_ascii=False, indent=2), encoding="utf-8")
+                    out.write_text(json.dumps(prior_stub_payload(pose, age_min),
+                                              ensure_ascii=False, indent=2),
+                                   encoding="utf-8")
                 return 0
         prior_path = str(candidate) if candidate.exists() else ""
         if prior_path:

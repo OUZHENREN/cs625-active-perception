@@ -79,12 +79,17 @@ observe_checks:
     --groups 5 --out runtime/measurements/slot_latest.json
   tables: none
   slot_fine: none
+  # 2026-11-24 所有者批准：--prior-max-age-min 由 30 改为 0。
+  # 30 的含义是"先验文件 30 分钟内就直接采用、根本不拍照"，导致
+  # "拍摄验证"可以通过而一张新图都没拍（当天 19:34 就发生了：手工测量刷新的先验
+  # 只差 4.4 分钟，粗观测被整段跳过）。改成 0 后先验仍然作为配准引导使用，
+  # 但粗观测一律实拍；代价是每次约多 1 分钟（当天实测 3 组×3 帧共 46 秒）。
   workpiece_coarse: python3 scripts/measure_object.py --preset workpiece --stage coarse
     --groups 3 --out runtime/measurements/workpiece_coarse.json --prior auto --auto-release
-    --prior-max-age-min 30
+    --prior-max-age-min 0
   workpiece_coarse_efficient: python3 scripts/measure_object.py --preset workpiece
     --stage coarse --groups 3 --out runtime/measurements/workpiece_coarse.json --prior
-    auto --auto-release --prior-max-age-min 30
+    auto --auto-release --prior-max-age-min 0
 environment_gate: measurement
 measurement_targets:
 - workpiece_fine

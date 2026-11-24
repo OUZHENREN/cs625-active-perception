@@ -140,7 +140,7 @@
 | 肩部安全区间 | **(−130, 10)**（2026-11-24 批准，原 −110；验证过的抓取位姿肩部 −124.5） | `scripts/plan_pose_ik.py` 两处限位表 |
 | TCP 作业空间框 | x[0.3, 1.1] y[0.1, 0.9] **z[−0.08, 0.95]**（2026-11-24 批准 z 下限 0.05→−0.08；桌面在 −0.11，抓取位 z=−0.060 需更低下限） | `config/tasks/common.yaml` 的 `workspace_bounds` |
 | TCP 位姿口径 | 末端是 **`my_end_effector_link`**（MoveIt 规划/到位复核/抓取推导都用它），与 `/tcp_pose_broadcaster/pose` 一致；**`tool0` 是占位 link，与真实尖端差 353 mm**（= `tool_flange_to_tcp_mm`），不可用于判断高度 | `config/tasks/common.yaml` 的 `tool_flange_to_tcp_mm`、手册第 50 条 |
-| 效率模式粗观测的先验 | 阶段命令带 `--prior auto --prior-max-age-min 30`：**30 分钟内的先验会直接采用，粗观测不重新拍摄**；做"拍摄验证"时必须把 `--prior-max-age-min` 设为 0，否则链路"成功"但一张新图都没拍 | `scripts/run_pick_and_place.py` 的 measure 阶段命令、手册第 53 条 |
+| 效率模式粗观测的先验 | 先验 = `runtime/measurements/workpiece_prior.json`（**一个工件位姿** + 时间戳，任何 OK 测量都会写回）。阶段命令为 `--prior auto --prior-max-age-min 0`（**2026-11-24 由 30 改为 0**）：先验只作配准引导，粗观测**一律实拍**（约 46 s）；万一再被顶替，占位记录写 `coverage_median = None` + `measured = false`，不再编造 0.97 | `config/tasks/{load,full}_efficient.yaml` 的 `observe_checks`、`scripts/measure_object.py` 的 `prior_stub_payload`、手册第 53 条 |
 | 真实桌面高度 | base 系 **z ≈ −0.11**（不是 0.12）；判断"低于桌面"前先看 `[table] 桌面在 base z=` | 手册第 43 条 |
 | 肘部安全区间 | **(−160, −60)**（2026-11-24 所有者批准，原 −100；真机验证过的姿态肘部到 −107/−102/−92，预抓取解为 −69） | `scripts/plan_pose_ik.py` 两处限位表、手册第 41 条 |
 | 预抓取位口径 | **抓取点正上方 150 mm**（示教链与效率模式一致）；config 里的 `pre_grasp` 键是横向 120 mm 旧值，预抓取阶段不使用 | `scripts/teaching/pose_math.py` 的 `APPROACH_HEIGHT_M`、`scripts/run_pick_and_place.py` 的 `approach_pose()` |

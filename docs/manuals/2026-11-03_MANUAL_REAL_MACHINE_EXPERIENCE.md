@@ -1272,19 +1272,28 @@ config/tasks/common.yaml 里，代码在 scripts/run_pick_and_place.py 的 grip_
 
 真因：measure 阶段的命令固定带
   --prior auto --auto-release --prior-max-age-min 30
-  （见 scripts/run_pick_and_place.py 的 measure 分支）。
-  先验文件 runtime/measurements/workpiece_prior.json 在 30 分钟内 → 直接采用，
-  连相机都不采集。这是"效率"的设计（省一次 3–6 分钟采集），
-  但它让"验证拍摄链路"这件事失真。
+  （写在 config/tasks/load_efficient.yaml 与 full_efficient.yaml 的 observe_checks 里）。
+  先验 = runtime/measurements/workpiece_prior.json，里面只有**一个工件位姿**
+  （translation + quaternion + 时间戳），由任何一次 verdict=OK 的测量写回
+  （scripts/measure_object.py:461-469）。
+  先验比 30 分钟新 → 直接用先验、连相机都不采集（scripts/measure_object.py:251-263）。
+  这是"效率"的设计，但它让"验证拍摄链路"这件事失真；
+  当天命中的原因正是 19:29 手工测过一次，先验只差 4.4 分钟。
 
 确认命令：
-  grep -n "prior-max-age-min" scripts/run_pick_and_place.py
+  grep -n "prior-max-age-min" config/tasks/load_efficient.yaml
   ls -l --time-style=+%H:%M runtime/measurements/workpiece_prior.json
+  sed -n '251,272p' scripts/measure_object.py          # 命中捷径就 return 0，不拍照
 
-处置：
-  · 只想验证下游（选站/精测）：默认行为即可，但要**明确知道粗观测没重拍**；
-  · 要验证整条拍摄链路：把该阶段的 --prior-max-age-min 改成 0（或先删先验文件），
-    再跑；否则看到的"成功"不包含粗观测实拍。
+处置（2026-11-24 已改，所有者批准）：
+  · 两个 *_efficient.yaml 里的 --prior-max-age-min 由 30 改为 **0**：
+    先验仍然作为配准引导（日志会打"自动先验：workpiece_prior.json"），
+    但粗观测一律实拍。代价很小——当天实测一次粗测实拍 46 秒
+    （3 组×3 帧 + 配准），不是几分钟。
+  · 占位记录不再编造覆盖率：旧代码 coverage_median = payload.get("coverage", 0.97)
+    在先验里没有 coverage 字段时永远写 0.97，下游看到"覆盖率 0.97"却一张照片都没有。
+    现在写 coverage_median = None、measured = false、prior_age_min = 实际年龄，
+    登记工具（add_station_from_measurement）遇到 None 会拒绝登记——这是对的。
 
 预防：任何"拍摄验证/示教位精拍"都要在日志里写清楚：这一次是实拍还是复用先验，
   并且写清先验的时间戳。不要用"四段全 ok"代替"真的拍了"。

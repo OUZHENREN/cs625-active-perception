@@ -245,3 +245,44 @@ print('往返误差 mm:', round(float(np.linalg.norm((T@G)[:3,3] - np.array(c['g
 · 本轮新增手册条目：50（tool0 陷阱）、51（平移后腕部重解）、52（两个粗观测位）、53（先验顶替实拍）
 · 仍缺：完整搬运（J4 抱闸）、规划场景缺工件/桌子
 ```
+
+### 19:42 根因讲清后按所有者要求修掉：先验不再顶替实拍（A + B）
+
+```text
+所有者追问"为什么这次粗观测没有实拍？时间上应该是足够的啊"，查实的链路是：
+  · 先验 = runtime/measurements/workpiece_prior.json，内容只是**一个工件位姿**
+    （translation + quaternion + 时间戳），由任何 verdict=OK 的测量写回
+    （scripts/measure_object.py:461-469）；
+  · 粗观测阶段命令带 --prior auto --auto-release --prior-max-age-min 30
+    （config/tasks/load_efficient.yaml / full_efficient.yaml 的 observe_checks）；
+  · scripts/measure_object.py:251-263：先验 mtime 在 30 分钟内 → 打印"先验新鲜"、
+    直接 return 0，**相机一帧不采**；
+  · 命中原因：19:29:50 我手工跑的那次 eff4_coarse 刷新了先验，
+    19:34:13 效率模式粗观测时先验只有 4.4 分钟 → 走捷径。
+
+顺带发现的真缺陷（比"跳过"更该修）：占位 JSON 里
+  coverage_median = float(payload.get("coverage", 0.97))
+先验文件没有 coverage 字段，所以永远写 0.97；下游（面板 / 登记工具）看到的
+"覆盖率 0.97"没有任何照片支撑。当天正常粗测实测是 0.871。
+
+修改（A + B，所有者 2026-11-24 19:40 批准）：
+  A. config/tasks/load_efficient.yaml、full_efficient.yaml 各两处
+     --prior-max-age-min 30 → **0**：先验仍作配准引导（日志打"自动先验"），
+     但粗观测一律实拍。代价实测：一次粗测实拍 46 秒（3 组×3 帧 + 配准），
+     不是我先前说的"3–6 分钟"（那个数错了，已在回复里更正）。
+  B. scripts/measure_object.py 新增 prior_stub_payload()：万一再走捷径，
+     写 coverage_median = None、measured = false、prior_age_min = 实际年龄，
+     并打印"本次没有拍照"。add_station_from_measurement 遇到 None 会拒绝登记
+     （这是正确的：先验不能当示教位）。
+
+验证：
+  python3 -m pytest test/ -q                      → 371 passed（新增 3 条）
+  python3 scripts/check_docs.py                   → ALL DOC CHECKS PASSED
+  run_task.py --dry-run 后查 effective 配置        → 两处都是 --prior-max-age-min 0
+  python3 -m pytest test/test_prior_stub_no_fake_coverage.py -q → 3 passed
+
+新增测试 test/test_prior_stub_no_fake_coverage.py：
+  · 占位记录不得编造覆盖率、必须带 measured=false；
+  · 位姿仍保留（下游可用），verdict 仍是 OK；
+  · 两个 *_efficient.yaml 不得再出现 --prior-max-age-min 30。
+```
