@@ -130,6 +130,8 @@
 | 当前主线 | 两模式跑同一条链路（`scripts/teaching/teaching_sequence.py`）：效率 `scripts/teaching/teaching_debug.py`（开发中）、示教/安全 `scripts/resume_teaching.sh`（已冻结）；六模式按 ADR-005 冻结，不是入口 | 原 §139④、ADR-005 |
 | 工件粗观测基准点 | (0.62380, 0.37375, 0.50762)，效率模式起点，2026-11-13 所有者确认 | `config/tasks/common.yaml` 的 `workpiece_views`、原 §139⑤ |
 | 关节速度硬上限 | `MAX_JOINT_SPEED_RAD_S = 0.10` rad/s（5.7°/s，2026-11-20 由 0.05 提高；2.86°/s 落在伺服死区，导致抖动与终点容差中止） | `scripts/execute_assembly_chunks.py:67`、手册第 34 条 |
+| 肘部安全区间 | **(−160, −60)**（2026-11-24 所有者批准，原 −100；真机验证过的姿态肘部到 −107/−102/−92，预抓取解为 −69） | `scripts/plan_pose_ik.py` 两处限位表、手册第 41 条 |
+| 预抓取位口径 | **抓取点正上方 150 mm**（示教链与效率模式一致）；config 里的 `pre_grasp` 键是横向 120 mm 旧值，预抓取阶段不使用 | `scripts/teaching/pose_math.py` 的 `APPROACH_HEIGHT_M`、`scripts/run_pick_and_place.py` 的 `approach_pose()` |
 | 示教位覆盖率门槛 | **0.95**（测量硬底线 0.90；0.90–0.95 只算"可接受但证据偏弱"，不得登记为示教位） | `scripts/add_station_from_measurement.py --min-coverage`、手册第 38 条 |
 | 新示教位（tier 1） | +27 / +23 / +18 / +13 / 0 / −9 / −19 / −29 / −36（实测 yaw，覆盖率均 ≥0.95）；旧站位为 tier 2 兜底 | `config/tasks/common.yaml` 的 `workpiece_views` |
 | 速度滑块换算 | 滑块 = `MAX_JOINT_SPEED_RAD_S × 3 / 额定 2.094` ≈ 14.3%（上限 17.2°/s），开工与恢复脚本自动设置 | `scripts/set_speed_slider.py`、手册第 34 条 |

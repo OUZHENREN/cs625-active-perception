@@ -845,7 +845,7 @@ class SafeTab(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(3)
 
-        self.camera = CameraView(probe=self._probe)
+        self.camera = CameraView(probe=self._probe, node_suffix="safety")
         camera_group = make_group("相机（1:1 原始像素）", self.camera)
         # 所有者要求：安全页把相机区域缩小，右下角那段留空（暂时不填充东西）
         camera_group.setFixedHeight(660)
@@ -1561,7 +1561,7 @@ class EfficiencyTab(QtWidgets.QWidget):
         camera_row_layout.setContentsMargins(0, 0, 0, 0)
         camera_row_layout.setSpacing(4)
 
-        self.camera = CameraView(probe=self._probe, fit=True)
+        self.camera = CameraView(probe=self._probe, fit=True, node_suffix="efficiency")
         camera_group = make_group("相机（等比适应，可切 1:1）", self.camera)
         camera_group.setMinimumWidth(660)
         camera_group.setMaximumWidth(1314)

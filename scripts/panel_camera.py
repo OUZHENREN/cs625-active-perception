@@ -62,7 +62,11 @@ class CameraWorker(QtCore.QThread):
             self._owns_context = not rclpy.ok()
             if self._owns_context:
                 rclpy.init(args=None)
-            node = rclpy.create_node("panel_camera")
+            # 面板里有两个相机视图（安全页与效率页），各自一个节点。
+            # 以前都叫 panel_camera，第二个会触发
+            # "Publisher already registered for node name" 警告。
+            suffix = f"_{self._node_suffix}" if self._node_suffix else ""
+            node = rclpy.create_node(f"panel_camera{suffix}")
             qos = QoSProfile(depth=1, history=HistoryPolicy.KEEP_LAST,
                              reliability=ReliabilityPolicy.BEST_EFFORT,
                              durability=DurabilityPolicy.VOLATILE)
@@ -168,8 +172,10 @@ class CameraView(QtWidgets.QWidget):
 
     image_size = QtCore.pyqtSignal(int, int)      # 真实像素尺寸变化时发出
 
-    def __init__(self, probe: bool = True, parent=None, fit: bool = False) -> None:
+    def __init__(self, probe: bool = True, parent=None, fit: bool = False,
+                 node_suffix: str = "") -> None:
         super().__init__(parent)
+        self._node_suffix = node_suffix
         self.setStyleSheet(f"background:{C_BG}; border:1px solid {C_BORDER};")
         # fit=True：等比缩放（保持纵横比，只缩小不放大），供效率页使用；
         # fit=False：1:1 原始像素，安全页沿用。

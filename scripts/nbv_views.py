@@ -296,11 +296,18 @@ def station_plan(views: dict, ref_pose: np.ndarray, cur_pose: np.ndarray,
     def rank_key(item):
         coverage = item["coverage"]
         has_coverage = 0 if coverage is not None else 1
+        # 2026-11-24 修正：摆放检查超限（blocked）必须排在覆盖率之前。
+        # 以前 blocked 只算出来参与诊断、没进排序键，导致 yaw −9.2° 时选中了
+        # 0@20261120（工件离它参考位置 67 mm / 9.45°，精测必然只看到 2 个面），
+        # 而真正匹配的 −9@20261120（6.2 mm / 0.38°）因为覆盖率 0.968 略低于
+        # 0.975 被排到第 3 位。摆放检查不过 = 这个站位对当前工件就是错的，
+        # 覆盖率再高也没有意义。
         return (item["tier"],            # ① 新拍的首选站位优先，现有站位兜底
                 has_coverage,            # ② 有实测覆盖率的优先
-                -float(coverage) if coverage is not None else 0.0,   # ③ 覆盖率高的优先
-                item["error_deg"],       # ④ 偏转角误差小的
-                item["delta_mm"])        # ⑤ 与当前工件匹配度高的
+                1 if item["blocked"] else 0,   # ③ 摆放检查超限的排后面
+                -float(coverage) if coverage is not None else 0.0,   # ④ 覆盖率高的优先
+                item["error_deg"],       # ⑤ 偏转角误差小的
+                item["delta_mm"])        # ⑥ 与当前工件匹配度高的
 
     candidates.sort(key=rank_key)
     best = None

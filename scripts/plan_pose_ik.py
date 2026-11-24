@@ -122,6 +122,17 @@ def _wrap_deg(angle: float) -> float:
 # 同一个 TCP 位姿通常有 8 组 IK 解（2×2×2 分支），它们末端位置一样但整条手臂的构型不同。
 # 跨分支切换会让手臂在关节空间里大幅重排（可能撞、也可能让相机姿态跳变），
 # 所以选解时必须**优先同一分支**，同分支内再取关节变化最小的。
+# 真机验证过并执行过的姿态（来自 scripts/teaching/plan_joint_locked.py）。
+# 2026-11-24：只拿"当前位姿 + 随机抖动"做种子时，IK 会收敛到翻转构型
+# （shoulder_lift −150、elbow +69），被安全区间拒绝 → 表现为"预抓取位 IK 无解"。
+# 用这些已验证姿态做种子才能收敛到可用分支（elbow −69.2）。
+PROVEN_POSTURES = (
+    (43.1, -57.4, -146.3, 14.3, 92.8, 89.8),      # observation
+    (37.1, -120.3, -107.2, -42.4, 90.8, 32.6),    # pre_grasp
+    (43.0, -123.0, -101.7, -45.0, 90.7, 38.4),    # grasp
+    (6.8, -87.9, -91.9, -50.5, 94.4, 91.2),       # baseline
+)
+
 SIGNATURE_JOINTS = ("shoulder_pan_joint", "elbow_joint", "wrist_2_joint")
 
 
@@ -147,7 +158,10 @@ def acceptable(candidate: list[float], names=None) -> bool:
     limits = {
         "shoulder_pan_joint": (-100.0, 100.0),
         "shoulder_lift_joint": (-110.0, 10.0),
-        "elbow_joint": (-160.0, -100.0),   # 2026-11-18 所有者放宽（原 -150；硬件 ±180）
+        # 2026-11-24 所有者批准：上限从 -100 放宽到 -60。真机验证过的姿态肘部到
+        # -107.2(pre_grasp)/-101.7(grasp)/-91.9(baseline)，本次预抓取所需 IK 解为
+        # -69.2；旧上限全部挡掉，表现为"能看见工件但抓不到"。
+        "elbow_joint": (-160.0, -60.0),
         "wrist_1_joint": (-150.0, 150.0),
         "wrist_2_joint": (-150.0, 150.0),
         "wrist_3_joint": (-150.0, 150.0),
@@ -216,7 +230,10 @@ def main() -> int:
     ABSOLUTE_LIMITS = {
         "shoulder_pan_joint": (-100.0, 100.0),
         "shoulder_lift_joint": (-110.0, 10.0),
-        "elbow_joint": (-160.0, -100.0),   # 2026-11-18 所有者放宽（原 -150；硬件 ±180）
+        # 2026-11-24 所有者批准：上限从 -100 放宽到 -60。真机验证过的姿态肘部到
+        # -107.2(pre_grasp)/-101.7(grasp)/-91.9(baseline)，本次预抓取所需 IK 解为
+        # -69.2；旧上限全部挡掉，表现为"能看见工件但抓不到"。
+        "elbow_joint": (-160.0, -60.0),
         "wrist_1_joint": (-150.0, 150.0),
         "wrist_2_joint": (-150.0, 150.0),
         "wrist_3_joint": (-150.0, 150.0),
@@ -228,11 +245,15 @@ def main() -> int:
         {name: math.degrees(start[i]) for i, name in enumerate(names)})
     candidates_pool = []
     rng = np.random.default_rng(7)
-    for attempt in range(args.ik_seeds):
+    # 种子顺序：已验证姿态优先（它们能收敛到可用分支），再用当前位姿与随机扰动。
+    seeds = [[math.radians(v) for v in posture] for posture in PROVEN_POSTURES]
+    seeds.append(list(start))
+    for _ in range(max(1, args.ik_seeds - len(seeds))):
         seed = list(start)
-        if attempt:
-            for index in wrist_idx:
-                seed[index] += float(rng.uniform(-0.6, 0.6))
+        for index in wrist_idx:
+            seed[index] += float(rng.uniform(-0.6, 0.6))
+        seeds.append(seed)
+    for attempt, seed in enumerate(seeds):
         request = GetPositionIK.Request()
         request.ik_request.group_name = GROUP
         request.ik_request.ik_link_name = TIP

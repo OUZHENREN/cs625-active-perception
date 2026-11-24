@@ -303,3 +303,53 @@ def test_entries_without_tier_default_to_two(world):
     ref_pose, T_tcp_cam, views = world
     plan = nbv_views.station_plan(views, ref_pose, pose(yaw_deg=-20.0), T_tcp_cam)
     assert all(item["tier"] == 2 for item in plan["ranked"])
+
+
+def test_blocked_station_loses_to_a_worse_coverage_but_matching_one(tmp_path):
+    """2026-11-24 真机发现：摆放检查超限的站位不得因覆盖率更高而胜出。
+
+    实测场景（工件 yaw −9.2°）：
+      · 0@20261120  覆盖率 0.975，但工件离它验证时的位置 67 mm / 9.45° → 精测必失败
+      · −9@20261120 覆盖率 0.968，工件只离 6.2 mm / 0.38° → 应当选中
+    旧排序只看覆盖率，选中了前者。本测试锁住"blocked 优先于覆盖率"。
+    """
+    ref_pose = pose()
+    T_tcp_cam = np.eye(4)
+    T_tcp_cam[:3, 3] = [0.05, 0.0, 0.1]
+
+    # 两个站位的参考测量：一个与当前工件位置吻合，一个偏离 67 mm
+    near = ref_pose.copy()
+    far = ref_pose.copy()
+    far[:3, 3] = ref_pose[:3, 3] + np.array([0.0, 0.067, 0.0])
+
+    def dump(matrix, name):
+        path = tmp_path / name
+        payload = {
+            "per_group": [{
+                "group": "g00_m",
+                "pose_base": {
+                    "translation": [float(v) for v in matrix[:3, 3]],
+                    "quaternion": [float(v) for v in
+                                   __import__("scipy.spatial.transform").spatial.transform
+                                   .Rotation.from_matrix(matrix[:3, :3]).as_quat()],
+                },
+            }]
+        }
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return str(path)
+
+    base = make_views(ref_pose, T_tcp_cam)["0"]
+    anchor = dict(base, validated=False)      # 只作 0° 推导基准，不参与选站
+    views = {
+        "0": anchor,
+        "0@test": dict(base, yaw_deg=0.0, tier=1, empirical_coverage=0.975,
+                       reference_measurement=dump(far, "far.json")),
+        "-9@test": dict(base, yaw_deg=-9.0, tier=1, empirical_coverage=0.968,
+                        reference_measurement=dump(near, "near.json")),
+    }
+    cur = ref_pose.copy()          # 当前工件就在 near 的位置上
+    plan = nbv_views.station_plan(views, ref_pose, cur, T_tcp_cam)
+    assert plan["verdict"] == "station"
+    assert plan["station"][1] == "-9@test", "摆放吻合的站位应当胜出，即使覆盖率略低"
+    ranked = plan["ranked"]
+    assert ranked[0]["key"] == "-9@test"
