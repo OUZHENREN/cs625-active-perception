@@ -2198,13 +2198,14 @@ def capture_process_image(tag: str, boundary: str) -> None:
         capture_output=True, timeout=60, check=False)
 
 
-def run_observation_check(command: str, pose: dict) -> tuple[bool, str]:
-    """Run the configured check for an observation waypoint.
+# 2026-11-25 所有者：测量第一次没过要**自动重测**，不要直接失败等人。
+# 只对 measure_object.py 这类测量命令生效（重测只是多拍几帧，安全且廉价）；
+# model_environment 之类的检查不重试，避免掩盖真问题。
+MEASURE_ATTEMPTS = 3
 
-    The check is a plain shell command so the pose logic stays in the pose
-    scripts (ICP, environment gate, ...) instead of growing inside the runner.
-    Exit code 0 means the observation is acceptable.
-    """
+
+def _run_check_once(command: str, pose: dict) -> tuple[bool, str]:
+    """Execute one observation check and return (ok, last output line)."""
     extra = ""
     if pose.get("check_args"):
         extra = " " + " ".join(str(v) for v in pose["check_args"])
@@ -2219,6 +2220,27 @@ def run_observation_check(command: str, pose: dict) -> tuple[bool, str]:
             return False, " | ".join(reason_lines[:2])
     tail = output[-1] if output else "no output"
     return completed.returncode == 0, tail
+
+
+def run_observation_check(command: str, pose: dict,
+                          attempts: int = 1) -> tuple[bool, str]:
+    """Run the configured check, retrying measurement commands automatically.
+
+    The check is a plain shell command so the pose logic stays in the pose
+    scripts (ICP, environment gate, ...) instead of growing inside the runner.
+    Exit code 0 means the observation is acceptable.
+
+    2026-11-25 所有者要求：测量第一次没过自动重测（实测有一次精测因单组离群被拒、
+    原地重测即通过）。重测只对 measure_object.py 生效，其它检查按 attempts 原样执行。
+    """
+    total = max(1, int(attempts)) if "measure_object.py" in (command or "") else 1
+    ok, detail = False, "no attempt"
+    for attempt in range(1, total + 1):
+        ok, detail = _run_check_once(command, pose)
+        if ok or attempt >= total:
+            break
+        print(f"[测量重测] 第 {attempt}/{total} 次未通过：{detail} → 立即重测")
+    return ok, detail
 
 
 def resolve_phase_list(cfg) -> list[tuple[str, str]]:
@@ -2983,7 +3005,8 @@ def main() -> int:
                                               encoding="utf-8")
                     node.get_logger().info(f"[{name}] check {check} skipped in sim")
                 elif check:
-                    ok_check, check_detail = run_observation_check(check, pose)
+                    ok_check, check_detail = run_observation_check(
+                        check, pose, attempts=MEASURE_ATTEMPTS)
                     record[-1]["check"] = {"name": check, "ok": ok_check,
                                            "detail": check_detail}
                     Path(args.log).write_text(json.dumps(record, indent=2),

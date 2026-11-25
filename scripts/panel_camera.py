@@ -86,22 +86,38 @@ class CameraWorker(QtCore.QThread):
 
             # launch_sensor_adapter:=false 时 /sensors/camera/* 不存在（归一化话题没发布），
             # 所以同时订阅相机原始话题——否则面板永远是"等待图像"。
-            topics = {
-                "color": (COLOR_TOPIC, "/camera/color/image_raw"),
-                "depth": (DEPTH_TOPIC, "/camera/depth/image_raw"),
+            # 2026-11-25：COLOR_TOPIC 本身就是 /camera/color/image_raw，旧写法把同一个
+            # 话题订阅了两次；这里用 fromkeys 去重，并把归一化话题排在前面。
+            candidates = {
+                "color": ["/sensors/camera/color/image", COLOR_TOPIC,
+                          "/camera/color/image_raw"],
+                "depth": ["/sensors/camera/depth/image", DEPTH_TOPIC,
+                          "/camera/depth/image_raw"],
             }
-            for kind, names in topics.items():
-                for topic in names:
+            subscribed: list[str] = []
+            for kind, names in candidates.items():
+                for topic in dict.fromkeys(names):
                     node.create_subscription(
                         Image, topic,
                         on_color if kind == "color" else on_depth, qos)
+                    subscribed.append(topic)
             self.status = "等待图像"
             last_version: dict[str, int] = {}
             reemit = 0.0
+            started_at = time.time()
+            warned = False
             while not self._stop and rclpy.ok():
                 with SPIN_LOCK:
                     rclpy.spin_once(node, timeout_sec=0.05)
                 now = time.time()
+                # 2026-11-25：面板显示"无图像"时最难判断是"没订阅上"还是"没发布"。
+                # 15 s 没有任何帧就打印一次诊断，把每条候选话题的发布者数量列出来。
+                if (not latest) and not warned and now - started_at > 15.0:
+                    warned = True
+                    detail = ", ".join(
+                        f"{t}={node.count_publishers(t)} 个发布者" for t in subscribed)
+                    print(f"[panel_camera{'_' + self._node_suffix if self._node_suffix else ''}]"
+                          f" 15 s 未收到图像：{detail}")
                 if now - reemit < 0.1:           # 最多 10 Hz 刷新界面，图像不缩放
                     continue
                 reemit = now

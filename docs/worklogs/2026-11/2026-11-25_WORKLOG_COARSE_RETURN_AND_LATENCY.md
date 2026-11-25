@@ -66,3 +66,89 @@ python3 -m pytest test/ -q            # 393 passed
 python3 scripts/check_docs.py         # ALL DOC CHECKS PASSED
 python3 scripts/goto_workpiece_coarse.py --execute --allow-flip   # 真机成功，8.2 s
 ```
+
+## 3. 18:00–18:30 效率模式逐步验证（所有者：工件今天已换位置）
+
+工件今天被移动了：11-24 的 138 mm 外的新位置。开始前把失效先验归档
+（`workpiece_prior.json` → `workpiece_prior_20261124_stale.json`），拍一帧确认工件在视野内。
+
+### 18:00 第 1 步：粗观测（起点的 mode 起点的位姿）+ 粗测
+
+```text
+命令：run_task.py --scope load --mode efficient --world real       --phases observe:workpiece_coarse_efficient,measure:workpiece_coarse --confirm
+结果：EXIT=0，measure 阶段 40 s
+  覆盖率 0.98（11-24 为 0.871）｜yaw −25.1°（11-24 为 +9.2°）
+  中心 (885.8, 686.6, 127.4) mm（比 11-24 移动 138 mm）
+  重复性 0.66 mm / 0.101°｜verdict OK｜2 组×2 帧实拍（先验未顶替）
+```
+
+### 18:05 第 2 步：选站换位（−29@20261120）+ 精测
+
+```text
+离线选站：yaw −25.3° → −29@20261120（tier1，差 3.3°，cov 0.976）
+         摆放检查 15.9 mm / 3.33°（限 50 mm / 5.0°）→ 通过
+nbv 执行：ok，到位复核无接触 ✅
+精测第 1 次：**REFUSE**
+  reasons: 低覆盖 0.926 < 0.95；中心重复性 1.1 mm > 1.0；姿态重复性 2.22° > 0.5
+  逐组：g00 fit 0.926 / g01 fit 0.965（两者互差 0.03°）/ g02 fit 0.772（离群，差 2.22°）
+  → 3 组里 2 组几乎完美，单组瞬时异常把整体判据拉爆
+精测第 2 次（原地重测，不动臂）：**OK**
+  覆盖率 0.978｜重复性 0.42 mm / 0.078°｜yaw −25.8°
+```
+
+### 18:15 相机面板"无图像"：查出两个真问题
+
+```text
+现象：效率页相机区一直显示「无图像（相机未启动或 RVS 占用）」，
+      但同一时刻 measure_object 用同一台相机正常出图。
+
+独立复现（BEST_EFFORT + 四个候选话题，8 秒）：
+  /camera/color/image_raw          4 帧 ✅
+  /camera/depth/image_raw          6 帧 ✅
+  /sensors/camera/color/image      0 帧（驱动侧未发布）
+  /sensors/camera/depth/image      0 帧
+→ 相机与话题都正常，问题在面板侧。
+
+真因（代码缺陷）：
+  ① `COLOR_TOPIC` 本身就是 "/camera/color/image_raw"，而 panel_camera 里
+     又写了一遍同名话题 → **同一个话题被订阅两次**（无意义且浪费）；
+  ② 面板对"收不到图像"没有任何诊断输出，只能看到一句占位文字，
+     无法判断是"没订阅上"还是"没发布"。
+修：话题候选去重（`dict.fromkeys`）并把归一化话题排前面；
+    15 s 无帧时打印一次诊断：每条候选话题的**发布者数量**。
+```
+
+### 18:20 示教器切换本地/远程 → 立即重挂 + 2° 探针
+
+```text
+所有者：刚在示教器上切了一次本地控制 / 远程控制。
+
+按手册第 31/32 条：切换后反控通道常常"端口还在 ESTAB、指令根本不执行"，
+所以状态话题（robot_mode=7 / safety_mode=1 / 3 条 ESTAB）**不算证据**。
+
+处置：
+  python3 scripts/ensure_robot_ready.py --force  → 已重挂为 RUNNING
+  2° 微动探针（wrist_3 +2.000°）                 → 实测 +2.00° ✅ 跟指令走
+```
+
+### 18:25 新规矩写进代码：测量失败自动重测
+
+```text
+所有者：测量第一次没过要自动重测，不要直接失败等人。
+
+实现（scripts/run_pick_and_place.py）：
+  MEASURE_ATTEMPTS = 3
+  run_observation_check(command, pose, attempts) 对含 measure_object.py 的命令
+  自动重试 3 次，每次失败立刻打印原因并重测；model_environment 等检查不重试，
+  避免掩盖真问题。measure / observe 两个调用点都已传 attempts=MEASURE_ATTEMPTS。
+本次 18:07 那次 REFUSE 正好就是需要这个机制的场景（原地重测即通过）。
+```
+
+## 4. 验证
+
+```bash
+python3 -m pytest test/ -q     # 393 passed
+python3 scripts/check_docs.py  # ALL DOC CHECKS PASSED
+真机：粗测 OK（0.98）→ 选站 −29 → 精测重测 OK（0.978 / 0.42 mm / 0.078°）
+      2° 探针命中 +2.00°；相机面板已修但**未在重启后的面板上复核**
+```
