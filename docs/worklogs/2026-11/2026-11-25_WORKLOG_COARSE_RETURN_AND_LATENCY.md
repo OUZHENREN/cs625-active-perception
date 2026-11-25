@@ -666,3 +666,39 @@ TODO 新增："局部视角优化（I2）"研究增量任务（离线评分器�
     85 mm 深插框），因此论文里必须量化"为什么我们需要力柔顺"（间隙/深度比、长径比、遮挡）
   · 指出我们误差链缺"负载变形/关节刚度"一项，并说明不能照搬它的刚度值（不同机器人）
 → 这批笔记可直接用于引用矩阵，不是摘要复述。
+
+## 20. 01:45–02:10（记 11-25）文献流水线跑满 + 引用矩阵 + Zotero 回写就绪
+
+```text
+按所有者"今晚必须完成计划、不许偷懒"的要求，按批推进。
+
+已完成的批次：
+  wave1 24 篇（lit-a/b/c/d）     ✅ 全部 9 节笔记
+  wave2 24 篇（lit-a2/b2/c2/d2） ✅ 全部完成   → 累计 **48 篇 T1 笔记**
+  wave3 24 篇（lit-a3/b3/c3/d3） 🚀 已派出（目标 T1=72 篇）
+
+T2 通读登记（机器化，不占子智能体）：
+  scripts/lit_triage.py → 登记 **908 条**（已排除 T1 的 48 篇）
+  分线：未归类 555｜误差可靠 156｜视觉标定 127｜力觉柔顺 48｜装校装备 22
+  无摘要 86 条（只能读 PDF 才能判断）
+  输出：runtime/lit_triage/all.json + summary.md
+
+引用矩阵（所有者核心要求：每节 ≥3 篇 + 对应章节）：
+  scripts/citation_matrix.py → docs/literature/CITATION_MATRIX.md
+  **16 个小节，每节列 3 篇候选**，每篇给出①该文献自己的章节结构②带页码的可核查论断③笔记链接
+  当前 48 篇笔记下"候选不足"的章节数 = **0**
+
+Zotero 回写通道（Zotero 开着时用）：
+  实测本地 API（127.0.0.1:23119）不可达 → 改用 Zotero 自带 JS 运行器
+  `scripts/zotero_import_notes.py --emit-manifest` 已生成清单并复制到
+  `C:\Users\l'z\AppData\Local\Temp\zotero_notes_manifest.json`
+  下一步：Zotero → 工具 → 开发者 → Run JavaScript → 粘贴 `scripts/zotero_import.js`
+  （去重标记 `<!-- litnote:KEY -->`，不会重复导入）
+
+力控接口核查（并入第 19 节结论，补三条硬事实）：
+  · RTSI 提供 `getAcutalTCPForce()`（RtsiIOInterface.hpp:210），驱动以 `tcp_fts_sensor` 发布
+    → 控制器内部有力估计，但**是否授权启用未知**
+  · SDK 真签名 `startForceMode(reference_frame, selection_vector, wrench, ForceMode, limits)`
+  · 我方 ROS 驱动**不暴露力控指令** → 启用只能走 SDK/示教器
+  · 决策：主线自建位置型导纳；厂商力控=待验证基线；直接 writeServoj=不采用
+  · 工具 `scripts/ft_latency_probe.py`（测 goal→运动延迟，dry-run 默认）
