@@ -156,6 +156,66 @@ def prior_stub_payload(pose_base: dict, age_min: float) -> dict:
     }
 
 
+HAND_EYE_PATH = REPO / "config" / "handeye" / "tcp_to_camera.json"
+
+
+def write_env_metadata(dataset: pathlib.Path, base_cam) -> None:
+    """给采集组补上 ``metadata.jsonl`` + ``<组名>_depth.npy``，让环境建模能直接用。
+
+    背景（所有者 2026-11-25 决定 A）：测量数据集本来只写 ``depth.npy`` + ``meta.json``，
+    而 meta.json 里**没有机械臂位姿**，所以 ``model_environment.py`` 会把每组都跳过
+    （"no metadata.jsonl (depth frames carry no pose)"），现有的点云因此无法用来建模。
+
+    但测量时机械臂是静止的，``T_base_cam`` 已经算出来了，所以可以反推
+    ``T_base_tcp = T_base_cam @ inv(T_tcp_cam)`` 写进 metadata。
+    model_environment 需要的形式是：每帧 ``<stem>_depth.npy`` 加上
+    ``metadata.jsonl`` 里一行 ``{"file": <stem>, "tcp_matrix": <16 个浮点>}``。
+
+    深度文件用**硬链接**指向原来的 ``depth.npy``，不额外占空间；同一份数据两边都能读。
+    """
+    if base_cam is None:
+        print("[env metadata] 没有 T_base_cam，跳过（这份数据集不能用于环境建模）")
+        return
+    try:
+        handeye = json.loads(HAND_EYE_PATH.read_text(encoding="utf-8"))
+        T_tcp_cam = np.array(handeye["T_tcp_cam"], dtype=float)
+    except Exception as error:  # noqa: BLE001
+        print(f"[env metadata] 读手眼标定失败，跳过：{error}")
+        return
+    T_base_tcp = np.asarray(base_cam, dtype=float) @ np.linalg.inv(T_tcp_cam)
+    flat = [round(float(v), 6) for v in T_base_tcp.reshape(-1)]
+    written = 0
+    for directory in sorted(dataset.glob("g*")):
+        if not directory.is_dir():
+            continue
+        depth = directory / "depth.npy"
+        if not depth.is_file():
+            continue
+        stem = directory.name
+        link = directory / f"{stem}_depth.npy"
+        # 单位必须转换：measure_object 存的是**米（float32）**，
+        # 而 model_environment 按 **uint16 毫米** 处理（阈值 DEPTH_MIN_M*1000=150 …
+        # DEPTH_MAX_M*1000=2000）。直接硬链接会让整帧被判"无效"，
+        # 表现为 "frames with fewer than 1000 valid points"（2026-11-25 实测）。
+        try:
+            metres = np.load(depth).astype(np.float32)
+            millimetres = np.where(np.isfinite(metres) & (metres > 0.0),
+                                   metres * 1000.0, 0.0)
+            np.save(link, np.clip(millimetres, 0, 65535).astype(np.uint16))
+        except Exception as error:  # noqa: BLE001
+            print(f"[env metadata] {stem}: 深度转换失败，跳过（{error}）")
+            continue
+        (directory / "metadata.jsonl").write_text(json.dumps({
+            "file": stem,
+            "tcp_matrix": flat,
+            "tcp_base": [round(float(v), 6) for v in np.asarray(base_cam, float)[:3, 3]],
+            "source": "measure_object (T_base_tcp = T_base_cam @ inv(T_tcp_cam))",
+        }, ensure_ascii=False) + "\n", encoding="utf-8")
+        written += 1
+    print(f"[env metadata] 已为 {written} 个采集组写入 metadata.jsonl + 深度硬链接"
+          f"（T_base_tcp xyz={np.round(T_base_tcp[:3, 3], 4).tolist()}）")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -241,6 +301,8 @@ def main() -> int:
     mesh = o3d.io.read_triangle_mesh(str(template_path))
     cad = cp.sample_mesh(mesh, args.cad_points, seed=7)
     base_cam = cp._read_base_camera()
+    # 2026-11-25：同一批数据既用于位姿测量，也用于环境建模（所有者决定 A）
+    write_env_metadata(dataset, base_cam)
     if base_cam is None:
         print("读不到 TCP，无法换算到 base 系", file=sys.stderr)
         return 2

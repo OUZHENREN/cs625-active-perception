@@ -72,6 +72,7 @@
 | 59 | 面板效率页一直"无图像"，但测量脚本能正常拍照 | 同一话题被订阅两次；且无任何诊断输出。已去重 + 15 s 打印发布者数 |
 | 60 | 测量第一次被拒（单组离群），重测即通过 | 已改为自动重测 3 次（仅 measure_object 命令） |
 | 61 | 面板相机"无图像"：两个 CameraView 各自起 worker 会两边都收不到帧 | 一个进程只跑一个相机订阅线程（shared_worker），两路图像都发、各视图过滤 |
+| 62 | 测量数据集不能直接用来建环境模型 | 缺 metadata.jsonl（无位姿）+ 深度单位是米；已改为顺带写出（uint16 毫米 + T_base_tcp） |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -1575,6 +1576,50 @@ config/tasks/common.yaml 里，代码在 scripts/run_pick_and_place.py 的 grip_
   · GUI 里"看不到数据"先做①②两步（独立复现 + 单独跑视图），再改界面代码；
   · 一个进程只允许一个相机订阅线程（shared_worker）；新增视图只能连它，不许自己起线程；
   · 诊断输出必须带**每条候选话题的发布者数量**（0 发布者 = 没发；1 发布者但 0 帧 = 订阅侧问题）。
+```
+
+## 62. 测量数据集要能直接用于环境建模：补 metadata.jsonl + 深度单位换算
+
+```text
+问题（2026-11-25 所有者："当前拍摄的桌面点云是否能够正常使用"）：
+  用当天 measure_object 的数据集跑 model_environment：
+    skipped batch g00_m: no metadata.jsonl (depth frames carry no pose)
+    no usable frame (need <file>_depth.npy plus a tcp_matrix entry)
+  即：**拍到的点云无法用于环境建模**。
+
+两个真因（缺一个都不行）：
+  ① **缺位姿**：measure_object 写 depth.npy + meta.json，而 meta.json 里没有机械臂位姿
+     （只有 frames/valid_ratio/median_m/camera_info/stamps…）。
+     model_environment 需要每个组目录里的 metadata.jsonl：
+       {"file": <stem>, "tcp_matrix": [16 个数，行优先]}，且深度文件名为 <stem>_depth.npy。
+     tcp_matrix 必须是 **T_base_tcp**（model_environment 内部再乘 T_tcp_cam 得到 T_base_cam）。
+  ② **单位不同**：measure_object 存的是**米（float32）**；model_environment 按
+     **uint16 毫米**处理（阈值 DEPTH_MIN_M*1000=150 … DEPTH_MAX_M*1000=2000）。
+     直接复用原文件时每个像素都 <150 被清零，报 "frames with fewer than 1000 valid points"。
+
+处置（所有者 2026-11-25 决定 A：不重拍）：
+  measure_object 采集后顺带调用 write_env_metadata()：
+    · T_base_tcp = T_base_cam @ inv(T_tcp_cam)（T_base_cam 本来就已经算出来了）；
+    · 每组写 <组名>_depth.npy（米 → 毫米 uint16）与 metadata.jsonl；
+    · 没有 T_base_cam 时不写（避免半套错位姿数据）。
+  当天三份历史数据集也用同一函数补了文件，**不需要重拍**。
+
+实测（当天 slot_coarse 的 5 组数据重建环境模型）：
+  frames used 5｜valid points 28108｜collision voxels 545
+  workpiece_table z=-0.1102 m x[0.840,1.320] y[0.400,0.880]
+  slot_table      z=-0.0497 m x[1.200,1.680] y[-0.260,0.200]
+  build gate PASS（首次因工件移动 142.77 mm / 10.26° 被拒 → --accept-workpiece-move 后通过）
+
+**模型里两个字段的权威边界（必须知道）**：
+  · workpiece 字段来自 config 的 workpiece_reference（历史值），**不是本次实测**；
+    抓取点用的是 measure_object 的实测位姿（T_实测 @ grasp_in_workpiece_frame），
+    所以模型里的工件位姿只对仿真/参考有意义，不能当抓取依据。
+  · slot 字段是点云实测的插槽位姿，与插入参考位姿差约 39 mm（两套坐标系约定不同）；
+    插入权威仍是 runtime/slot_reference_verified.json。
+  · 真正有价值的是**桌子**：高度与足迹、545 个碰撞体素——这是"桌面点云可用"的实际含义。
+
+预防：环境建模前先看两组输出——"跳过原因"和"valid points"。
+  出现 no metadata.jsonl / fewer than 1000 valid points 时，先查位姿与单位，别急着重拍。
 ```
 ## 通用开工检查清单（每次上真机前）
 

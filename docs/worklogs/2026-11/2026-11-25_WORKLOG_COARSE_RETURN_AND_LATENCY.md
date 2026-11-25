@@ -179,3 +179,37 @@ python3 scripts/check_docs.py  # ALL DOC CHECKS PASSED
 
 → 手册第 61 条。**需要重启面板（任务 ④）后由所有者肉眼确认出图。**
 ```
+
+### 19:30–19:45 桌面点云能否使用：修通"测量数据 → 环境模型"这条链
+
+```text
+所有者问：当前拍摄的桌面点云是否能够正常使用？这是悬而未决的事情。
+
+实测结论：**不能直接用**，缺两样东西
+  ① 缺位姿：measure_object 写 depth.npy + meta.json，meta.json 里没有机械臂位姿；
+     model_environment 需要每组 metadata.jsonl（{"file","tcp_matrix"}）+ <stem>_depth.npy，
+     而 tcp_matrix 必须是 T_base_tcp。
+  ② 单位不同：measure_object 存的是米(float32)，model_environment 按 uint16 毫米处理
+     （阈值 150–2000），直接复用会把每帧清零 → "fewer than 1000 valid points"。
+  另外 runtime/environment/latest 还停在 2026-11-05（20 天前），dry-run 一直报 MISSING。
+
+处置（所有者选 A：不重拍）：
+  measure_object 采集后调用 write_env_metadata()：
+    T_base_tcp = T_base_cam @ inv(T_tcp_cam)（T_base_cam 本来就有），
+    每组写 <组名>_depth.npy（米→毫米 uint16）+ metadata.jsonl；无位姿则不写。
+  当天三份历史数据集用同一函数补齐，无需重拍。
+
+结果（用 19:18 slot_coarse 的 5 组数据重建）：
+  frames 5｜valid points 28108｜collision voxels 545
+  workpiece_table z=-0.1102 m（与实测桌面 −0.111 一致）x[0.840,1.320] y[0.400,0.880]
+  slot_table z=-0.0497 m x[1.200,1.680] y[-0.260,0.200]
+  首次 build gate REJECT：工件偏差 142.77 mm / 10.26°（正是今天换的位置）
+  → --accept-workpiece-move 重建后 build gate PASS，verify-only 全 ok（age 0.0 h）
+
+必须记住的边界：
+  · 模型里的 workpiece 字段来自 config 历史值，不是本次实测，不能当抓取依据；
+  · slot 字段与插入参考位姿差约 39 mm（坐标系约定差），插入仍用 slot_reference_verified.json；
+  · 真正可用的是桌子几何与 545 个碰撞体素。
+
+→ 手册第 62 条；新增 test/test_measure_env_metadata.py（3 条，锁住单位换算与 tcp_matrix 口径）。
+```
