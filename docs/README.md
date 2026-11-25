@@ -33,8 +33,8 @@
 
 | 顺序 | 文档 | 什么时候看 |
 |---|---|---|
-| 0b | [`plans/2026-11-26_PLAN_THESIS_OUTLINE_V2.md`](plans/2026-11-26_PLAN_THESIS_OUTLINE_V2.md) | **大论文纲要 v2**：按已有数据重排写作顺序 + 10-30 版脱节点清单 + 每章可行性 |
 | 0a | [`TODO.md`](TODO.md) | **当前周待办（唯一入口）**：开工先看、完成即勾；每周 `scripts/todo_week.py --rollover` 归档到 `todos/` |
+| 0b | [`plans/2026-11-26_PLAN_THESIS_OUTLINE_V2.md`](plans/2026-11-26_PLAN_THESIS_OUTLINE_V2.md) | **大论文纲要 v2**：按已有数据重排写作顺序 + 10-30 版脱节点清单 + 每章可行性 |
 | 0 | [`reference/data_map.md`](reference/data_map.md) | **我有哪些数据、放在哪里、怎么读**（力矩/点云/指标/实验归档）——一条命令：`python3 scripts/data_report.py` |
 | 1 | [`agent_memory.md`](agent_memory.md) | **每次开工先扫一遍**：硬规则、当前权威值、安全红线（≤300 行；历史条目见 [`agent_memory_history.md`](agent_memory_history.md)，不必每轮读） |
 | 2 | [`reference/architecture_current.md`](reference/architecture_current.md) | 想知道代码怎么分层、示教链路 0–18 步是什么 |
