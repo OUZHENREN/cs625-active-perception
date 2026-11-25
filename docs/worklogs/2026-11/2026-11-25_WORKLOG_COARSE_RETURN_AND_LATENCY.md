@@ -459,3 +459,25 @@ python3 scripts/check_docs.py  # ALL DOC CHECKS PASSED
   由 11-04 参考换成的相对变换 ≈ (−112, −198.4, −411.8) mm
   → x 差约 30 mm、y 5 mm、z 0.7 mm —— 这是两条链在相对意义下的真实差别。
 → 手册第 69 条。
+
+## 12. 23:40 六维力传感器接入（今晚完成，离线可验）
+
+```text
+所有者给了硬件信息：坤维 KWR75、RS485、COM3、延时已改 1 ms，并给出三本手册。
+
+读手册（KWR75用户手册V21.6.75.3.3LB，非定制版长数据格式 28 字节）得到协议：
+  460800 8N1；命令 0x48AA0D0A（1 kHz 流）/0x49AA0D0A（单次，需发两次）/0x43AA0D0A（停）
+  28 字节帧 = [0x48|0x49] 0xAA + 6×float32(小端) + 0x0D0A
+  分量 Fx Fy Fz Mx My Mz，**力单位 kgf、力矩 kgf·m**（不是 N），故发布前乘 9.80665。
+
+新增：
+  config/ft_sensor/kwr75.yaml      串口/帧格式/单位换算/命令帧/话题 + 与数采软件互斥说明
+  scripts/ft_sensor_node.py        发布 /ft_sensor/wrench（N/N·m）+ /ft_sensor/diagnostics，
+                                   流/轮询两种模式，抗丢字节重同步，--self-test 用手册样例帧自检
+  experiment_recorder              候选话题加入 /ft_sensor/wrench
+  test/test_ft_sensor_protocol.py  手册样例逐位校验、kg→N、坏帧拒收、乱码重同步、半帧拼接
+  手册第 70 条                     完整接线步骤（usbipd / dialout / latency_timer=1 / 关 SenserLinker）
+
+离线验证：--self-test 通过（Fx −9.77873 vs 手册 −9.7787，六分量全对；容错切帧 2/2）。
+真机未验（传感器尚未安装到法兰，法兰未加工）。
+→ 407 测试通过；提交 1acc5e1。
