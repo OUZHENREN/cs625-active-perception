@@ -141,6 +141,8 @@
 | TCP 作业空间框 | x[0.3, 1.1] y[0.1, 0.9] **z[−0.08, 0.95]**（2026-11-24 批准 z 下限 0.05→−0.08；桌面在 −0.11，抓取位 z=−0.060 需更低下限） | `config/tasks/common.yaml` 的 `workspace_bounds` |
 | 数据在哪 | **先看 `docs/reference/data_map.md`**；一条命令 `python3 scripts/data_report.py` 列出全部数据产品（测量 JSON / 点云数据集 / 实验归档 timeseries.csv / 环境模型 / 标定）。关节力矩在归档 `timeseries.csv` 的 `joint_effort_1..6`（驱动器电流反推，没有单独 effort.csv）；六维力列 `fx fy fz tx ty tz` 已预留，接上 KWR75 后自动填充 | 手册第 70 条 |
 | 测量结果与数据集 | 测量 JSON 的 `dataset` 字段才是采集目录（目录名取采集时刻，**与 `stamp` 不同**）；按测量找数据集一律读该字段。`measure_object` 现在会顺带写 `metadata.jsonl` + 毫米深度，数据集可直接用于环境建模 | 手册第 62/64 条 |
+| 日期归属 | 连续跨零点的工作（晚上做到凌晨）**一律算到开始那一天**；00:00–06:00 新建日志默认沿用前一天 | `AGENTS.md` 第 13 条 |
+| 待办在哪 | **`docs/TODO.md`（当前周）是唯一待办入口**，独立于工作日志；每周 `python3 scripts/todo_week.py --rollover` 归档到 `docs/todos/`；开工先看、完成即勾 | `AGENTS.md` 第 14 条 |
 | 真机执行的节奏 | **一次调用一件事；真机动作一律后台跑 + 立刻回"已下发" + 跑完立刻报数字；超 1 分钟无反馈必须停；回复只给结论与数字（指标表 + 下一步一句）** | `AGENTS.md` 可理解开发模式第 12 条 |
 | 真机动作的等待上限 | 任何与机械臂真机有关的动作，**超过 1 分钟没有反馈就必须停下来报告**，不允许继续空等；我自己的推理延迟（每轮 1–2 分钟）与机械臂无关，必须如实区分 | 所有者 2026-11-25、工作日志 2026-11-25 §2 |
 | 末端实体的口径（**高频错误，已犯三次**） | 未抓取工件前，`tool_flange_to_tcp_mm = 353 mm` 是**虚拟抓取基准点**，那一点上什么都没有；实体只有夹爪手指 + 电机保护座：`tool_body_forward_from_flange_mm = 207`、`tool_body_half_extent_xy_m = 0.1473`。抓取前做间隙检查只用实体包络；**夹持后**才把工件按 TCP 处的相对位姿算进去 | `config/tasks/common.yaml` 两个 tool 键 + `tool_safety_note`、`scripts/check_tool_envelope.py`、手册第 56 条 |
