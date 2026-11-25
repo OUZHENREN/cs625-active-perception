@@ -122,9 +122,12 @@
 - [x] Zotero 回写通道：本地 API 不可达 → 改用 JS 运行器 `scripts/zotero_import.js` + `--emit-manifest`
 - [x] 工具：`scripts/literature_index.py`（汇总索引，可 `--to-obsidian` 复制）、
       `scripts/zotero_import_notes.py`（子笔记回写 Zotero，默认 dry-run + 备份 + 拒绝在 Zotero 运行时写入）
-- [~] 首批 24 篇笔记回收（进行中，已出 8 篇） → 生成文献索引（`scripts/literature_index.py` 输出 NOTES_INDEX.md）→ 复制到 Obsidian `04_文献与研究问题`
-- [ ] Zotero 回写（需关闭 Zotero）：`--apply` 导入子笔记
-- [ ] 剩余 ~800 篇分批推进（每批 20–30 篇，按"直接对象证据 → 方法迁移"优先）
+- [x] **T1 精读 72 篇全部完成**（3 波 × 4 子智能体 × 6 篇）→ `docs/literature/notes/`；索引 NOTES_INDEX.md 已生成并复制到 Obsidian `04_文献与研究问题`
+- [x] **T2 通读登记 908 条**（`scripts/lit_triage.py` → `runtime/lit_triage/`）
+- [x] **引用矩阵** `docs/literature/CITATION_MATRIX.md`：16 节 × 3 篇，含该文献章节+页码论断，缺口 0
+- [x] **纲要注入**：纲要附录 A 列出每节 3 个 Zotero key；纲要已复制到 Obsidian `01_研究规划`
+- [ ] **Zotero 回写（等你点一次，Zotero 不用关）**：清单已生成并复制到 `C:\\Users\\l'z\\AppData\\Local\\Temp\\zotero_notes_manifest.json`；Zotero → 工具 → 开发者 → Run JavaScript → 粘贴 `scripts/zotero_import.js`
+- [ ] T3：正文引用到的 T2 文献按需升精读（等论文正文动笔时做）
 - [ ] 更新阅读提示词 v3：把本课题四条线（装校装备/视觉测量标定/力觉柔顺/误差可靠）与
       我们的实测口径（0.42 mm/0.078°、插槽面内弱约束、371 mm 插入深度）写进固定背景
 
