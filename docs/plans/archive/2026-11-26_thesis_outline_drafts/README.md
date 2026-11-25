@@ -9,5 +9,5 @@
 | `2026-11-26_PLAN_THESIS_OUTLINE_V3.md` | 8 章，补厚了平台/标定/误差，但按功能分章、仍是"照现状写" |
 | `2026-11-26_PLAN_THESIS_OUTLINE_V4.md` | 8 章，改为"现状当基线"，但**章数过多**，被指"挺扯的" |
 
-现行版本：`docs/plans/THESIS_OUTLINE_V2.md`（6 章，按同类硕博论文的章法重做）。
+现行版本：`docs/plans/2026-11-26_THESIS_OUTLINE_V2.md`（6 章，按同类硕博论文的章法重做）。
 只读留档，不要修改。

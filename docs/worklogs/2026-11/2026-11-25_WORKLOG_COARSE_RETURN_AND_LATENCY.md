@@ -629,7 +629,7 @@ TODO 新增："局部视角优化（I2）"研究增量任务（离线评分器�
 
 产出：
   · 归档：`docs/plans/archive/2026-11-26_thesis_outline_drafts/`（原 V2/V3/V4 + 归档说明）
-  · 现行：`docs/plans/THESIS_OUTLINE_V2.md` —— **6 章**
+  · 现行：`docs/plans/2026-11-26_THESIS_OUTLINE_V2.md` —— **6 章**
       1 绪论
       2 实验平台与总体方案
       3 遮挡目标位姿测量与可达性观测规划（标定 + 粗精测量 + 可达性 + **局部视角优化**）
