@@ -84,7 +84,9 @@ def collect_referenced_paths() -> dict[str, set[str]]:
             # Historical records (work logs, archived docs) cite files as they existed then;
             # re-checking them would only flag history.  Only live docs must resolve.
             rel = str(path.relative_to(REPO))
-            if rel.startswith(("docs/worklogs/", "docs/archive/")):
+            # 2026-11-26：文献笔记里会引用"尚未产出的笔记""计划要写的脚本"，
+            # 那是研究过程记录，不是失效链接；和历史日志一样不参与路径校验。
+            if rel.startswith(("docs/worklogs/", "docs/archive/", "docs/literature/notes/")):
                 continue
             for match in re.findall(r"`((?:docs|scripts|config|src|test)/[^`\s]+)`",
                                     path.read_text(errors="ignore")):
@@ -109,6 +111,10 @@ def resolve_reference(ref: str) -> pathlib.Path | None:
       3. docs/archive/**/<basename>          (outdated docs kept read-only);
       4. docs/reference/<basename>            (updated technical reference).
     """
+    # 2026-11-26：文档里常用 `config/tasks/common.yaml:workpiece_views` 这种
+    # "文件:键名" 的写法（指向 YAML 的某个键，不是文件）。这里把 :键名 也剥掉，
+    # 否则每条这样的引用都会被误判成"路径不存在"（文献笔记里出现很多）。
+    ref = re.sub(r":[A-Za-z_][\w.\-]*$", "", ref)
     ref = re.sub(r":\d+(-\d+)?$", "", ref)      # strip a trailing :line or :line-line
     ref = re.sub(r"::[A-Za-z_][\w.]*\(\)?$", "", ref)   # strip a trailing ::symbol reference
     literal = REPO / ref
