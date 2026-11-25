@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import pathlib
 import sys
 import json
 import subprocess
@@ -2261,6 +2262,10 @@ def resolve_phase_list(cfg) -> list[tuple[str, str]]:
             name = entry.split(":", 1)[1] if ":" in entry else entry[len("measure_"):]
             resolved.append((f"measure:{name}", "measure"))
             continue
+        if entry.startswith("model:") or entry.startswith("model_"):
+            name = entry.split(":", 1)[1] if ":" in entry else entry[len("model_"):]
+            resolved.append((f"model:{name}", "model"))
+            continue
         if entry.startswith("nbv:") or entry.startswith("nbv_"):
             name = entry.split(":", 1)[1] if ":" in entry else entry[len("nbv_"):]
             resolved.append((f"nbv:{name}", "nbv"))
@@ -2887,6 +2892,42 @@ def main() -> int:
                         # A) 抓取基线：必须在 attached 之后取（见上面
                         # capture_grasp_baseline 的说明）。真机走不到这里。
                         capture_grasp_baseline()
+            elif kind == "model":
+                # 2026-11-25 所有者定：环境模型在**插槽精观测之后**重建，
+                # 这样用于建模的点云来自最准的观测位；并取代原来的 observe:tables
+                # （那一步只移动、不产出数据，白跑 11.6 s）。
+                # 模型里真正被使用的是桌子几何与碰撞体素；workpiece/slot 字段的权威性
+                # 有限（见手册第 62 条），所以工件位置变化用 --accept-workpiece-move 放行，
+                # 并在日志里写明理由，不是悄悄跳过检查。
+                target = name.split(":", 1)[1]
+                meas_path = REPO / "runtime" / "measurements" / f"{target}_latest.json"
+                if not meas_path.exists():
+                    step(name, False, f"MODEL_DATASET_MISSING ({meas_path.name})")
+                    continue
+                try:
+                    payload = json.loads(meas_path.read_text(encoding="utf-8"))
+                    dataset = payload.get("dataset") or ""
+                except (OSError, json.JSONDecodeError) as error:
+                    step(name, False, f"MODEL_DATASET_UNREADABLE: {error}")
+                    continue
+                if not dataset or not pathlib.Path(dataset).is_dir():
+                    step(name, False, f"MODEL_DATASET_NOT_FOUND ({dataset})")
+                    continue
+                command = [sys.executable, "-u",
+                           str(REPO / "scripts" / "model_environment.py"),
+                           "--dataset", dataset,
+                           "--out", str(REPO / "runtime" / "environment"),
+                           "--accept-workpiece-move"]
+                if plan_only:
+                    step(name, True, f"模型重建 dry-run：数据集 {pathlib.Path(dataset).name}")
+                    continue
+                code_m, text_m = run(command, timeout=900.0)
+                lines = [line.strip() for line in (text_m or "").splitlines()
+                         if any(k in line for k in ("workpiece_table", "slot_table",
+                                                    "collision voxels", "build gate",
+                                                    "frames used"))]
+                ok_m = code_m == 0 and any("build gate: PASS" in line for line in lines)
+                step(name, ok_m, "模型重建｜" + " | ".join(lines[-4:]))
             elif kind == "measure":
                 # 原地测量：NBV 已经把机械臂放到精观测位，这里不再移动，只跑测量检查
                 target = name.split(":", 1)[1]

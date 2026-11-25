@@ -6,9 +6,9 @@ phases:
 - measure:workpiece_coarse
 - nbv:workpiece
 - measure:workpiece_fine
-- observe:tables
 - observe:slot_coarse
 - observe:slot_fine
+- model:slot
 - baseline
 - pre_grasp
 - gripper_init
@@ -36,9 +36,6 @@ phase_speeds:
   # chunks: 1 —— 执行器自己会按 25° 自动分段并逐段复核，外层再切成 3 段
   # 只是多起两个子进程（每段 4.2 s 启动 + 1.1 s 同步 + 力矩探针），实测白等十几秒。
   workpiece_coarse_efficient:
-    joint_speed: 0.20
-    chunks: 1
-  tables:
     joint_speed: 0.20
     chunks: 1
   slot_coarse:
@@ -93,11 +90,14 @@ phase_speeds:
 observe_checks:
   workpiece_fine: python3 scripts/measure_object.py --preset workpiece --stage fine
     --groups 3 --out runtime/measurements/workpiece_latest.json --prior runtime/measurements/workpiece_coarse.json
+  # 2026-11-25：插槽也分粗/精两级（以前 5 组精配准写在粗观测位阶段，与工件流程相反）。
   slot_coarse: python3 scripts/measure_object.py --preset slot --observe-pose slot_coarse
-    --groups 5 --out runtime/measurements/slot_latest.json
-  tables: none
-  slot_fine: python3 scripts/check_slot_reference.py --measurement
-    runtime/measurements/slot_latest.json
+    --stage coarse --groups 2 --frames 2 --out runtime/measurements/slot_coarse.json
+  # 精观测位做真正的精配准（5 组），随后与历史基线比对；两步是一个整体，故用 && 串联。
+  slot_fine: python3 scripts/measure_object.py --preset slot --observe-pose slot_fine
+    --stage fine --groups 5 --prior runtime/measurements/slot_coarse.json
+    --out runtime/measurements/slot_latest.json && python3 scripts/check_slot_reference.py
+    --measurement runtime/measurements/slot_latest.json
   # 2026-11-24 所有者批准：--prior-max-age-min 由 30 改为 0。
   # 30 的含义是"先验文件 30 分钟内就直接采用、根本不拍照"，导致
   # "拍摄验证"可以通过而一张新图都没拍（当天 19:34 就发生了：手工测量刷新的先验

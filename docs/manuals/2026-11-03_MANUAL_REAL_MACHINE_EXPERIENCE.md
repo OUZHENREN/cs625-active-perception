@@ -73,6 +73,8 @@
 | 60 | 测量第一次被拒（单组离群），重测即通过 | 已改为自动重测 3 次（仅 measure_object 命令） |
 | 61 | 面板相机"无图像"：两个 CameraView 各自起 worker 会两边都收不到帧 | 一个进程只跑一个相机订阅线程（shared_worker），两路图像都发、各视图过滤 |
 | 62 | 测量数据集不能直接用来建环境模型 | 缺 metadata.jsonl（无位姿）+ 深度单位是米；已改为顺带写出（uint16 毫米 + T_base_tcp） |
+| 63 | 插槽的精配准写在了粗观测位阶段；tables 空跑 | 插槽也分粗/精两级；环境模型改在 slot_fine 之后由 `model:slot` 阶段重建 |
+| 64 | 按测量 JSON 的 `stamp` 去找数据集目录，结果补错了目录 | 目录名取**采集时刻**，与 `stamp` 不同；一律读 JSON 里的 `dataset` 字段 |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -1620,6 +1622,68 @@ config/tasks/common.yaml 里，代码在 scripts/run_pick_and_place.py 的 grip_
 
 预防：环境建模前先看两组输出——"跳过原因"和"valid points"。
   出现 no metadata.jsonl / fewer than 1000 valid points 时，先查位姿与单位，别急着重拍。
+```
+
+## 63. 插槽观测也分粗/精两级；环境模型改在插槽精观测之后重建
+
+```text
+问题一（所有者 2026-11-25 指出"模型重建难道不应该放在插槽精观测之后"）：
+  查配置发现更严重的事 —— **插槽的精配准其实发生在粗观测位阶段**：
+    observe:slot_coarse 的检查 = measure_object --preset slot --groups 5 --out slot_latest.json
+    observe:slot_fine   的检查 = 只跑 check_slot_reference（比对基线，**完全不测量**）
+  这与工件流程（coarse 粗测 → fine 精测）相反，精配准用的还是较远的粗观测位。
+
+问题二：`observe:tables` 在效率配置里的检查是 none，**只移动、不产出任何数据**
+  （白跑 11.6 s），而它原本想产出的正是环境模型。
+
+处置（所有者 2026-11-25 批准 A）：
+  · 插槽分两级：
+      observe:slot_coarse → measure_object --preset slot --stage coarse --groups 2 --frames 2
+                            --out runtime/measurements/slot_coarse.json
+      observe:slot_fine   → measure_object --preset slot --stage fine --groups 5
+                            --prior runtime/measurements/slot_coarse.json
+                            --out runtime/measurements/slot_latest.json
+                            && check_slot_reference.py --measurement .../slot_latest.json
+    两步是一个整体（测量 + 基线比对），所以用 && 串在同一条检查命令里。
+  · 新增阶段 `model:slot`（run_pick_and_place 的 model 分支）：
+      读 slot_latest.json 里的 dataset 字段 → model_environment --dataset <它>
+      --out runtime/environment --accept-workpiece-move
+    放在 observe:slot_fine **之后**，用最准的观测位点云建模。
+  · 从阶段表删掉 `observe:tables`（少一次空跑）。
+
+为什么允许 --accept-workpiece-move：
+  模型里真正被使用的是**桌子几何与碰撞体素**；workpiece/slot 字段的权威性有限
+  （workpiece 来自 config 历史值、slot 与插入参考差固定约 37 mm，见第 62 条）。
+  工件在每个实验之间本来就会移动，所以工件偏差不是错误；日志里会明确打印这条理由，
+  不是悄悄跳过检查。
+
+插槽位姿可用性实测（2026-11-25 19:18，三条独立对比）：
+  今天实测 vs 测量基线(11-24)     0.5 mm / 0.07°   → 插槽没动 ✅
+  今天实测 vs 插入参考(已验证)    37.0 mm / 0.88°  → 恒定口径差
+  11-24 基线 vs 插入参考(已验证)  36.5 mm / 0.84°  → 同一个常数
+  结论：判断"插槽有没有动"用测量自比；插入仍用 runtime/slot_reference_verified.json。
+  两次独立测量的口径差只差 0.5 mm → 这个常数是稳定的，不是漂移。
+```
+
+## 64. 数据集目录名不等于测量文件的 `stamp`：一律读 JSON 里的 `dataset` 字段
+
+```text
+症状（2026-11-25 20:37）：新增的 `model:slot` 阶段连续失败，日志只有
+  "模型重建｜"（空），耗时 3.9 s；直接手跑同一条 model_environment 命令 rc=0 正常。
+
+真因：`slot_latest.json` 里
+  "stamp": "20261125_191808"        ← 测量结果的时间戳
+  "dataset": ".../measure_20261125_191925"   ← **实际采集目录**（取采集那一刻的时间）
+两者不同。我按 stamp 去补 metadata，补到了 `measure_20261125_191808`
+（另一次采集），而被引用的 `191925` 依旧没有 metadata.jsonl →
+model_environment 报 "no metadata.jsonl (depth frames carry no pose)"。
+
+处置：按每份测量 JSON 的 `dataset` 字段逐份补 metadata（不再猜目录名），
+  之后 runner 那条命令 rc=0、build gate PASS、5 帧、435 碰撞体素。
+
+预防：任何"按测量结果找数据集"的地方，**一律读 `dataset` 字段**，
+  不要用 `stamp`、也不要用目录列表里最像的那个。
+  同理：日志里报"数据集 X"时，以 `dataset` 字段为准。
 ```
 ## 通用开工检查清单（每次上真机前）
 

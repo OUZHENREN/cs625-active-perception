@@ -213,3 +213,100 @@ python3 scripts/check_docs.py  # ALL DOC CHECKS PASSED
 
 → 手册第 62 条；新增 test/test_measure_env_metadata.py（3 条，锁住单位换算与 tcp_matrix 口径）。
 ```
+
+### 20:00–20:10 插槽观测改粗/精两级 + 环境模型改到 slot_fine 之后
+
+```text
+所有者："A，但是难道不应该放在插槽精观测之后吗？这样出来的插槽位姿才更准"
+
+查配置后发现比顺序更严重的问题：**插槽的精配准写在粗观测位阶段**
+  observe:slot_coarse 的检查 = measure_object --preset slot --groups 5（5 组精配准）
+  observe:slot_fine   的检查 = 只比基线，完全不测量
+→ 与工件流程（coarse 粗测 → fine 精测）相反。
+
+改（所有者批准 A）：
+  · slot_coarse → --stage coarse --groups 2 --frames 2 → slot_coarse.json
+  · slot_fine   → --stage fine --groups 5 --prior slot_coarse.json → slot_latest.json
+                  && check_slot_reference（测量与比对是一个整体）
+  · 新增 model:slot 阶段（run_pick_and_place 的 model 分支）：读 slot_latest 的 dataset，
+    跑 model_environment --accept-workpiece-move，放在 slot_fine 之后；
+  · 删掉 observe:tables（检查是 none，纯空跑 11.6 s）。
+
+插槽位姿可用性（所有者问"最新位姿与历史基准差多大、可用吗"）：
+  今天 19:18 实测 [1.2562, 0.1419, 0.4428] vs 11-24 基线 [1.2558, 0.1422, 0.4428]
+    → 0.5 mm / 0.07°     插槽没动
+  今天实测 vs 插入参考 [1.2194, 0.1389, 0.4444] → 37.0 mm / 0.88°
+  11-24 基线 vs 插入参考                       → 36.5 mm / 0.84°
+    → 恒定口径差（两次独立测量只差 0.5 mm）；插入仍用 slot_reference_verified.json
+  结论：**插槽可用**。
+
+配准环节确认：measure_object --preset slot 用夹具 CAD
+（slot_fixture_collision.stl）三平面 RANSAC + ICP 精配准；工件用弹仓 STL + 扶手判据。
+→ 手册第 63 条。
+```
+
+## 5. 20:40–21:05 收工：环境模型阶段验证通过，真机已关机
+
+### 20:22 model:slot 阶段首次失败（我的两处 bug）
+
+```text
+① NameError: name 'pathlib' is not defined
+   → run_pick_and_place.py 只 from pathlib import Path，我的新分支写了 pathlib.Path。补 import。
+② 第二次仍失败：ok=False、detail 只有"模型重建｜"、**耗时 3.9 s**（真建模要几分钟）。
+   查真因：slot_latest.json 里
+     stamp   = 20261125_191808        ← 测量结果时间戳
+     dataset = .../measure_20261125_191925  ← 实际采集目录（与 stamp 不同！）
+   我之前按 stamp 补 metadata，补到了另一次采集的目录，被引用的那个目录仍然没有
+   metadata.jsonl → model_environment 直接跳过全部 5 组。
+   按 dataset 字段逐份重补后：rc=0、build gate PASS、5 帧、435 碰撞体素。
+   → 手册第 64 条；agent_memory 增加"测量结果与数据集"一行。
+```
+
+### 本次真实收获（所有者点名）
+
+```text
+所有者："现在的一键回到停机位极其干净利落，很好用，棒。"
+对应 11-24 的改动：goto_park_pose 走安全换位白名单（0.20 rad/s、单段执行、
+时间戳地板 0.05 s），不再分三段、不再被 0.25 s/点的地板拉长。
+→ 这是本轮"分段只用于接触段"的设计在真机上的正面验证。
+```
+
+### 今日真机验证汇总（11-25）
+
+```text
+✅ 一键回工件粗观测位（wrist_1 94° 单轴、单段 0.20 rad/s、8.21 s、到位误差 0.2 mm）
+✅ 一键回停车位（所有者："极其干净利落"）
+✅ 工件粗测（工件已换位置）：覆盖率 0.98、yaw −25.1°、重复性 0.66 mm/0.101°、40 s
+✅ 选站 −29@20261120（差 3.3°、摆放 15.9 mm/3.33°）+ 换位到位无接触
+✅ 工件精测：首次 REFUSE（3 组中 1 组离群）→ 原地重测 0.978 / 0.42 mm / 0.078°
+✅ 插槽观测链：tables→slot_coarse→slot_fine 全 ok，插槽基线比对 PASS（0.5 mm / 0.07°）
+✅ 示教器切本地/远程后：ensure_robot_ready --force + 2° 探针实测 +2.00° 命中
+✅ 相机面板：定位真因为"两个 CameraView 各起一个订阅线程会两边都收不到帧"，
+   改为单共享线程后两视图各 17 帧/15 s（所有者已确认出图）
+✅ 环境模型：测量数据集补 metadata 后可直接建模，build gate PASS
+⏸ 未验证（真机已关机）：pre_grasp / grasp / grip 三个接触段（工件已换位置，需重跑）
+⏸ 未验证：model:slot 阶段在 run_task 里的完整串联（底层命令已 rc=0 验证）
+```
+
+### 下次开工清单
+
+```text
+1. 任务 ①（四项门 + control_health），若示教器动过则加 ensure_robot_ready --force + 2° 探针
+2. bash scripts/gripper_link.sh --status（夹爪 init=5、position_mm=0 才算就绪）
+3. 任务 ④ 面板，确认效率页相机出图（今天已修，重启后应正常）
+4. python3 scripts/goto_park_pose.py            # 只规划，看单段 0.20 打印
+5. python3 scripts/goto_workpiece_coarse.py --execute --allow-flip   # 一键回粗观测位
+6. 按所有者确认的阶段清单跑效率模式；本轮建议直接到 grip，验证接触三段
+7. 每阶段看 secs 字段，把固定开销的新数值补进手册第 54 条
+```
+
+## 6. 今日提交
+
+| 提交 | 内容 |
+|---|---|
+| `acbeae2` | 一键回粗观测位任务内置 --allow-flip + 六关节表；末端实体口径（353 虚拟点）手册 56/57 |
+| `a03cd08` | 下发前区间检查 dict() 崩溃修复（真机 rc=1 但机械臂未动）+ 收工日志 |
+| `df20096` | 测量失败自动重测 + 面板话题去重 + 示教器切换规程（手册 58–60） |
+| `2dd404f` | 面板相机真因：一个进程一个订阅线程（手册 61） |
+| `39f2a71` | 测量数据集可用于环境建模（metadata + 单位换算，手册 62） |
+| `本次`   | 插槽粗/精两级 + model:slot 阶段 + 删 observe:tables（手册 63/64） |
