@@ -80,9 +80,10 @@
       按四大方向分类 → `runtime/literature_worklist.json`
 - [x] 首批 24 篇（四方向各 6，互不重复）已派 4 个子智能体精读 → `runtime/literature_batches.json`
 - [x] 笔记模板（依据所有者 9-19 阅读提示词压缩）：`docs/literature/templates/PAPER_NOTE_TEMPLATE.md`
+- [x] Zotero 回写通道：本地 API 不可达 → 改用 JS 运行器 `scripts/zotero_import.js` + `--emit-manifest`
 - [x] 工具：`scripts/literature_index.py`（汇总索引，可 `--to-obsidian` 复制）、
       `scripts/zotero_import_notes.py`（子笔记回写 Zotero，默认 dry-run + 备份 + 拒绝在 Zotero 运行时写入）
-- [ ] 首批 24 篇笔记回收 → 生成 `docs/literature/NOTES_INDEX.md` → 复制到 Obsidian `04_文献与研究问题`
+- [~] 首批 24 篇笔记回收（进行中，已出 8 篇） → 生成文献索引（`scripts/literature_index.py` 输出 NOTES_INDEX.md）→ 复制到 Obsidian `04_文献与研究问题`
 - [ ] Zotero 回写（需关闭 Zotero）：`--apply` 导入子笔记
 - [ ] 剩余 ~800 篇分批推进（每批 20–30 篇，按"直接对象证据 → 方法迁移"优先）
 - [ ] 更新阅读提示词 v3：把本课题四条线（装校装备/视觉测量标定/力觉柔顺/误差可靠）与

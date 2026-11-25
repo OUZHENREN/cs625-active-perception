@@ -90,6 +90,9 @@ def main() -> int:
     parser.add_argument("--db", required=True,
                         help='Zotero 库路径，例如 "/mnt/g/我的云端硬盘/Zotero/zotero.sqlite"')
     parser.add_argument("--apply", action="store_true")
+    parser.add_argument("--emit-manifest", action="store_true",
+                        help="生成 Zotero JS 运行器用的清单（Zotero 开启时用这条路），"
+                             "并复制到 Windows 临时目录")
     args = parser.parse_args()
     db = pathlib.Path(args.db)
     if not db.is_file():
@@ -99,6 +102,25 @@ def main() -> int:
     if not items:
         print(f"{NOTES} 下没有符合命名规则的笔记")
         return 2
+
+    if args.emit_manifest:
+        import json, shutil as _shutil, pathlib as _pl
+        manifest = {"generated_at": dt.datetime.now().isoformat(timespec="seconds"),
+                    "notes": [{"itemKey": it["key"], "title": it["title"], "html": it["html"]}
+                              for it in items]}
+        local = _pl.Path("runtime/zotero_notes_manifest.json")
+        local.parent.mkdir(parents=True, exist_ok=True)
+        local.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
+        print(f"清单已生成：{local}（{len(items)} 条）")
+        windows = _pl.Path("/mnt/c/Users/l'z/AppData/Local/Temp")
+        if windows.is_dir():
+            target = windows / "zotero_notes_manifest.json"
+            _shutil.copy2(local, target)
+            print(f"已复制到：{target}")
+            print("接下来：Zotero → 工具 → 开发者 → Run JavaScript → 粘贴 scripts/zotero_import.js")
+        else:
+            print("Windows 临时目录不可用，请手动把清单复制过去后运行 scripts/zotero_import.js")
+        return 0
 
     copy_db = pathlib.Path("/tmp/zotero_import_copy.sqlite")
     shutil.copy2(db, copy_db)          # 只读副本用于分析，绝不直接改源库来判断
