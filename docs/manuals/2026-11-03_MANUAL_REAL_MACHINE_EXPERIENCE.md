@@ -80,6 +80,7 @@
 | 67 | 插入位姿该不该像抓取那样重标 | 建议：一次手动验证 → `insert_in_slot_frame` 相对变换；验收 0.000 mm 往返 |
 | 68 | 同一片点云两条配准路径差 66 mm | 插槽以大平面为主，ICP 面内无约束会滑移；必须角点锚定 + 相对变换 |
 | 69 | 插入位姿怎么标定（所有者方案） | 手动摆出能插入的位姿 → `record_insert_poses.py` 记录（含静止确认）→ 推导 `insert_in_slot_frame` |
+| 70 | 六维力传感器怎么接进 ROS（KWR75 / RS485） | 460800 8N1、28 字节帧、单位 kg→N；`ft_sensor_node.py`；与数采软件互斥 |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -1865,6 +1866,49 @@ model_environment 报 "no metadata.jsonl (depth frames carry no pose)"。
 注意（标定完成后才处理）：效率模式目前仍从 runtime/slot_reference_verified.json
   推导插入链；要改用这份标定，需要改 reference_insert_chain() 读取 insert_calibration，
   这一步等标定数据到手、所有者确认后再做。
+```
+
+## 70. 坤维 KWR75 六轴力传感器接进 ROS（RS485 / 28 字节长数据格式）
+
+```text
+硬件与协议（KWR75用户手册 V21.6.75.3.3LB，非定制版）：
+  接口 RS485｜波特率 **460800**｜8 数据位｜1 停止位｜无校验
+  命令帧（4 字节，均以 0D 0A 结尾）：
+    0x48 AA 0D 0A  1 kHz 连续发送，数据帧以 0x48 开头
+    0x49 AA 0D 0A  单次转换（**第一次只启动内部刷新，第二次才开始回**）
+    0x43 AA 0D 0A  停止发送
+    0x51 00 0D 0A  上电静默
+    0x50 01/02/04 0D 0A  改波特率为 460800 / 691200 / 921600（**改完必须断电重启**）
+  数据帧（28 字节）：[0x48 或 0x49] 0xAA + 6×float32(**小端**) + 0x0D 0x0A
+    分量顺序 Fx Fy Fz Mx My Mz；**力单位 kg（kgf）、力矩单位 kg·m**（不是 N！）
+    ROS 用 N/N·m → 发布前乘 9.80665。
+  手册样例帧已在 test/test_ft_sensor_protocol.py 里逐位校验
+  （Fx 解析 -9.77873，手册写 -9.7787，六个分量全对）。
+
+接入（WSL 不能直接打开 Windows 的 COM3）：
+  Windows 管理员 PowerShell：
+      usbipd list
+      usbipd bind   --busid <BUSID>
+      usbipd attach --wsl --busid <BUSID>
+  WSL：
+      sudo usermod -aG dialout $USER            # 重新登录生效
+      echo 1 | sudo tee /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
+      cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer     # 必须是 1（所有者已在 Windows 设过 1 ms）
+  **互斥**：数采软件 SenserLinker 会独占 COM3，跑节点前必须关掉它
+  （与 RVS↔ROS 相机、HITBOT Studio↔夹爪桥是同一类互斥）。
+
+用法：
+  python3 scripts/ft_sensor_node.py --self-test      # 离线自检，不需要硬件
+  python3 scripts/ft_sensor_node.py                  # 流模式 1 kHz
+  python3 scripts/ft_sensor_node.py --poll --rate 20 # 轮询模式
+  发布 /ft_sensor/wrench（WrenchStamped，N/N·m）+ /ft_sensor/diagnostics（帧数/坏帧/速率）
+  配置：config/ft_sensor/kwr75.yaml
+
+为什么发布前必须换单位：直接拿 kg 当 N 会让力控阈值全部偏小 9.8 倍，
+  它不会报错、只会让"接触检测"永远不触发——这类错误从波形上很难看出来。
+
+已经把 /ft_sensor/wrench 加入 experiment_recorder 的候选话题，
+  但注意：recorder 采样 20 Hz，力的高动态分析需要单独按全速率录。
 ```
 ## 通用开工检查清单（每次上真机前）
 

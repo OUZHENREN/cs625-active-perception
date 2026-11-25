@@ -102,6 +102,7 @@ TOPIC_CAMERA = "/camera/color/image_raw"
 TOPIC_PHASE_SPEC = "/pipeline_state"
 # Probed in order; the first one that publishes wins and is written to run.json.
 WRENCH_CANDIDATES = (
+    "/ft_sensor/wrench",          # 坤维 KWR75（scripts/ft_sensor_node.py，2026-11-25 接入）
     "/cs625/tcp_force",
     "/force_torque_sensor_broadcaster/wrench",
     "/cs625/tcp_force_filtered",

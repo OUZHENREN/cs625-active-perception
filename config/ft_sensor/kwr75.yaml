@@ -1,0 +1,33 @@
+# 坤维 KWR75 六轴力/力矩传感器（RS485）——2026-11-25 接入
+# 依据：KWR75用户手册V21.6.75.3.3LB（非定制版，长数据格式 28 字节，RS485）
+sensor:
+  model: KWR75
+  vendor: 坤维科技 (Kunwei)
+  interface: RS485
+  baudrate: 460800        # 手册默认；软件里若改过请同步（0x50 01=460800 / 02=691200 / 04=921600）
+  bytesize: 8
+  parity: N
+  stopbits: 1
+  # WSL 里读 USB-485 转换器：先 usbipd attach，设备通常变成 /dev/ttyUSB0
+  port: /dev/ttyUSB0
+  # 帧格式：0x49/0x48 + 0xAA + 6×float32(小端) + 0x0D 0x0A = 28 字节
+  frame_header: [0x49, 0x48]
+  frame_marker: 0xAA
+  frame_length: 28
+  frame_trailer: [0x0D, 0x0A]
+  # 手册：Fx/Fy/Fz 单位 kg，Mx/My/Mz 单位 kg·m
+  force_unit: kgf
+  torque_unit: kgf_m
+  gravity_m_s2: 9.80665   # 转成 ROS 的 N / N·m
+  command:
+    stream_1khz: [0x48, 0xAA, 0x0D, 0x0A]   # 1 kHz 连续发送，帧以 0x48 开头
+    poll_once: [0x49, 0xAA, 0x0D, 0x0A]     # 单次转换（需发两次才开始回复）
+    stop: [0x43, 0xAA, 0x0D, 0x0A]          # 停止发送
+    silent: [0x51, 0x00, 0x0D, 0x0A]        # 上电静默
+ros:
+  topic: /ft_sensor/wrench
+  frame_id: ft_sensor
+  diagnostics_topic: /ft_sensor/diagnostics
+  publish_rate_hz: 1000.0
+# 与数采软件 SenserLinker 互斥：同一时刻只能有一方占用 COM3 / ttyUSB0
+exclusive_with: SenserLinker (E:\Desktop\SenserLinker.exe)
