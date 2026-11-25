@@ -74,6 +74,20 @@
 - [ ] 补：Zotero 里真正批注过的 3 个 PDF 归属哪几篇论文（批注 30 条，集中在 2 个附件上）
 - [ ] 10-30 版总方案**不覆盖不改写**（Obsidian 原件保持），v2 只做纲要对照
 
+## 六d、文献精读流水线（所有者 2026-11-26 新需求，进行中）
+
+- [x] 建成工作清单：Zotero 全库 956 条（thesis/journal/conference），**828 条有 PDF**，
+      按四大方向分类 → `runtime/literature_worklist.json`
+- [x] 首批 24 篇（四方向各 6，互不重复）已派 4 个子智能体精读 → `runtime/literature_batches.json`
+- [x] 笔记模板（依据所有者 9-19 阅读提示词压缩）：`docs/literature/templates/PAPER_NOTE_TEMPLATE.md`
+- [x] 工具：`scripts/literature_index.py`（汇总索引，可 `--to-obsidian` 复制）、
+      `scripts/zotero_import_notes.py`（子笔记回写 Zotero，默认 dry-run + 备份 + 拒绝在 Zotero 运行时写入）
+- [ ] 首批 24 篇笔记回收 → 生成 `docs/literature/NOTES_INDEX.md` → 复制到 Obsidian `04_文献与研究问题`
+- [ ] Zotero 回写（需关闭 Zotero）：`--apply` 导入子笔记
+- [ ] 剩余 ~800 篇分批推进（每批 20–30 篇，按"直接对象证据 → 方法迁移"优先）
+- [ ] 更新阅读提示词 v3：把本课题四条线（装校装备/视觉测量标定/力觉柔顺/误差可靠）与
+      我们的实测口径（0.42 mm/0.078°、插槽面内弱约束、371 mm 插入深度）写进固定背景
+
 ## 六c、遗留缺口（本轮盘点新增，2026-11-26）
 
 - [ ] `full` scope 配置梳理：`phases_load` 的观测位仍是 `observe:workpiece_coarse`（RVS 桌面扫描位，
