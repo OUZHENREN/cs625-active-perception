@@ -99,7 +99,29 @@ def test_executor_watchdog_limits_match_planner_approval():
         "看门狗肘部区间必须与规划器一致"
 
 
-def test_pre_send_range_check_exists():
-    source = (ROOT / "scripts" / "execute_assembly_chunks.py").read_text(encoding="utf-8")
-    assert "REFUSED_OUT_OF_RANGE_PLAN" in source
-    assert "return 19" in source
+def test_pre_send_range_check_actually_runs():
+    """必须真的调用函数，而不是 grep 源码——2026-11-25 真机故障就是"grep 过了但运行即崩"。
+
+    旧代码 `dict(SAFE_JOINT_LIMITS)` 在 3 元组上抛 ValueError，检查没跑成、轨迹也没发出去。
+    """
+    names = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+             "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"]
+
+    def plan(*deg):
+        return {"joint_names": names,
+                "points": [{"q": [math.radians(v) for v in deg], "t": 0.0}]}
+
+    ok, _ = executor.trajectory_within_safe_limits(plan(34, -70, -148, 13, 104, 79))
+    assert ok is True
+    ok, reason = executor.trajectory_within_safe_limits(plan(34, -70, -30, 13, 104, 79))
+    assert ok is False and "elbow_joint" in reason
+    # 暂停位姿（wrist_1=+13.2）必须能通过——正是 2026-11-25 要执行的那条轨迹
+    assert executor.trajectory_within_safe_limits(
+        plan(34.08, -70.31, -148.27, 13.24, 104.80, 79.16))[0] is True
+
+
+def test_safe_joint_limit_map_has_all_six_joints():
+    limits = executor.safe_joint_limit_map()
+    assert len(limits) == 6
+    low, high = limits["shoulder_lift_joint"]
+    assert math.isclose(math.degrees(low), -130.0) and math.isclose(math.degrees(high), 10.0)

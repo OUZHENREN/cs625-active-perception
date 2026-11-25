@@ -139,6 +139,7 @@
 | 抓取点权威定义 | `grasp = T_工件实测 @ grasp_in_workpiece_frame`（2026-11-24 所有者手工验证，往返误差 0.000 mm）；**不要**经过示教链的 box 系常数 | `config/tasks/common.yaml` 的 `grasp_in_workpiece_frame`、手册第 43 条 |
 | 肩部安全区间 | **(−130, 10)**（2026-11-24 批准，原 −110；验证过的抓取位姿肩部 −124.5） | `scripts/plan_pose_ik.py` 两处限位表 |
 | TCP 作业空间框 | x[0.3, 1.1] y[0.1, 0.9] **z[−0.08, 0.95]**（2026-11-24 批准 z 下限 0.05→−0.08；桌面在 −0.11，抓取位 z=−0.060 需更低下限） | `config/tasks/common.yaml` 的 `workspace_bounds` |
+| 真机动作的等待上限 | 任何与机械臂真机有关的动作，**超过 1 分钟没有反馈就必须停下来报告**，不允许继续空等；我自己的推理延迟（每轮 1–2 分钟）与机械臂无关，必须如实区分 | 所有者 2026-11-25、工作日志 2026-11-25 §2 |
 | 末端实体的口径（**高频错误，已犯三次**） | 未抓取工件前，`tool_flange_to_tcp_mm = 353 mm` 是**虚拟抓取基准点**，那一点上什么都没有；实体只有夹爪手指 + 电机保护座：`tool_body_forward_from_flange_mm = 207`、`tool_body_half_extent_xy_m = 0.1473`。抓取前做间隙检查只用实体包络；**夹持后**才把工件按 TCP 处的相对位姿算进去 | `config/tasks/common.yaml` 两个 tool 键 + `tool_safety_note`、`scripts/check_tool_envelope.py`、手册第 56 条 |
 | 停车位 ↔ 粗观测位 | 两套位姿之间 **wrist_1 必然差 94°**（停车位就是"只把 J4 转到 −80.5°"设计的）→ 超过 90° 翻转闸。这是所有者设计并批准的标准路径：`goto_workpiece_coarse.py` 与 VS Code 任务 ⑬ 内置 `--allow-flip`，放行时打印六关节表；同分支、单轴、终点安全区间内、轨迹无接触 | `config/tasks/common.yaml` 的 `j4_park_pose`、手册第 57 条 |
 | TCP 位姿口径 | 末端是 **`my_end_effector_link`**（MoveIt 规划/到位复核/抓取推导都用它），与 `/tcp_pose_broadcaster/pose` 一致；**`tool0` 是占位 link，与真实尖端差 353 mm**（= `tool_flange_to_tcp_mm`），不可用于判断高度 | `config/tasks/common.yaml` 的 `tool_flange_to_tcp_mm`、手册第 50 条 |

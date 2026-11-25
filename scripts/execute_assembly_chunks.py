@@ -159,6 +159,37 @@ def safe_transit_min_segment(phase: str) -> float:
     return MIN_SEGMENT_SEC
 
 
+def safe_joint_limit_map() -> dict[str, tuple[float, float]]:
+    """SAFE_JOINT_LIMITS 的 {关节名: (下限, 上限)} 视图。
+
+    2026-11-25 真机故障：旧代码在这里写 ``dict(SAFE_JOINT_LIMITS)``，而该常量是
+    (name, low, high) 三元组的元组 —— dict() 直接抛 ValueError，于是"下发前检查"
+    变成"下发前崩溃"，整段轨迹发不出去（机械臂一步没动，退出码 1）。
+    同一个错误在 test 里也出现过一次、当时只改了 test 没改源码，这次一并修正。
+    """
+    return {name: (low, high) for name, low, high in SAFE_JOINT_LIMITS}
+
+
+def trajectory_within_safe_limits(data: dict) -> tuple[bool, str]:
+    """下发前逐点检查轨迹是否在绝对安全关节区间内。
+
+    返回 (ok, reason)。ok=False 时调用方拒绝下发（exit 19）——这是"下发前"的最后一道
+    静态检查，与执行中的在线看门狗互为补充（短轨迹的看门狗可能一次都不跑）。
+    """
+    limits = safe_joint_limit_map()
+    indices = _arm_indices(data["joint_names"])
+    for index, point in enumerate(data["points"]):
+        for j in indices:
+            name = data["joint_names"][j]
+            low, high = limits.get(name, (-math.inf, math.inf))
+            value = float(point["q"][j])
+            if not (low - 1e-9 <= value <= high + 1e-9):
+                return False, (f"计划第 {index} 点 {name}="
+                               f"{math.degrees(value):.1f}° 超出安全区间 "
+                               f"[{math.degrees(low):.0f}, {math.degrees(high):.0f}]")
+    return True, ""
+
+
 def resolve_speed_cap(requested: float, phase: str) -> tuple[float, str]:
     """决定这次下发用多大的关节速度上限。
 
@@ -631,16 +662,10 @@ def main() -> int:
         # --- 2026-11-24 硬闸 2.5：下发前全轨迹点安全区间检查 ---
         # 执行中的看门狗（JOINT_OUT_OF_RANGE）只在等待循环里轮询，短轨迹可能一次都不跑；
         # 这里在发送前就把轨迹的每个点与 SAFE_JOINT_LIMITS 比对，越界直接拒绝（exit 19）。
-        for point in data["points"]:
-            for j in _arm_indices(data["joint_names"]):
-                name = data["joint_names"][j]
-                low, high = dict(SAFE_JOINT_LIMITS).get(name, (-math.inf, math.inf))
-                value = float(point["q"][j])
-                if not (low - 1e-9 <= value <= high + 1e-9):
-                    print(f"REFUSED_OUT_OF_RANGE_PLAN: 计划点里 {name}={math.degrees(value):.1f}° "
-                          f"超出安全区间 [{math.degrees(low):.0f}, {math.degrees(high):.0f}]；"
-                          f"不下发（第 {data['points'].index(point)} 点）")
-                    return 19
+        in_range, reason = trajectory_within_safe_limits(data)
+        if not in_range:
+            print(f"REFUSED_OUT_OF_RANGE_PLAN: {reason}；不下发")
+            return 19
 
         goal = FollowJointTrajectory.Goal()
         goal.trajectory.joint_names = data["joint_names"]
