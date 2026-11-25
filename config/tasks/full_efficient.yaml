@@ -209,7 +209,7 @@ observe_checks:
     --stage coarse --groups 2 --frames 2 --out runtime/measurements/slot_coarse.json
   # 精观测位做真正的精配准（5 组），随后与历史基线比对；两步是一个整体，故用 && 串联。
   slot_fine: python3 scripts/measure_object.py --preset slot --observe-pose slot_fine
-    --stage fine --groups 5 --prior runtime/measurements/slot_coarse.json
+    --stage fine --groups 3 --prior runtime/measurements/slot_coarse.json
     --out runtime/measurements/slot_latest.json && python3 scripts/check_slot_reference.py
     --measurement runtime/measurements/slot_latest.json
   # 2026-11-24 所有者批准：--prior-max-age-min 由 30 改为 0（30 会让粗观测
