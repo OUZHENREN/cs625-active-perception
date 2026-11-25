@@ -79,6 +79,7 @@
 | 66 | 插入链曾有**两个权威**（师兄 RVS slot_origin vs 11-04 验证参考） | 旧常量由 RVS 位姿推导，逐位 0.0 mm 差；差异来自两个插槽权威本身。已统一到 11-04 |
 | 67 | 插入位姿该不该像抓取那样重标 | 建议：一次手动验证 → `insert_in_slot_frame` 相对变换；验收 0.000 mm 往返 |
 | 68 | 同一片点云两条配准路径差 66 mm | 插槽以大平面为主，ICP 面内无约束会滑移；必须角点锚定 + 相对变换 |
+| 69 | 插入位姿怎么标定（所有者方案） | 手动摆出能插入的位姿 → `record_insert_poses.py` 记录（含静止确认）→ 推导 `insert_in_slot_frame` |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -1828,6 +1829,42 @@ model_environment 报 "no metadata.jsonl (depth frames carry no pose)"。
 
 验收线：三条组重复性 ≤ 2 mm（现在 z 方向 19 mm，未达标）；往返 0.000 mm；已知平移跟随测试。
 详见 docs/reference/task_pose_derivation.md §6（"我们自己的位姿标准"）。
+```
+
+## 69. 插入位姿的标定流程（所有者 2026-11-25 方案，工具已就绪）
+
+```text
+所有者方案："我直接让你知道工件插到底之后位于哪个位姿，然后让夹爪带着它手动取出和旋转，
+把这些位姿记住。"
+
+为什么这是对的：
+  插槽是面内弱约束（同一片点云两条配准路径差 66 mm，第 68 条），
+  "测出来的绝对位姿"不可靠；而**所有者手动摆出的位姿是真的能插进去的**，
+  直接记录它比任何推导都可靠。
+
+工具：scripts/record_insert_poses.py（只读机械臂状态、只写本地文件，不发运动指令）
+  ① 记录（每个位姿一条命令，**机械臂必须静止 1.2 s**，否则拒录）：
+       python3 scripts/record_insert_poses.py --name insert      --note "插到底、座好"
+       python3 scripts/record_insert_poses.py --name straighten  --note "夹爪带件转平"
+       python3 scripts/record_insert_poses.py --name pre_insert
+     每条记录：TCP xyz+quat、六个关节角、时间、备注、静止确认（最大速度/窗口偏移）。
+     安全：任何关节超出绝对区间（肩 −130/10、肘 −160/−60、腕 ±150）一律拒录。
+  ② 查看：--show
+  ③ 推导相对变换（与 grasp_in_workpiece_frame 同构）：
+       python3 scripts/record_insert_poses.py --derive --name insert \
+           --slot-measurement runtime/measurements/slot_latest.json
+     输出 insert_in_slot_frame = inv(T_base_slot) @ T_base_tcp，并做往返校验（应为 0）。
+  ④ 所有者确认后写入 config：--promote（写 insert_calibration 块）
+
+跨口径交叉核对（这个相对变换的真正价值）：
+  师兄的记录常数  T_s_tcp = diag(-1,1,-1) + (−82, −193, −412.5) mm
+  由 11-04 验证参考换成的相对变换          ≈ (−112, −198.4, −411.8) mm
+  → **x 差约 30 mm**，y 差 5 mm，z 差 0.7 mm。
+  这就是"两条插入链在相对意义下的真实差别"，不再需要争绝对坐标。
+
+注意（标定完成后才处理）：效率模式目前仍从 runtime/slot_reference_verified.json
+  推导插入链；要改用这份标定，需要改 reference_insert_chain() 读取 insert_calibration，
+  这一步等标定数据到手、所有者确认后再做。
 ```
 ## 通用开工检查清单（每次上真机前）
 
