@@ -25,6 +25,10 @@ TCP (0.6238, 0.37375, 0.50762)，quat (-0.383818, 0.748045, 0.213452, 0.497544)�
   · 默认**只规划不动臂**；要动臂必须显式加 --execute；
   · 腕部翻转解默认拒绝（plan_pose_ik 行为）：被拒绝时打印六个关节角，
     所有者确认后加 --allow-flip 再跑。
+  · **从停车位过来的标准路径必然需要 --allow-flip**：停车位就是"其余五轴留在
+    粗观测位附近、只把 J4 转到 −80.5°"设计的，所以两个位姿之间 wrist_1 天生差
+    94°，超过 90° 的翻转阈值。VS Code 任务 ⑬ 因此内置 --allow-flip，并在执行前
+    打印六个关节角与行程（所有者 2026-11-25 确认这是设计好的标准路径）。
 
 用法
 ----
@@ -90,6 +94,32 @@ def main() -> int:
         print(f"规划失败（exit {plan.returncode}）：不移动。"
               "若因腕部翻转被拒绝，确认六个关节角后加 --allow-flip 重跑。")
         return 4
+
+    if args.allow_flip:
+        # 2026-11-25 所有者：停车位 ↔ 粗观测位 之间 wrist_1 必然要转 94°。
+        # 停车位就是这样设计的（"其余五轴保持粗观测位附近，只把 J4 转到 −80.5°"），
+        # 所以这一对位姿之间的单轴 94° 旋转是**所有者设计并批准的标准路径**，
+        # 不是危险的重构。仍然每次都把六个关节角打出来，让所有者一眼看到会怎么动。
+        try:
+            data = json.loads(PLAN_FILE.read_text(encoding="utf-8"))
+            names = data["joint_names"]
+            first = data["points"][0]["q"]
+            last = data["points"][-1]["q"]
+            order = ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+                     "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"]
+            index = [names.index(n) for n in order]
+            print("\n[腕部翻转放行] 停车位 ↔ 粗观测位 的标准路径（所有者设计）：")
+            print(f"  {'关节':<22}{'当前':>10}{'目标':>10}{'行程':>10}")
+            for j, name in enumerate(order):
+                now = first[index[j]]
+                end = last[index[j]]
+                print(f"  {name:<22}{now*57.2958:9.2f}°{end*57.2958:9.2f}°"
+                      f"{(end-now)*57.2958:+9.2f}°")
+            wr = abs(last[index[3]] - first[index[3]]) * 57.2958
+            print(f"  → wrist_1 单轴旋转 {wr:.1f}°（停车位与粗观测位在设计上就差这么多），"
+                  f"其余五轴几乎不动")
+        except Exception:  # noqa: BLE001 - 打印失败不影响后续判断
+            pass
 
     if not args.execute:
         print(f"\n计划已写出：{PLAN_FILE}")
