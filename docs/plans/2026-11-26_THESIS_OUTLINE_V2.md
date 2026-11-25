@@ -146,3 +146,25 @@
 ② 第 5 章降级触发时间（建议法兰 >6 周未到位）
 ③ ANSYS 静力学是否纳入（若纳入，放第 5 章末还是第 6 章）
 ```
+
+## 附录 A：每节的文献支撑（自动生成）
+
+> 由 `scripts/outline_inject_refs.py` 从 `docs/literature/CITATION_MATRIX.md` 生成；
+> 每条给出该节最相关的 3 篇精读文献（Zotero itemKey），对应章节与页码证据见矩阵。
+
+- **3.1 手眼标定与残差评价**：`4GTGTC8B`、`5A6JAAHY`、`7ECW7Z52`
+- **3.2 粗-精分层位姿解算**：`BJPEZ2IP`、`HU8YMEZA`、`T8IJCCH3`
+- **3.3 可达性判定**：`ABEPHJV4`、`GX9BMX7X`、`SUHKBEF7`
+- **3.4 受约束局部视角优化**：`4USD9WCL`、`CJQ59PHU`、`GX9BMX7X`
+- **3.5 测量精度实验与对照**：`RE3RSLML`、`T8IJCCH3`、`7ECW7Z52`
+- **4.1 误差源辨识**：`STCIFGDR`、`SUHKBEF7`、`9CABC9I6`
+- **4.2 角度误差的杠杆放大**：`8G2H64GR`、`GKA22H5S`、`YX73CNI5`
+- **4.3 蒙特卡洛与公差分配**：`KS6R8GVF`、`RE3RSLML`、`46IFGMQ7`
+- **4.4 测量系统 R&R**：`4USD9WCL`、`8G2H64GR`、`GKA22H5S`
+- **5.1 六维力接入与重力补偿**：`4QFLA6S4`、`HATPVGDA`、`4YNM6N34`
+- **5.2 接触状态识别**：`5PHN9L8R`、`SVBIUAB8`、`HATPVGDA`
+- **5.3 位置型导纳控制**：`75ZLS6V4`、`7C8YS9Q8`、`9N32TNG7`
+- **5.4 视觉-力觉切换**：`7ECW7Z52`、`K4SFE2IP`、`BPLZ7AEK`
+- **6.1 全链实验与失败模式**：`4QFLA6S4`、`5XI53YCM`、`75ZLS6V4`
+- **6.2 与文献方法对比**：`VVBJ8MRW`、`5XI53YCM`、`KS6R8GVF`
+- **6.3 可靠度评估**：`FZVTUZMC`、`RE3RSLML`、`KS6R8GVF`
