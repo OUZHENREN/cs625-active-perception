@@ -33,12 +33,20 @@ class CameraWorker(QtCore.QThread):
 
     image_ready = QtCore.pyqtSignal(object, str)      # QImage, source
 
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, node_suffix: str = "", node=None) -> None:
         super().__init__(parent)
+        # 2026-11-25 决定性实验：rclpy 节点必须在**主线程**创建，在 QThread 里
+        # create_node 出来的节点收不到任何 DDS 数据（实测两线程各 0 帧，
+        # 而主线程创建 + 各自执行器 12 s 收 7+5 帧）。所以节点由 CameraView
+        # （GUI 主线程）建好传进来，worker 只负责 spin。
+        self._node = node
         self._stop = False
         self._source = "color"
         self._last = {"color": 0.0, "depth": 0.0}
         self.status = "未启动"
+        # 2026-11-25：诊断打印要用后缀区分两个页面；以前误写成 self._node_suffix
+        # （那是 CameraView 的属性），worker 到 15 s 诊断那一刻抛 AttributeError 直接退出。
+        self._node_suffix = node_suffix
 
     def set_source(self, source: str) -> None:
         self._source = source if source in ("color", "depth") else "color"
@@ -60,13 +68,15 @@ class CameraWorker(QtCore.QThread):
             # 同进程里 status/telemetry 线程也可能先初始化过 rclpy，重复 init 会抛
             # "Context.init() must only be called once"，所以只在未初始化时初始化。
             self._owns_context = not rclpy.ok()
-            if self._owns_context:
-                rclpy.init(args=None)
+            if self._node is None:
+                if self._owns_context:
+                    rclpy.init(args=None)
             # 面板里有两个相机视图（安全页与效率页），各自一个节点。
             # 以前都叫 panel_camera，第二个会触发
             # "Publisher already registered for node name" 警告。
-            suffix = f"_{self._node_suffix}" if self._node_suffix else ""
-            node = rclpy.create_node(f"panel_camera{suffix}")
+                suffix = f"_{self._node_suffix}" if self._node_suffix else ""
+                self._node = rclpy.create_node(f"panel_camera{suffix}")
+            node = self._node
             qos = QoSProfile(depth=1, history=HistoryPolicy.KEEP_LAST,
                              reliability=ReliabilityPolicy.BEST_EFFORT,
                              durability=DurabilityPolicy.VOLATILE)
@@ -101,6 +111,14 @@ class CameraWorker(QtCore.QThread):
                         Image, topic,
                         on_color if kind == "color" else on_depth, qos)
                     subscribed.append(topic)
+            # 2026-11-25 真因：以前每个 worker 都用 rclpy.spin_once(node)，
+            # 那是**全局执行器**：两个相机视图（安全页 + 效率页）交替 add_node/remove_node，
+            # 结果两边都收不到任何帧（实测 25 s 各 0 帧，而话题明明有 1 个发布者）。
+            # 单个视图时反而正常（13 帧/20 s），所以很难复现。
+            # 修法：每个 worker 用自己的 SingleThreadedExecutor，节点只加一次。
+            from rclpy.executors import SingleThreadedExecutor
+            executor = SingleThreadedExecutor(context=node.context)
+            executor.add_node(node)
             self.status = "等待图像"
             last_version: dict[str, int] = {}
             reemit = 0.0
@@ -108,7 +126,7 @@ class CameraWorker(QtCore.QThread):
             warned = False
             while not self._stop and rclpy.ok():
                 with SPIN_LOCK:
-                    rclpy.spin_once(node, timeout_sec=0.05)
+                    executor.spin_once(timeout_sec=0.05)
                 now = time.time()
                 # 2026-11-25：面板显示"无图像"时最难判断是"没订阅上"还是"没发布"。
                 # 15 s 没有任何帧就打印一次诊断，把每条候选话题的发布者数量列出来。
@@ -116,29 +134,26 @@ class CameraWorker(QtCore.QThread):
                     warned = True
                     detail = ", ".join(
                         f"{t}={node.count_publishers(t)} 个发布者" for t in subscribed)
-                    print(f"[panel_camera{'_' + self._node_suffix if self._node_suffix else ''}]"
-                          f" 15 s 未收到图像：{detail}")
+                    suffix_text = f"_{self._node_suffix}" if self._node_suffix else ""
+                    print(f"[panel_camera{suffix_text}] 15 s 未收到图像：{detail}")
                 if now - reemit < 0.1:           # 最多 10 Hz 刷新界面，图像不缩放
                     continue
                 reemit = now
-                # 当前选中的源优先；若它长时间没数据就退回另一个（例如只有彩色模式）
-                source = self._source
-                if source not in latest or now - self._last[source] > 1.5:
-                    other = "depth" if source == "color" else "color"
-                    source = other if other in latest and now - self._last[other] <= 1.5 else source
-                message = latest.get(source)
-                if message is None:
-                    continue
-                # 2026-11-19 修：以前每个 0.1 s 都重新转换**同一帧**，深度图纯 Python
-                # 转换一次要 1–3 s，于是线程永远在转旧帧，界面只能到 0.2–0.5 fps。
-                # 现在只有真的收到新帧才转换。
-                if versions.get(source, 0) == last_version.get(source, -1):
-                    continue
-                last_version[source] = versions[source]
-                image = self._to_qimage(message)
-                if image is not None:
-                    self.status = f"{source} {image.width()}×{image.height()}"
-                    self.image_ready.emit(image, source)
+                # 2026-11-25：一个进程只跑一个相机订阅线程（实测两个同时订阅会两边
+                # 都收不到帧：单视图 9 帧/12 s，两视图各 0 帧）。所以这里把彩色与深度
+                # **两路都发出去**，由各视图按自己的 _source 过滤。
+                # 2026-11-19 修：只有真的收到新帧才转换（深度图纯 Python 转换很贵）。
+                for src in ("color", "depth"):
+                    message = latest.get(src)
+                    if message is None:
+                        continue
+                    if versions.get(src, 0) == last_version.get(src, -1):
+                        continue
+                    last_version[src] = versions[src]
+                    image = self._to_qimage(message)
+                    if image is not None:
+                        self.status = f"{src} {image.width()}×{image.height()}"
+                        self.image_ready.emit(image, src)
             node.destroy_node()
             if self._owns_context and rclpy.ok():
                 rclpy.shutdown()
@@ -181,6 +196,40 @@ class CameraWorker(QtCore.QThread):
             image = QtGui.QImage(data, width, height, stride, QtGui.QImage.Format_Grayscale8)
             return image.copy()
         return None
+
+
+_SHARED = {"worker": None}
+_SHARED_LOCK = __import__("threading").Lock()
+
+
+def stop_shared_worker() -> None:
+    """面板退出时停掉共享相机线程（否则 QThread 仍在跑，解释器退出会报
+    "terminate called without an active exception"）。"""
+    with _SHARED_LOCK:
+        worker = _SHARED.get("worker")
+        _SHARED["worker"] = None
+    if worker is not None:
+        try:
+            worker.stop()
+            worker.wait(1500)
+        except Exception:            # noqa: BLE001
+            pass
+
+
+def shared_worker():
+    """整个面板共用一个相机订阅线程（2026-11-25 决定性实验后改）。
+
+    两个 CameraView 各自起一个 worker 时，两边都收不到任何 DDS 帧
+    （实测：单视图 12 s 收 9 帧；两视图 12 s 各 0 帧；与共享锁无关；
+      节点在主线程创建也无效）。一个 worker 负责订阅、两路图像都发，
+    各视图自己按 _source 过滤，这是唯一验证可靠的形态。
+    """
+    with _SHARED_LOCK:
+        if _SHARED["worker"] is None:
+            worker = CameraWorker(parent=None, node_suffix="shared")
+            worker.start()
+            _SHARED["worker"] = worker
+        return _SHARED["worker"]
 
 
 class CameraView(QtWidgets.QWidget):
@@ -247,15 +296,26 @@ class CameraView(QtWidgets.QWidget):
     def start(self) -> None:
         if self._worker is not None:
             return
-        self._worker = CameraWorker(parent=self)
-        self._worker.image_ready.connect(self._on_image)
-        self._worker.start()
+        # 共享一个订阅线程（见 shared_worker 的说明）
+        self._slot = (lambda image, source:
+                      self._on_image(image, source) if source == self._source else None)
+        app = QtWidgets.QApplication.instance()
+        if app is not None and not _SHARED.get("hooked"):
+            app.aboutToQuit.connect(stop_shared_worker)
+            _SHARED["hooked"] = True
+        self._worker = shared_worker()
+        self._worker.image_ready.connect(self._slot)
 
     def stop(self) -> None:
-        if self._worker is not None:
-            self._worker.stop()
-            self._worker.wait(1500)
-            self._worker = None
+        if self._worker is None:
+            return
+        try:
+            self._worker.image_ready.disconnect(self._slot)
+        except Exception:            # noqa: BLE001 - 已断开 / 未连上都无妨
+            pass
+        self._slot = None
+        # 共享 worker 不在单个视图关闭时停止；面板退出时进程结束自然回收。
+        self._worker = None
 
     @staticmethod
     def _placeholder() -> QtGui.QImage:

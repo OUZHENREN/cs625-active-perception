@@ -152,3 +152,30 @@ python3 scripts/check_docs.py  # ALL DOC CHECKS PASSED
 真机：粗测 OK（0.98）→ 选站 −29 → 精测重测 OK（0.978 / 0.42 mm / 0.078°）
       2° 探针命中 +2.00°；相机面板已修但**未在重启后的面板上复核**
 ```
+
+### 18:50–19:10 相机面板"无图像"：找到真因（两个 worker 互相饿死）并修复
+
+```text
+所有者重启面板后仍然没有相机数据。逐层实验（全部可复现）：
+  单线程单节点订阅        → 4 帧/8 s ✅
+  面板 CameraView 单视图  → 13–17 帧/15–20 s ✅
+  两个 CameraView 同时跑  → **两边各 0 帧** ❌（真实面板结构）
+  去掉共享 SPIN_LOCK      → 仍 0 帧（与锁无关）
+  纯 rclpy 两节点两线程   → 7+5 帧 ✅（不带 Qt 时正常）
+  纯 rclpy 两节点一执行器 → 0 帧
+→ 结论：一个进程同时跑两个相机订阅 worker，本机 DDS/rclpy 组合两边都收不到。
+
+修（panel_camera.py）：
+  shared_worker() 单例：全面板只跑一个订阅线程，一次订阅彩色+深度，两路都 emit；
+  两个 CameraView 按自己的 _source 过滤（start 里 lambda 过滤连接）；
+  stop() 只断开；aboutToQuit → stop_shared_worker() 收尾。
+  实测两视图各 17 帧/15 s，状态栏显示 color 1280×960。
+
+同时修掉：
+  · CameraWorker 误用 self._node_suffix（CameraView 的属性）→ 15 s 诊断时抛
+    AttributeError 直接退出；
+  · COLOR_TOPIC 与硬编码话题相同 → 同一话题订阅两次，已去重；
+  · 15 s 无帧诊断改为打印每条候选话题的发布者数量。
+
+→ 手册第 61 条。**需要重启面板（任务 ④）后由所有者肉眼确认出图。**
+```

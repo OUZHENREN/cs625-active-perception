@@ -71,6 +71,7 @@
 | 58 | 示教器切过本地/远程后，状态话题正常但机器人不执行 | 反控通道静默失效；`ensure_robot_ready.py --force` + 2° 探针 |
 | 59 | 面板效率页一直"无图像"，但测量脚本能正常拍照 | 同一话题被订阅两次；且无任何诊断输出。已去重 + 15 s 打印发布者数 |
 | 60 | 测量第一次被拒（单组离群），重测即通过 | 已改为自动重测 3 次（仅 measure_object 命令） |
+| 61 | 面板相机"无图像"：两个 CameraView 各自起 worker 会两边都收不到帧 | 一个进程只跑一个相机订阅线程（shared_worker），两路图像都发、各视图过滤 |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -1537,6 +1538,43 @@ config/tasks/common.yaml 里，代码在 scripts/run_pick_and_place.py 的 grip_
   model_environment 之类的检查不重试，避免掩盖真问题。
 
 注意：重测**不是放宽门槛**。每一次的 verdict 都照实记录；连续 3 次不过仍判失败。
+```
+
+## 61. 面板相机"无图像"的真因：两个 CameraView 各起一个订阅线程 → 两边都收不到帧
+
+```text
+症状（2026-11-25，反复出现）：4K 面板效率页/安全页相机区一直显示
+  「无图像（相机未启动或 RVS 占用）」，而同时刻 measure_object 用同一台相机正常出图；
+  话题 /camera/color/image_raw 明确有 1 个发布者。
+
+排查链（每步都是可复现的实验，不要跳）：
+  ① 独立订阅复现（单线程、单节点、BEST_EFFORT，8 s）：
+       /camera/color/image_raw   4 帧 ✅   /camera/depth/image_raw  6 帧 ✅
+     → 相机与话题正常，问题在面板侧。
+  ② 把面板的 CameraView 类单独离屏跑（一个视图）：**13–17 帧 / 15–20 s ✅**
+  ③ 同时创建两个 CameraView（真实面板结构）：**两边各 0 帧 ❌**
+  ④ 去掉它们共享的 SPIN_LOCK：仍然 0 帧 → 与锁无关
+  ⑤ 纯 rclpy（不带 Qt）两节点两线程各自执行器：**7+5 帧 ✅**（能收）
+  ⑥ 纯 rclpy 两节点共用一个执行器：0 帧
+  ⑦ 结论：**一个进程里同时运行两个相机订阅 worker 时，本机 DDS/rclpy 组合会两边都收不到**；
+     单 worker 一定正常。
+
+处置（2026-11-25）：
+  panel_camera.py 新增 shared_worker() 单例：**整个面板只跑一个相机订阅线程**，
+  一次订阅彩色+深度，并且**两路图像都 emit**；两个 CameraView 各自按自己的
+  _source 过滤（start() 里用 lambda 过滤连接），stop() 只断开不杀线程，
+  面板退出时 aboutToQuit → stop_shared_worker() 收尾。
+  实测：两视图各 17 帧 / 15 s，状态栏显示 "color 1280×960"。
+
+顺带修掉的两个自身缺陷：
+  · CameraWorker 里误用 self._node_suffix（那是 CameraView 的属性）→ 15 s 诊断那一刻
+    抛 AttributeError，worker 直接退出。已改为 worker 自己保存 node_suffix。
+  · COLOR_TOPIC 本身就是 /camera/color/image_raw，旧代码又把同名话题订阅了一次 → 去重。
+
+预防：
+  · GUI 里"看不到数据"先做①②两步（独立复现 + 单独跑视图），再改界面代码；
+  · 一个进程只允许一个相机订阅线程（shared_worker）；新增视图只能连它，不许自己起线程；
+  · 诊断输出必须带**每条候选话题的发布者数量**（0 发布者 = 没发；1 发布者但 0 帧 = 订阅侧问题）。
 ```
 ## 通用开工检查清单（每次上真机前）
 
