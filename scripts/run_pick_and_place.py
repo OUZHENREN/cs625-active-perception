@@ -2313,6 +2313,54 @@ def approach_pose(grasp_xyz) -> np.ndarray:
     return point
 
 
+SLOT_REFERENCE = REPO / "runtime" / "slot_reference_verified.json"
+SLOT_TILT_DEG = -10.0          # 进槽姿态（2026-11-04：无倾斜下降会撞槽口）
+PRE_INSERT_EXTRA_M = 0.100     # 预插入再抬高 100 mm（2026-11-04 所有者要求）
+INSERT_TOOL_X_BACKOFF_M = 0.010  # 与抓取同一套 3 mm 级表面余量
+
+
+def _retract_along_tool_x(pose, distance: float):
+    """沿工具 x 轴回退（与 teaching_sequence.retract_along_tool_x 同口径）。"""
+    from scipy.spatial.transform import Rotation as _R
+    xyz, quat = pose
+    back = _R.from_quat(quat).as_matrix() @ np.array([distance, 0.0, 0.0])
+    return ([float(xyz[i]) - float(back[i]) for i in range(3)], list(quat))
+
+
+def reference_insert_chain() -> dict:
+    """从 11-04 验证过的插槽参考位姿推导 pre_insert / insert / straighten。
+
+    2026-11-25 所有者：**所有示教位姿都以 11-04 手动验证的插入参考为准**，
+    效率模式与示教模式共用同一套推导 —— 示教链 teaching_sequence 调的是同一个
+    pose_math.insert_from_slot，所以两条链不会再有 40–110 mm 的口径差。
+
+    旧做法（效率模式直接用 config 常量）实测偏差：
+        pre_insert 110.3 mm（主要缺了 +100 mm 抬高）
+        insert      43.2 mm（Δy −41.6）
+    返回 {"pre_insert": (xyz, quat), "insert": (xyz, quat), "straighten": (xyz, quat)}。
+    参考文件不存在时返回空字典，调用方回落到 config（并打印警告）。
+    """
+    if not SLOT_REFERENCE.exists():
+        print(f"[insert] 参考位姿缺失 {SLOT_REFERENCE.name}，回落 config 常量（可能有 40–110 mm 偏差）")
+        return {}
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(REPO / "scripts" / "teaching"))
+        import pose_math as _pm
+        payload = json.loads(SLOT_REFERENCE.read_text(encoding="utf-8"))
+        flat, tilted, pre = _pm.insert_from_slot(
+            payload["slot"], payload["slot_quat"],
+            tilt_deg=SLOT_TILT_DEG, extra_height_m=PRE_INSERT_EXTRA_M)
+        return {
+            "pre_insert": _retract_along_tool_x(pre, INSERT_TOOL_X_BACKOFF_M),
+            "insert": _retract_along_tool_x(tilted, INSERT_TOOL_X_BACKOFF_M),
+            "straighten": _retract_along_tool_x(flat, INSERT_TOOL_X_BACKOFF_M),
+        }
+    except Exception as error:  # noqa: BLE001 - 推导失败回落常量，但要说清楚
+        print(f"[insert] 参考位姿推导失败（{error}），回落 config 常量")
+        return {}
+
+
 def approach_staging_point(pre_xyz, radius_m: float) -> np.ndarray:
     """预抓取位正上方 ``radius_m`` 处的关节空间终点。
 
@@ -3070,19 +3118,24 @@ def main() -> int:
                 step(name, ok, f"v={profile.velocity} ts={profile.time_scale}"
                                f" {detail(goal, points)}")
             elif kind == "cartesian":
+                chain = reference_insert_chain()
                 if name == "lift":
                     xyz = current_tcp() + np.array([0, 0, cfg.lift_total_mm / 1000.0])
                     quat = cfg.grasp_q
                     speed = cfg.assembly_velocity_scale
                 elif name == "pre_insert":
-                    xyz, quat, speed = cfg.pre_insert, cfg.pre_insert_q, cfg.assembly_velocity_scale
+                    xyz, quat = chain.get("pre_insert", (cfg.pre_insert, cfg.pre_insert_q))
+                    speed = cfg.assembly_velocity_scale
                 elif name == "insert":
-                    xyz, quat, speed = cfg.insert, cfg.pre_insert_q, cfg.assembly_velocity_scale
+                    xyz, quat = chain.get("insert", (cfg.insert, cfg.pre_insert_q))
+                    speed = cfg.assembly_velocity_scale
                 elif name == "straighten":
-                    xyz, quat, speed = cfg.insert, cfg.insert_q, cfg.assembly_velocity_scale
+                    xyz, quat = chain.get("straighten", (cfg.insert, cfg.insert_q))
+                    speed = cfg.assembly_velocity_scale
                 else:  # withdraw
                     xyz = current_tcp() - cfg.advance_axis * (cfg.safe_clear_mm / 1000.0)
-                    quat, speed = cfg.insert_q, cfg.assembly_velocity_scale
+                    quat = chain.get("straighten", (cfg.insert, cfg.insert_q))[1]
+                    speed = cfg.assembly_velocity_scale
                 profile = profile_for(cfg.speeds, name, speed,
                                       cfg.time_scale, cfg.max_chunks)
                 # The handle band is defined along the insertion axis, so the

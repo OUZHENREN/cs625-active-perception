@@ -76,6 +76,7 @@
 | 63 | 插槽的精配准写在了粗观测位阶段；tables 空跑 | 插槽也分粗/精两级；环境模型改在 slot_fine 之后由 `model:slot` 阶段重建 |
 | 64 | 按测量 JSON 的 `stamp` 去找数据集目录，结果补错了目录 | 目录名取**采集时刻**，与 `stamp` 不同；一律读 JSON 里的 `dataset` 字段 |
 | 65 | 插槽位姿有 37/42/48 mm 三套不一致的数字 | 三个不同来源（师兄 RVS calib / 我们的 CAD ICP / 11-04 手动验证参考），**各自是不同口径**；插入只能用 11-04 参考 |
+| 66 | 效率模式插入比验证过的目标偏 43–110 mm | 它用 config 常量、示教链用参考推导；已改为两条链共用 `reference_insert_chain()` |
 
 > **作用域（2026-11-13）**：RVS 相关条目（#1/#2/#13/#16）**只适用于示教链路**
 > （`teaching_sequence.py` 每次运行的 T1/T2/T3 观测）。效率模式/面板的新流程用
@@ -1735,6 +1736,42 @@ model_environment 报 "no metadata.jsonl (depth frames carry no pose)"。
   a) 用 TCP 触碰夹具上一个可测特征（角点/螺钉孔），从两个方向各碰一次，
      把触碰值分别与 ①②③ 比，谁对上就是谁的口径；
   b) 直接用 ③ 的插入目标试插一次（0.005 m/s、有人在旁），成功即确认口径。
+```
+
+## 66. 插入链只有一个权威：`runtime/slot_reference_verified.json`（两条模式共用）
+
+```text
+问题（所有者 2026-11-25："以 11-04 手动验证的插入参考当做我所有的示教位姿，
+不管效率模式还是示教模式"）：
+
+  示教链 teaching_sequence 是从参考位姿**推导**插入链的：
+      insert_flat, insert_tilted, pre_insert = insert_from_slot(
+          slot_xyz, slot_quat, tilt_deg=-10.0, extra_height_m=0.100)
+      再各自沿工具 x 回退 10 mm（电机保护座余量）
+  而效率模式 run_pick_and_place 直接用 config 常量 → 两套数字：
+
+      目标            从参考推导                        config 旧值                    偏差
+      pre_insert     (1.0847, −0.0530, 0.4788)      (1.0996, −0.0125, 0.3773)    110.3 mm（Δz 101.5 = 缺 +100 mm 抬高）
+      insert(倾斜)   (1.1460, −0.0548, 0.0342)      (1.1574, −0.0132, 0.0321)     43.2 mm（Δy −41.6）
+      straighten(平) (1.1462, −0.0548, 0.0324)      (1.1574, −0.0132, 0.0321)     43.1 mm
+  槽内每侧余量约 1.5°，43 mm 的 y 偏差必撞；110 mm 的 z 偏差意味着预插入高度也不对。
+
+处置：
+  · run_pick_and_place 新增 reference_insert_chain()：
+      读 runtime/slot_reference_verified.json → pose_math.insert_from_slot
+      （tilt −10°、+100 mm、工具 x 回退 10 mm）→ pre_insert / insert(倾斜) / straighten(平放)。
+    pre_insert / insert / straighten / withdraw 四个阶段全部改用它；
+    参考文件缺失时回落 config 常量并**打印警告**（不静默）。
+  · config 的 pre_insert / insert / pre_insert_q / insert_q 同步为推导结果，
+    并注明"这是推导结果、不是手调值"，供 advance_axis 与慢速带几何使用。
+  · 新增 test/test_insert_chain_authority.py：
+      与示教链推导逐位一致；把参考平移 20 mm 推导跟着动（证明没写死）；
+      config 常量与推导一致；倾斜姿态 w≈0.088 不能退化成平放。
+
+为什么倾斜必须保留（2026-11-04 经验）：
+  无倾斜垂直下降会撞槽口。insert 与 pre_insert 都必须用 −10° 姿态，
+  只有 straighten（最后转平）用平放姿态 —— config 旧的 insert_q 是平放的（w≈−0.004），
+  如果直接拿它当进槽姿态就会重演那次碰撞。
 ```
 ## 通用开工检查清单（每次上真机前）
 

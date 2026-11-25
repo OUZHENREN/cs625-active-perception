@@ -340,3 +340,34 @@ python3 scripts/check_docs.py  # ALL DOC CHECKS PASSED
 改动：slot_fine 的测量组数 5 → **3**（load/full_efficient 两处）。
 → 手册第 65 条。
 ```
+
+## 8. 22:15–22:40 插入链统一到 11-04 参考（所有者指令）
+
+```text
+所有者："以 11-04 手动验证的插入参考当做我所有的示教位姿，不管效率模式还是示教模式。"
+
+先回答了"三套位姿口径不同"的追问（手册第 65 条）：
+  我们的测量同时输出两个点 —— CAD 模板原点(translation) 与 包围盒中心(centre_mm)，
+  两者相差 320 mm；模板原点本身也不在角点、不在中心（距 bbox 中心 77/193/254 mm）。
+  配对结果：
+    我们的 CAD 原点 vs 参考 slot   → 37.0 mm，其中 **36.8 mm 全在 x**（Δy 仅 3.1）
+    我们的 CAD 原点 vs 师兄 RVS    → 42.4 mm，主要是 **Δy 39.8**
+  参考文件自述 "chain shifted 45.5 mm toward the robot in x"（11-04 日志 8+5+27.5+5 累计平移）
+  → 30–40 mm 是三种口径（CAD 原点 / RVS 模型原点 / 经验调过的插入 TCP）叠加，不是配准漂移。
+
+改动：
+  · run_pick_and_place 新增 reference_insert_chain()：从
+    runtime/slot_reference_verified.json 经 pose_math.insert_from_slot 推导
+    pre_insert / insert(倾斜 −10°) / straighten(平放)，各沿工具 x 回退 10 mm；
+    四个插入阶段全部改用；参考缺失则回落 config 并打印警告。
+  · config 的 insert / pre_insert / insert_q / pre_insert_q 同步为推导值，
+    并注明是"推导结果、非手调"，供 advance_axis 与慢速带几何使用。
+  · 新增 test/test_insert_chain_authority.py（3 条）。
+
+实测偏差（改前 → 改后）：
+  pre_insert  110.3 mm（Δz 101.5，缺 +100 mm 抬高）→ 0
+  insert       43.2 mm（Δy −41.6）              → 0
+  straighten   43.1 mm                          → 0
+  另外发现 config 旧 insert_q 是**平放**姿态（w≈−0.004），
+  而进槽必须 −10° 倾斜（2026-11-04：无倾斜下降撞槽口）→ 现已改为倾斜姿态。
+→ 手册第 66 条。真机未验证（已关机），下次跑插入前先用 --plan-only 复核。
