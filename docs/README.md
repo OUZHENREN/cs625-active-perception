@@ -33,6 +33,7 @@
 
 | 顺序 | 文档 | 什么时候看 |
 |---|---|---|
+| 0 | [`reference/data_map.md`](reference/data_map.md) | **我有哪些数据、放在哪里、怎么读**（力矩/点云/指标/实验归档）——一条命令：`python3 scripts/data_report.py` |
 | 1 | [`agent_memory.md`](agent_memory.md) | **每次开工先扫一遍**：硬规则、当前权威值、安全红线（≤300 行；历史条目见 [`agent_memory_history.md`](agent_memory_history.md)，不必每轮读） |
 | 2 | [`reference/architecture_current.md`](reference/architecture_current.md) | 想知道代码怎么分层、示教链路 0–18 步是什么 |
 | 3 | [`manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md`](manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md) | **上真机前**：55 条实机经验（含装配工艺、断联排障、排查顺序、示教位精拍、效率模式抓取链、安全） |

@@ -481,3 +481,31 @@ python3 scripts/check_docs.py  # ALL DOC CHECKS PASSED
 离线验证：--self-test 通过（Fx −9.77873 vs 手册 −9.7787，六分量全对；容错切帧 2/2）。
 真机未验（传感器尚未安装到法兰，法兰未加工）。
 → 407 测试通过；提交 1acc5e1。
+
+## 13. 23:50 数据地图（所有者："我对数据在哪完全没有掌控感"）
+
+```text
+所有者的核心诉求：不只是"面板看不到数据"，而是**不知道自己能拿到什么数据、放在哪里**。
+力矩数据（驱动器电流反推）不知道存哪、相机点云和各类指标也不知道。
+
+查清的事实（写进 docs/reference/data_map.md）：
+  ① 关节力矩**一直在采**：归档 timeseries.csv 的 joint_effort_1..6（20 Hz），
+     没有单独 effort.csv —— 这就是之前"找不到力矩"的原因。
+  ② 六维力的列**早已预留**：fx fy fz tx ty tz，当前 100% 为空；
+     接上 KWR75 后由 experiment_recorder 自动填充，表结构不用改。
+  ③ 点云原始数据在 runtime/vision_dataset/measure_<stamp>/g*/（cloud.npy / depth.npy /
+     color.png / meta.json / metadata.jsonl），可以重新跑算法、重新出图。
+  ④ 面板"视觉实验数据"卡片**只读两个文件**（workpiece_latest.json / slot_latest.json），
+     不读 timeseries、不读点云、不读环境模型 —— 所以"面板看不到数据"是设计缺口，
+     不是数据没采到。
+
+新增：
+  docs/reference/data_map.md     完整数据清单：位置/格式/频率/怎么读 + 常见误解 + 出图入口
+  scripts/data_report.py         一条命令列出全部数据产品（存在？多新？多大？关键指标？）
+                                 --ros 额外检查 /joint_states、TCP 位姿、/ft_sensor/wrench
+  docs/README.md                 导航表第 0 项登记 data_map（开工先看）
+  docs/agent_memory.md           新增"数据在哪"一行，指向 data_map + data_report
+
+实测输出（今晚）：测量结果 4.5 小时前 OK；归档实验 3 个，力矩列全部有值；
+环境模型 2.7 小时前（已超 2 小时门限，提示会被环境门拒）；插入标定尚未生成。
+```
