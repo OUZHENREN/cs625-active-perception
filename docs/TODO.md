@@ -104,6 +104,13 @@
 - [ ] 初步判断（待证据定稿）：**导纳（位置型，外层闭环）** 与现有安全契约兼容性最好
       （速度上限 0.10 rad/s、25° 分段、看门狗、工作空间框都能继续生效）；
       厂商内置力控作为**对照基线**；力矩型阻抗暂不作为主线（接口未确认）
+- [x] 力控接口核查（`docs/reference/force_control_interface.md`）：
+      · 厂商 SDK 有 `startForceMode/endForceMode`（EliteDriver.hpp:304），limits 可限速
+      · RTSI 已提供内部 TCP 力估计（`getAcutalTCPForce`），驱动以 `tcp_fts_sensor` 发布
+      · **但我方 ROS 驱动不暴露力控指令**；能否启用需示教器/SDK 探针实测，不能假设
+      · 决策：主线 = 自建位置型导纳（KWR75 供力）；厂商力控 = 待验证基线；直接 writeServoj = 不采用
+- [x] 延迟探针工具：`scripts/ft_latency_probe.py`（测 goal→运动延迟，决定 10 Hz 还是 20–30 Hz 切片）
+- [ ] 真机待做：① 示教器看力控菜单 ② 读 tcp_fts_sensor 按末端看响应 ③ 测 goal 延迟
 - [ ] 文献依据：C 批（力觉柔顺）6 篇的"阻抗/导纳"使用与参数整定做法，读完后写进引用矩阵
 
 ## 六d、文献精读流水线（所有者 2026-11-26 新需求，进行中）
