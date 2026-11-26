@@ -35,6 +35,7 @@
 |---|---|---|
 | 0a | [`TODO.md`](TODO.md) | **当前周待办（唯一入口）**：开工先看、完成即勾；每周 `scripts/todo_week.py --rollover` 归档到 `todos/` |
 | 0e | [`plans/2026-11-26_PLAN_INSERTION_PROCESS.md`](plans/2026-11-26_PLAN_INSERTION_PROCESS.md) | **插入流程设计**（5 段：测量→接近→入口视觉→深插力觉→转正；含师兄链路差异与代码改动点） |
+| 0f | [`reference/slot_measurement_verdict.md`](reference/slot_measurement_verdict.md) | **插槽识别可用性判定**（重复性✅ / 准确性待一项验证） |
 | 0d | [`reference/insertion_craft_to_force_control.md`](reference/insertion_craft_to_force_control.md) | **插入工艺 → 力控实验设计**（手册第 23 条六条经验的力信号映射，第 5 章实验用） |
 | 0c | [`literature/RESEARCH_GAPS.md`](literature/RESEARCH_GAPS.md) | **文献空白与我们的增量点**（手眼残差 / 接触误判率 / 停走节拍）——写论文直接用 |
 | 0b | [`plans/2026-11-26_THESIS_OUTLINE_V2.md`](plans/2026-11-26_THESIS_OUTLINE_V2.md) | **大论文纲要 V2（现行）**：6 章（依据同类硕博论文章法抽样）；现状当基线；NBV=站位先验+受约束局部优化 |
