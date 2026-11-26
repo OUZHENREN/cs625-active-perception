@@ -1,6 +1,6 @@
 # 文献精读索引（自动生成）
 
-生成时间：2026-11-26 14:21｜共 **88** 篇
+生成时间：2026-11-26 14:27｜共 **88** 篇
 
 > 由 `scripts/literature_index.py` 从 `docs/literature/notes/` 汇总；笔记格式见 `docs/literature/templates/PAPER_NOTE_TEMPLATE.md`。
 
