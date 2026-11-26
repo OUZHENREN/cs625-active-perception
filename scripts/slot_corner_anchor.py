@@ -110,35 +110,26 @@ def fit_planes(points: np.ndarray, max_planes: int = 8) -> list[Plane]:
     return planes
 
 
-def classify(planes: list[Plane]) -> tuple[Plane | None, Plane | None, Plane | None]:
-    """挑出插槽的两面**竖直侧壁**与底面。
+def classify(planes: list[Plane]) -> dict:
+    """把平面分成三类锚点（2026-11-26 实测结论驱动）。
 
-    2026-11-26 实测纠正：槽壁的法向是 **±x**（不是 ±y）——夹具通道沿另一方向延伸。
-    所以判据改为：法向水平（|n_z| 小）、两面近似反向、间距落在通道宽度区间内
-    （工作件 131 mm 厚 + 两侧各 ~2 mm → 120–160 mm），取内点最多的一对。
+    通道沿 **y** 延伸、宽度沿 **x**：
+      · 侧壁（法向 ±x）→ 锚定 **x 与 yaw**
+      · 端面（法向 ±y）→ 锚定 **y**（这是唯一能压住长轴滑移的锚点）
+      · 底面/顶面（法向 ±z）→ 锚定 **z**
     """
-    horizontal = [p for p in planes if abs(p.normal[2]) < 0.30]
-    best = None
-    for i, a in enumerate(horizontal):
-        for b in horizontal[i + 1:]:
-            if abs(a.normal @ b.normal) < 0.95:      # 两面必须近似平行
-                continue
-            if a.normal @ b.normal > 0:               # 必须反向（面对面）
-                continue
-            axis = int(np.argmax(np.abs(a.normal)))
-            if abs(a.normal[axis]) < 0.9:
-                continue
-            gap = abs((-a.offset) - (-b.offset)) if abs(a.normal[axis]) > 0.99 else float(
-                np.linalg.norm(a.centroid - b.centroid))
-            if not (0.10 <= gap <= 0.20):
-                continue
-            score = a.inliers + b.inliers
-            if best is None or score > best[0]:
-                best = (score, a, b, gap)
-    walls = (best[1], best[2]) if best else (None, None)
-    floors = sorted([p for p in planes if p.normal[2] > 0.6], key=lambda p: -p.inliers)
-    floor = floors[0] if floors else None
-    return walls[0], walls[1], floor
+    side = [p for p in planes if abs(p.normal[0]) > 0.9 and abs(p.normal[2]) < 0.35]
+    ends = [p for p in planes if abs(p.normal[1]) > 0.9 and abs(p.normal[2]) < 0.5]
+    horiz = [p for p in planes if abs(p.normal[2]) > 0.6]
+    side.sort(key=lambda p: -p.inliers)
+    ends.sort(key=lambda p: -p.inliers)
+    horiz.sort(key=lambda p: -p.inliers)
+    left = right = None
+    if len(side) >= 2:
+        a, b = side[0], side[1]
+        left, right = (a, b) if a.centroid[0] < b.centroid[0] else (b, a)
+    return {"left": left, "right": right, "end": ends[0] if ends else None,
+            "floor": horiz[0] if horiz else None}
 
 
 def analyse_group(group: pathlib.Path, t_tcp_cam: np.ndarray,
@@ -149,34 +140,44 @@ def analyse_group(group: pathlib.Path, t_tcp_cam: np.ndarray,
     t_base_cam = t_base_tcp @ t_tcp_cam
     pts = load_cloud_base(group, t_base_cam)
     centre = roi_centre if roi_centre is not None else np.array([1.17, -0.05, 0.25])
-    mask = np.all(np.abs(pts - centre) < np.array(ROI_HALF), axis=1)
-    pts = pts[mask]
+    pts = pts[np.all(np.abs(pts - centre) < np.array(ROI_HALF), axis=1)]
     if len(pts) < MIN_PLANE_POINTS:
         return {"group": group.name, "error": f"ROI 内点太少（{len(pts)}）"}
     planes = fit_planes(pts)
-    left, right, floor = classify(planes)
+    cls = classify(planes)
     out = {"group": group.name, "roi_points": int(len(pts)), "planes": len(planes),
-           "plane_summary": [{"n": np.round(p.normal, 3).tolist(),
-                              "inliers": p.inliers,
+           "plane_summary": [{"n": np.round(p.normal, 3).tolist(), "inliers": p.inliers,
                               "centroid": np.round(p.centroid, 4).tolist()} for p in planes[:6]]}
+    left, right, end, floor = cls["left"], cls["right"], cls["end"], cls["floor"]
     if left is None or right is None:
-        out["error"] = "没有找到两面竖直壁"
+        out["error"] = "没有找到两面侧壁（法向 ±x）"
         return out
-    width = abs(left.offset - right.offset) if abs(left.normal[1]) > 0.9 else float(
-        np.linalg.norm(left.centroid - right.centroid))
-    mid = 0.5 * (left.centroid + right.centroid)
-    out.update({
-        "wall_width_m": round(float(width), 4),
-        "mid_point": np.round(mid, 4).tolist(),
-        "left_normal": np.round(left.normal, 3).tolist(),
-        "right_normal": np.round(right.normal, 3).tolist(),
-        "wall_parallel_deg": round(float(np.degrees(
-            np.arccos(np.clip(abs(left.normal @ right.normal), -1, 1)))), 2),
-        "floor_found": floor is not None,
-    })
+    width = abs(float(left.offset) - float(right.offset))
+    out["wall_width_m"] = round(width, 4)
+    out["wall_parallel_deg"] = round(float(np.degrees(np.arccos(
+        np.clip(abs(left.normal @ right.normal), -1, 1)))), 2)
+    # y 锚点：端面
+    if end is not None:
+        out["end_face"] = True
+        out["end_y_m"] = round(float(-end.offset / (end.normal @ np.array([0, 1, 0]))), 4)
+        out["end_normal"] = np.round(end.normal, 3).tolist()
+    else:
+        out["end_face"] = False
+        out["error_y"] = "没有找到端面（法向 ±y）→ y 无法锚定（这是长轴滑移的根源）"
     if floor is not None:
         out["floor_normal"] = np.round(floor.normal, 3).tolist()
-        out["floor_distance_to_mid_m"] = round(float(floor.signed_dist(mid[None, :])[0]), 4)
+        out["floor_z_m"] = round(float(-floor.offset / floor.normal[2]), 4)
+    # 综合锚定位姿：x 取两壁中点、y 取端面、z 取底面
+    anchor = {}
+    if left is not None and right is not None:
+        anchor["x_m"] = round(float(-(left.offset + right.offset) / (
+            left.normal[0] + right.normal[0]) if (left.normal[0] + right.normal[0]) else
+            (left.centroid[0] + right.centroid[0]) / 2), 4)
+    if end is not None:
+        anchor["y_m"] = out["end_y_m"]
+    if floor is not None:
+        anchor["z_m"] = out["floor_z_m"]
+    out["anchor"] = anchor
     return out
 
 
@@ -206,21 +207,29 @@ def main() -> int:
             print(f"  {group.name}: {res['error']}（ROI {res.get('roi_points')} 点，"
                   f"{res.get('planes')} 平面）")
             continue
-        print(f"  {group.name}: 壁间距 {res['wall_width_m']*1000:7.1f} mm｜"
-              f"两面平行度偏差 {res['wall_parallel_deg']:5.2f}°｜中点在 "
-              f"{np.round(np.array(res['mid_point'])*1000, 1)} mm｜底面 {'有' if res['floor_found'] else '无'}")
+        a = res.get("anchor", {})
+        y_txt = f"{a['y_m']*1000:8.1f}" if "y_m" in a else "   无  "
+        x_txt = f"{a['x_m']*1000:8.1f}" if "x_m" in a else "   无  "
+        z_txt = f"{a['z_m']*1000:8.1f}" if "z_m" in a else "   无  "
+        print(f"  {group.name}: 壁间距 {res['wall_width_m']*1000:6.1f} mm｜平行度 "
+              f"{res['wall_parallel_deg']:5.2f}°｜锚点 x{x_txt} y{y_txt} z{z_txt} mm"
+              + ("" if res.get("end_face") else "  ← 端面缺失，y 未锚定"))
     if len(results) >= 2:
-        mids = [np.array(r["mid_point"]) for r in results if "mid_point" in r]
+        mids = [np.array([r["anchor"].get(k, np.nan) for k in ("x_m", "y_m", "z_m")])
+                for r in results if "anchor" in r]
         widths = [r["wall_width_m"] for r in results if "wall_width_m" in r]
         if len(mids) >= 2:
-            spread = (np.max(np.abs(np.array(mids) - np.mean(mids, axis=0)), axis=0)) * 1000
-            print(f"\n组间中位点最大偏差: x {spread[0]:.1f} / y {spread[1]:.1f} / z {spread[2]:.1f} mm")
+            arr = np.array(mids, dtype=float)
+            with np.errstate(invalid="ignore"):
+                spread = np.nanmax(np.abs(arr - np.nanmean(arr, axis=0)), axis=0) * 1000
+            print(f"\n组间锚点最大偏差: x {spread[0]:.1f} / y {spread[1]:.1f} / z {spread[2]:.1f} mm"
+                  "   ← 关键看 y（通道长轴）")
         if widths:
             print(f"壁间距: 均值 {np.mean(widths)*1000:.1f} mm，极差 {(max(widths)-min(widths))*1000:.1f} mm")
     if args.save_json:
         args.save_json.write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"结果已写：{args.save_json}")
-    return 0 if any("mid_point" in r for r in results) else 4
+    return 0 if any("anchor" in r and r["anchor"] for r in results) else 4
 
 
 if __name__ == "__main__":
