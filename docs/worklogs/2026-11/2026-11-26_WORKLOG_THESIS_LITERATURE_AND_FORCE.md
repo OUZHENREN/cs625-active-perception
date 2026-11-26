@@ -416,3 +416,28 @@ config 原值 [1.2416, 0.1817, 0.4432] → 残差 (+5.3, **−35.8**, −2.2) mm
 下一步（离线可做）：
   A. 扫历史数据集，找出哪些观测位/阶段能看到真端面（垂直偏差 <10°），把它们作为"y 锚定专用视角"；
   B. 若没有任何视角能看到端面，用楔形斜面与侧壁的交线做 y 锚点（几何上可推，需标定楔形角）。
+
+## 22:10 所有者更正：只有 insert 是手摆真值，pre_insert/straighten 不可用
+
+```text
+更正内容：之前记录的预插入位姿**不可用**；只有插入位姿可用。
+
+落地：
+  · runtime/insert_calibration.json 给 S02 三个位姿加 usable 字段：
+      insert  = usable: true   （唯一真值）
+      pre_insert = usable: false（手摆无意义，应由 insert + 设计位移推导）
+      straighten = usable: false（应由 insert 绕工具 y 转平 9.81° 解析得到）
+    并把整组 validity 改为"只有 insert 可用，其余必须推导 + 运动验证"。
+  · 手册新增第 78 条：三件套只有 insert 值得手摆；其余解析计算 + 运动验证。
+
+自洽性复核（重要）：即使不依赖 straighten，只用 insert 也能反算 slot 原点：
+    slot = insert − (−0.082,−0.193,−0.4125) = [1.2445, 0.1480, 0.4409]
+    与 config 现值 [1.2416, 0.1459, 0.4432] 差 (2.9, 2.1, −2.3) mm
+  → 之前基于 straighten 的 y=0.1459 修正**在没有 straighten 时同样成立**（±3 mm）。
+
+另外两个此前问题的答复（已核实）：
+  · 精观测标准组数 = **3 组**（load_efficient.yaml: --groups 3）；我分析的 5 组数据集
+    来自 --groups 5 的运行，应改用 measure_20261125_180715 / 181333（3 组）；
+  · 今天的 slot_origin 修正**没有进入效率模式**：效率链读 runtime/slot_reference_verified.json
+    （slot y=0.1389），与 common.yaml 的 slot_origin 是两条不同的路径。
+    该参考文件标着"2026-11-04 手动验证"，是否更新待所有者决定。
