@@ -25,7 +25,9 @@
 from __future__ import annotations
 
 import argparse
+import bisect
 import csv
+import json
 import pathlib
 import statistics
 import sys
@@ -46,6 +48,61 @@ def summarise(rows: list[list[float]]) -> dict:
                        "std": statistics.pstdev(values) if len(values) > 1 else 0.0,
                        "min": min(values), "max": max(values)}
     return stats
+
+
+def _summary_ms(values_s: list[float]) -> dict | None:
+    if not values_s:
+        return None
+    ordered = sorted(v * 1000.0 for v in values_s)
+    return {
+        "count": len(ordered),
+        "median_ms": round(statistics.median(ordered), 3),
+        "min_ms": round(ordered[0], 3),
+        "max_ms": round(ordered[-1], 3),
+        "abs_max_ms": round(max(abs(ordered[0]), abs(ordered[-1])), 3),
+    }
+
+
+def compute_clock_alignment_metadata(
+    ft_rows: list[list[float]],
+    joint_samples: list[tuple[float, float]] | None = None,
+) -> dict:
+    """Compute wall-clock and header.stamp alignment statistics for F/T logs."""
+    wall_minus_ft_stamp = [
+        float(r[0]) - float(r[1]) for r in ft_rows if len(r) >= 2 and float(r[1]) > 0.0
+    ]
+    meta: dict = {
+        "ft_samples": len(ft_rows),
+        "ft_wall_minus_stamp": _summary_ms(wall_minus_ft_stamp),
+        "joint_samples": len(joint_samples or []),
+        "ft_minus_joint_stamp": None,
+        "nearest_pair_wall_gap": None,
+    }
+    valid_joints = sorted(
+        (float(tw), float(ts)) for tw, ts in (joint_samples or []) if float(ts) > 0.0
+    )
+    if valid_joints and ft_rows:
+        j_walls = [w for w, _ in valid_joints]
+        stamp_diffs: list[float] = []
+        pair_gaps: list[float] = []
+        for row in ft_rows:
+            tw, ts = float(row[0]), float(row[1])
+            if ts <= 0.0:
+                continue
+            pos = bisect.bisect_left(j_walls, tw)
+            best = None
+            for cand in (pos - 1, pos):
+                if 0 <= cand < len(valid_joints):
+                    jw, js = valid_joints[cand]
+                    gap = abs(tw - jw)
+                    if best is None or gap < best[0]:
+                        best = (gap, jw, js)
+            if best is not None:
+                pair_gaps.append(best[0])
+                stamp_diffs.append(ts - best[2])
+        meta["ft_minus_joint_stamp"] = _summary_ms(stamp_diffs)
+        meta["nearest_pair_wall_gap"] = _summary_ms(pair_gaps)
+    return meta
 
 
 def print_summary(stats: dict, rate: float, path: pathlib.Path) -> None:
@@ -113,10 +170,12 @@ def main() -> int:
     import rclpy
     from geometry_msgs.msg import WrenchStamped
     from rclpy.node import Node
+    from sensor_msgs.msg import JointState
 
     rclpy.init(args=None)
     node = Node("ft_sensor_record")
     rows: list[list[float]] = []
+    joint_samples: list[tuple[float, float]] = []
 
     def on_msg(msg: WrenchStamped) -> None:
         stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
@@ -124,8 +183,13 @@ def main() -> int:
                      msg.wrench.force.x, msg.wrench.force.y, msg.wrench.force.z,
                      msg.wrench.torque.x, msg.wrench.torque.y, msg.wrench.torque.z])
 
+    def on_joints(msg: JointState) -> None:
+        stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+        joint_samples.append((time.time(), stamp))
+
     node.create_subscription(WrenchStamped, args.topic, on_msg, 100)
-    print(f"采集 {args.topic}，{args.duration:.0f} s …（Ctrl+C 提前结束）")
+    node.create_subscription(JointState, "/joint_states", on_joints, 50)
+    print(f"采集 {args.topic}（同步监听 /joint_states 时钟对齐），{args.duration:.0f} s …（Ctrl+C 提前结束）")
     started = time.time()
     try:
         while rclpy.ok() and time.time() - started < args.duration:
@@ -150,7 +214,28 @@ def main() -> int:
         writer.writerow(COLUMNS)
         writer.writerows(rows)
     span = rows[-1][0] - rows[0][0] if len(rows) > 1 else 1e-6
-    print_summary(summarise(rows), len(rows) / max(1e-6, span), path)
+    stats = summarise(rows)
+    rate = len(rows) / max(1e-6, span)
+    alignment = compute_clock_alignment_metadata(rows, joint_samples)
+    meta_path = path.with_suffix(".meta.json")
+    meta_payload = {
+        "csv": path.name,
+        "topic": args.topic,
+        "joint_topic": "/joint_states",
+        "duration_s": round(span, 3),
+        "rate_hz": round(rate, 2),
+        "stats": stats,
+        "clock_alignment": alignment,
+    }
+    meta_path.write_text(json.dumps(meta_payload, indent=2, ensure_ascii=False) + "\n",
+                         encoding="utf-8")
+    print_summary(stats, rate, path)
+    ft_j = alignment.get("ft_minus_joint_stamp")
+    if ft_j is not None:
+        print(f"  时钟对齐（FT−joint_states stamp）：中位 {ft_j['median_ms']:.2f} ms"
+              f"（最大 |Δ| = {ft_j['abs_max_ms']:.2f} ms）→ {meta_path.name}")
+    else:
+        print(f"  时钟对齐：未收到 /joint_states 样本，已写 F/T 元数据 → {meta_path.name}")
     if args.plot:
         plot(path)
     return 0

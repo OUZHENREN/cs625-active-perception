@@ -1,6 +1,6 @@
 # CS625 视触融合精密装配 — 文档导航
 
-> 更新：**2026-11-24**。本页是**唯一入口**，其余文档按"现在有效 / 历史归档"分区。
+> 更新：**2026-11-26**。本页是**唯一入口**，其余文档按"现在有效 / 历史归档"分区。
 > 旧文档一律保留在 `archive/`，只读，不再维护。
 
 ---
@@ -39,7 +39,7 @@
 | 0 | [`reference/data_map.md`](reference/data_map.md) | **我有哪些数据、放在哪里、怎么读**（力矩/点云/指标/实验归档）——一条命令：`python3 scripts/data_report.py` |
 | 1 | [`agent_memory.md`](agent_memory.md) | **每次开工先扫一遍**：硬规则、当前权威值、安全红线（≤300 行；历史条目见 [`agent_memory_history.md`](agent_memory_history.md)，不必每轮读） |
 | 2 | [`reference/architecture_current.md`](reference/architecture_current.md) | 想知道代码怎么分层、示教链路 0–18 步是什么 |
-| 3 | [`manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md`](manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md) | **上真机前**：55 条实机经验（含装配工艺、断联排障、排查顺序、示教位精拍、效率模式抓取链、安全） |
+| 3 | [`manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md`](manuals/2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md) | **上真机前**：71 条实机经验（含装配工艺、断联排障、排查顺序、示教位精拍、效率模式抓取链、安全） |
 | 4 | [`reference/experiment_metrics.md`](reference/experiment_metrics.md) | 要做实验、要出数据之前 |
 | 5 | [`reference/real_cell.md`](reference/real_cell.md) | 换场地、网络异常、开工就绪检查 |
 | 6 | [`manuals/debug/README.md`](manuals/debug/README.md) | **看不到数据时**：相机/ROS 图的常用调试命令，正常输出与失败含义 |
@@ -65,7 +65,7 @@ docs/
 │   ├── frames_and_topics.md         TF 链与话题契约
 │   ├── task_pose_derivation.md      任务位姿推导（插槽/插入链）
 │   └── 其余：interfaces / dependencies / project_layout / file_viewer
-├── manuals/                ← 实机经验手册（55 条）+ debug/ 调试命令分册
+├── manuals/                ← 实机经验手册（71 条）+ debug/ 调试命令分册
 ├── plans/                  ← 月度计划（YYYY-MM.md，一个月一份；旧月份不重写）
 ├── decisions/              ← ADR（含 ADR-005 两模式与插入权威）
 ├── worklogs/               ← 工作日志，按月份分目录
@@ -108,7 +108,7 @@ python3 scripts/teaching/teaching_debug.py --stage 14 --repeat 3 --no-settle
 
 ---
 
-## VS Code 任务（13 个）
+## VS Code 任务（14 个）
 
 | # | 任务 | 说明 |
 |---|---|---|
@@ -124,6 +124,7 @@ python3 scripts/teaching/teaching_debug.py --stage 14 --repeat 3 --no-settle
 | ⑩ | 续跑 · 效率入口 | `resume_task.sh`（读 run_task_resume.json） |
 | ⑪ | 回停车位姿 · J4 安全位 | `goto_park_pose.py --execute` |
 | ⑫ | 记录停车位姿 | `goto_park_pose.py --record` |
+| ⑭ | 切回远程后：校正记忆 + 重挂为运动中（`rehang_after_manual.py`） | 示教器切本地 + 手拖过之后的必做动作 |
 | ⑬ | 回工件粗观测位 · 效率模式起点 | `goto_workpiece_coarse.py --execute` |
 
 ---

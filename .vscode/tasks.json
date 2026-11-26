@@ -109,6 +109,13 @@
       "command": "source scripts/source_dev_env.sh --full || exit 1; python3 scripts/goto_workpiece_coarse.py --execute --allow-flip",
       "problemMatcher": [],
       "detail": "回到 config observe.workpiece_coarse_efficient（效率模式起点）。停车位与粗观测位之间 wrist_1 天生差 94°（停车位就是为此设计的），所以内置 --allow-flip：执行前会打印六个关节角与行程，其余安全闸（关节区间、轨迹碰撞、在线看门狗、到位复核）全部保留。"
+    },
+    {
+      "label": "⑭ 切回远程后：校正记忆 + 重挂为运动中",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; python3 scripts/rehang_after_manual.py",
+      "problemMatcher": [],
+      "detail": "示教器切到本地 + 手拖过之后的必做动作。只读检查模式：打印控制器记忆偏差、当前六关节、离停车位姿距离，然后给出建议，不动硬件。真正执行请手动加 --apply（偏差 >2° 还要加 --accept-drift），顺序为 sync_command_position --apply → ensure_robot_ready --force → 四项门复核。为什么不能直接 --force 重挂：控制器会把上一条轨迹终点重新下发，机械臂会全速跳回旧位置。"
     }
   ]
 }

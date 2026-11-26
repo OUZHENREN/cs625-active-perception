@@ -33,7 +33,7 @@ python3 scripts/todo_week.py --show         # 当前周待办（唯一入口 doc
 
 ```text
 docs/            唯一导航 docs/README.md；待办 docs/TODO.md；文献精读 docs/literature/
-scripts/         任务链与工具（六模式入口 run_task.py、环境建模、观测、实验记录）
+scripts/         任务链与工具（效率/示教主线、环境建模、观测、实验记录）
 src/             12 个 ROS 2 包（感知/规划/执行分层，不设 mega-node）
 config/tasks/    任务常量与站位表（唯一权威数值源）
 ```

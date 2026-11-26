@@ -227,13 +227,14 @@ def validate_phase_tag(tag: str) -> str:
 
 
 def write_phases_json(path: pathlib.Path, experiment_id: str,
-                      entries: list[dict]) -> None:
+                      entries: list[dict], t_end: float | None = None) -> None:
     """Atomically rewrite ``phases.json`` (the reader may be a human)."""
     payload = {
         "experiment_id": experiment_id,
         "updated_at": iso_local(time.time()),
         "count": len(entries),
         "phases": entries,
+        "timings": phase_stage_timings(entries, t_end),
     }
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
@@ -292,6 +293,81 @@ def phase_windows(phases: list[dict], t_end: float | None) -> list[dict]:
         end = window["end"]
         window["duration"] = (end - window["start"]) if end is not None else None
     return windows
+
+
+def _split_phase_tag(tag: str) -> tuple[str, str]:
+    base, sep, boundary = str(tag or "").strip().rpartition(":")
+    if not sep:
+        return str(tag or "").strip(), ""
+    return base, boundary
+
+
+def phase_stage_timings(phases: list[dict], t_end: float | None = None) -> list[dict]:
+    """Summarize each phase's plan/exec split, retry attempts, and failure gates."""
+    ordered = sorted(phases, key=lambda p: float(p.get("t_wall") or 0.0))
+    runs: list[dict] = []
+    open_run: dict | None = None
+
+    def _finish(run: dict, stop_t: float | None) -> None:
+        enter_t = run["t_enter"]
+        exec_t = run["t_exec"]
+        if stop_t is not None and stop_t < enter_t:
+            stop_t = None
+        run["t_exit"] = stop_t
+        total = (round(stop_t - enter_t, 3) if stop_t is not None else None)
+        run["total_secs"] = total
+        if exec_t is not None:
+            run["plan_secs"] = round(max(0.0, exec_t - enter_t), 3)
+            run["exec_secs"] = (round(max(0.0, stop_t - exec_t), 3)
+                                if stop_t is not None else None)
+        else:
+            run["plan_secs"] = total
+            run["exec_secs"] = None
+
+    def _merge_meta(run: dict, entry: dict) -> None:
+        for key in ("attempts", "attempt_reasons", "gate_reason", "failure_mode",
+                    "plan_secs", "exec_secs"):
+            val = entry.get(key)
+            if val is not None:
+                run[key] = val
+
+    for index, entry in enumerate(ordered):
+        t_wall = _number(entry.get("t_wall"))
+        if t_wall is None:
+            continue
+        base, boundary = _split_phase_tag(entry.get("tag") or "")
+        if boundary == "enter" or boundary == "" or open_run is None or base != open_run["phase"]:
+            if open_run is not None:
+                _finish(open_run, t_wall)
+                runs.append(open_run)
+            open_run = {
+                "phase": base,
+                "t_enter": t_wall,
+                "t_exec": None,
+                "t_exit": None,
+                "plan_secs": None,
+                "exec_secs": None,
+                "total_secs": None,
+                "attempts": None,
+                "attempt_reasons": None,
+                "gate_reason": None,
+                "failure_mode": None,
+            }
+            _merge_meta(open_run, entry)
+        elif boundary in ("exec", "plan_done"):
+            if open_run["t_exec"] is None:
+                open_run["t_exec"] = t_wall
+            _merge_meta(open_run, entry)
+        elif boundary == "exit":
+            _finish(open_run, t_wall)
+            _merge_meta(open_run, entry)
+            runs.append(open_run)
+            open_run = None
+
+    if open_run is not None:
+        _finish(open_run, _number(t_end))
+        runs.append(open_run)
+    return runs
 
 
 def compute_stats(rows: list[dict]) -> dict:
@@ -468,6 +544,29 @@ def render_summary(run: dict, stats: dict, phases: list[dict],
         lines.append("")
         total = sum(w["duration"] for w in windows if w["duration"] is not None)
         lines.append(f"阶段总时长：{total:.2f} s")
+        timings = phase_stage_timings(phases, stats.get("t_end"))
+        if any(t.get("exec_secs") is not None or (t.get("attempts") or 0) > 1
+               or t.get("failure_mode") or t.get("gate_reason") for t in timings):
+            lines.append("")
+            lines.append("### 4.1 规划/执行分段与重测明细")
+            lines.append("")
+            lines.append("| 阶段 | 规划 (s) | 执行 (s) | 总时长 (s) | 重测次数 | 状态/门限说明 |")
+            lines.append("| --- | --- | --- | --- | --- | --- |")
+            for item in timings:
+                p_txt = f"{item['plan_secs']:.2f}" if item.get("plan_secs") is not None else "—"
+                e_txt = f"{item['exec_secs']:.2f}" if item.get("exec_secs") is not None else "—"
+                t_txt = f"{item['total_secs']:.2f}" if item.get("total_secs") is not None else "—"
+                att = item.get("attempts")
+                att_txt = f"第 {att} 次通过" if att and att > 1 else (str(att) if att else "—")
+                note_parts = []
+                if item.get("failure_mode"):
+                    note_parts.append(str(item["failure_mode"]))
+                if item.get("gate_reason"):
+                    note_parts.append(str(item["gate_reason"]))
+                lines.append(
+                    f"| `{item['phase']}` | {p_txt} | {e_txt} | {t_txt} | {att_txt} | "
+                    + ("; ".join(note_parts) if note_parts else "—") + " |"
+                )
     if crop:
         lines.append("")
         lines.append("## 5. 裁剪与归档")
@@ -672,16 +771,21 @@ class RecorderSession:
         if wrench is not None:
             self._fields["wrench"] = list(wrench)[:6]
 
-    def set_phase(self, tag: str, t_wall: float, t_ros: float | None) -> None:
+    def set_phase(self, tag: str, t_wall: float, t_ros: float | None,
+                  meta: dict | None = None) -> None:
         """Append a phase boundary (no file churn for a repeated tag)."""
         tag = str(tag or "").strip()
-        if not tag or tag == self.phase:
+        if not tag:
+            return
+        if tag == self.phase and not meta:
             return
         validate_phase_tag(tag)
         t_wall = self.monotonic_wall(t_wall)
         self.phase = tag
-        phase_name, _, boundary = tag.partition(":")
-        self.phase_entries.append({
+        phase_name, _, boundary = tag.rpartition(":")
+        if not phase_name:
+            phase_name, boundary = tag, ""
+        entry = {
             "index": len(self.phase_entries),
             "tag": tag,
             "phase": phase_name,
@@ -689,12 +793,17 @@ class RecorderSession:
             "t_wall": round(float(t_wall), 6),
             "t_ros": None if t_ros is None else round(float(t_ros), 6),
             "row": self.rows,
-        })
+        }
+        if isinstance(meta, dict):
+            for key, value in meta.items():
+                if key not in ("index", "tag", "phase", "boundary", "t_wall", "t_ros", "row"):
+                    entry[key] = value
+        self.phase_entries.append(entry)
         self.write_phases()
 
     def write_phases(self) -> None:
         write_phases_json(self.run_dir / "phases.json", self.experiment_id,
-                          self.phase_entries)
+                          self.phase_entries, t_end=self.t_last_row)
 
     # -- ticking ------------------------------------------------------------
     def monotonic_wall(self, candidate: float) -> float:
@@ -783,8 +892,17 @@ class RecorderSession:
             line = line.strip()
             if not line:
                 continue
+            tag, sep, raw_meta = line.partition("\t")
+            meta = None
+            if sep and raw_meta:
+                try:
+                    parsed = json.loads(raw_meta)
+                    if isinstance(parsed, dict):
+                        meta = parsed
+                except json.JSONDecodeError:
+                    meta = None
             try:
-                self.set_phase(line, now, t_ros)
+                self.set_phase(tag, now, t_ros, meta=meta)
             except ValueError:
                 continue
 
@@ -1473,7 +1591,11 @@ def cmd_set_phase(args) -> int:
               file=sys.stderr)
         return EXIT_NOT_RUNNING
     with (run_dir / "phase.inbox").open("a", encoding="utf-8") as handle:
-        handle.write(tag + "\n")
+        raw_meta = getattr(args, "meta", None)
+        if raw_meta:
+            handle.write(f"{tag}\t{raw_meta.strip()}\n")
+        else:
+            handle.write(tag + "\n")
         handle.flush()
         os.fsync(handle.fileno())
     print(f"[experiment_recorder] phase {tag} -> {run_dir.name}")
@@ -1521,8 +1643,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     set_phase = sub.add_parser("set-phase", help="tag a phase boundary")
     set_phase.add_argument("--tag", required=True,
-                           help="e.g. grasp:enter or observe:left")
+                           help="e.g. grasp:enter, grasp:exec, or observe:left")
     set_phase.add_argument("--run-dir", default=None)
+    set_phase.add_argument("--meta", default=None,
+                           help="optional JSON object with attempts/timings/gate metadata")
     set_phase.set_defaults(func=cmd_set_phase)
 
     worker = sub.add_parser("_worker", help=argparse.SUPPRESS)

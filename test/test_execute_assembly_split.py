@@ -109,3 +109,38 @@ def test_plan_jobs_keeps_a_small_plan_as_one_job(tmp_path):
     path.write_text(__import__("json").dumps(plan), encoding="utf-8")
     jobs, refused = executor.plan_jobs([str(path)])
     assert refused is None and len(jobs) == 1
+
+
+def test_single_segment_within_safe_skips_splitting(tmp_path):
+    """所有者 2026-11-26：终点全程在绝对安全区间内时，允许不分段一次性执行。
+
+    肩转 40°（>25° 自动分段闸），但起点与终点都在 SAFE_JOINT_LIMITS 内，
+    且整条轨迹抽样也不越界 → 给开关后应当只有 1 个 job。
+    """
+    plan = make_plan([0, -60, -150, 0, 100, 80], [40, -60, -150, 0, 100, 80])
+    path = tmp_path / "plan.json"
+    path.write_text(__import__("json").dumps(plan), encoding="utf-8")
+
+    # 不给开关：仍然自动分段（旧行为不变）
+    jobs_default, _ = executor.plan_jobs([str(path)])
+    assert len(jobs_default) > 1
+
+    # 给开关：1 个 job，且计划内容未被改写
+    jobs, refused = executor.plan_jobs([str(path)], single_segment_within_safe=True)
+    assert refused is None
+    assert len(jobs) == 1
+    assert jobs[0][1] == plan
+
+
+def test_single_segment_within_safe_still_splits_outside_limits(tmp_path):
+    """区间外的目标不允许借这个开关逃避分段：肩转 40° 但终点 150° 超出 SAFE 上限。
+
+    shoulder_pan 的绝对安全区间是 ±150°，把终点放到 200°（模拟越界）后，
+    即使给了开关也必须回落到自动分段（或拒绝），不能一次性执行。
+    """
+    plan = make_plan([0, -60, -150, 0, 100, 80], [200, -60, -150, 0, 100, 80])
+    path = tmp_path / "plan.json"
+    path.write_text(__import__("json").dumps(plan), encoding="utf-8")
+    jobs, refused = executor.plan_jobs([str(path)], single_segment_within_safe=True)
+    assert refused is None
+    assert len(jobs) > 1, "越界目标必须仍然分段，不能借开关一次性执行"

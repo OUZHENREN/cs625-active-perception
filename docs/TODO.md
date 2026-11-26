@@ -25,13 +25,13 @@
 - [ ] 加工到位后：传感器安装 → URDF 加 FT frame → 更新 TCP/工具链 → **手眼重标定** → `wrench` 接入 recorder → 基线采集（零漂/噪声）
 - [ ] 台架熟悉（不装机）：通电后 `ft_sensor_node.py --self-test` → 跑节点 → `ft_sensor_record.py --duration 10 --plot`，看零漂与噪声
 
-## 三、数据通道待补（"漏项一"，所有者要求记住、暂不推进）
+## 三、数据通道待补（代码与单测已落地，真机采集待实机运行验收）
 
 - [ ] ① 夹爪位置/电流（Windows 串口桥，20 Hz）——接触的间接证据
-- [ ] ② **测量尝试次数与失败原因**（自动重测上线后必须记，否则 E5 成功率虚高）
-- [ ] ③ 规划耗时 vs 执行耗时拆开（论文"成本"指标）
-- [ ] ④ 传感器与关节的时钟对齐偏差（画联合曲线必需）
-- [ ] ⑤ 安全闸/环境门触发记录（失败模式统计）
+- [x] ② **测量尝试次数与失败原因**（`run_pick_and_place.py` `measure`/`observe` 均按 `MEASURE_ATTEMPTS=3` 记录并回写测量 JSON、`record[-1]["check"]` 及 `phases.json`）
+- [x] ③ 规划耗时 vs 执行耗时拆开（`phases.json` `timings` + `timeseries.csv` `:exec` 标记 + `archive_experiment.py` `README.md` 展示）
+- [x] ④ 传感器与关节的时钟对齐偏差（`ft_sensor_record.py` 同步监听 `/joint_states` 并输出 `.meta.json` 对齐统计；待通电同步采集实测）
+- [x] ⑤ 安全闸/环境门触发记录（`classify_failure_mode` + `failure_mode` / `gate_reason` 写入运行记录与 `phases.json`）
 
 ## 四、视觉实验计划需更新（"漏项二"：`docs/plans/2026-11-13_PLAN_NBV_CHAPTER.md` 仍可用，但）
 
@@ -71,7 +71,7 @@
       验收：同一工件位置，覆盖率/重复性提升且拒绝率可接受（真机约 4 h，可离线先做评分器）
 - [ ] 待确认：论文题目/定位（保留 10-30 版题目 + 倒序写作）与写作主战场（第 2、3 章先行）
 - [x] 交叉偏振已停用（所有者确认）→ 第 2 章按"已停用+原因"写，不写成已落地
-- [ ] 补：Zotero 里真正批注过的 3 个 PDF 归属哪几篇论文（批注 30 条，集中在 2 个附件上）
+- [x] 补：Zotero 里真正批注过的 3 个 PDF 已查明并完成 T1 全文精读（`N7KRDULX` 24 条、`JKP9YS3R` 5 条、`5PHN9L8R` 1 条）
 - [ ] 10-30 版总方案**不覆盖不改写**（Obsidian 原件保持），v2 只做纲要对照
 
 ## 六f、六维力量程校核（2026-11-26 已定稿：**够用**，我方两次估算都错了）
@@ -107,11 +107,11 @@
       ④ 流程落地：AGENTS 六模式压缩为指针 + 删 Capability-gate 模板 + 手腕口径修正；
          pre-commit hook 已装（`scripts/pre-commit.hook` + `scripts/install_hooks.sh`）；
          根 README 已瘦身为"定位+上手+红线"并指向 docs/README
-- [ ] **取数前数据通道补全（评审④，代码工作）**：
-      ① 测量自动重测记 attempts 与失败原因（写入 measurements JSON 与 phases）
-      ② 每阶段 plan_secs 与 exec_secs 分离（phases.json 两栏，timeseries 标记规划起点）
-      ③ KWR75 与关节时间戳对齐（一次同步采集算 wall 时钟偏移，写入 ft 日志元数据）
-      验收：一次真实运行后，归档 README 能读出"第 3 次才成功、规划 6.1 s、执行 31.2 s、力-位错峰 ≤50 ms" 
+- [x] **取数前数据通道补全（评审④，代码与离线单测已完成）**：
+      ① 测量自动重测记 `attempts` 与失败原因（写入 measurements JSON、运行日志与 `phases.json`）
+      ② 每阶段 `plan_secs` 与 `exec_secs` 分离（`phases.json` `timings` 与 `timeseries.csv` `:exec` 标记）
+      ③ KWR75 与关节时间戳对齐（`ft_sensor_record.py` 输出 `.meta.json` 对齐统计，待真机通电实测）
+      验收：已由单测覆盖字段生成；真机一次完整运行后归档 README 将实测呈现上述字段 
 
 ## 六h、三条文献空白 → 我们的增量点（见 `docs/literature/RESEARCH_GAPS.md`）
 
@@ -119,16 +119,11 @@
 - [ ] ② 接触状态**误判率**没人报 → 力数据人工标注 → 混淆矩阵 + 误判率 + 误判后果
 - [ ] ③ **停走节拍**只有 5UFZI35T 一篇支持 10 Hz → 先用 `ft_latency_probe.py` 实测 goal 延迟再定
 
-## 六g、⚠ 第五章漏了"残差强化学习"（所有者 2026-11-26 指出，正在补）
+## 六g、第五章强化学习收敛记录（已归并六i，2026-11-26 定稿）
 
-- [ ] 原方案（10-30 版模块 1）是「导纳控制 + 轻量残差 RL 精修」，但我在 V2 纲要与引用矩阵里只写了
-      "位置型导纳控制"，**把残差 RL 漏掉了**。所有者明确指出。
-- [ ] 库里强化学习类文献 **21 篇**，此前 T1 的 72 篇里**一篇都没有** → 已派专项批次 `lit-rl`
-      精读 6 篇（YLRC47U5 / YLLSUC5R / YKWDBBEQ / 9V2FF8P4 / KZ3CTUGL / 6DT9WUIS）
-- [ ] 待补：纲要新增 **5.5「导纳参数整定与残差强化学习补偿」**（含 action 空间、奖励设计、
-      残差幅度限制、sim2real、安全约束），引用矩阵新增对应小节（≥3 篇）
-- [ ] 落地判断（待 lit-rl 结论）：力矩型变阻抗我们做不了（无 torque 命令）；
-      可做的是「位置型导纳输出上叠加残差 Δx」——需确认残差幅度与安全钳位方式
+- [x] 5.5 节已按所有者批准归并定稿为 **变阻尼 RL**（冻结 M/K、只在线调节正定阻尼 B_t；位移残差仅作可选对照组）
+- [x] `THESIS_OUTLINE_V2.md` 5.5 与 `CITATION_MATRIX.md` 5.5（`KZ3CTUGL` / `GEKIMA8P` / `CW6SUARC`）已对齐落地；`EXPERIMENT_DESIGN_FROM_LITERATURE.md` 与 `force_control_interface.md` 已同步口径
+- [ ] 待办：法兰加工及延时代价实测到位后，再在仿真/真机开展 5.5 变阻尼 RL 训练与 5.6 三档对照
 
 ## 六e、力控架构决策：阻抗 vs 导纳（所有者 2026-11-26 提出，待定稿）
 
@@ -162,22 +157,21 @@
 - [x] Zotero 回写通道：本地 API 不可达 → 改用 JS 运行器 `scripts/zotero_import.js` + `--emit-manifest`
 - [x] 工具：`scripts/literature_index.py`（汇总索引，可 `--to-obsidian` 复制）、
       `scripts/zotero_import_notes.py`（子笔记回写 Zotero，默认 dry-run + 备份 + 拒绝在 Zotero 运行时写入）
-- [x] **T1 精读 72 篇全部完成**（3 波 × 4 子智能体 × 6 篇）→ `docs/literature/notes/`；索引 NOTES_INDEX.md 已生成并复制到 Obsidian `04_文献与研究问题`
-- [x] **T2 通读登记 908 条**（`scripts/lit_triage.py` → `runtime/lit_triage/`）
-- [x] **引用矩阵** `docs/literature/CITATION_MATRIX.md`：16 节 × 3 篇，含该文献章节+页码论断，缺口 0
-- [x] **纲要注入**：纲要附录 A 列出每节 3 个 Zotero key；纲要已复制到 Obsidian `01_研究规划`
-- [ ] **Zotero 回写（等你点一次，Zotero 不用关）**：清单已生成并复制到 `C:\\Users\\l'z\\AppData\\Local\\Temp\\zotero_notes_manifest.json`；Zotero → 工具 → 开发者 → Run JavaScript → 粘贴 `scripts/zotero_import.js`
+- [x] **T1 精读增至 93 篇**（含 `N7KRDULX`、`JKP9YS3R`、`SKHVI4C5`、`SP4IE6N4`、`CPQNLDLY`）→ `docs/literature/notes/`；`NOTES_INDEX.md` 已修复年份与 5 类结构并重生成
+- [x] **T2 通读登记更新至 782 条**（`scripts/lit_triage.py` → `runtime/lit_triage/`，已严格排除全部 93 篇 T1）
+- [x] **引用矩阵** `docs/literature/CITATION_MATRIX.md`：19 节矩阵已重生成，18 节候选 ≥3 篇；`3.6 R&R` 经 Zotero 3,411 条全库检索为 0 篇（仅存无附件标准 `ZIL5I4QK` ISO 9283:1998），待库外补入 `AIAG MSA 第 4 版 + ISO 9283 原文`
+- [x] **纲要注入**：纲要 V2 附录 A 已重生成（19 节、缺口仅 3.6）；注意同步至 Obsidian（宿主写 G 盘）
+- [ ] **Zotero 回写与 Obsidian 镜像（需在宿主环境或 G 盘可写权限下执行）**：重跑 `--emit-manifest` 覆盖 93 篇并在 Zotero Run JavaScript 执行 `scripts/zotero_import.js`；同步更新后的 `NOTES_INDEX.md`、`CITATION_MATRIX.md`、`THESIS_OUTLINE_V2.md` 至 Obsidian
 - [ ] T3：正文引用到的 T2 文献按需升精读（等论文正文动笔时做）
 - [ ] 更新阅读提示词 v3：把本课题四条线（装校装备/视觉测量标定/力觉柔顺/误差可靠）与
       我们的实测口径（0.42 mm/0.078°、插槽面内弱约束、371 mm 插入深度）写进固定背景
 
 ## 六c、遗留缺口（本轮盘点新增，2026-11-26）
 
-- [ ] `full` scope 配置梳理：`phases_load` 的观测位仍是 `observe:workpiece_coarse`（RVS 桌面扫描位，
-      对着墙，手册第 52 条）；`phases_unload` 缺 `observe:tables` / `observe:slot_fine`
+- [x] `full` scope 配置梳理：`config/tasks/full_efficient.yaml` `phases_load` 已同步 `phases` / `load_efficient.yaml`，`phases_unload` 已补齐 `observe:slot_fine` 与 `observe:tables` 对齐 `unload_efficient.yaml`（`test_full_efficient_step_phases_aligned_with_mainline` 已覆盖）
 - [ ] 相机面板修复后**重启面板复核出图**（所有者已口头确认"修复好了"，但代码在重启前生效与否需复核）
 - [ ] 六维力只在**离线自检**通过，真机（通电 + COM3 → usbipd）从未跑过
-- [ ] 插槽测量改**角点锚定**并验证三条组重复性 ≤ 2 mm（手册第 68 条；离线可做）
+- [x] 插槽测量离线核查（`measure_20261125_191925`）：`coarse_pose.py` 无 `--preset slot`，`measure_object.py --preset slot` 现有 `prior_register` 实测最大中心散布 **0.365 mm**（`slot_latest.json` `0.41 mm / 0.171°`）；若对 745 mm 非立方体槽套用 `anchor_on_corner`，交点锚定使位置跳变 ~795 mm、覆盖率跌至 0.000（散布 1.409 mm），证实应维持 `prior_register` 路线
 
 ## 七、本周已完成
 

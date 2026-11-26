@@ -296,7 +296,8 @@ def trajectory_contact_free(node, joint_names: list[str], samples: list[list[flo
 
 def plan_jobs(files, allow_large_move: bool = False,
               no_auto_split: bool = False,
-              single_shot_phase: str = "") -> tuple[list[tuple[str, dict]], int | None]:
+              single_shot_phase: str = "",
+              single_segment_within_safe: bool = False) -> tuple[list[tuple[str, dict]], int | None]:
     """读入计划文件并按需要自动分段。
 
     返回 (jobs, refused)。refused 非 None 时需要直接返回该退出码（用于 --no-auto-split）。
@@ -315,6 +316,22 @@ def plan_jobs(files, allow_large_move: bool = False,
         # 白名单里的段都是已验证的自由空间换位，且在线关节区间看门狗（JOINT_OUT_OF_RANGE）
         # 与整段到位复核仍然生效；接触/装配段保持 25° 自动分段不变。
         single_shot = single_shot_phase.strip() in SAFE_TRANSIT_PHASES
+        # 2026-11-26 所有者批准：**终点全程落在绝对安全关节区间内时，不自动分段**。
+        # 理由：分段不改变几何路径，只提供"每 ≤25° 停一次核对"的责任边界；
+        # 当整条轨迹的每个采样点都已在 SAFE_JOINT_LIMITS 内、且碰撞校验通过时，
+        # 在线关节区间看门狗（JOINT_OUT_OF_RANGE）+ 到位复核 + 逐点先验检查仍然生效，
+        # 因此允许一次性执行。**区间外的目标仍然自动分段/拒绝**（该保护不变）。
+        if (single_segment_within_safe and worst_delta > MAX_JOINT_DELTA_RAD + 1e-9):
+            inside, why = trajectory_within_safe_limits(data)
+            if inside:
+                table = "  ".join(f"{n.replace('_joint', '')}={math.degrees(v):.1f}°"
+                                  for n, v in deltas.items())
+                print(f"[{path.name}] 终点全在绝对安全区间内：单关节最大行程 "
+                      f"{math.degrees(worst_delta):.1f}° 一次性执行（不分段）。{table}")
+                print("           仍生效：逐点先验区间检查 + 碰撞校验 + 在线看门狗 + 到位复核")
+                jobs.append((str(path), data))
+                continue
+            print(f"[{path.name}] --single-segment-within-safe 被拒绝：{why} → 继续自动分段")
         if worst_delta <= MAX_JOINT_DELTA_RAD + 1e-9 or allow_large_move or single_shot:
             if single_shot and worst_delta > MAX_JOINT_DELTA_RAD + 1e-9:
                 print(f"[{path.name}] 安全换位段 {single_shot_phase}：单关节行程 "
@@ -411,6 +428,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-joint-speed", type=float, default=MAX_JOINT_SPEED_RAD_S,
                         help=f"请求的关节速度上限（rad/s）；默认 {MAX_JOINT_SPEED_RAD_S}，"
                              f"硬上限 {HARD_MAX_JOINT_SPEED_RAD_S}")
+    parser.add_argument("--single-segment-within-safe", action="store_true",
+                        help="终点全程落在绝对安全关节区间内且碰撞校验通过时，不自动分段"
+                             "直接一次性执行（所有者 2026-11-26 批准）。区间外的目标仍然"
+                             "自动分段；在线看门狗、逐点区间检查、到位复核全部保留。")
     parser.add_argument("--no-auto-split", action="store_true",
                         help="超过 25° 行程时拒绝而不是自动分段（默认分段，见 split_plan）")
     parser.add_argument("--action", default=DEFAULT_ACTION,
@@ -640,6 +661,7 @@ def main() -> int:
 
     # --- 2026-11-19 硬闸 1：单关节行程（超限自动分段，不再让人手工拆）---
     jobs, refused = plan_jobs(files, allow_large_move=args.allow_large_move,
+                              single_segment_within_safe=args.single_segment_within_safe,
                               no_auto_split=args.no_auto_split,
                               single_shot_phase=args.phase)
     if refused is not None:

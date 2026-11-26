@@ -20,6 +20,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import archive_experiment as ax  # noqa: E402
 import experiment_recorder as er  # noqa: E402
+import ft_sensor_record as ftr  # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -440,3 +441,50 @@ def test_append_index_is_idempotent(tmp_path) -> None:
     text = index.read_text()
     assert text.count(row["id"]) == 1
     assert "| id | 日期 | world | scope | mode | 耗时 (s) | 结果 | 归档路径 |" in text
+
+
+def test_phase_stage_timings_and_archive_readme_details(tmp_path) -> None:
+    phases = [
+        {"index": 0, "tag": "grasp:enter", "phase": "grasp", "boundary": "enter",
+         "t_wall": 100.0},
+        {"index": 1, "tag": "grasp:exec", "phase": "grasp", "boundary": "exec",
+         "t_wall": 106.1},
+        {"index": 2, "tag": "grasp:exit", "phase": "grasp", "boundary": "exit",
+         "t_wall": 137.3, "attempts": 3, "failure_mode": None},
+    ]
+    timings = er.phase_stage_timings(phases, 140.0)
+    assert len(timings) == 1
+    assert timings[0]["plan_secs"] == pytest.approx(6.1, abs=1e-3)
+    assert timings[0]["exec_secs"] == pytest.approx(31.2, abs=1e-3)
+    assert timings[0]["attempts"] == 3
+
+    phases_path = tmp_path / "phases.json"
+    er.write_phases_json(phases_path, "test_run", phases, t_end=140.0)
+    written = json.loads(phases_path.read_text(encoding="utf-8"))
+    assert len(written["timings"]) == 1
+    assert written["timings"][0]["plan_secs"] == pytest.approx(6.1, abs=1e-3)
+
+    ft_meta = {
+        "clock_alignment": ftr.compute_clock_alignment_metadata(
+            [[100.015, 100.000, 0, 0, 0, 0, 0, 0],
+             [100.025, 100.010, 0, 0, 0, 0, 0, 0]],
+            joint_samples=[(100.016, 100.005), (100.026, 100.014)],
+        )
+    }
+    assert ft_meta["clock_alignment"]["ft_minus_joint_stamp"]["abs_max_ms"] <= 50.0
+
+    readme = ax.build_readme(
+        {"id": "demo", "world": "sim", "scope": "load", "mode": "efficient",
+         "source": "synthetic", "run_dir": str(tmp_path), "params": {"rate_hz": 20.0}},
+        {"rows_before": 10, "rows_after": 8, "head_dropped": 1, "tail_dropped": 1,
+         "pad_s": 0.5, "max_still_s": 3.0, "static_runs": 0, "static_dropped": 0,
+         "eps": 1e-4, "dup_span_s": 0.25, "duplicate_dropped": 0},
+        {"images_before": 0, "images_after": 0},
+        tmp_path,
+        phases_timings=timings,
+        ft_meta=ft_meta,
+    )
+    assert "第 3 次才成功" in readme
+    assert "规划 6.1 s" in readme
+    assert "执行 31.2 s" in readme
+    assert "力-位错峰" in readme

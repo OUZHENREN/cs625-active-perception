@@ -40,7 +40,7 @@ eli_driver_->writeServoj(position_commands_, recv_timeout_ * 1000, false, false)
 | 路线 | 做法 | 优点 | 代价/风险 | 结论 |
 |---|---|---|---|---|
 | **A 厂商力控模式** | `enableForceMode` 设期望 wrench + 柔性轴 + 速度限幅 | 控制器内闭环、响应快、成熟 | 绕过我们 `execute_assembly_chunks` 的关节速度治理器；需自己加看门狗（力阈值、关节区间、超时） | **作为基线对照**（论文第 5 章的 baseline） |
-| **B 自建导纳（10–50 Hz 切片）** | 读 `/ft_sensor/wrench` → 导纳律算 Δx → 发短 `FollowJointTrajectory` goal | **算法是我们自己的**（论文主体，可加残差 RL）；安全治理器全程生效 | 受 goal 更新延迟限制，需先实测 | **主线方案**（符合"本文方法 vs 基线"的章节结构） |
+| **B 自建导纳（10–50 Hz 切片）** | 读 `/ft_sensor/wrench` → 导纳律算 Δx → 发短 `FollowJointTrajectory` goal | **算法是我们自己的**（论文主体，5.5 节叠加变阻尼 RL 在线调 B）；安全治理器全程生效 | 受 goal 更新延迟限制，需先实测 | **主线方案**（符合"本文方法 vs 基线"的章节结构） |
 | **C 直接 writeServoj 流式** | 自己起节点按 125 Hz 下发 servoj | 延迟最低 | **绕过 ros2_control 与我们全部安全闸**，违反执行安全契约 | **不采用** |
 
 **决策**：主线走 **B（自建位置型导纳）**，A 作为**对照基线**，C 不采用。
@@ -110,7 +110,7 @@ eli_driver_->writeServoj(position_commands_, recv_timeout_ * 1000, false, false)
 ## 6. 与论文结构的关系
 
 ```text
-第 5 章 力控：基线 = 厂商力控模式（A）；本文方法 = 自建导纳 + 残差补偿（B）
+第 5 章 力控：基线 = 厂商力控模式（A）；本文方法 = 自建导纳 + 变阻尼 RL 参数调节（B，位移残差仅作可选对照）
              对照指标：插入成功率、力峰值、分段用时、位置/角度残差
 这样"基线 vs 方法"是同一台机器人、同一工件、同一间隙下的对照，证据强度最高。
 ```

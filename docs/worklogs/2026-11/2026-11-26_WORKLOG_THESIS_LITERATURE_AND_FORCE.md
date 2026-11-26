@@ -145,3 +145,79 @@ lit-cn-top（5A9MHS5X/IDNHNTKH/EZPX9E2H，Top-10 第 2/8/10 名漏读）。
 
 工程修复：G 盘挂载不支持 chmod/utime，literature_index.py 的 --to-obsidian
 从 shutil.copy2/copy 改为纯内容复制（读字节写字节），否则每次同步都 PermissionError。
+
+## 15:20 全面复核与修复（接管完成文献闭环、规划口径对齐、配置与数据通道补全）
+
+1. **高批注与引文 T1 补读落地（88 → 93 篇）**：
+   - 完成 Zotero 全库 30 条所有者批注对应文献精读：`N7KRDULX`（24 条，Table 2 p.93 定量反证单纯最小化 `e_R` 不等于最小化三维误差 `R_ae`，`Li[67]` `e_R=0.0563` 对应 `R_ae=206.4` 而 `Tabb rp1[66]` 仅 `74.58`）、`JKP9YS3R`（5 条，表 1–3 真机 `81.7%` 及其 `§5 p.5612` 严重遮挡退化自承），补读 `SKHVI4C5`（Stein ICP 后验方差，GPU 5× 提速且 RPE 无损）、`SP4IE6N4`（2019 封面，Ch4 摄动误差 `2.6→0.25 mm` 角度主导、Ch5 ANSYS `0.727/0.789 mm` 静态变形）、`CPQNLDLY`（2018，纯仿真 `101.0775→23.9640`，`-76.29%`）。
+   - 修复 `92KPMV94` 印刷页码定位（Emerald PDF p.2–11 对应印刷页 `p.171–180`）及章节结构；在 Zotero 3,411 条有效条目中确认 Gage R&R / MSA PDF 为 `0` 篇（仅无附件 `ZIL5I4QK` ISO 9283:1998）。
+2. **脚本正则修复与索引/矩阵/分诊全量重生成**：
+   - 修复 `scripts/literature_index.py` 与 `scripts/citation_matrix.py` 年份提取正则（避免 `YYYY-MM` 连字符误删 `9CABC9I6` 2023、`B5RU795I` 2023、`K6GRA38N` 2024、`SUHKBEF7` 2021 年份；对无出版年份手稿 `BJPEZ2IP` 诚实置空而非误抓 `2026`）与章节提取逻辑；更新 `MANUAL_OVERRIDE`（`3.1`/`3.2`/`3.3`/`4.1`/`4.2`/`4.4`）并移除 18 轴连续体 `ABEPHJV4` 替换为 `IDNHNTKH`。
+   - 重跑结果：`lit_triage.py` 登记 **782** 篇（排除全部 **93** 篇 T1）；`literature_index.py` 生成 93 篇；`citation_matrix.py` 输出 **19 节 / 0 空缺论断**（仅 `3.6 R&R` 缺口）；`outline_inject_refs.py` 注入 V2 附录 A。
+3. **规划与参考文档口径一致化**：
+   - 修复 `RESEARCH_GAPS.md` 空白一（按 `N7KRDULX` p.93–95 核实口径改为“缺少方程残差向物理任务 3D 误差的映射且中文工程论文缺报”，补充 `3.6` 库内缺口说明）；
+   - 修复 `2026-11-26_EXPERIMENT_DESIGN_FROM_LITERATURE.md`（原数字 ID `130/543/90/668/683/176/470` 统一为规范 `itemKey`，`§5` 不再写“不追强化学习”而是对齐 V2 5.5 变阻尼 RL，第 4 节工时预算与 V2 §3 对齐）；
+   - 同步 `force_control_interface.md` 5.5 变阻尼 RL 口径、`2026-11-13_PLAN_NBV_CHAPTER.md` 历史草案状态提示、`THESIS_OUTLINE_V2.md` `N7KRDULX` 与 7.2 小时算术口径、`TODO.md` 与 `DSH_CHORES` 台账。
+4. **配置、数据通道与离线插槽核查**：
+   - 修复 `config/tasks/full_efficient.yaml`：同步 `phases_load` 到 `phases` / `load_efficient.yaml`，向 `phases_unload` 补入 `observe:slot_fine` 与 `observe:tables` 对齐 `unload_efficient.yaml`；
+   - 补全 `run_pick_and_place.py` / `experiment_recorder.py` / `archive_experiment.py` / `ft_sensor_record.py`：`kind == "measure"` 补传 `attempts=MEASURE_ATTEMPTS`，新增 `run_observation_check_detailed` / `classify_failure_mode` 回写测量 JSON / `phases.json`，拆分 `:exec` 标记与 `plan_secs` / `exec_secs`，`ft_sensor_record.py` 同步采集 `/joint_states` 并输出 `.meta.json` 对齐统计；新增对应单测；
+   - 对 `runtime/vision_dataset/measure_20261125_191925` 做离线插槽诊断：`coarse_pose.py` 无 `--preset slot`，`prior_register` 5 组中心最大散布 **0.365 mm**（`slot_latest.json` `0.41 mm / 0.171°`）；对 745 mm 非立方体槽强套 `anchor_on_corner` 会跳变 **795–796 mm** 且覆盖率跌至 **0.000**（散布 **1.409 mm**），证实 `measure_object.py --preset slot` 保持 `prior_register` 正确。
+5. **当前仍受环境/硬件阻塞项**：完整 ROS 2 Jazzy `pytest`（含 `rclpy` 用例）、G 盘 Obsidian 同步与 Zotero `--emit-manifest` 写入、`371 mm` 简化接触仿真及真机窗口检查。
+
+## 19:45 事故：记录插入位后，肘部堵转过载 + J4 掉落 41°
+
+```text
+背景：所有者手动摆位记录三个真位姿（转正 / 插到底 / 预插入），用以取代推导值。
+
+已完成记录：
+  · straighten（转正）：TCP [1.1649, −0.0471, 0.0285]，quat [−0.0067, −1.0, 0.0023, −0.0017]
+  · insert（插到底）：TCP [1.1649, −0.0471, 0.0285]，quat [−0.007, −0.9962, 0.0051, −0.0871]
+  验证结果（重要）：两者**位置完全相同（0.00 mm）**，姿态差 **9.81°**，且分解为
+  绕工具 **y 轴 +9.81°**（x/z 仅 0.26°/0.07°） —— 与师兄源码
+  `T_world_rotated = T_world_insert @ Ry(-10°)` 的结构完全一致，所有者记忆被证实。
+
+事故经过：
+  所有者接下来想记录"工件**取出**时外边缘与插槽滚轮/楔形区窄区的首次接触点"，
+  过程中**触发了一条运动命令**（来源未定位）→ 肘部堵转过载 → 机械臂需重启
+  → J4 抱闸失效，从 −41.63° 自由回落到 −83.03°（41.4°）。
+  其余五轴与记录值相差 <2°（pan 7.41 / lift −121.17 / elbow −95.14 / wrist2 88.29 / wrist3 97.36）
+  → 判定为**堵转**，不是轨迹失控。
+
+所有者结论（已写入 insert 位姿的 verdict 字段）：
+  **该插入位姿不能直接实现装入/取出**——取出时工件外边缘会先撞上滚轮与楔形窄区。
+
+处置：
+  · 未再发送任何运动指令；
+  · `runtime/insert_calibration.json` 给 insert 增加 `verdict: INVALID_FOR_EXTRACTION`
+    与 `incident_2026-11-26` 记录（记录数值本身未改动）；
+  · 手册新增第 72 条（症状/真因/确认命令/处置/预防）；
+  · 待所有者重启机械臂后：四项门 → `ensure_robot_ready.py --force` → 2° 探针。
+
+未定位：触发那条命令的来源。`~/.ros/log/python3_*.log` 为空，没有命令记录。
+
+## 20:33 新增任务 ⑭：切回远程后"校正记忆 + 重挂为运动中"
+
+```text
+所有者需求（2026-11-26）：示教器切换远程/本地控制之后，需要一个能手动重挂 + 让机械臂
+回到"运动中"的任务。
+
+为什么不能直接 ensure_robot_ready --force：
+  控制器是位置记忆器——手拖只改实际位置、不改记忆；重挂会把旧记忆重新下发，
+  机械臂全速跳回旧轨迹终点（2026-11-20 三次，一次 y 偏 240 mm、一次 J6 越过 ±150°）。
+
+新增 scripts/rehang_after_manual.py（顺序固定）：
+  ① 读 safety/robot 模式，safety ≠ NORMAL 直接拒绝
+  ② sync_command_position.py（只读）打印记忆偏差 / 离停车位姿距离 + 当前六关节
+  ③ 偏差 >2° 且未给 --accept-drift → 拒绝（exit 5）
+  ④ 偏差大时把 --force 透传给 sync（它默认拒绝远离停车位姿的校正）
+  ⑤ 校正前后采样关节角，变化 >1° 判"伺服释放下坠"立即停止（exit 6）
+  ⑥ ensure_robot_ready --force 重挂为 RUNNING
+  ⑦ control_health 四项门复核
+  默认只检查不动硬件。
+
+实机试跑（只读）实证当前状态：
+  反控端口：**断开**；记忆偏差 **35.1°（wrist_1_joint）**；离停车位姿 **52.0°**
+  → 正是 19:45 事故（J4 掉落 41°）之后的典型状态，脚本按设计拒绝直接重挂。
+
+配套：.vscode/tasks.json 新增任务 ⑭（共 14 个）；docs/README 任务表更新；
+手册新增第 73 条（症状/真因/确认命令/处置/预防）。

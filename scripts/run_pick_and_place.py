@@ -1658,18 +1658,19 @@ def run_observe_list(node, cfg: UnloadConfig, entries: list[tuple[str, str]],
                             "detail": f"check {check}: skipped in sim "
                                       f"(planning uses the known ground-truth poses)"})
         elif check:
-            ok_check, detail = run_observation_check(check, pose)
-            # The pose checks use a YOLO model trained on REAL photographs; a Gazebo
-            # render has no texture, so the model reports "no mask" and the check can
-            # never pass.  It says nothing about the motion, so in simulation it is
-            # advisory: report it and keep the flow going.  Real runs stay blocking.
-            advisory = cfg.world == "sim" and not ok_check
+            chk = run_observation_check_detailed(
+                check, pose, attempts=MEASURE_ATTEMPTS)
+            advisory = cfg.world == "sim" and not chk["ok"]
             if advisory:
                 print(f"[sim] {name}: check failed (advisory, no texture in the "
-                      f"Gazebo render): {detail}", file=sys.stderr)
-            results.append({"phase": name, "ok": ok_check or advisory,
-                            "detail": f"check {check}: {detail}"
-                                      + (" (sim advisory)" if advisory else "")})
+                      f"Gazebo render): {chk['detail']}", file=sys.stderr)
+            results.append({"phase": name, "ok": chk["ok"] or advisory,
+                            "detail": f"check {check}: {chk['detail']}"
+                                      + (" (sim advisory)" if advisory else ""),
+                            "check": {"name": check, "ok": chk["ok"],
+                                      "detail": chk["detail"],
+                                      "attempts": chk["attempts"],
+                                      "attempt_reasons": chk["attempt_reasons"]}})
         else:
             results.append({"phase": name, "ok": True, "detail": "observed"})
     return results
@@ -2027,7 +2028,9 @@ def build_cartesian_legs(current, target, profile: SpeedProfile, band=None):
 
 def run_cartesian_profile(node, name: str, xyz, quat, profile: SpeedProfile,
                           dwell: float, log=None, band=None,
-                          tight: bool = False) -> bool:
+                          tight: bool = False,
+                          timing_out: dict | None = None,
+                          on_exec_start=None) -> bool:
     """Move to xyz, cruising fast and slowing down only where the profile says.
 
     Two slowing mechanisms exist and can be combined:
@@ -2037,31 +2040,49 @@ def run_cartesian_profile(node, name: str, xyz, quat, profile: SpeedProfile,
     """
     import numpy as _np
 
-    for attempt in range(3):
-        if not node.ensure_control_ready():
-            continue
-        target = _np.array(xyz, dtype=float)
-        current = node.tcp()
-        legs = build_cartesian_legs(current, target, profile, band)
-        if not legs:
-            return True
-        ok = True
-        for leg_target, velocity, time_scale, chunks in legs:
-            points = node.plan_cartesian(leg_target, quat, velocity,
-                                         avoid_collisions=not tight)
-            if not points:
-                ok = False
-                break
-            if not node.run_chunks(points, chunks, time_scale, dwell):
-                ok = False
-                break
-        if ok:
-            return True
-        if log:
-            log.warn(f"{name}: leg failed on attempt {attempt + 1}; replanning from current")
-        subprocess.run(["bash", RECOVER_SH], check=False,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return False
+    plan_elapsed = 0.0
+    exec_elapsed = 0.0
+    exec_notified = False
+    try:
+        for attempt in range(3):
+            if not node.ensure_control_ready():
+                continue
+            t0 = time.time()
+            target = _np.array(xyz, dtype=float)
+            current = node.tcp()
+            legs = build_cartesian_legs(current, target, profile, band)
+            plan_elapsed += time.time() - t0
+            if not legs:
+                return True
+            ok = True
+            for leg_target, velocity, time_scale, chunks in legs:
+                tp = time.time()
+                points = node.plan_cartesian(leg_target, quat, velocity,
+                                             avoid_collisions=not tight)
+                plan_elapsed += time.time() - tp
+                if not points:
+                    ok = False
+                    break
+                if on_exec_start is not None and not exec_notified:
+                    exec_notified = True
+                    on_exec_start()
+                te = time.time()
+                ran = node.run_chunks(points, chunks, time_scale, dwell)
+                exec_elapsed += time.time() - te
+                if not ran:
+                    ok = False
+                    break
+            if ok:
+                return True
+            if log:
+                log.warn(f"{name}: leg failed on attempt {attempt + 1}; replanning from current")
+            subprocess.run(["bash", RECOVER_SH], check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return False
+    finally:
+        if timing_out is not None:
+            timing_out["plan_secs"] = round(plan_elapsed, 2)
+            timing_out["exec_secs"] = round(exec_elapsed, 2)
 
 
 _CAMERA_RESTORE_REGISTERED = [False]
@@ -2169,7 +2190,7 @@ def finger_position_m(width_mm: float, max_opening_mm: float = 50.0,
     return ratio * (float(span_max_mm) - float(span_min_mm)) / 2.0 / 1000.0
 
 
-def notify_recorder(phase: str, boundary: str) -> None:
+def notify_recorder(phase: str, boundary: str, meta: dict | None = None) -> None:
     """Tell the running experiment recorder which phase just started/ended.
 
     Best effort: no recorder, no script or a broken call must never abort a
@@ -2179,9 +2200,11 @@ def notify_recorder(phase: str, boundary: str) -> None:
     pidfile = Path("runtime/recorder.pid")
     if not script.exists() or not pidfile.exists():
         return
-    subprocess.run(["python3", "-u", str(script), "set-phase", "--tag",
-                    f"{phase}:{boundary}"],
-                   capture_output=True, timeout=20, check=False)
+    command = ["python3", "-u", str(script), "set-phase", "--tag",
+               f"{phase}:{boundary}"]
+    if isinstance(meta, dict) and meta:
+        command.extend(["--meta", json.dumps(meta, ensure_ascii=False)])
+    subprocess.run(command, capture_output=True, timeout=20, check=False)
 
 
 def capture_process_image(tag: str, boundary: str) -> None:
@@ -2223,6 +2246,93 @@ def _run_check_once(command: str, pose: dict) -> tuple[bool, str]:
     return completed.returncode == 0, tail
 
 
+def _extract_out_path(command: str) -> Path | None:
+    """Extract the ``--out <path>`` argument from a shell command when present."""
+    import shlex
+    try:
+        tokens = shlex.split(command or "")
+    except ValueError:
+        return None
+    for idx, token in enumerate(tokens[:-1]):
+        if token == "--out":
+            return Path(tokens[idx + 1])
+    return None
+
+
+def _annotate_measurement_attempts(command: str, history: list[dict],
+                                   started_at: float) -> bool:
+    """Write retry attempt count and failure reasons into the measurement JSON."""
+    if "measure_object.py" not in (command or "") or not history:
+        return False
+    out_path = _extract_out_path(command)
+    if out_path is None:
+        return False
+    if not out_path.is_absolute():
+        out_path = REPO / out_path
+    if not out_path.exists():
+        return False
+    try:
+        if out_path.stat().st_mtime < started_at - 1.0:
+            return False
+        payload = json.loads(out_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    payload["attempts"] = len(history)
+    payload["attempt_reasons"] = history
+    out_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
+                        encoding="utf-8")
+    return True
+
+
+def classify_failure_mode(detail: str) -> str:
+    """Normalize gate/safety/planning failure strings for offline failure Pareto."""
+    text = str(detail or "").strip()
+    upper = text.upper()
+    if "IK_FAILED" in upper:
+        return "IK_FAILED"
+    if "CARTESIAN_PLAN_FAILED" in upper:
+        return "CARTESIAN_PLAN_FAILED"
+    if "PLAN_FAILED" in upper:
+        return "PLAN_FAILED"
+    if ("REFUSED" in upper or "MODEL_" in upper or "MISSING" in upper
+            or "UNHEALTHY" in upper):
+        return "GATE_REFUSED"
+    if "OUTSIDE TOLERANCE" in upper or "VERIFY" in upper:
+        return "VERIFY_FAILED"
+    if "CHECK " in upper or "VERDICT" in upper or "MEASURE" in upper:
+        return "CHECK_FAILED"
+    return "EXEC_FAILED"
+
+
+def run_observation_check_detailed(
+    command: str,
+    pose: dict,
+    attempts: int = 1,
+    runner_fn=None,
+) -> dict:
+    """Run an observation check with bounded retries and return full attempt history."""
+    total = max(1, int(attempts)) if "measure_object.py" in (command or "") else 1
+    check_fn = runner_fn or _run_check_once
+    started_at = time.time()
+    ok, detail = False, "no attempt"
+    history: list[dict] = []
+    for attempt in range(1, total + 1):
+        ok, detail = check_fn(command, pose)
+        history.append({"attempt": attempt, "ok": bool(ok), "detail": str(detail)})
+        if ok or attempt >= total:
+            break
+        print(f"[测量重测] 第 {attempt}/{total} 次未通过：{detail} → 立即重测")
+    _annotate_measurement_attempts(command, history, started_at)
+    return {
+        "ok": bool(ok),
+        "detail": str(detail),
+        "attempts": len(history),
+        "attempt_reasons": history,
+    }
+
+
 def run_observation_check(command: str, pose: dict,
                           attempts: int = 1) -> tuple[bool, str]:
     """Run the configured check, retrying measurement commands automatically.
@@ -2234,14 +2344,8 @@ def run_observation_check(command: str, pose: dict,
     2026-11-25 所有者要求：测量第一次没过自动重测（实测有一次精测因单组离群被拒、
     原地重测即通过）。重测只对 measure_object.py 生效，其它检查按 attempts 原样执行。
     """
-    total = max(1, int(attempts)) if "measure_object.py" in (command or "") else 1
-    ok, detail = False, "no attempt"
-    for attempt in range(1, total + 1):
-        ok, detail = _run_check_once(command, pose)
-        if ok or attempt >= total:
-            break
-        print(f"[测量重测] 第 {attempt}/{total} 次未通过：{detail} → 立即重测")
-    return ok, detail
+    result = run_observation_check_detailed(command, pose, attempts=attempts)
+    return result["ok"], result["detail"]
 
 
 def resolve_phase_list(cfg) -> list[tuple[str, str]]:
@@ -2689,6 +2793,18 @@ def main() -> int:
         record_verdict(node.sim_grasp_baseline())
 
     current_phase = ""                # 由阶段循环更新，deliver() 读取
+    exec_started: list[float | None] = [None]
+    phase_timing: dict[str, float | None] = {"plan_secs": None, "exec_secs": None}
+
+    def mark_exec(phase_name: str) -> None:
+        """Mark planning->execution boundary once per phase for timeseries/phases."""
+        if exec_started[0] is not None:
+            return
+        now = time.time()
+        exec_started[0] = now
+        if phase_timing["plan_secs"] is None:
+            phase_timing["plan_secs"] = round(max(0.0, now - phase_started), 2)
+        notify_recorder(phase_name, "exec")
 
     def step(name: str, ok: bool, detail: str = "") -> None:
         record.append({"phase": name, "ok": ok, "detail": detail,
@@ -2714,8 +2830,19 @@ def main() -> int:
         ok = record[-1]["ok"]
         # 2026-11-24：所有者问"为什么发一条命令要一两分钟才动"。阶段记录里带上墙钟
         # 耗时，慢在哪里一眼能看出来（原来是靠人肉对时间戳）。
-        record[-1]["secs"] = round(time.time() - phase_started, 1)
-        notify_recorder(name, "exit")
+        now = time.time()
+        total_secs = round(max(0.0, now - phase_started), 1)
+        record[-1]["secs"] = total_secs
+        p_secs = phase_timing.get("plan_secs")
+        e_secs = phase_timing.get("exec_secs")
+        if e_secs is None and exec_started[0] is not None:
+            e_secs = round(max(0.0, now - exec_started[0]), 2)
+        if p_secs is None and e_secs is None and kind not in ("measure", "model", "special"):
+            p_secs = total_secs
+        record[-1]["plan_secs"] = p_secs
+        record[-1]["exec_secs"] = e_secs
+        if not ok:
+            record[-1]["failure_mode"] = classify_failure_mode(record[-1]["detail"])
         publish_task_state(node, {"flow": getattr(cfg, "scope", "") or args.flow,
                                   "mode": getattr(cfg, "mode", ""),
                                   "world": getattr(cfg, "world", "real"),
@@ -2822,6 +2949,9 @@ def main() -> int:
             continue
         phase_started = time.time()
         current_phase = name          # deliver()/run_chunks 用它查"可提速白名单"
+        exec_started[0] = None
+        phase_timing["plan_secs"] = None
+        phase_timing["exec_secs"] = None
         notify_recorder(name, "enter")
         publish_task_state(node, {"flow": getattr(cfg, "scope", "") or args.flow,
                                   "mode": getattr(cfg, "mode", ""),
@@ -2829,11 +2959,12 @@ def main() -> int:
                                   "phase": name, "phase_index": index + 1,
                                   "phase_total": len(phases), "status": "running",
                                   "plan_only": plan_only})
-        if not plan_only and not node.ensure_control_ready():
-            step(name, False, "control chain unhealthy")
-            break
         records_before = len(record)
         try:
+          if not plan_only and not node.ensure_control_ready():
+              step(name, False, "control chain unhealthy")
+              break
+          try:
             if kind == "special":
                 if plan_only:
                     step(name, True, "gripper phase skipped (plan-only)")
@@ -2896,6 +3027,8 @@ def main() -> int:
                 goal = node.ik(staging_point, grasp_quat, seed=start_positions())
                 points = (node.plan_joint(goal, velocity, start_positions())
                           if goal else None)
+                if points:
+                    mark_exec(name)
                 ok = deliver(points, profile)
                 if ok and not plan_only:
                     ok = cartesian_move(pre, velocity, max(2.0, cfg.time_scale))
@@ -2920,6 +3053,7 @@ def main() -> int:
                 # TCP 会横摆几十毫米直接扫到工件（手册第 48 条）。半速下降（所有者认可）。
                 ok = True
                 if not plan_only:
+                    mark_exec(name)
                     ok = cartesian_move(grasp_xyz, velocity, max(2.0, cfg.time_scale))
                 step(name, ok, f"v={velocity:.3f} 笛卡尔下降 "
                                f"{distance*1000:.0f}mm (半速, 间隙闸在线)"
@@ -2986,17 +3120,21 @@ def main() -> int:
                 if plan_only:
                     step(name, True, f"measure {target} (planned only)")
                     continue
-                ok_check, check_detail = run_observation_check(check, {})
-                # 先 step()（它会 append 记录），再补 check 明细；
-                # 之前先写 record[-1] 在"第一个阶段就是 measure"时会 IndexError。
-                step(name, ok_check, f"measure {target}: {check_detail}")
-                record[-1]["check"] = {"name": check, "ok": ok_check,
-                                       "detail": check_detail}
+                chk = run_observation_check_detailed(
+                    check, {}, attempts=MEASURE_ATTEMPTS)
+                step(name, chk["ok"], f"measure {target}: {chk['detail']}")
+                record[-1]["check"] = {
+                    "name": check,
+                    "ok": chk["ok"],
+                    "detail": chk["detail"],
+                    "attempts": chk["attempts"],
+                    "attempt_reasons": chk["attempt_reasons"],
+                }
                 Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
             elif kind == "nbv":
                 # NBV = 方案 A（2026-11-13 所有者定调）：预教站位 + 按偏转角自动选站。
                 #   粗观测给出工件偏转角 → 查 workpiece_views 选最近已验证站位
-                #   → 与"0° 相对视角推导"交叉核对（relative_zero 族相差 >40 mm 判
+                #   → 与"0° 相对视角推导"交叉核对（relative_zero 族相差 >200 mm 判
                 #   工件已移动，拒绝）→ 由 plan_pose_ik 带全套安全闸执行到站位
                 #   绝对位姿。查不到站位 / 核对不过 / 需大幅改构型 → 一律跳过自动
                 #   换位，继续原地精测（精测失败再人工摆位）。
@@ -3024,6 +3162,7 @@ def main() -> int:
                         step(name, True,
                              f"NBV {target}（plan-only，无测量文件，跳过换位）")
                     continue
+                mark_exec(name)
                 station_cmd.append("--execute")
                 code, text = run(station_cmd, timeout=900.0)
                 tail = (text or "").strip().splitlines()
@@ -3048,6 +3187,8 @@ def main() -> int:
                 goal = node.ik(xyz, quat, seed=start_positions())
                 points = (node.plan_joint(goal, profile.velocity, start_positions())
                           if goal else None)
+                if points:
+                    mark_exec(name)
                 ok = deliver(points, profile)
                 # detail() already distinguishes IK_FAILED from PLAN_FAILED; the
                 # old "if ok else PLAN_FAILED" hid every IK failure behind a plan
@@ -3094,17 +3235,28 @@ def main() -> int:
                                               encoding="utf-8")
                     node.get_logger().info(f"[{name}] check {check} skipped in sim")
                 elif check:
-                    ok_check, check_detail = run_observation_check(
+                    chk = run_observation_check_detailed(
                         check, pose, attempts=MEASURE_ATTEMPTS)
-                    record[-1]["check"] = {"name": check, "ok": ok_check,
-                                           "detail": check_detail}
+                    record[-1]["check"] = {
+                        "name": check,
+                        "ok": chk["ok"],
+                        "detail": chk["detail"],
+                        "attempts": chk["attempts"],
+                        "attempt_reasons": chk["attempt_reasons"],
+                    }
                     Path(args.log).write_text(json.dumps(record, indent=2),
                                               encoding="utf-8")
                     node.get_logger().info(
-                        f"[{name}] check {check} ok={ok_check} {check_detail}")
+                        f"[{name}] check {check} ok={chk['ok']} {chk['detail']}")
                     # 真机侧仍然是阻断判据。
-                    if not ok_check:
-                        step(name, False, f"check {check} failed: {check_detail}")
+                    if not chk["ok"]:
+                        record[-1]["ok"] = False
+                        record[-1]["detail"] = (
+                            f"{record[-1]['detail']} | check {check} failed: {chk['detail']}"
+                        )
+                        record[-1]["failure_mode"] = "CHECK_FAILED"
+                        Path(args.log).write_text(json.dumps(record, indent=2),
+                                                  encoding="utf-8")
                         break
             elif kind == "joint":
                 target = {"transit": (cfg.transit, cfg.grasp_q),
@@ -3114,6 +3266,8 @@ def main() -> int:
                 goal = node.ik(target[0], target[1], seed=start_positions())
                 points = (node.plan_joint(goal, profile.velocity, start_positions())
                           if goal else None)
+                if points:
+                    mark_exec(name)
                 ok = deliver(points, profile)
                 step(name, ok, f"v={profile.velocity} ts={profile.time_scale}"
                                f" {detail(goal, points)}")
@@ -3171,7 +3325,9 @@ def main() -> int:
                 else:
                     ok = run_cartesian_profile(node, name, xyz, quat, profile,
                                                cfg.dwell_sec, node.get_logger(),
-                                               band=band, tight=tight)
+                                               band=band, tight=tight,
+                                               timing_out=phase_timing,
+                                               on_exec_start=lambda: mark_exec(name))
                     step(name, ok, f"v={profile.velocity} ts={profile.time_scale}"
                                    f" tail={profile.slow_tail_mm}mm"
                                    f" band={profile.slow_band_mm}")
@@ -3179,18 +3335,36 @@ def main() -> int:
                     verify(name, xyz, quat)
             else:
                 step(name, False, "unknown phase")
-        except Exception as exc:  # noqa: BLE001 - recorded, then stop
+          except Exception as exc:  # noqa: BLE001 - recorded, then stop
             # 2026-11-24：只记 "TypeError: 'str' object is not callable" 无法定位
             # （observe:tables 就报过这一句，日志里没有栈，白查半小时）。
             # 现在把完整栈打到运行日志里：阶段记录仍然只放一行摘要。
             print(f"[{name}] 阶段异常，完整栈：\n{__import__('traceback').format_exc()}")
             step(name, False, f"{type(exc).__name__}: {exc}")
+            if len(record) > records_before:
+                record[-1]["failure_mode"] = "EXCEPTION"
+                Path(args.log).write_text(json.dumps(record, indent=2), encoding="utf-8")
             break
-        if len(record) > records_before and not record[-1]["ok"]:
+          if len(record) > records_before and not record[-1]["ok"]:
             node.get_logger().error(
                 f"[{name}] phase failed; stopping the flow instead of moving on "
                 "with a wrong result (the remaining phases would act on a wrong state)")
             break
+        finally:
+          exit_meta: dict = {}
+          if len(record) > records_before:
+              last = record[-1]
+              for key in ("plan_secs", "exec_secs", "failure_mode"):
+                  if last.get(key) is not None:
+                      exit_meta[key] = last[key]
+              chk_info = last.get("check") or {}
+              if chk_info.get("attempts") is not None:
+                  exit_meta["attempts"] = chk_info["attempts"]
+              if chk_info.get("attempt_reasons") is not None:
+                  exit_meta["attempt_reasons"] = chk_info["attempt_reasons"]
+              if not last.get("ok") and last.get("detail"):
+                  exit_meta["gate_reason"] = str(last["detail"])[:160]
+          notify_recorder(name, "exit", meta=exit_meta or None)
 
     node.destroy_node()
     if rclpy.ok():

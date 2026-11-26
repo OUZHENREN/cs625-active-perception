@@ -31,7 +31,7 @@ sys.stdout.reconfigure(line_buffering=True)
 REPO = pathlib.Path(__file__).resolve().parents[1]
 MANUAL = REPO / "docs" / "manuals" / "2026-11-03_MANUAL_REAL_MACHINE_EXPERIENCE.md"
 AGENT_MEMORY = REPO / "docs" / "agent_memory.md"
-DOC_GLOBS = ("docs/**/*.md", "README.md")
+DOC_GLOBS = ("docs/**/*.md", "README.md", "AGENTS.md")
 
 PROBLEMS: list[str] = []
 

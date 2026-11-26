@@ -37,6 +37,35 @@ def field(text: str, pattern: str) -> str:
     return found.group(1).strip() if found else ""
 
 
+REL_ORDER = ("直接对象证据 + 方法迁移", "直接对象证据", "方法迁移", "工程工具", "暂不相关", "未标注")
+
+
+def extract_year(text: str) -> str:
+    head = "\n".join(text.splitlines()[:15])
+    m = re.search(r"(?:年份|发表|日期|答辩|提交)[：:\s\*]*((?:19|20)\d{2})", head)
+    if m:
+        return m.group(1)
+    top = "\n".join(
+        ln for ln in text.splitlines()[1:12]
+        if not any(w in ln for w in ("阅读", "2026-11", "无任何年份证据"))
+    )
+    # 只剔除"1995—"这类出生年份标记，避免误删"2023-03"等带连字符的答辩/发表年月
+    top_clean = re.sub(r"(?:19|20)\d{2}\s*[—–](?!\d)", "", top)
+    m2 = re.search(r"\b((?:19|20)\d{2})\b", top_clean)
+    return m2.group(1) if m2 else ""
+
+
+def extract_relevance(text: str) -> str:
+    m = re.search(r"相关性[^\n：:]*[：:]\s*\**(.+?)(?:\*\*|$|[（(—。，])", text, re.MULTILINE)
+    if not m:
+        return "未标注"
+    raw = re.sub(r"\s+", " ", m.group(1)).strip()
+    for cat in REL_ORDER[:-1]:
+        if raw.startswith(cat) or cat in raw:
+            return cat
+    return raw or "未标注"
+
+
 def summarize(path: pathlib.Path) -> dict | None:
     text = path.read_text(encoding="utf-8", errors="replace")
     key = path.name.split("_")[0]
@@ -47,8 +76,8 @@ def summarize(path: pathlib.Path) -> dict | None:
         "file": path.name,
         "title": field(text, r"^#\s+(.+)$") or field(text, r"\*\*标题\*\*[：:]\s*(.+)"),
         "kind": field(text, r"(硕士学位论文|博士学位论文|期刊|会议|journal|conference)"),
-        "year": field(text, r"(20\d{2})"),
-        "relevance": field(text, r"相关性[^\n：:]*[：:]\s*\**(.+?)\**\s*$"),
+        "year": extract_year(text),
+        "relevance": extract_relevance(text),
         "conclusion": field(text, r"一句话[^\n：:]*[：:]\s*(.+)"),
         "lines": len(text.splitlines()),
     }
@@ -72,7 +101,8 @@ def main() -> int:
            f"生成时间：{time.strftime('%Y-%m-%d %H:%M')}｜共 **{len(rows)}** 篇",
            "", "> 由 `scripts/literature_index.py` 从 `docs/literature/notes/` 汇总；"
                "笔记格式见 `docs/literature/templates/PAPER_NOTE_TEMPLATE.md`。", ""]
-    for rel in sorted(by_rel, key=lambda r: (r == "未标注", r)):
+    rel_rank = {cat: idx for idx, cat in enumerate(REL_ORDER)}
+    for rel in sorted(by_rel, key=lambda r: (rel_rank.get(r, 98), r)):
         out += [f"## {rel}（{len(by_rel[rel])} 篇）", "",
                 "| Zotero | 年份 | 类型 | 标题 | 一句话结论 | 笔记 |",
                 "|---|---|---|---|---|---|"]

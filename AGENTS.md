@@ -169,7 +169,7 @@ A new capability belongs in one of these scripts, or in a package, **not in both
 > stay at **0.005 m/s**; per-phase speeds stay under the proven caps (approach 0.08,
 > assembly 0.03); `d2b_entrance_tilted` is not a tight phase; gripper-only motion is slow
 > only inside `slow_band_mm`; release always needs `--allow-release`.
-> Full design record and the mode matrix: [`docs/decisions/ADR-005-six-task-modes.md`](docs/decisions/ADR-005-six-task-modes.md).
+> Full design record and the mode matrix: [`docs/decisions/ADR-005-two-modes-and-insert-authority.md`](docs/decisions/ADR-005-two-modes-and-insert-authority.md).
 
 ## Environment model is mandatory before motion
 

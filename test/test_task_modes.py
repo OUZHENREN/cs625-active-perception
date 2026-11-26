@@ -236,3 +236,57 @@ def test_measurement_gate_requires_configured_targets(run_task, merged_efficient
     ok, reasons, _ = run_task.check_environment(stripped, None)
     assert not ok
     assert any("observe_checks" in reason for reason in reasons)
+
+
+def test_full_efficient_step_phases_aligned_with_mainline(run_task):
+    common = yaml.safe_load((REPO / "config/tasks/common.yaml").read_text(encoding="utf-8"))
+    full_eff = yaml.safe_load(
+        (REPO / "config/tasks/full_efficient.yaml").read_text(encoding="utf-8"))
+    load_eff = yaml.safe_load(
+        (REPO / "config/tasks/load_efficient.yaml").read_text(encoding="utf-8"))
+    unload_eff = yaml.safe_load(
+        (REPO / "config/tasks/unload_efficient.yaml").read_text(encoding="utf-8"))
+
+    assert full_eff["phases_load"] == full_eff["phases"] == load_eff["phases"]
+    assert "observe:workpiece_coarse" not in full_eff["phases_load"]
+    assert "observe:tables" not in full_eff["phases_load"]
+    assert "observe:slot_fine" in full_eff["phases_unload"]
+    assert "observe:tables" in full_eff["phases_unload"]
+    assert full_eff["phases_unload"] == unload_eff["phases"]
+    assert full_eff["observe_checks"].get("tables") == "none"
+
+    merged_full = run_task.merge_configs(common, full_eff)
+    _, step_load = run_task.effective_for_step("full", "efficient", merged_full, "load")
+    assert step_load["phases"] == load_eff["phases"]
+    _, step_unload = run_task.effective_for_step("full", "efficient", merged_full, "unload")
+    assert step_unload["phases"] == unload_eff["phases"]
+
+
+def test_measure_retry_metadata_and_failure_classification(tmp_path):
+    """Verify measure retry counting, failure reasons, JSON annotation, and failure classification."""
+    module = load_module("rpp_retry_test", SCRIPTS / "run_pick_and_place.py")
+    out_json = tmp_path / "workpiece_fine.json"
+    calls = []
+
+    def fake_once(cmd, pose):
+        attempt = len(calls) + 1
+        calls.append(attempt)
+        if attempt < 3:
+            return False, f"verdict=FAIL reason=degenerate_{attempt}"
+        out_json.write_text(json.dumps({"verdict": "OK"}), encoding="utf-8")
+        return True, "verdict=OK"
+
+    cmd = f"python3 scripts/measure_object.py --preset workpiece --out {out_json}"
+    res = module.run_observation_check_detailed(
+        cmd, {}, attempts=module.MEASURE_ATTEMPTS, runner_fn=fake_once)
+    assert res["ok"] is True
+    assert res["attempts"] == 3
+    assert [r["attempt"] for r in res["attempt_reasons"]] == [1, 2, 3]
+    assert res["attempt_reasons"][0]["ok"] is False
+    saved = json.loads(out_json.read_text(encoding="utf-8"))
+    assert saved["attempts"] == 3
+    assert len(saved["attempt_reasons"]) == 3
+
+    assert module.classify_failure_mode("IK_FAILED") == "IK_FAILED"
+    assert module.classify_failure_mode("refused: gripper release requires --allow-release") == "GATE_REFUSED"
+    assert module.classify_failure_mode("check slot_fine failed: verdict=FAIL") == "CHECK_FAILED"

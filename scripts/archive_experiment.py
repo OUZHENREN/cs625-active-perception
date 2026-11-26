@@ -388,7 +388,9 @@ def resolve_archive_root(value: str | None) -> pathlib.Path:
 
 
 def build_readme(run: dict, crop: dict, image_report: dict,
-                 archive_dir: pathlib.Path) -> str:
+                 archive_dir: pathlib.Path, *,
+                 phases_timings: list[dict] | None = None,
+                 ft_meta: dict | None = None) -> str:
     """Self-describing README: what this is, how to read it, how to reproduce."""
     lines: list[str] = []
     lines.append(f"# {run['id']} — 实验数据归档")
@@ -454,6 +456,32 @@ def build_readme(run: dict, crop: dict, image_report: dict,
     lines.append(f"- 行数：{crop.get('rows_before')} → {crop.get('rows_after')}；"
                  f"图像：{image_report.get('images_before')} → "
                  f"{image_report.get('images_after')}。")
+    timings = phases_timings or []
+    interesting = [t for t in timings
+                   if t.get("exec_secs") is not None or (t.get("attempts") or 0) > 1
+                   or t.get("failure_mode")]
+    ft_align = (ft_meta or {}).get("clock_alignment") or {}
+    ft_joint = ft_align.get("ft_minus_joint_stamp")
+    if interesting or ft_joint is not None:
+        lines.append("")
+        lines.append("## 阶段耗时与数据对齐")
+        lines.append("")
+        for item in interesting:
+            parts = []
+            if item.get("attempts") and item["attempts"] > 1:
+                parts.append(f"第 {item['attempts']} 次才成功")
+            if item.get("plan_secs") is not None and item.get("exec_secs") is not None:
+                parts.append(f"规划 {item['plan_secs']:.1f} s、执行 {item['exec_secs']:.1f} s")
+            elif item.get("total_secs") is not None:
+                parts.append(f"总耗时 {item['total_secs']:.1f} s")
+            if item.get("failure_mode"):
+                parts.append(f"失败模式 {item['failure_mode']}")
+            lines.append(f"- `{item['phase']}`：" + "，".join(parts))
+        if ft_joint is not None:
+            lines.append(
+                f"- 力-位错峰（F/T vs `/joint_states`）：中位 {ft_joint.get('median_ms')} ms，"
+                f"最大 |Δ| = {ft_joint.get('abs_max_ms')} ms"
+            )
     lines.append("")
     lines.append("## 怎么复现")
     lines.append("")
@@ -565,11 +593,21 @@ def archive_run(run_dir: pathlib.Path, archive_root: pathlib.Path, *,
         payload = dict(phases_payload)
         payload["crop"] = {k: crop[k] for k in (
             "rows_before", "rows_after", "kept_t_start", "kept_t_end")}
+        payload["timings"] = er.phase_stage_timings(phases, crop.get("kept_t_end"))
         (archive_dir / "phases.json").write_text(
             json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8")
     elif phases_path.exists():
         shutil.copy2(phases_path, archive_dir / "phases.json")
+
+    ft_meta = None
+    for cand in (run_dir / "ft_meta.json", run_dir / "ft.meta.json"):
+        if cand.exists():
+            try:
+                ft_meta = json.loads(cand.read_text(encoding="utf-8"))
+                break
+            except (OSError, json.JSONDecodeError):
+                ft_meta = None
 
     images_out = archive_dir / "images"
     images_out.mkdir(exist_ok=True)
@@ -602,12 +640,14 @@ def archive_run(run_dir: pathlib.Path, archive_root: pathlib.Path, *,
     (archive_dir / "run.json").write_text(
         json.dumps(merged_run, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8")
+    timings = er.phase_stage_timings(phases, crop.get("kept_t_end"))
     summary = er.render_summary(
         merged_run, stats, phases, crop=crop,
         phase_row_counts=er.count_rows_per_phase(kept))
     (archive_dir / "summary.md").write_text(summary, encoding="utf-8")
     (archive_dir / "README.md").write_text(
-        build_readme(merged_run, crop, image_report, archive_dir),
+        build_readme(merged_run, crop, image_report, archive_dir,
+                     phases_timings=timings, ft_meta=ft_meta),
         encoding="utf-8")
     log_path = run_dir / "recorder.log"
     if log_path.exists():

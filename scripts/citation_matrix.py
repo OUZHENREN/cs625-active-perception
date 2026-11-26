@@ -78,16 +78,32 @@ SECTIONS: dict[str, tuple[list[str], str, list[str]]] = {
 }
 
 
-# 人工复核覆盖（评审 2026-11-26 逐节核对）：自动词频在这几节被笔记自身模板污染，
-# 这里的 key 是人工核对过"论文自己确实做了这件事"的。新文献进来后需再人工复核一次。
+# 人工复核覆盖（2026-11-26 逐节核对）：自动词频在以下小节易被笔记模板用语或无关对象碰撞，
+# 这里的 key 是逐篇核对过论文正文工作并补充近期精读（N7KRDULX / JKP9YS3R / SKHVI4C5 / SP4IE6N4 / CPQNLDLY）的结果。
 MANUAL_OVERRIDE: dict[str, list[str]] = {
-    "3.1 手眼标定与残差评价": ["RGBUCYKU", "8G2H64GR", "T8IJCCH3"],   # AX=XB（MLE/Tsai-Lenz）真做的
-    "3.4 受约束局部视角优化": ["4USD9WCL", "J85Y8BDM", "GX9BMX7X"],   # 主动探索/两级视场/换视点（弱）；待 lit-en 的 94THW73P 补强
-    "4.2 传播建模与角度误差杠杆放大": ["8G2H64GR", "T9FQSZ7I", "RE3RSLML"],
-    "4.4 柔度变形（7 kg 偏心夹持）": ["G9UUCJNL", "RE3RSLML", "CUKTKZ3C"],
+    "3.1 手眼标定与残差评价": ["N7KRDULX", "RGBUCYKU", "8G2H64GR", "T8IJCCH3"],
+    "3.2 粗-精分层位姿解算": ["HU8YMEZA", "JKP9YS3R", "SKHVI4C5", "BJPEZ2IP"],
+    "3.3 可达性判定": ["IDNHNTKH", "SUHKBEF7", "GX9BMX7X", "B5RU795I"],
+    "3.4 受约束局部视角优化": ["94THW73P", "4USD9WCL", "J85Y8BDM"],
+    "3.5 实验：局部优化对照": ["94THW73P", "92KPMV94", "4USD9WCL"],
+    "4.1 误差源辨识": ["STCIFGDR", "9CABC9I6", "CPQNLDLY", "SUHKBEF7"],
+    "4.2 传播建模与角度误差杠杆放大": ["8G2H64GR", "T9FQSZ7I", "SP4IE6N4", "SKHVI4C5", "RE3RSLML"],
+    "4.3 蒙特卡洛与公差分配": ["RE3RSLML", "KS6R8GVF", "FZVTUZMC"],
+    "4.4 柔度变形（7 kg 偏心夹持）": ["SP4IE6N4", "G9UUCJNL", "RE3RSLML", "CPQNLDLY"],
     "4.5 卡阻与楔紧力学边界": ["SVBIUAB8", "HATPVGDA", "LB859ZEB"],
     "4.6 验证实验：杠杆臂与卡阻边界": ["8G2H64GR", "T9FQSZ7I", "P7CZ6JWL"],
+    "5.3 接触状态识别": ["5A9MHS5X", "SVBIUAB8", "HATPVGDA"],
+    "5.4 位置型导纳与视觉-力觉切换": ["5A9MHS5X", "4YNM6N34", "RLHBFRBA"],
+    "5.5 导纳参数整定与变阻尼强化学习": ["KZ3CTUGL", "GEKIMA8P", "CW6SUARC"],
+    "5.6 实验：三档对照": ["GEKIMA8P", "RLHBFRBA", "5UFZI35T"],
     "6.1–6.3 结论与展望（可靠度/对比证据）": ["RLHBFRBA", "U8EW6HDC", "5UFZI35T"],
+}
+
+EXTERNAL_GAP_NOTES: dict[str, str] = {
+    "3.6 测量系统能力评价（R&R）": (
+        "Zotero 全库（3,411 条）检索结果：Gage R&R / MSA PDF 为 0 篇，仅存无附件标准条目 `ZIL5I4QK`（ISO 9283:1998）；"
+        "需库外导入 AIAG MSA 第 4 版与 ISO 9283 原文。"
+    ),
 }
 
 
@@ -106,11 +122,29 @@ def load_notes() -> list[dict]:
         rel_match = re.search(r"相关性[^\n：:]*[：:]\s*\**([^\n*]+)", text)
         if rel_match:
             rel = rel_match.group(1).strip()
-        # ① 该文献自己的章节结构（笔记 §1 里的"章节："行）
+        # ① 该文献自己的章节结构（笔记 §1 里的"章节/结构"行，或阅读状态里的分章定位）
         chapters = ""
-        chapter_match = re.search(r"章节[：:]\s*(.+)", text)
+        chapter_match = re.search(
+            r"(?:^|\n)[-\s\*]*(?:章节|结构)(?:（[^）\n]*）)?\**\s*[：:]\s*(.+)",
+            text,
+        )
         if chapter_match:
             chapters = chapter_match.group(1).strip()[:110]
+        else:
+            status_match = re.search(
+                r"阅读状态[：:]\s*[^\n]*(?:——|：\s*)([^\n]+(?:第\s*\d+\s*章|p\.\d+)[^\n]+)",
+                text,
+            )
+            if status_match:
+                chapters = status_match.group(1).strip()[:110]
+            else:
+                quote_match = re.search(
+                    r"^>\s*(?:本笔记)?(?:基于[^\n]+)?((?:第\s*\d+\s*章[^。\n]*(?:[、，,]\s*第\s*\d+\s*章[^。\n]*)+))",
+                    text,
+                    re.MULTILINE,
+                )
+                if quote_match:
+                    chapters = quote_match.group(1).strip()[:110]
         # ② 可核查论断：同一行里既有页码又有数字，且不是元数据/阅读状态行
         skip = ("阅读状态", "PDF：", "类型：", "页码", "章节：", "元数据", "Zotero itemKey",
                 "未读", "只读到", "仅目录", "未定位")
@@ -143,16 +177,20 @@ def load_notes() -> list[dict]:
     return out
 
 
-NEGATION = re.compile(r"(没有|未|无|不采用|不是|缺失|不存在|回避|跳过|空白)")
+NEGATION = re.compile(r"(没有|未|无|不采用|不是|缺失|不存在|回避|跳过|空白|不适用|不涉及)")
+SUFFIX_NEGATION = re.compile(
+    r"^[^，。；\n]{0,45}[：:]\s*\**(?:本文)?(?:没有|无(?![偏导差线损])|未(?:给|做|见|涉及|报告|建模|定量|开展|计算|优化)|不适用|不涉及|缺失|空白)"
+)
 
 
 def _positive_hits(text: str, pat: str) -> int:
-    """命中但所在句是否定句（"本文没有手眼标定"）的不算——评审指出的词面碰撞。"""
+    """命中但所在句是否定句（前置否定如"本文没有手眼标定"，或后缀否定如"公差分配：无"）的不算。"""
     count = 0
     for sentence in re.split(r"[。；\n]|(?<=[a-z])\. ", text):
         for m in re.finditer(pat, sentence, re.IGNORECASE):
             head = sentence[: m.start()]
-            if not NEGATION.search(head[-25:]):
+            tail = sentence[m.end() :]
+            if not NEGATION.search(head[-35:]) and not SUFFIX_NEGATION.search(tail):
                 count += 1
     return count
 
@@ -173,6 +211,20 @@ def score(note: dict, keywords: list[str]) -> int:
             total += 2
         total += kw.lower() in own.lower()
     return total
+
+
+def _extract_year(text: str) -> str:
+    head = "\n".join(text.splitlines()[:15])
+    m = re.search(r"(?:年份|发表|日期|答辩|提交)[：:\s\*]*((?:19|20)\d{2})", head)
+    if m:
+        return m.group(1)
+    top = "\n".join(
+        ln for ln in text.splitlines()[1:12]
+        if not any(w in ln for w in ("阅读", "2026-11", "无任何年份证据"))
+    )
+    top_clean = re.sub(r"(?:19|20)\d{2}\s*[—–](?!\d)", "", top)
+    m2 = re.search(r"\b((?:19|20)\d{2})\b", top_clean)
+    return m2.group(1) if m2 else ""
 
 
 def main() -> int:
@@ -207,6 +259,8 @@ def main() -> int:
         if len(ranked) < args.min:
             gaps += 1
             out.append(f"⚠ **候选只有 {len(ranked)} 篇（要求 ≥{args.min}）** —— 证据正则：`{required}`；需补检索或补精读")
+            if section in EXTERNAL_GAP_NOTES:
+                out.append(f"> {EXTERNAL_GAP_NOTES[section]}")
             # 从 T2 里找候选
             sugg = [t for t in triage
                     if any(k in t["title"] for k in keywords)][:5]
@@ -220,7 +274,7 @@ def main() -> int:
         out.append("|---|---|---|---|---|---|---|")
         for i, (sc, n) in enumerate(ranked, 1):
             ev = "<br>".join(e.replace("|", "/") for e in n["evidence"][:2]) or "（见笔记 §4/§5）"
-            year = (re.search(r"(20\d{2})", n["text"]) or [""])[0]
+            year = _extract_year(n["text"])
             chap = (n.get("chapters") or "（见笔记 §1）").replace("|", "/")
             out.append(f"| {i} | `{n['key']}` | {year} | {n['title'][:34]} | {chap} | {ev} | "
                        f"[{n['file']}](notes/{n['file']}) |")
