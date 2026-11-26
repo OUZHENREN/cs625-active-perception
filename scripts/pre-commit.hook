@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# 提交前自动检查（评审建议 2026-11-26，所有者批准）。
+# 暂存区含代码文件（.py/.cpp/.hpp/.xacro/.yaml/.sdf/.repos 或 src/）→ 完整三连；
+# 只改文档 → --fast（跳过 pytest）。失败即拒绝提交，在错误信息里写明哪一步。
+set -euo pipefail
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$repo_root"
+if git diff --cached --name-only | grep -qE '\.(py|cpp|hpp|xacro|yaml|sdf|repos)$|^src/'; then
+  bash scripts/pre_commit_check.sh
+else
+  bash scripts/pre_commit_check.sh --fast
+fi

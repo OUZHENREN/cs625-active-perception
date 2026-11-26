@@ -73,7 +73,7 @@
 
 This repository implements the ROS 2 framework for the thesis:
 
-**面向遮挡目标定位的机械臂可达性规划方法研究**
+**面向遮挡光学元件精密装配的可达观测规划与视触柔顺控制研究**
 
 The system has two deployment profiles with one shared application core:
 
@@ -163,44 +163,13 @@ A new capability belongs in one of these scripts, or in a package, **not in both
 
 ## Six task modes (frozen design record — NOT the daily entry)
 
-> **Status (ADR-005, 2026-11-07; reconfirmed by the owner 2026-11-13):** the six-mode
-> matrix was **classified/frozen**, not deleted. It is **not** the application entry.
-> The current mainline is two modes running one chain:
-> `efficiency = scripts/teaching/teaching_debug.py` (under development) and
-> `teaching/safe = scripts/resume_teaching.sh` (frozen). The six-mode sources
-> (`scripts/run_task.py`, `scripts/run_pick_and_place.py`, `scripts/cs625_ui.py`) are
-> kept runnable but are no longer the entry; the panel's Run button and parts of the
-> efficiency flow reuse `run_task.py --scope load --mode efficient`, which does not
-> promote the matrix back to an entry. Do not describe the six modes as "the current
-> application contract". The description below is the frozen design record, and its hard
-> rules still apply whenever that code path is executed.
-
-```text
-scope  load    = 抓取工件 → 装入插槽
-scope  unload  = 从插槽取出 → 放回工件桌
-scope  full    = 环境建模 → 装入 → 取出 → 回到停车观测位
-mode   safe       = 分段多、dwell、time_scale 2.0、每阶段实测验收
-mode   efficient  = 单段执行、无 dwell、巡航 ≤0.12 m/s；槽内紧间隙仍 0.005 m/s
-```
-
-Every flow starts with an observation prefix (workpiece coarse/fine, table scan, slot
-coarse/fine) and ends at the next flow's start pose. Configuration layers:
-
-```text
-config/tasks/common.yaml          world constants + reusable poses + observe waypoints
-config/tasks/<scope>_<mode>.yaml  6 independent mode files (phases + phase_speeds)
-config/tasks/world_sim.yaml       minimal sim overlay (control action name)
-```
-
-Hard rules baked into `scripts/run_pick_and_place.py` (do not relax them):
-
-- tight-clearance phases (`insert`, `straighten`, `d2c`, `d4`, `d5_extract`) stay at
-  **0.005 m/s** and must not use "fast cruise + slow tail";
-- per-phase speeds are validated against per-mode caps; the caps are the values already
-  proven on the real cell (approach 0.08, assembly 0.03, tight 0.005);
-- `d2b_entrance_tilted` is **not** a tight phase (empty gripper, proven at 0.03);
-- gripper-only retreat/entry is slow **only inside the handle band** (`slow_band_mm`);
-- gripper release always requires `--allow-release`.
+> Six-mode matrix is **frozen/classified** (ADR-005, 2026-10-24 / 2026-11-13), kept
+> runnable but no longer the entry. Hard rules that still apply whenever that code path
+> executes: tight-clearance phases (`insert`, `straighten`, `d2c`, `d4`, `d5_extract`)
+> stay at **0.005 m/s**; per-phase speeds stay under the proven caps (approach 0.08,
+> assembly 0.03); `d2b_entrance_tilted` is not a tight phase; gripper-only motion is slow
+> only inside `slow_band_mm`; release always needs `--allow-release`.
+> Full design record and the mode matrix: [`docs/decisions/ADR-005-six-task-modes.md`](docs/decisions/ADR-005-six-task-modes.md).
 
 ## Environment model is mandatory before motion
 
@@ -350,7 +319,7 @@ observe → estimate target → check termination → generate candidates
 
 This loop is kept for simulation and research. It is **not used on the real cell**: the
 camera sits about 0.3 m behind the TCP, so rotating the wrist swings the camera on a
-large arc, the wrist is limited to ±45° by its cabling, and table/fixture interference
+large arc, the wrist's cabling makes extreme travel dangerous (absolute joint range ±150°, but per-plan relative change defaults to 45° and J4 is recommended within ±120°), and table/fixture interference
 makes "generate → score → pick the best" candidates mostly unreachable in hardware.
 
 Fixed, random, predefined and NBV strategies must use one common interface and one
@@ -379,6 +348,10 @@ python3 scripts/run_task.py ... --world real --confirm           # real arm, own
 Work logs must state changed files, exact commands, pass/fail results, remaining
 limitations, whether fake hardware/Gazebo/real hardware was used, and whether real motion
 occurred.
+
+Commits go through `.git/hooks/pre-commit`, which runs `scripts/pre_commit_check.sh`
+automatically (full three-checks when staged files include code, `--fast` for doc-only).
+The hook is machine-local: a new clone installs it with `bash scripts/install_hooks.sh`.
 
 ### Work-log storage and mirroring
 
@@ -485,47 +458,6 @@ docs/archive/2026-10-24-pre-six-modes/  old docs (protocols, phase reviews)
 [`docs/archive/2026-11-07-pre-reorg/source_authority.md`](docs/archive/2026-11-07-pre-reorg/source_authority.md) defines which numbers are
 authoritative (A: 2026-10-22..24 real measurements, B: senior interfaces, C: old simulation
 parameters, kept for reference only).
-
-## Capability-gate work-log requirements
-
-Every work log must make the system maturity and the next allowed step explicit:
-
-```text
-Capability layer
-- environment and dependencies
-- robot model and simulation
-- kinematics, control and planning
-- vision, hand-eye calibration and TF
-- active perception / NBV
-- real-hardware integration and safety
-
-Acceptance target
-- objective / pass criteria / runtime evidence (commands, topics, TF, logs, screenshots)
-
-Critical-chain status
-- URDF -> Gazebo entity
-- ros2_control -> joint_states
-- base_link -> camera optical TF
-- RGB-D -> normalized sensor topics
-- point cloud -> MoveIt planning scene
-- NBV decision -> robot execution
-
-Sim/real alignment
-- reused common core / sim entry / real entry / real execution allowed / gate state
-
-Intentionally not done
-- deferred layers and the gate that blocks them
-- confirmation that vendor code was not modified
-```
-
-For every critical-chain item record `PASS`, `BLOCKED`, `NOT ACCEPTED` or `NOT STARTED`
-with evidence. A topic name in the ROS graph is not proof of a working publisher, and a
-process that exited after a timeout is not runtime validation.
-
-Advance to a higher capability layer only after the prerequisite layer passed its runtime
-gate. In particular, do not begin NBV/active-vision/RL/imitation/VLA work while the
-camera, point-cloud, TF and MoveIt input chain is not accepted. Record infrastructure
-blockers at their actual layer instead of attributing downstream symptoms to algorithms.
 
 ## Execution safety contract (2026-11-19, owner directive — never bypass)
 
