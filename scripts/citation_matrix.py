@@ -69,7 +69,7 @@ SECTIONS: dict[str, tuple[list[str], str, list[str]]] = {
      [r"接触状态", r"contact state", r"状态机", r"卡阻", r"jamming", r"wedging", r"力阈值"]),
  "5.4 位置型导纳与视觉-力觉切换": (["导纳", "阻抗", "柔顺", "切换"], "方法来源",
      [r"导纳", r"admittance", r"阻抗", r"impedance", r"柔顺", r"compliance", r"切换"]),
- "5.5 导纳参数整定与残差强化学习": (["强化学习", "残差", "奖励", "策略", "阻尼"], "方法来源",
+ "5.5 导纳参数整定与变阻尼强化学习": (["强化学习", "残差", "奖励", "策略", "阻尼"], "方法来源",
      [r"强化学习", r"reinforcement learning", r"残差", r"residual", r"变阻抗", r"variable impedance", r"变阻尼", r"奖励"]),
  "5.6 实验：三档对照": (["对照", "消融", "成功率", "试次"], "对比基线",
      [r"对照", r"对比", r"消融", r"成功率", r"success rate", r"试次", r"trials"]),

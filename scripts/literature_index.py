@@ -88,9 +88,12 @@ def main() -> int:
         if not VAULT.is_dir():
             print(f"Obsidian 目录不存在，跳过复制：{VAULT}")
             return 0
-        shutil.copy2(INDEX, VAULT / INDEX.name)
+        # G 盘挂载不支持 chmod/utime（9p），只能做纯内容复制。
+        def _content_copy(src: pathlib.Path, dst: pathlib.Path) -> None:
+            dst.write_bytes(src.read_bytes())
+        _content_copy(INDEX, VAULT / INDEX.name)
         for path in NOTES.glob("*.md"):
-            shutil.copy2(path, VAULT / path.name)
+            _content_copy(path, VAULT / path.name)
         print(f"已复制到 {VAULT}")
     return 0
 
