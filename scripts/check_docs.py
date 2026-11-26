@@ -187,6 +187,80 @@ def check_agent_memory() -> None:
         problem(f"agent_memory duplicated rules: {duplicates[:5]}")
 
 
+TODO_GROUPS = (
+    "⚠️ 下一步就做",
+    "一、", "二、", "三、", "四、", "五、", "六、", "七、", "八、", "九、",
+)
+# 追加式编号的典型形态：六b / 六k / 六l …（所有者 2026-11-26 明确禁止）
+APPEND_STYLE_GROUP = re.compile(r"^##\s*[一二三四五六七八九]\s*[b-z]")
+
+
+def check_todo_structure() -> None:
+    """TODO 必须有固定分组结构，且禁止追加式编号（所有者 2026-11-26 定）。
+
+    背景：TODO 曾膨胀到 230 行，编号顺序变成 一→六→六b→六l→六k→六j→六f…，
+    读的人找不到"下一步做什么"。规则只写在 AGENTS 里不够，这里让提交时拦住。
+    """
+    path = REPO / "docs" / "TODO.md"
+    if not path.is_file():
+        problem("docs/TODO.md missing")
+        return
+    text = path.read_text(encoding="utf-8")
+    headings = [ln.strip() for ln in text.splitlines() if ln.startswith("## ")]
+    if not headings:
+        problem("TODO has no section headings")
+        return
+
+    append_style = [h for h in headings if APPEND_STYLE_GROUP.match(h)]
+    if append_style:
+        problem(f"TODO uses append-style numbering (forbidden): {append_style[:3]}")
+
+    # 必须包含"下一步就做"分组（否则又会出现"不知道先做什么"）
+    if not any("下一步就做" in h for h in headings):
+        problem("TODO is missing the '⚠️ 下一步就做' block at the top")
+
+    # 分组顺序必须符合白名单顺序（允许缺组，但不允许乱序）
+    order = {prefix: i for i, prefix in enumerate(TODO_GROUPS)}
+    seen = []
+    for h in headings:
+        for prefix in TODO_GROUPS:
+            if prefix in h:
+                seen.append(order[prefix])
+                break
+    if seen != sorted(seen):
+        problem(f"TODO groups are out of order: {[h for h in headings]}")
+
+
+WORKLOG_SECTION = re.compile(r"^#{2,3}\s+\d{1,2}:\d{2}\b")
+WORKLOG_BANNED = re.compile(r"^###\s*$")
+
+
+def check_worklog_format() -> None:
+    """工作日志：时间戳节必须按时间单调递增，且每节至少有"做了什么/结果"之一。
+
+    背景（所有者 2026-11-26）：曾出现两个 14:10 重复节、以及一整节用完全不同的
+    密排编号列表写，与其它节的统一结构冲突。这里只校验可机器判定的部分。
+    """
+    logs = sorted((REPO / "docs" / "worklogs").glob("*/*WORKLOG*.md"))
+    for path in logs[-3:]:                     # 只查最近三份，避免历史日志误报
+        text = path.read_text(encoding="utf-8")
+        times: list[tuple[int, int]] = []
+        for ln in text.splitlines():
+            m = WORKLOG_SECTION.match(ln.strip())
+            if m:
+                stamp = re.search(r"(\d{1,2}):(\d{2})", ln)
+                if stamp:
+                    times.append((int(stamp.group(1)), int(stamp.group(2))))
+        if len(times) < 2:
+            continue
+        if times != sorted(times):
+            problem(f"{path.name}: time-stamped sections are not chronological")
+        duplicates = {t for t in times if times.count(t) > 1}
+        if duplicates:
+            problem(f"{path.name}: duplicate section timestamps "
+                    f"{['%02d:%02d' % t for t in sorted(duplicates)]}")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -201,6 +275,10 @@ def main() -> int:
     check_commits()
     print("\n== agent memory ==")
     check_agent_memory()
+    print("\n== TODO structure ==")
+    check_todo_structure()
+    print("\n== work-log format ==")
+    check_worklog_format()
 
     print()
     if PROBLEMS:
