@@ -251,3 +251,5 @@
 历史条目（§10–§62 等一次性调试记录）见 docs/agent_memory_history.md
 
 **接近类运动一律慢速（所有者 2026-11-26）**：接近工件、接近插槽两类接近段必须用 `--max-joint-speed 0.02`（≈1.1°/s）；`--time-scale` 自 2026-11-20 起不叠加，想更慢只能改 max-joint-speed。自由空间换位才用 0.10–0.20 rad/s。
+
+**示教模式已冻结（所有者 2026-11-26）**：`scripts/teaching/teaching_sequence.py` 及其链路**不再修改**——那一侧用 RVS 走位；当前唯一开发主线是效率模式（`scripts/run_pick_and_place.py` + `config/tasks/load_efficient.yaml`）。

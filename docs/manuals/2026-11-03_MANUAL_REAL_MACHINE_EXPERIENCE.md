@@ -82,6 +82,7 @@
 | 69 | 插入位姿怎么标定（所有者方案） | 手动摆出能插入的位姿 → `record_insert_poses.py` 记录（含静止确认）→ 推导 `insert_in_slot_frame` |
 | 70 | 六维力传感器怎么接进 ROS（KWR75 / RS485） | 460800 8N1、28 字节帧、单位 kg→N；`ft_sensor_node.py`；与数采软件互斥 |
 | 74 | 手动抬升用了世界 Z → 与设计的工具系 Z 差 61 mm（10° 倾角） | 倾角 10° 时沿工具 z 退 350 mm 会横移 60.8 mm；手动 jog 必须选工具系 Z |
+| 82 | 误改示教模式（它已冻结，那侧用 RVS） | 只开发效率模式；`teaching_sequence.py` 及其链路不动 |
 | 81 | 接近工件/接近插槽走得太快 | 这两类接近段**一律慢速**（≤0.02 rad/s≈1.1°/s，靠 `--max-joint-speed`，`--time-scale` 已不叠加） |
 | 80 | 近位拍摄被判 BAD，其实只是取了整个夹具的外缘当标准 | 取景只看**测量区域** 153×474×435 mm；S0 位姿 7/8 入画可用 |
 | 79 | 效率模式的插槽精观测位用的是六模式时代的远位姿 | 真正的精观测位 = 示教 **S0**（0.252 m，原 0.651 m）；粗观测位不变 |
@@ -2244,6 +2245,23 @@ model_environment 报 "no metadata.jsonl (depth frames carry no pose)"。
     接近工件（pre_grasp→grasp）   ≤0.02 rad/s
     接近插槽（staging→pre_insert）≤0.02 rad/s
     插入（insert/straighten）     0.005 m/s（沿用现有紧间隙速率）
+```
+
+## 82. 示教模式已冻结：不要再改它的链路
+
+```text
+所有者 2026-11-26：**示教模式冻结，那一侧用 RVS**，不要管它、不要改它。
+
+背景：
+  · 示教模式（scripts/teaching/teaching_sequence.py 及其调用链）走的是 RVS 出位姿的路径；
+  · 当前唯一开发主线是**效率模式**：scripts/run_pick_and_place.py +
+    config/tasks/load_efficient.yaml（+ config/tasks/common.yaml 的共享常量）。
+
+含义：
+  · 本次我把"插入链单一权威"的注释也加到了 teaching_sequence.py，属于越界改动，已撤销；
+  · 以后凡是"两条链要对齐"的想法，一律只改效率链，示教链保持原样（它由 RVS 位姿驱动，
+    与我们的推导链本来就不是同一套输入）；
+  · 需要对照时用"读它的输出/记录"，不修改它的代码。
 ```
 ## 通用开工检查清单（每次上真机前）
 
