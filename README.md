@@ -3,7 +3,7 @@
 > 课题：**面向遮挡目标定位的机械臂可达性规划方法研究**（毕业论文主线）
 > 真机：Elite CS625 六轴协作臂 + 平行夹爪 + Percipio PS800 RGB-D + 插槽夹具 + 弹仓工件
 > 环境：WSL2 Ubuntu 24.04 + ROS 2 Jazzy + MoveIt 2 + Gazebo Harmonic
-> 更新：**2026-11-13**（上一版状态表停在 2026-11-08，已过期；更早的六模式版在 `docs/archive/`）
+> 更新：**2026-11-26**。状态表自 11-26 起以 `docs/README.md` 为唯一权威，本表只保留课题定位与安全红线；数字差异以 docs/README 为准。
 
 本仓库做一件事：**让机械臂先看清楚再动手** —— 在遮挡/不确定条件下主动选择观测位姿把目标定位到
 可抓取/可装配的精度，再把它交给一个可复现、可测量的装配流程。
@@ -21,7 +21,7 @@
 | 插槽精观测 | ✅ 真机 0.64 mm / 0.063° | `measure_object.py --preset slot --stage fine` |
 | 观测前缀接入面板效率页 | ✅ 约 1 分钟跑通（该页走 `run_task.py --mode efficient`，不是 ADR-005 的 `teaching_debug` 效率模式） | `run_task.py ... --until measure:workpiece_fine` |
 | 预教站位自动选站（方案 A） | 🆕 代码完成 + 离线验证；**真机未跑** | `scripts/nbv_from_reference.py --auto-station` |
-| 自动 NBV（几何打分搜索换位） | ⛔ 已放弃：需大幅改构型或越界，收窄为方案 A | `docs/archive/2026-11-13-p7-nbv-legacy-code/` |
+| 自动 NBV（几何打分搜索换位） | ⛔ 已放弃（z-buffer 打分无分辨力 + 需大幅改构型）；收窄为**站位表 + 受约束局部优化** | `docs/archive/2026-11-13-p7-nbv-legacy-code/` |
 
 ### 运动与装配
 
@@ -33,7 +33,7 @@
 | 槽内转 10° 转平 | 🚧 未在真机跑通（源码依据已确认） | `scripts/teaching/straighten_in_slot.py` |
 | 规划场景里的夹具 | ✅ 已修（2026-11-13）：改走 `/apply_planning_scene` 服务并回查，仿真端到端验证通过 | `scripts/apply_real_cell_scene.py` |
 | 规划场景里的桌子 | 🚧 默认不发布（需 `--include-tables`）；生成的世界/配置落后于 11-05 实测（桌顶差 12.1/65.5 mm），待新 URDF 到位后统一重生成 | `docs/worklogs/2026-11/2026-11-13_WORKLOG_PLANNING_SCENE_FIX.md` |
-| 六维力传感与力控 | ⛔ 传感器 12 月到位，指标全部记"未采集" | `docs/reference/experiment_metrics.md` |
+| 六维力传感与力控 | 🚧 KWR75 已到货：RS485 协议、ROS 节点、全速率记录已完成；卡在**法兰加工**未装机 | `config/ft_sensor/kwr75.yaml` |
 
 ### 平台与工具
 
@@ -59,7 +59,7 @@ cd ~/projects/cs625-active-perception
 source scripts/source_dev_env.sh --full
 
 # ② 离线自检（不碰机器人）
-python3 -m pytest test/ -q            # 283 passed（需先 source 环境；离线 shell 缺 rclpy 会少收集 1 个模块）
+python3 -m pytest test/ -q            # 411 passed（需先 source 环境；离线 shell 缺 rclpy 会少收集并报错）
 python3 test/contract_checks.py       # 仓库治理合同
 python3 scripts/check_docs.py         # 文档一致性
 
@@ -109,7 +109,7 @@ python3 scripts/show_targets_in_scene.py       # 已知位姿的工件与插槽�
 python3 scripts/camera_mode.py {status,fast,modeling,probe,high,stop}
 ```
 
-### VS Code 任务（8 个）
+### VS Code 任务（13 个，列表以 docs/README.md 为准）
 
 ```text
 ① 开工 · 真机        驱动栈 + MoveIt + 四项门

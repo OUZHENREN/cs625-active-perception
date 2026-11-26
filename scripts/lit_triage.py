@@ -33,13 +33,18 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 OUT = REPO / "runtime" / "lit_triage"
 
 LINES = {
-    "A_装校装备与结构": r"装校|抓取工装|机构设计|转运|洁净|对接|拆装|机械手|装校机构|平台设计",
-    "B_视觉测量与标定": r"视觉|标定|位姿测量|点云|配准|6D|相机|手眼|测量装置|视觉伺服|图像",
-    "C_力觉与柔顺": r"六维力|力觉|柔顺|阻抗|导纳|力控|卡阻|轴孔|力反馈|主动柔顺|接触力",
-    "D_误差与可靠规划": r"误差|可靠|精度|公差|可达|运动规划|轨迹|蒙特卡洛|灵敏度|补偿",
+    "A_装校装备与结构": (r"装校|抓取工装|机构设计|转运|洁净|对接|拆装|机械手|装校机构|平台设计",
+                        r"assembly tooling|fixture design|alignment mechanism|gripper design|installation|optomechanical assembly"),
+    "B_视觉测量与标定": (r"视觉|标定|位姿测量|点云|配准|6D|相机|手眼|测量装置|视觉伺服|图像",
+                        r"vision|calibration|pose estimation|point cloud|registration|6D|hand[- ]?eye|camera|visual servo|view planning"),
+    "C_力觉与柔顺": (r"六维力|力觉|柔顺|阻抗|导纳|力控|卡阻|轴孔|力反馈|主动柔顺|接触力",
+                    r"force[- ]?torque sensor|compliance|impedance|admittance|force control|peg[- ]?in[- ]?hole|contact"),
+    "D_误差与可靠规划": (r"误差|可靠|精度|公差|可达|运动规划|轨迹|蒙特卡洛|灵敏度|补偿",
+                        r"error|accuracy|uncertainty|reliability|tolerance|motion planning|reachab|trajectory|monte carlo|sensitivity"),
 }
-# 与课题强相关的加分词（用于挑"值得升 T1"的）
-BOOST = r"光学模块|光机|装校|六维力|柔顺装配|轴孔|间隙|手眼标定|位姿测量|误差分配|可靠度|插入"
+# 与课题强相关的加分词（中英；用于挑"值得升 T1"的）
+BOOST = (r"光学模块|光机|装校|六维力|柔顺装配|轴孔|间隙|手眼标定|位姿测量|误差分配|可靠度|插入",
+         r"optics|optomechanical|assembly|peg[- ]?in[- ]?hole|hand[- ]?eye|six[- ]?axis force|compliance|reliability|view planning|next[- ]?best[- ]?view")
 
 
 def field(conn, iid: int, name: str) -> str:
@@ -79,10 +84,12 @@ def main() -> int:
         abstract = field(conn, iid, "abstractNote")
         year = field(conn, iid, "date")[:4]
         kind = field(conn, iid, "thesisType") or typ
-        hits = {name: len(re.findall(pat, title + " " + abstract)) for name, pat in LINES.items()}
+        text = title + " " + abstract
+        hits = {name: max(len(re.findall(pat_cn, text)), len(re.findall(pat_en, text)))
+                for name, (pat_cn, pat_en) in LINES.items()}
         best = max(hits, key=hits.get)
         line = best if hits[best] else "未归类"
-        boost = len(re.findall(BOOST, title + " " + abstract))
+        boost = len(re.findall(BOOST[0], text)) + len(re.findall(BOOST[1], text))
         # 可引用点候选：从摘要里抽第一句含数字的论断
         quote = ""
         for sentence in re.split(r"[。；;]", abstract):
