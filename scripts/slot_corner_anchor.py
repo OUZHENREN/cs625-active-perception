@@ -1,0 +1,227 @@
+#!/usr/bin/env python3
+"""角点锚定插槽位姿（离线原型，2026-11-26）。
+
+为什么需要它
+------------
+插槽以大平面为主，点-面 ICP 在面内几乎没有约束：同一片点云两条配准路径差 **66 mm**
+（手册第 68 条），实测跨天差异 ~40 mm。**多测取平均不会收敛**——必须让每个自由度
+都由几何锚点定义。本脚本用「三平面求交 → 角点」构造插槽坐标系：
+
+    左内壁面 ∩ 右内壁面 → 一条竖直棱（给出 y 与 yaw）
+    该棱 ∩ 底面（或楔形斜面）→ 角点（给出 z / x 的一个锚点）
+    两个角点 + 面法向 → 完整 6 DOF 插槽坐标系
+
+数据来源（离线，不动真机）
+--------------------------
+每个采集组有 `metadata.jsonl`（T_base_tcp）+ 手眼 `config/handeye/tcp_to_camera.json`
+（T_tcp_cam）→ `T_base_cam = T_base_tcp @ T_tcp_cam`，把 camera 系点云变换到 base 系，
+于是不同组/不同天的结果可以直接比较。
+
+用法
+----
+    python3 scripts/slot_corner_anchor.py --dataset runtime/vision_dataset/measure_20261125_191925
+    python3 scripts/slot_corner_anchor.py --dataset <dir> --roi-centre 1.17 -0.05 0.19 --save-json out.json
+退出码：0 成功；2 数据缺失；4 平面提取失败。
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import pathlib
+import sys
+from dataclasses import dataclass
+
+import numpy as np
+
+sys.stdout.reconfigure(line_buffering=True)
+REPO = pathlib.Path(__file__).resolve().parents[1]
+HANDEYE = REPO / "config" / "handeye" / "tcp_to_camera.json"
+PLANE_DIST_M = 0.004          # RANSAC 内点距离
+MIN_PLANE_POINTS = 2000
+ROI_HALF = (0.30, 0.30, 0.30)
+
+
+@dataclass
+class Plane:
+    normal: np.ndarray
+    offset: float
+    inliers: int
+    centroid: np.ndarray
+
+    def signed_dist(self, pts: np.ndarray) -> np.ndarray:
+        return pts @ self.normal + self.offset
+
+
+def load_handeye() -> np.ndarray:
+    payload = json.loads(HANDEYE.read_text(encoding="utf-8"))
+    return np.array(payload["T_tcp_cam"], dtype=float)
+
+
+def group_transform(group: pathlib.Path) -> np.ndarray | None:
+    meta = group / "metadata.jsonl"
+    if not meta.exists():
+        return None
+    first = json.loads(meta.read_text(encoding="utf-8").splitlines()[0])
+    return np.array(first["tcp_matrix"], dtype=float).reshape(4, 4)
+
+
+def load_cloud_base(group: pathlib.Path, t_base_cam: np.ndarray) -> np.ndarray:
+    cloud = np.load(group / "cloud.npy").astype(np.float64)
+    return cloud @ t_base_cam[:3, :3].T + t_base_cam[:3, 3]
+
+
+def fit_planes(points: np.ndarray, max_planes: int = 8) -> list[Plane]:
+    """迭代 RANSAC 提取主平面（不依赖 open3d，纯 numpy 实现，便于离线复现）。"""
+    remaining = points.copy()
+    planes: list[Plane] = []
+    rng = np.random.default_rng(0)
+    for _ in range(max_planes):
+        if len(remaining) < MIN_PLANE_POINTS:
+            break
+        best = None
+        for _ in range(300):
+            idx = rng.choice(len(remaining), 3, replace=False)
+            p0, p1, p2 = remaining[idx]
+            normal = np.cross(p1 - p0, p2 - p0)
+            norm = np.linalg.norm(normal)
+            if norm < 1e-9:
+                continue
+            normal = normal / norm
+            offset = -normal @ p0
+            dist = np.abs(remaining @ normal + offset)
+            inliers = int((dist < PLANE_DIST_M).sum())
+            if best is None or inliers > best[0]:
+                best = (inliers, normal, offset)
+        if best is None or best[0] < MIN_PLANE_POINTS:
+            break
+        inliers, normal, offset = best
+        mask = np.abs(remaining @ normal + offset) < PLANE_DIST_M
+        pts = remaining[mask]
+        # 用内点做最小二乘精修
+        centroid = pts.mean(axis=0)
+        _, _, vh = np.linalg.svd(pts - centroid, full_matrices=False)
+        normal = vh[-1]
+        if normal @ centroid + offset < 0:      # 统一朝向：让 offset 的符号一致
+            normal, offset = -normal, -offset
+        offset = -normal @ centroid
+        planes.append(Plane(normal=normal, offset=offset, inliers=inliers, centroid=centroid))
+        remaining = remaining[~mask]
+    return planes
+
+
+def classify(planes: list[Plane]) -> tuple[Plane | None, Plane | None, Plane | None]:
+    """挑出插槽的两面**竖直侧壁**与底面。
+
+    2026-11-26 实测纠正：槽壁的法向是 **±x**（不是 ±y）——夹具通道沿另一方向延伸。
+    所以判据改为：法向水平（|n_z| 小）、两面近似反向、间距落在通道宽度区间内
+    （工作件 131 mm 厚 + 两侧各 ~2 mm → 120–160 mm），取内点最多的一对。
+    """
+    horizontal = [p for p in planes if abs(p.normal[2]) < 0.30]
+    best = None
+    for i, a in enumerate(horizontal):
+        for b in horizontal[i + 1:]:
+            if abs(a.normal @ b.normal) < 0.95:      # 两面必须近似平行
+                continue
+            if a.normal @ b.normal > 0:               # 必须反向（面对面）
+                continue
+            axis = int(np.argmax(np.abs(a.normal)))
+            if abs(a.normal[axis]) < 0.9:
+                continue
+            gap = abs((-a.offset) - (-b.offset)) if abs(a.normal[axis]) > 0.99 else float(
+                np.linalg.norm(a.centroid - b.centroid))
+            if not (0.10 <= gap <= 0.20):
+                continue
+            score = a.inliers + b.inliers
+            if best is None or score > best[0]:
+                best = (score, a, b, gap)
+    walls = (best[1], best[2]) if best else (None, None)
+    floors = sorted([p for p in planes if p.normal[2] > 0.6], key=lambda p: -p.inliers)
+    floor = floors[0] if floors else None
+    return walls[0], walls[1], floor
+
+
+def analyse_group(group: pathlib.Path, t_tcp_cam: np.ndarray,
+                  roi_centre: np.ndarray | None) -> dict | None:
+    t_base_tcp = group_transform(group)
+    if t_base_tcp is None:
+        return None
+    t_base_cam = t_base_tcp @ t_tcp_cam
+    pts = load_cloud_base(group, t_base_cam)
+    centre = roi_centre if roi_centre is not None else np.array([1.17, -0.05, 0.25])
+    mask = np.all(np.abs(pts - centre) < np.array(ROI_HALF), axis=1)
+    pts = pts[mask]
+    if len(pts) < MIN_PLANE_POINTS:
+        return {"group": group.name, "error": f"ROI 内点太少（{len(pts)}）"}
+    planes = fit_planes(pts)
+    left, right, floor = classify(planes)
+    out = {"group": group.name, "roi_points": int(len(pts)), "planes": len(planes),
+           "plane_summary": [{"n": np.round(p.normal, 3).tolist(),
+                              "inliers": p.inliers,
+                              "centroid": np.round(p.centroid, 4).tolist()} for p in planes[:6]]}
+    if left is None or right is None:
+        out["error"] = "没有找到两面竖直壁"
+        return out
+    width = abs(left.offset - right.offset) if abs(left.normal[1]) > 0.9 else float(
+        np.linalg.norm(left.centroid - right.centroid))
+    mid = 0.5 * (left.centroid + right.centroid)
+    out.update({
+        "wall_width_m": round(float(width), 4),
+        "mid_point": np.round(mid, 4).tolist(),
+        "left_normal": np.round(left.normal, 3).tolist(),
+        "right_normal": np.round(right.normal, 3).tolist(),
+        "wall_parallel_deg": round(float(np.degrees(
+            np.arccos(np.clip(abs(left.normal @ right.normal), -1, 1)))), 2),
+        "floor_found": floor is not None,
+    })
+    if floor is not None:
+        out["floor_normal"] = np.round(floor.normal, 3).tolist()
+        out["floor_distance_to_mid_m"] = round(float(floor.signed_dist(mid[None, :])[0]), 4)
+    return out
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--dataset", required=True, type=pathlib.Path)
+    parser.add_argument("--roi-centre", nargs=3, type=float, default=None,
+                        help="ROI 中心（base 系，米）；默认 [1.17,-0.05,0.25]")
+    parser.add_argument("--save-json", type=pathlib.Path, default=None)
+    args = parser.parse_args()
+    if not args.dataset.is_dir():
+        print(f"数据集不存在：{args.dataset}")
+        return 2
+    t_tcp_cam = load_handeye()
+    roi = np.array(args.roi_centre) if args.roi_centre else None
+    groups = sorted(g for g in args.dataset.glob("g*") if g.is_dir())
+    print(f"数据集 {args.dataset.name}：{len(groups)} 组；ROI 半边长 {ROI_HALF} m")
+    results = []
+    for group in groups:
+        res = analyse_group(group, t_tcp_cam, roi)
+        if res is None:
+            print(f"  {group.name}: 缺 metadata.jsonl，跳过")
+            continue
+        results.append(res)
+        if "error" in res:
+            print(f"  {group.name}: {res['error']}（ROI {res.get('roi_points')} 点，"
+                  f"{res.get('planes')} 平面）")
+            continue
+        print(f"  {group.name}: 壁间距 {res['wall_width_m']*1000:7.1f} mm｜"
+              f"两面平行度偏差 {res['wall_parallel_deg']:5.2f}°｜中点在 "
+              f"{np.round(np.array(res['mid_point'])*1000, 1)} mm｜底面 {'有' if res['floor_found'] else '无'}")
+    if len(results) >= 2:
+        mids = [np.array(r["mid_point"]) for r in results if "mid_point" in r]
+        widths = [r["wall_width_m"] for r in results if "wall_width_m" in r]
+        if len(mids) >= 2:
+            spread = (np.max(np.abs(np.array(mids) - np.mean(mids, axis=0)), axis=0)) * 1000
+            print(f"\n组间中位点最大偏差: x {spread[0]:.1f} / y {spread[1]:.1f} / z {spread[2]:.1f} mm")
+        if widths:
+            print(f"壁间距: 均值 {np.mean(widths)*1000:.1f} mm，极差 {(max(widths)-min(widths))*1000:.1f} mm")
+    if args.save_json:
+        args.save_json.write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"结果已写：{args.save_json}")
+    return 0 if any("mid_point" in r for r in results) else 4
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

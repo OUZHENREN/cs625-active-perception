@@ -168,7 +168,20 @@ def cmd_record(args) -> int:
         return 2
     pose["note"] = args.note
     pose["recorded_at"] = datetime.datetime.now().isoformat(timespec="seconds")
-    payload["poses"][args.name] = pose
+    if payload.get("schema") == 2:
+        # 2026-11-26 起：位姿按组编号管理（S01/S02/...），每组独立记录三件套，
+        # 旧编号永不覆盖。--set 指定写入哪一组；不给时写 active_set。
+        set_name = args.set or payload.get("active_set")
+        if not set_name:
+            print("文件是编号结构但没有 active_set，请用 --set 指定组号")
+            return 2
+        sets = payload.setdefault("sets", {})
+        entry = sets.setdefault(set_name, {"recorded_at": pose["recorded_at"], "poses": {}})
+        entry["poses"][args.name] = pose
+        entry["updated_at"] = pose["recorded_at"]
+        print(f"  （写入编号组 {set_name}）")
+    else:
+        payload["poses"][args.name] = pose
     payload["recorded_at"] = pose["recorded_at"]
     save_store(payload)
     print(f"已记录 {args.name}：")
@@ -295,6 +308,8 @@ def main() -> int:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--name", choices=PHASES,
                         help="要记录/推导的位姿名")
+    parser.add_argument("--set", default=None,
+                        help="写入哪个编号组（S01/S02/...）；默认写 active_set")
     parser.add_argument("--note", default="", help="备注，例如：插到底座好")
     parser.add_argument("--slot-measurement",
                         default="runtime/measurements/slot_latest.json",
