@@ -34,6 +34,7 @@
 | 顺序 | 文档 | 什么时候看 |
 |---|---|---|
 | 0a | [`TODO.md`](TODO.md) | **当前周待办（唯一入口）**：开工先看、完成即勾；每周 `scripts/todo_week.py --rollover` 归档到 `todos/` |
+| 0d | [`reference/insertion_craft_to_force_control.md`](reference/insertion_craft_to_force_control.md) | **插入工艺 → 力控实验设计**（手册第 23 条六条经验的力信号映射，第 5 章实验用） |
 | 0c | [`literature/RESEARCH_GAPS.md`](literature/RESEARCH_GAPS.md) | **文献空白与我们的增量点**（手眼残差 / 接触误判率 / 停走节拍）——写论文直接用 |
 | 0b | [`plans/2026-11-26_THESIS_OUTLINE_V2.md`](plans/2026-11-26_THESIS_OUTLINE_V2.md) | **大论文纲要 V2（现行）**：6 章（依据同类硕博论文章法抽样）；现状当基线；NBV=站位先验+受约束局部优化 |
 | 0 | [`reference/data_map.md`](reference/data_map.md) | **我有哪些数据、放在哪里、怎么读**（力矩/点云/指标/实验归档）——一条命令：`python3 scripts/data_report.py` |
