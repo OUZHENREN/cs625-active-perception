@@ -20,7 +20,7 @@
     - 夹具：模型 origin = slot_origin（RobotVisionSuite 对这块真机网格的标定），只转 yaw。
       模型 origin 不在零件中心，bbox 中心因此偏离 slot_origin
       0.3281 m，这是坐标系的定义，不是对齐误差；底部法兰落在
-      插槽桌顶面以下 16.4 mm。
+      插槽桌顶面以下 17.0 mm。
     - 工件：直接使用实测 CAD 位姿（模型系 == CAD 系，已用 bbox 中心和 CAD 中心核验），
       不按 bbox 摆。工件 bbox 底面比工件桌顶面低 0.0 mm，这是实测位姿本身带出来的，
       不是对齐误差；若要当动力学体生成，需另抬这 0.0 mm 才不穿模。
@@ -125,7 +125,7 @@
       <uri>model://cs625_real_cell/slot_fixture</uri>
       <name>slot_fixture</name>
       <static>true</static>
-      <pose>1.241629000 0.145900000 0.443245000 0.000000000 0.000000000 0.006754424</pose>
+      <pose>1.254780000 0.146230000 0.442680000 0.000000000 0.000000000 0.006754424</pose>
     </include>
 
     <!-- 工件：实测 CAD 位姿原样（xyz + quat 转 rpy），非 bbox 对齐。 -->
