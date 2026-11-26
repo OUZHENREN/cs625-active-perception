@@ -2417,6 +2417,7 @@ def approach_pose(grasp_xyz) -> np.ndarray:
     return point
 
 
+COMMON_CONFIG = REPO / "config" / "tasks" / "common.yaml"
 SLOT_REFERENCE = REPO / "runtime" / "slot_reference_verified.json"
 SLOT_TILT_DEG = -10.0          # 进槽姿态（2026-11-04：无倾斜下降会撞槽口）
 PRE_INSERT_EXTRA_M = 0.100     # 预插入再抬高 100 mm（2026-11-04 所有者要求）
@@ -2444,16 +2445,33 @@ def reference_insert_chain() -> dict:
     返回 {"pre_insert": (xyz, quat), "insert": (xyz, quat), "straighten": (xyz, quat)}。
     参考文件不存在时返回空字典，调用方回落到 config（并打印警告）。
     """
-    if not SLOT_REFERENCE.exists():
-        print(f"[insert] 参考位姿缺失 {SLOT_REFERENCE.name}，回落 config 常量（可能有 40–110 mm 偏差）")
-        return {}
+    # 2026-11-26 所有者：效率模式的插入链改用 **config 的 slot_origin**（单一权威）。
+    # 原因：11-04 那份 runtime 参考的 slot y=0.1389 与实测/手摆位姿差 7–9 mm；
+    # 而修正后的 config slot_origin（y 0.1817→0.1459）经两条独立证据确认：
+    #   ① 手摆 S02.insert 反算 → 残差 (−2.8,−2.1,+2.3) mm；
+    #   ② S0 精观测实测插槽中心反算 → x/y 差 <3 mm。
+    # 参考文件仍保留为**回退**，并在使用回退时打印原因。
+    slot_xyz = slot_quat = None
+    try:
+        import yaml as _yaml
+        _common = _yaml.safe_load(COMMON_CONFIG.read_text())
+        slot_xyz = [float(v) for v in _common["slot_origin"]]
+        slot_quat = [float(v) for v in _common["slot_origin_q"]]
+        print(f"[insert] 插入链来源：config slot_origin {[round(v, 4) for v in slot_xyz]}")
+    except Exception as error:  # noqa: BLE001
+        print(f"[insert] 读 config slot_origin 失败（{error}）→ 回退 {SLOT_REFERENCE.name}")
+    if slot_xyz is None:
+        if not SLOT_REFERENCE.exists():
+            print(f"[insert] 参考位姿缺失 {SLOT_REFERENCE.name}，回落 config 常量（可能有 40–110 mm 偏差）")
+            return {}
+        payload = json.loads(SLOT_REFERENCE.read_text(encoding="utf-8"))
+        slot_xyz, slot_quat = payload["slot"], payload["slot_quat"]
     try:
         import sys as _sys
         _sys.path.insert(0, str(REPO / "scripts" / "teaching"))
         import pose_math as _pm
-        payload = json.loads(SLOT_REFERENCE.read_text(encoding="utf-8"))
         flat, tilted, pre = _pm.insert_from_slot(
-            payload["slot"], payload["slot_quat"],
+            slot_xyz, slot_quat,
             tilt_deg=SLOT_TILT_DEG, extra_height_m=PRE_INSERT_EXTRA_M)
         return {
             "pre_insert": _retract_along_tool_x(pre, INSERT_TOOL_X_BACKOFF_M),

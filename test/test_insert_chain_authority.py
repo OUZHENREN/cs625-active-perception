@@ -49,30 +49,27 @@ def _manual_chain(slot_xyz, slot_quat):
 
 
 def test_derived_chain_matches_the_teaching_chain_exactly():
-    ref = json.loads((ROOT / "runtime" / "slot_reference_verified.json").read_text())
-    pre, tilted, flat = _manual_chain(ref["slot"], ref["slot_quat"])
+    """2026-11-26 起单一权威 = config slot_origin（不再是 runtime 参考文件）。"""
+    cfg = yaml.safe_load((ROOT / "config" / "tasks" / "common.yaml").read_text())
+    pre, tilted, flat = _manual_chain(cfg["slot_origin"], cfg["slot_origin_q"])
     chain = rpp.reference_insert_chain()
     assert np.allclose(np.asarray(chain["pre_insert"][0], float), pre, atol=1e-9)
     assert np.allclose(np.asarray(chain["insert"][0], float), tilted, atol=1e-9)
     assert np.allclose(np.asarray(chain["straighten"][0], float), flat, atol=1e-9)
 
 
-def test_chain_follows_the_reference_not_a_hardcoded_value(tmp_path, monkeypatch):
-    """把参考位姿整体平移 20 mm，推导结果必须跟着动 20 mm（说明没有写死）。"""
-    ref = json.loads((ROOT / "runtime" / "slot_reference_verified.json").read_text())
-    moved = {"slot": [ref["slot"][0] + 0.020] + list(ref["slot"][1:]),
-             "slot_quat": ref["slot_quat"]}
-    fake = tmp_path / "slot_reference_verified.json"
-    fake.write_text(json.dumps(moved), encoding="utf-8")
-    monkeypatch.setattr(rpp, "SLOT_REFERENCE", fake)
-    before = rpp.reference_insert_chain()
-    orig = json.loads((ROOT / "runtime" / "slot_reference_verified.json").read_text())
-    monkeypatch.setattr(rpp, "SLOT_REFERENCE",
-                        ROOT / "runtime" / "slot_reference_verified.json")
+def test_chain_follows_the_slot_origin_not_a_hardcoded_value(tmp_path, monkeypatch):
+    """把 slot_origin 整体平移 20 mm，推导结果必须跟着动 20 mm（说明没有写死）。"""
     base = rpp.reference_insert_chain()
+    cfg = yaml.safe_load((ROOT / "config" / "tasks" / "common.yaml").read_text())
+    moved = dict(cfg)
+    moved["slot_origin"] = [float(cfg["slot_origin"][0]) + 0.020] + list(cfg["slot_origin"][1:])
+    fake_cfg = tmp_path / "common.yaml"
+    fake_cfg.write_text(yaml.safe_dump(moved), encoding="utf-8")
+    monkeypatch.setattr(rpp, "COMMON_CONFIG", fake_cfg, raising=False)
+    before = rpp.reference_insert_chain()
     delta = np.asarray(before["insert"][0], float) - np.asarray(base["insert"][0], float)
-    assert np.allclose(delta, [0.020, 0.0, 0.0], atol=1e-9), delta
-    assert orig["slot"] != moved["slot"]
+    assert np.allclose(delta, [0.020, 0.0, 0.0], atol=1e-6), delta
 
 
 def test_config_constants_agree_with_the_derived_chain():

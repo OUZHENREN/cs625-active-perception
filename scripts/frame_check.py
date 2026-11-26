@@ -63,6 +63,13 @@ def check(preset: str, observe_name: str, object_pose: str | None = None,
 
     template = pathlib.Path(TEMPLATES[preset]).expanduser()
     bbox_min, bbox_max = cp.load_template_bbox(template)
+    if preset == "slot":
+        # 2026-11-26：取景只看**测量区域**（RVS 模板 153×474×435 mm），
+        # 不用整个夹具 745 mm 的外缘——外缘露不露与测量无关。
+        region = (config.get("slot_measure_bbox") or {})
+        if region.get("min") and region.get("max"):
+            bbox_min = np.asarray(region["min"], dtype=float)
+            bbox_max = np.asarray(region["max"], dtype=float)
     corners = np.array([[bbox_max[i] if (index >> i) & 1 else bbox_min[i] for i in range(3)]
                         for index in range(8)])
 

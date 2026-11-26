@@ -1159,6 +1159,8 @@ def slot_pose_for_insert():
     Either way the live R1 is printed as a comparison so drift stays visible.
     """
     reference_path = REPO / "runtime" / "slot_reference_verified.json"
+    # 2026-11-26：与效率链统一权威 —— 优先用 config 的 slot_origin（见手册第 77 条），
+    # 文件只作回退。这样示教链与效率链不会再有 7–9 mm 的口径差。
     reference = None
     if reference_path.exists():
         try:
