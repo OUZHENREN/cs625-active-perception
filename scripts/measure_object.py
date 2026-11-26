@@ -557,11 +557,33 @@ def main() -> int:
         except Exception:  # noqa: BLE001
             pass
 
+    # 融合模板位姿：平移取各组中位；姿态取与中位平移最接近的那一组
+    # （姿态本身一致到 0.02–0.08°，不需要做四元数平均这种易错操作）
+    tpl_trans = np.array([row["pose_base"]["translation"] for row in credible_rows])
+    template_t = np.median(tpl_trans, axis=0)
+    nearest = int(np.argmin(np.linalg.norm(tpl_trans - template_t, axis=1)))
+    template_Rs = [R.from_quat(credible_rows[nearest]["pose_base"]["quaternion"]).as_matrix()]
+
     summary = {
         "stamp": stamp,
         "dataset": str(dataset),
         "groups": len(results),
+        # ⚠ 这是**模板包围盒中心**在世界系的位置，不是模板原点。
+        # 下游若需要 slot_origin（模板原点在顶面角点），必须用下面 pose_base_template，
+        # 不要用"中心 − 模板中心"反算——两种中心定义差 28.8/47.7 mm（2026-11-26 实测）。
         "pose_base_centre_mm": [round(float(v), 1) for v in centres.mean(axis=0)],
+        # 2026-11-26：**直接输出模板完整位姿**（此前只输出中心点，下游要靠
+        # "中心 − 模板中心"反算 slot_origin，而模板中心的定义不确定：包围盒中心
+        # 与质心差 28.8/47.7 mm，实测反算差 30–80 mm）。这里直接给 T_base_template，
+        # 下游 slot_origin = 该位姿的平移，不再经过任何中心换算。
+        "pose_base_template": {
+            "translation": [round(float(v), 5) for v in template_t.mean(axis=0)],
+            "quaternion": [round(float(v), 6) for v in
+                           np.array(R.from_matrix(
+                               template_Rs[0]).as_quat()).tolist()],
+            "per_group_translation": [[round(float(v), 5) for v in row["pose_base"]["translation"]]
+                                      for row in credible_rows],
+        },
         "repeatability": {"translation_mm": round(translation_spread, 2),
                           "rotation_deg": round(rotation_spread, 3)},
         "coverage_median": round(coverage, 4),
