@@ -220,16 +220,20 @@ observe:
     - -0.1133
     - -0.4803
     check: ''
+  # 2026-11-26 所有者定：**真正的插槽精观测位 = 示教 S0**（rvs_taught_views.S0，
+  # rvs_view_pose_frame=tcp 所以它就是 TCP 位姿）。旧的 0.7036/-0.0945/0.8146 是
+  # 六模式时代留下的远位姿（离插槽约 0.70 m），S0 只有约 0.32 m，近 0.38 m。
+  # 粗观测位 slot_coarse 不变（所有者明确）。
   slot_fine:
     xyz:
-    - 0.7036
-    - -0.0945
-    - 0.8146
+    - 1.084404
+    - 0.04897
+    - 0.614883
     quat:
-    - -0.16424
-    - 0.8023
-    - 0.12511
-    - 0.56007
+    - -0.0266
+    - -0.9304
+    - 0.0535
+    - -0.3617
     check: python3 scripts/model_environment.py --out runtime/environment --verify-only
   workpiece_coarse_efficient:
     xyz:

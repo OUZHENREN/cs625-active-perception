@@ -116,6 +116,13 @@
       "command": "source scripts/source_dev_env.sh --full || exit 1; python3 scripts/rehang_after_manual.py",
       "problemMatcher": [],
       "detail": "示教器切到本地 + 手拖过之后的必做动作。只读检查模式：打印控制器记忆偏差、当前六关节、离停车位姿距离，然后给出建议，不动硬件。真正执行请手动加 --apply（偏差 >2° 还要加 --accept-drift），顺序为 sync_command_position --apply → ensure_robot_ready --force → 四项门复核。为什么不能直接 --force 重挂：控制器会把上一条轨迹终点重新下发，机械臂会全速跳回旧位置。"
+    },
+    {
+      "label": "⑮ 到插槽精观测位 · 示教 S0（不分段）",
+      "type": "shell",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; python3 scripts/goto_slot_fine.py",
+      "problemMatcher": [],
+      "detail": "到 config observe.slot_fine（= 示教 S0，离插槽 0.252 m）。默认只规划；执行请手动加 --execute。执行时带 --phase observe:slot_fine，该段在安全换位白名单里 → 安全区间内不分段（所有者 2026-11-26 批准），但工作空间/关节区间/碰撞/翻转闸/看门狗/到位复核全部保留。"
     }
   ]
 }

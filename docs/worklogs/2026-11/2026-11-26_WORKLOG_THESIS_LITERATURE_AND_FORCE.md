@@ -441,3 +441,29 @@ config 原值 [1.2416, 0.1817, 0.4432] → 残差 (+5.3, **−35.8**, −2.2) mm
   · 今天的 slot_origin 修正**没有进入效率模式**：效率链读 runtime/slot_reference_verified.json
     （slot y=0.1389），与 common.yaml 的 slot_origin 是两条不同的路径。
     该参考文件标着"2026-11-04 手动验证"，是否更新待所有者决定。
+
+## 22:20 插槽精观测位改为示教 S0 + 粗→精不分段
+
+```text
+所有者："换，之后要记住了，这才是真正的插槽精观测位，插槽的粗观测位可以不用变"
+        "之后从插槽的粗观测位到精观测位，可以登记为安全区间不分段"
+
+查证过程（重要，避免再搞错）：
+  · config observe.slot_fine 从第一个提交起一直是 [0.7036, −0.0945, 0.8146]（离插槽 0.651 m）；
+    归档实验 20261124_195640 里 observe:slot_fine:enter 那一行实测 TCP
+    (0.7025, −0.0950, 0.8174) 与之差 3 mm → 确认实际跑的就是这个远位姿。
+  · 真正的近位姿在**示教模式**：teaching_sequence.py:1318
+    "插槽精观测 T1（粗观测已删除：插槽近乎固定，直接用教学 S0）"，
+    取 config.rvs_taught_views.S0 = [1.084404, 0.04897, 0.614883]（离插槽 0.252 m）；
+    rvs_view_pose_frame = tcp → S0 本身就是 TCP 位姿。
+
+落地：
+  · config observe.slot_fine 改为 S0 的值（并写清原因与旧值）；
+    observe.slot_coarse 保持不变（所有者明确）；
+  · 机械臂已规划并执行到 S0：3 段全部 SUCCESSFUL（wrist_2 62.2° 分段），
+    每段前做记忆校正（零位移）；
+  · 新增 scripts/goto_slot_fine.py + VS Code 任务 ⑮：
+    规划到 S0 后带 `--phase observe:slot_fine` 执行 → 命中 SAFE_TRANSIT_PHASES 白名单，
+    **安全区间内不分段**（所有者 2026-11-26 批准），但工作空间/关节区间/碰撞/翻转闸/
+    在线看门狗/到位复核全部保留；
+  · 手册第 79 条 + agent_memory 已记录"S0 = 唯一精观测位来源"。

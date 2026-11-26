@@ -110,7 +110,7 @@ python3 scripts/teaching/teaching_debug.py --stage 14 --repeat 3 --no-settle
 
 ---
 
-## VS Code 任务（14 个）
+## VS Code 任务（15 个）
 
 | # | 任务 | 说明 |
 |---|---|---|
@@ -126,6 +126,7 @@ python3 scripts/teaching/teaching_debug.py --stage 14 --repeat 3 --no-settle
 | ⑩ | 续跑 · 效率入口 | `resume_task.sh`（读 run_task_resume.json） |
 | ⑪ | 回停车位姿 · J4 安全位 | `goto_park_pose.py --execute` |
 | ⑫ | 记录停车位姿 | `goto_park_pose.py --record` |
+| ⑮ | 到插槽精观测位 · 示教 S0（`goto_slot_fine.py`，安全区间内不分段） | 粗→精观测换位 |
 | ⑭ | 切回远程后：校正记忆 + 重挂为运动中（`rehang_after_manual.py`） | 示教器切本地 + 手拖过之后的必做动作 |
 | ⑬ | 回工件粗观测位 · 效率模式起点 | `goto_workpiece_coarse.py --execute` |
 

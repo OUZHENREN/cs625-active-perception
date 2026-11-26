@@ -82,6 +82,7 @@
 | 69 | 插入位姿怎么标定（所有者方案） | 手动摆出能插入的位姿 → `record_insert_poses.py` 记录（含静止确认）→ 推导 `insert_in_slot_frame` |
 | 70 | 六维力传感器怎么接进 ROS（KWR75 / RS485） | 460800 8N1、28 字节帧、单位 kg→N；`ft_sensor_node.py`；与数采软件互斥 |
 | 74 | 手动抬升用了世界 Z → 与设计的工具系 Z 差 61 mm（10° 倾角） | 倾角 10° 时沿工具 z 退 350 mm 会横移 60.8 mm；手动 jog 必须选工具系 Z |
+| 79 | 效率模式的插槽精观测位用的是六模式时代的远位姿 | 真正的精观测位 = 示教 **S0**（0.252 m，原 0.651 m）；粗观测位不变 |
 | 78 | 把 pre_insert / straighten 当基准使用 | 只有 **insert 是手摆真值**；其余必须由 insert 推导 + 运动验证 |
 | 77 | 插槽位姿的 40 mm 误差几乎全在 **y**（通道长轴） | RVS slot 原点 = 夹具顶面角点；T_s_tcp=(−82,−193,−412.5)；手摆位姿反算后 y 应改 0.1459 |
 | 76 | 在预插入高度把 x 移到插入位的 x → 8.4 mm 后保护停止 | 槽口上方没有空间；预插入位的 x 必须比插入位小 ~61 mm（倾角 10°），由下降补回 |
@@ -2157,6 +2158,37 @@ model_environment 报 "no metadata.jsonl (depth frames carry no pose)"。
   与 config 现值 [1.2416, 0.1459, 0.4432] 相差 (2.9, 2.1, −2.3) mm
   → 说明 slot_origin 的修正（y 0.1817 → 0.1459）在**不依赖 straighten** 的情况下同样成立，
     不确定性约 ±3 mm。
+```
+
+## 79. 真正的插槽精观测位 = 示教 S0（不是效率模式里那个远位姿）
+
+```text
+症状（2026-11-26）：所有者指出"之前有一个更接近插槽的精观测位，去哪了"。
+
+真因：插槽观测位在我们仓库里有**两套**，只有一套是对的。
+  · 效率模式（config/tasks/load_efficient.yaml → observe:slot_fine）
+      = [0.7036, −0.0945, 0.8146]，离插槽原点 **0.651 m**
+      —— 这是六模式时代（第一个提交 0892723）留下来的值，之后从未修改；
+  · 示教模式（teaching_sequence.py:1318）
+      = **教学 S0**，config/tasks/common.yaml → rvs_taught_views.S0
+      = [1.084404, 0.04897, 0.614883]，离插槽原点 **0.252 m**
+      —— 而且示教链里有一段明确注释：
+        "Slot coarse observation REMOVED (owner 2026-11-04)：插槽位姿近乎固定，
+         T0 往返只增加失败模式……直接用 TAUGHT S0 stance"
+
+处置（所有者 2026-11-26 定）：
+  · `config/tasks/common.yaml` 的 `observe.slot_fine` 改为 S0 的值；
+  · **`observe.slot_coarse` 不变**（所有者明确）；
+  · `rvs_view_pose_frame = tcp`，所以 S0 直接就是 TCP 位姿，不需要再换算。
+
+确认命令：
+    python3 -c "import yaml;c=yaml.safe_load(open('config/tasks/common.yaml'));\
+        print(c['observe']['slot_fine']['xyz'], c['rvs_taught_views']['S0']['position'])"
+    # 两者应完全一致
+
+预防：
+  · 精观测位只有一个权威来源 = S0；不要再用效率模式里的旧常量；
+  · 以后新增观测位一律加进 rvs_taught_views 并注明来源，避免又出现"两套值"。
 ```
 ## 通用开工检查清单（每次上真机前）
 
