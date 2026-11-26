@@ -350,3 +350,25 @@ C 的执行结果：**只走了 8.4 mm（x 1.1012→1.1096）就 PROTECTIVE_STOP
       pre_insert.x = insert.x − L·sinθ（θ=10°、L=350 mm → 60.8 mm）
       pre_insert.z = insert.z + L·cosθ + 100 mm
   · S02.pre_insert 定稿为 A 版，validity 更新为"三件套几何已验证（straighten 待重记）"。
+
+## 21:50 slot 原点定义查清（RVS 模板 vs 夹具 CAD）+ slot_origin.y 修正
+
+```text
+所有者要求：确认师兄/RVS 里 "slot 原点" 到底是哪个点，并替他查看（他不会在 RVS 里找）。
+
+从文件层面查清（不需要打开 RVS GUI）：
+  RVS 模板 Model/slot_pointcloud20260127.ply：x −143~+10, y −430~+44, z −435~0 mm
+  夹具 CAD slot_fixture_collision.stl        ：x −177~+23, y −566~+179, z −508~0 mm
+  → 两者 z 最大值都是 0，模板 ⊂ 夹具 → **同一坐标系、原点在顶面基准角点**（不是槽口中心）。
+  师兄 T_s_tcp 旋转 = diag(-1,1,-1)（绕 y 180°，无倾角），平移 (−82, −193, −412.5)，
+  其中 −193 正好是模板 y 中心 → 插入点 = 顶面角点 + 该常量。
+
+用所有者手摆的 S02.straighten 反算 slot 原点 = [1.2469, 0.1459, 0.4410]；
+config 原值 [1.2416, 0.1817, 0.4432] → 残差 (+5.3, **−35.8**, −2.2) mm。
+→ **插槽位姿的 40 mm 误差几乎全部在 y（通道长轴、弱约束方向）**，x/z 都准到 2–5 mm。
+
+处置（所有者选 A）：
+  · config slot_origin.y 0.181709 → **0.145900**；
+  · 新增 test/test_slot_origin_from_hand_pose.py（2 条：反算复现手摆位姿 + 夹具原点在顶面）；
+  · 手册第 77 条（证据/结论/处置/预防）。
+  · 修正后推导插入位 [1.1596, −0.0471, 0.0307]，与手摆位姿残差 (−5.3, 0, +2.2) mm。
