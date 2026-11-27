@@ -113,9 +113,9 @@
     {
       "label": "⑭ 切回远程后：校正记忆 + 重挂为运动中",
       "type": "shell",
-      "command": "source scripts/source_dev_env.sh --full || exit 1; python3 scripts/rehang_after_manual.py",
+      "command": "source scripts/source_dev_env.sh --full || exit 1; python3 scripts/rehang_after_manual.py --apply --accept-drift",
       "problemMatcher": [],
-      "detail": "示教器切到本地 + 手拖过之后的必做动作。只读检查模式：打印控制器记忆偏差、当前六关节、离停车位姿距离，然后给出建议，不动硬件。真正执行请手动加 --apply（偏差 >2° 还要加 --accept-drift），顺序为 sync_command_position --apply → ensure_robot_ready --force → 四项门复核。为什么不能直接 --force 重挂：控制器会把上一条轨迹终点重新下发，机械臂会全速跳回旧位置。"
+      "detail": "示教器切本地 / 手拖过之后的**一键真重挂**：把控制器记忆对齐到当前实测位置，再重发外部控制脚本进入 RUNNING。脚本内部仍保留全部安全检查：safety≠NORMAL 直接拒绝；校正前后采样关节角，位移 >1° 立即中止（伺服释放下坠检测）；末尾跑四项门复核。只想看状态不加 --apply 时请直接在终端运行脚本。"
     },
     {
       "label": "⑮ 到插槽精观测位 · 示教 S0（不分段）",
